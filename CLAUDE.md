@@ -68,19 +68,22 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 - Reads Supabase server-side only (service key in server env, never in the client bundle), from `daily_load`, `blocks` and `weekly_load`. No writes.
 - "updated <time>" from the latest `daily_load` row; stale when older than 26 h.
 - Deploy on Vercel behind Vercel Authentication, scope "All Deployments" (tech-lead: free on Hobby, no auth code; Password Protection needs Pro + $20/mo). Root directory `web`.
-- No auth UI, no settings page, no extra routes. pnpm, TypeScript strict, Tailwind; the simplest chart library that meets `DESIGN.md`.
+- No auth UI, no settings page. pnpm, TypeScript strict, Tailwind; the simplest chart library that meets `DESIGN.md`.
+- Routes: `/` = Today (what to do in the gym or on the bike today; spec `design/specs/today.md`), `/load` = the load dashboard (unchanged), a small nav between them.
 
 ## Development team (user-level subagents in ~/.claude/agents/)
 | When | Agent |
 |---|---|
 | New feature or unclear requirement | `tech-lead` first |
 | New project, new module, schema change | `architect` |
-| Any screen, component or visual change (follows `DESIGN.md`) | `ui` (after architect) |
+| Before any screen the user sees: spec; after it's built: review (owns `DESIGN.md`) | `design-lead` |
+| Build or polish a screen/component from design-lead's spec (follows `DESIGN.md`) | `ui` |
 | Feature finished, before merge | `reviewer` |
 | Bug, failing test, wrong output | `debugger` |
 | Before first deploy; after auth/DB-access/API/secret changes | `security` |
 
-Default flow: tech-lead → (architect if structural) → (ui if visible) → implement → reviewer → security if it touches auth or data.
+Default flow: tech-lead → (architect if structural) → implement → reviewer → security if it touches auth or data.
+Visible work: design-lead (spec) → ui (build) → design-lead (review) → ui (polish) → reviewer. Specs live in `design/specs/`, pattern packs in `design/patterns/`.
 
 ## Non-goals
 - No premature scaling. Optimize when a measurement says so.
