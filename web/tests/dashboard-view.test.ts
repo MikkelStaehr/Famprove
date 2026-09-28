@@ -94,5 +94,6 @@ test("buildDashboardView: empty without rows, hero from the latest row otherwise
   assert.equal(view.hero.zone?.label, "Fresh");
   assert.equal(view.freshness.kind, "fresh");
   assert.equal(view.chart.length, 2);
-  assert.equal(view.week?.isoWeek, 40);
+  assert.equal(view.week?.selected.isoWeek, 40);
+  assert.equal(view.week?.param, "2026-W40");
 });

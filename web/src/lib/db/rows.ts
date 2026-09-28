@@ -72,9 +72,61 @@ export const WEEKLY_LOAD_SELECT = {
   order: "week_start", // unique: one row per ISO week
 } as const;
 
+/** public.activities (cycling only), for the week detail. start_date_local is naive local time. */
+export type ActivityRow = {
+  readonly id: string;
+  readonly startDateLocal: string; // "YYYY-MM-DDTHH:MM:SS", athlete-local wall clock
+  readonly type: string;
+  readonly name: string | null;
+  readonly movingTimeS: number | null;
+  readonly weightedAvgWatts: number | null; // NP
+  readonly intensityPct: number | null; // IF as a percent (85.3 == 0.853)
+  readonly trainingLoad: number | null; // TSS (intervals.icu load)
+  readonly deviceName: string | null;
+};
+
+/** public.strength_sets, for the week detail. score is the raw per-set score (before K). */
+export type StrengthSetRow = {
+  readonly date: IsoDate;
+  readonly block: string;
+  readonly week: number;
+  readonly sheetRow: number;
+  readonly setNo: number;
+  readonly type: string;
+  readonly name: string;
+  readonly reps: number;
+  readonly loggedKg: number;
+  readonly kg: number;
+  readonly bodyweight: boolean;
+  readonly rpe: number | null;
+  readonly prescribed: string | null;
+  readonly score: number;
+};
+
+/** The selected week's sessions, as returned by queries.loadWeekDetail. */
+export type WeekDetailData = {
+  readonly activities: readonly ActivityRow[]; // ascending by start
+  readonly sets: readonly StrengthSetRow[]; // ascending by date, then sheet order
+};
+
+export const ACTIVITIES_SELECT = {
+  table: "activities",
+  columns:
+    "id,start_date_local,type,name,moving_time_s,weighted_avg_watts,intensity_pct,training_load,device_name",
+  order: "start_date_local,id", // unique (includes the primary key)
+} as const;
+
+export const STRENGTH_SETS_SELECT = {
+  table: "strength_sets",
+  columns:
+    "date,sheet_id,block,week,sheet_row,set_no,type,name,reps,logged_kg,kg,bodyweight,rpe,prescribed,score",
+  order: "date,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
+} as const;
+
 export class RowError extends Error {}
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 /** Narrows one JSON row; every accessor names table + column on failure, never the value. */
 class Fields {
@@ -126,6 +178,16 @@ class Fields {
     return this.get(column) === null ? null : this.date(column);
   }
 
+  boolean(column: string): boolean {
+    const value = this.get(column);
+    return typeof value === "boolean" ? value : this.fail(column, "a boolean");
+  }
+
+  localDateTime(column: string): string {
+    const value = this.string(column);
+    return LOCAL_DATE_TIME.test(value) ? value : this.fail(column, "a YYYY-MM-DDTHH:MM:SS time");
+  }
+
   timestampOrNull(column: string): string | null {
     const value = this.stringOrNull(column);
     if (value !== null && Number.isNaN(Date.parse(value))) this.fail(column, "a timestamp");
@@ -171,5 +233,40 @@ export function parseWeeklyLoadRow(raw: unknown): WeeklyLoadRow {
     strengthTss: f.number("strength_tss"),
     totalTss: f.number("total_tss"),
     days: f.number("days"),
+  };
+}
+
+export function parseActivityRow(raw: unknown): ActivityRow {
+  const f = new Fields(ACTIVITIES_SELECT.table, raw);
+  return {
+    id: f.string("id"),
+    startDateLocal: f.localDateTime("start_date_local"),
+    type: f.string("type"),
+    name: f.stringOrNull("name"),
+    movingTimeS: f.numberOrNull("moving_time_s"),
+    weightedAvgWatts: f.numberOrNull("weighted_avg_watts"),
+    intensityPct: f.numberOrNull("intensity_pct"),
+    trainingLoad: f.numberOrNull("training_load"),
+    deviceName: f.stringOrNull("device_name"),
+  };
+}
+
+export function parseStrengthSetRow(raw: unknown): StrengthSetRow {
+  const f = new Fields(STRENGTH_SETS_SELECT.table, raw);
+  return {
+    date: f.date("date"),
+    block: f.string("block"),
+    week: f.number("week"),
+    sheetRow: f.number("sheet_row"),
+    setNo: f.number("set_no"),
+    type: f.string("type"),
+    name: f.string("name"),
+    reps: f.number("reps"),
+    loggedKg: f.number("logged_kg"),
+    kg: f.number("kg"),
+    bodyweight: f.boolean("bodyweight"),
+    rpe: f.numberOrNull("rpe"),
+    prescribed: f.stringOrNull("prescribed"),
+    score: f.number("score"),
   };
 }
