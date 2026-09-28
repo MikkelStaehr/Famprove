@@ -1,0 +1,64 @@
+name: daily
+
+# Collect intervals.icu + the coach's sheet, then rebuild daily_load. Steps run in order and
+# stop at the first failure, so compute never runs on half-collected data.
+# Note: GitHub disables scheduled workflows in public repos after 60 days without a commit;
+# re-enable under Actions → daily if that happens.
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # 05:00 Copenhagen in summer (CEST), 04:00 in winter (CET)
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "collect-intervals --since YYYY-MM-DD (empty = last 14 days; 2026-01-01 = full backfill)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-load # strength_sets is replaced with delete + insert; never overlap two runs
+  cancel-in-progress: false
+
+jobs:
+  collect-and-compute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --no-dev
+
+      - name: collect-intervals
+        env:
+          SINCE: ${{ inputs.since }}
+          INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}
+          INTERVALS_ATHLETE_ID: ${{ secrets.INTERVALS_ATHLETE_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: uv run --no-dev collect-intervals ${SINCE:+--since "$SINCE"}
+
+      - name: collect-strength
+        env:
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BODYWEIGHT: ${{ secrets.BODYWEIGHT }}
+        run: uv run --no-dev collect-strength
+
+      - name: compute
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          STRENGTH_K: ${{ secrets.STRENGTH_K }}
+        run: uv run --no-dev compute
