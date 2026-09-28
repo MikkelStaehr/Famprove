@@ -31,7 +31,7 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - Collectors are idempotent: re-running a day overwrites, never duplicates.
 - Single user. No auth UI, no multi-tenancy. RLS on every table.
 
-## Milestone 1 brief (current)
+## Milestone 1 brief (done 2026-09-28)
 Goal: one weekly key figure — total TSS across cycling and strength — plus daily CTL (42 d), ATL (7 d), TSB = CTL − ATL, with strength-block markers. No UI in M1; M2 is a Next.js dashboard reading `daily_load` (+ weekly view).
 
 Sources:
@@ -62,16 +62,25 @@ Decisions (agreed with the user):
 - Layout: `python/` (uv project), `supabase/migrations/` (Supabase CLI), `web/` in M2.
 - Infra: Supabase project `iutgmfnqlmogfitezjnj`, GitHub repo `MikkelStaehr/Famprove` (public — nothing sensitive in git).
 
+## Milestone 2 brief (current)
+Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Project overrides).
+- One screen, mobile first (390px), answering "how loaded am I right now, and is fitness going up?"
+- Reads Supabase server-side only (service key in server env, never in the client bundle), from `daily_load`, `blocks` and `weekly_load`. No writes.
+- "updated <time>" from the latest `daily_load` row; stale when older than 26 h.
+- Deploy on Vercel behind Vercel password protection or a single shared secret (simplest safe option).
+- No auth UI, no settings page, no extra routes. pnpm, TypeScript strict, Tailwind; the simplest chart library that meets `DESIGN.md`.
+
 ## Development team (user-level subagents in ~/.claude/agents/)
 | When | Agent |
 |---|---|
 | New feature or unclear requirement | `tech-lead` first |
 | New project, new module, schema change | `architect` |
+| Any screen, component or visual change (follows `DESIGN.md`) | `ui` (after architect) |
 | Feature finished, before merge | `reviewer` |
 | Bug, failing test, wrong output | `debugger` |
 | Before first deploy; after auth/DB-access/API/secret changes | `security` |
 
-Default flow: tech-lead → (architect if structural) → implement → reviewer → security if it touches auth or data.
+Default flow: tech-lead → (architect if structural) → (ui if visible) → implement → reviewer → security if it touches auth or data.
 
 ## Non-goals
 - No premature scaling. Optimize when a measurement says so.
