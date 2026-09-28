@@ -8,7 +8,8 @@ Definitions (a "week" is a 1-based week index inside one tab of one sheet):
                   and logged_kg > 0.
   counted set     a set in a filled week whose date <= today. Only these count toward TSS.
   week start      the earliest set date in that week (a week spans several session dates).
-  block           one per (sheet_id, tab) that has at least one set:
+  block           one per (sheet_id, tab) that has at least one set (filled weeks here must
+                  also have started: week start <= today):
     start_date    earliest set date in the tab (first week with any prescribed set)
     end_date      week start of the last filled week + 6 days; None if no week is filled
     finished      a block of the same sheet with a higher block_no has a filled week, OR the
@@ -25,7 +26,6 @@ from typing import Final
 ABS_TYPE: Final = "ABS"
 """The type label the parser assigns to ab work (it gets a fixed score, never fills a week)."""
 
-BLOCK_TAB_PREFIX: Final = "Program - blok"
 _BLOCK_NO: Final = re.compile(r"program\s*-\s*blok\s*(\d+)", re.IGNORECASE)
 
 type WeekKey = tuple[str, str, int]
@@ -72,6 +72,11 @@ def block_number(tab: str) -> int:
     return int(match.group(1))
 
 
+def has_block_number(tab: str) -> bool:
+    """True iff block_number(tab) would succeed."""
+    return _BLOCK_NO.match(tab.strip()) is not None
+
+
 def _week_key(s: StrengthSet) -> WeekKey:
     return (s.sheet_id, s.block, s.week)
 
@@ -110,14 +115,15 @@ def daily_strength_tss(sets: Sequence[StrengthSet], today: date, k: float) -> di
     return {day: score * k for day, score in raw.items()}
 
 
-def derive_blocks(sets: Sequence[StrengthSet]) -> list[Block]:
+def derive_blocks(sets: Sequence[StrengthSet], today: date) -> list[Block]:
     """One Block per (sheet_id, tab) present in ``sets``, per the module docstring rules.
 
-    "Later block" is decided by block_number within the same sheet_id. Sorted by
-    (sheet_id, block_no).
+    Only weeks that have started (week start <= today) count as filled here: kg entered
+    ahead of time must not end a block or flag its deload early. "Later block" is decided by
+    block_number within the same sheet_id. Sorted by (sheet_id, block_no).
     """
-    filled = filled_weeks(sets)
     starts = week_starts(sets)
+    filled = {k for k in filled_weeks(sets) if starts[k] <= today}
 
     tabs: dict[tuple[str, str], list[StrengthSet]] = {}
     for s in sets:

@@ -1,6 +1,7 @@
 """collect-strength and compute end to end: fake Drive over FakeSend, in-memory PostgREST."""
 
 from datetime import date
+from typing import cast
 
 import pytest
 
@@ -22,6 +23,7 @@ from training_load.db.activities import upsert_activities
 from training_load.domain.load import ctl_atl
 from training_load.sources.google_drive import GOOGLE_SHEET_MIME, XLSX_MIME
 from training_load.sources.intervals import parse_activities
+from training_load.sources.strength_sheet import ParsedSet
 
 GOOGLE = GoogleSettings(sheet_id=SYNTHETIC_SHEET_ID, service_account_info={})
 
@@ -82,5 +84,46 @@ def test_compute_rebuilds_daily_load_and_blocks(
     assert feb5["total_tss"] == pytest.approx(60.0 + (3 * 90.7 + 3 * 307.2) * 0.02)
     assert {(b["name"], b["deload_start"]) for b in db.tables["blocks"]} == {
         (BLOK_11, "2026-02-02"),
-        (BLOK_12, "2026-03-16"),
+        (BLOK_12, None),  # week 2 has kg but starts after today
     }
+
+
+def ok_set(**overrides: object) -> ParsedSet:
+    base: dict[str, object] = {
+        "date": date(2026, 2, 2),
+        "block": BLOK_11,
+        "row": 9,
+        "week": 1,
+        "type": "SQUAT",
+        "name": "Squat",
+        "set": 1,
+        "reps": 5.0,
+        "logged_kg": 100.0,
+        "kg": 100.0,
+        "bodyweight": False,
+        "rpe": 7.0,
+        "score": 100.0,
+    }
+    return cast(ParsedSet, base | overrides)
+
+
+@pytest.mark.parametrize("reps", [None, "AMRAP", float("nan"), True])
+def test_bad_numbers_fail_before_anything_is_deleted(
+    db: InMemoryPostgrest, workbook_bytes: bytes, monkeypatch: pytest.MonkeyPatch, reps: object
+) -> None:
+    collect_strength.run(GOOGLE, bodyweight=80.0, send=drive(workbook_bytes), db=db)
+    monkeypatch.setattr(
+        collect_strength, "parse_all", lambda _x, _bw: [ok_set(), ok_set(reps=reps, row=11)]
+    )
+    with pytest.raises(ValueError, match="row 11 week 1: reps is not a number"):
+        collect_strength.run(GOOGLE, bodyweight=80.0, send=drive(workbook_bytes), db=db)
+    assert len(db.tables["strength_sets"]) == 55  # previous rows untouched
+
+
+def test_tabs_without_block_number_are_skipped(
+    db: InMemoryPostgrest, workbook_bytes: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    template = ok_set(block="Program - blok skabelon")
+    monkeypatch.setattr(collect_strength, "parse_all", lambda _x, _bw: [ok_set(), template])
+    assert collect_strength.run(GOOGLE, bodyweight=80.0, send=drive(workbook_bytes), db=db) == 1
+    assert {r["block"] for r in db.tables["strength_sets"]} == {BLOK_11}

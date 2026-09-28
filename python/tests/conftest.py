@@ -35,6 +35,7 @@ from typing import Any
 
 import openpyxl
 import pytest
+from openpyxl.worksheet.worksheet import Worksheet
 
 from training_load.db.client import Filters, JsonRow, Postgrest
 from training_load.domain.strength import StrengthSet
@@ -94,7 +95,7 @@ BLOK_12_SECTIONS: list[Section] = [
 
 
 def _write_tab(
-    ws: Any, e1rm: Mapping[str, float], sections: Sequence[Section], n_weeks: int
+    ws: Worksheet, e1rm: Mapping[str, float], sections: Sequence[Section], n_weeks: int
 ) -> None:
     width = 4 + 8 * n_weeks
     for lift, kg in e1rm.items():
@@ -165,6 +166,7 @@ _DEFAULT_SET = StrengthSet(
 def make_set() -> Callable[..., StrengthSet]:
     """Factory: StrengthSet with sensible defaults; keyword overrides per test."""
 
+    # Any: overrides span every StrengthSet field type; dataclasses.replace checks them.
     def factory(**overrides: Any) -> StrengthSet:
         return replace(_DEFAULT_SET, **overrides)
 

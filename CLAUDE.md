@@ -26,7 +26,7 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - Prefer boring solutions. No new dependency without a one-line justification.
 - Python owns all calculations. The frontend only reads `daily_load`.
 - The Google Sheet is read-only. Nothing in this repo may ever write to it.
-- The strength-TSS formula comes from `strength_collector.py`. Reuse it; do not redesign it.
+- The strength-TSS formula comes from `sources/strength_sheet.py` (ex-`strength_collector.py`). Reuse it; do not redesign it.
 - `STRENGTH_K` and `BODYWEIGHT` are env-configured tunables, never hardcoded.
 - Collectors are idempotent: re-running a day overwrites, never duplicates.
 - Single user. No auth UI, no multi-tenancy. RLS on every table.
@@ -36,7 +36,7 @@ Goal: one weekly key figure — total TSS across cycling and strength — plus d
 
 Sources:
 1. intervals.icu API (cycling): activities with TSS, NP, IF, duration, FTP. ~2 Zwift sessions/week (Thu, Sun) plus other rides.
-2. Google Sheets (strength coach's program): one workbook, one tab per block named `Program - blok N ...`. Parsing and the strength-TSS formula live in `strength_collector.py` — reuse, don't redesign. Read-only.
+2. Google Sheets (strength coach's program): one workbook, one tab per block named `Program - blok N ...`. Parsing and the strength-TSS formula live in `sources/strength_sheet.py` (ex-`strength_collector.py`) — reuse, don't redesign. Read-only.
 3. Later: Garmin (HRV, resting HR, sleep). Keep the schema open for it; don't implement.
 
 Deliverables:
@@ -47,7 +47,7 @@ Deliverables:
 - Tests for the parser and the CTL/ATL math, with fixtures.
 
 Decisions (agreed with the user):
-- Sheet is plan + log: coach prescribes sets/reps/RPE, the user logs kg on the day. Dates come from `strength_collector.py`.
+- Sheet is plan + log: coach prescribes sets/reps/RPE, the user logs kg on the day. Dates come from `sources/strength_sheet.py` (ex-`strength_collector.py`).
 - Block = tab name; start = first week date; end = last filled week; deload = last filled week of each tab. Derived from the sheet — no hand-kept list.
 - Cycling = intervals.icu types `Ride` and `VirtualRide` only. Everything else (incl. Garmin-synced `WeightTraining`) is excluded.
 - Cycling TSS = intervals.icu's own load value as-is; rides without power use its HR-based load (never skipped).

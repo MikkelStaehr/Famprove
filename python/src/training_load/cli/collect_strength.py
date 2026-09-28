@@ -1,6 +1,7 @@
 """`collect-strength`: export the coach's workbook, parse it, replace public.strength_sets."""
 
 import logging
+import math
 import os
 from collections import Counter
 from collections.abc import Sequence
@@ -13,7 +14,7 @@ from training_load.config import (
 )
 from training_load.db.client import Postgrest
 from training_load.db.strength_sets import replace_for_sheet
-from training_load.domain.strength import StrengthSet
+from training_load.domain.strength import StrengthSet, has_block_number
 from training_load.http import HttpSend, requests_send
 from training_load.sources.google_drive import access_token, download_workbook
 from training_load.sources.strength_sheet import ParsedSet, parse_all
@@ -22,7 +23,27 @@ log = logging.getLogger(__name__)
 
 
 def to_domain(parsed: ParsedSet, sheet_id: str) -> StrengthSet:
-    """Map a parser dict to StrengthSet: row -> sheet_row, set -> set_no, add sheet_id."""
+    """Map a parser dict to StrengthSet: row -> sheet_row, set -> set_no, add sheet_id.
+
+    Raises ValueError naming the tab/row/week when a number is missing or not finite (e.g.
+    reps "AMRAP" on an ABS row): this runs before anything is deleted from the database.
+    """
+    numbers: tuple[tuple[str, object], ...] = (
+        ("reps", parsed["reps"]),
+        ("logged_kg", parsed["logged_kg"]),
+        ("kg", parsed["kg"]),
+        ("score", parsed["score"]),
+    )
+    for column, value in numbers:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not math.isfinite(value)
+        ):
+            raise ValueError(
+                f"{parsed['block']!r} row {parsed['row']} week {parsed['week']}: "
+                f"{column} is not a number"
+            )
     return StrengthSet(
         sheet_id=sheet_id,
         block=parsed["block"],
@@ -50,6 +71,10 @@ def run(google: GoogleSettings, *, bodyweight: float, send: HttpSend, db: Postgr
     token = access_token(google.service_account_info)
     xlsx = download_workbook(send, token=token, file_id=google.sheet_id)
     sets = [to_domain(p, google.sheet_id) for p in parse_all(xlsx, bodyweight)]
+    unnumbered = sorted({s.block for s in sets if not has_block_number(s.block)})
+    if unnumbered:
+        log.warning("skipping tabs without a block number: %s", ", ".join(unnumbered))
+        sets = [s for s in sets if s.block not in unnumbered]
     replace_for_sheet(db, google.sheet_id, sets)
     for tab, count in sorted(Counter(s.block for s in sets).items()):
         log.info("%s: %d sets", tab, count)

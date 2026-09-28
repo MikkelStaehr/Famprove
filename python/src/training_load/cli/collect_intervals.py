@@ -58,8 +58,8 @@ def parse_since(argv: Sequence[str] | None, today: date) -> date:
 def run(
     intervals: IntervalsSettings, *, send: HttpSend, db: Postgrest, since: date, today: date
 ) -> IntervalsRunSummary:
-    """1. fetch_activities(oldest=since, newest=today + 1 day): covers today whether the
-          API treats ``newest`` as inclusive or exclusive.
+    """1. fetch_activities(oldest=since - 1 day, newest=today + 1 day): one day of margin on
+          both edges of the delete window, whatever day boundary the API applies.
     2. parse_activities; log a WARNING with the count (and ids) of Strava stubs and of rides
        with a null load.
     3. upsert the cycling activities.
@@ -70,7 +70,7 @@ def run(
         send,
         api_key=intervals.api_key,
         athlete_id=intervals.athlete_id,
-        oldest=since,
+        oldest=since - timedelta(days=1),
         newest=today + timedelta(days=1),
     )
     parsed = parse_activities(raw)

@@ -73,10 +73,6 @@ def req_date(obj: Mapping[str, object], key: str) -> date:
         raise ValueError(f"field {key!r} must be an ISO date") from exc
 
 
-def opt_date(obj: Mapping[str, object], key: str) -> date | None:
-    return None if obj.get(key) is None else req_date(obj, key)
-
-
 def req_naive_datetime(obj: Mapping[str, object], key: str) -> datetime:
     """ISO datetime as a naive wall-clock value (any offset is dropped, not converted)."""
     try:

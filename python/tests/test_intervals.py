@@ -104,7 +104,7 @@ def test_run_upserts_and_mirrors_deletions_only_inside_window(
     with caplog.at_level(logging.WARNING):
         summary = run(SETTINGS, send=send, db=db, since=date(2026, 3, 1), today=TODAY)
 
-    assert send.calls[0].params == [("oldest", "2026-03-01"), ("newest", "2026-03-16")]
+    assert send.calls[0].params == [("oldest", "2026-02-28"), ("newest", "2026-03-16")]
     assert {r["id"] for r in db.tables["activities"]} == {"i_old", "12345678", "i_new"}
     assert (summary.fetched, summary.upserted, summary.deleted) == (3, 1, 1)
     assert (summary.stubs_skipped, summary.excluded) == (1, 1)

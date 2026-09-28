@@ -40,7 +40,7 @@ def run(db: Postgrest, *, strength_k: float, today: date) -> ComputeSummary:
     2. daily_cycling_tss(activities); daily_strength_tss(sets, today, strength_k)
     3. build_daily_load(start=SERIES_START, end=today) with load.DECAY
     4. sync_daily_load(start=SERIES_START, end=today)
-    5. sync_blocks(derive_blocks(sets))
+    5. sync_blocks(derive_blocks(sets, today))
     """
     activities = all_activities(db)
     sets = all_sets(db)
@@ -50,7 +50,7 @@ def run(db: Postgrest, *, strength_k: float, today: date) -> ComputeSummary:
 
     days = build_daily_load(cycling, strength, start=SERIES_START, end=today, decay=DECAY)
     sync_daily_load(db, days, start=SERIES_START, end=today)
-    blocks = derive_blocks(sets)
+    blocks = derive_blocks(sets, today)
     sync_blocks(db, blocks)
 
     if ignored:

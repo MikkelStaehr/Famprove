@@ -15,6 +15,7 @@ from training_load.domain.strength import (
     daily_strength_tss,
     derive_blocks,
     filled_weeks,
+    has_block_number,
     week_starts,
 )
 from training_load.sources.strength_sheet import parse_all
@@ -81,16 +82,17 @@ def test_daily_strength_tss_sums_scores_times_k(workbook_sets: list[StrengthSet]
     )
 
 
+LATER = date(2026, 12, 31)
+
+
 def test_derive_blocks_from_workbook(workbook_sets: list[StrengthSet]) -> None:
-    assert derive_blocks(workbook_sets) == [
+    assert derive_blocks(workbook_sets, FIXED_TODAY) == [
         # Only week 1 filled; blok 12 has a filled week, so blok 11 is finished.
         Block(
             SYNTHETIC_SHEET_ID, BLOK_11, 11, date(2026, 2, 2), date(2026, 2, 8), date(2026, 2, 2)
         ),
-        # Last prescribed week (2) is filled, so it is finished and week 2 is the deload.
-        Block(
-            SYNTHETIC_SHEET_ID, BLOK_12, 12, date(2026, 3, 9), date(2026, 3, 22), date(2026, 3, 16)
-        ),
+        # Week 2 has kg but starts after today, so it is not filled yet: ongoing, no deload.
+        Block(SYNTHETIC_SHEET_ID, BLOK_12, 12, date(2026, 3, 9), date(2026, 3, 15), None),
     ]
 
 
@@ -100,12 +102,12 @@ def test_ongoing_block_has_end_but_no_deload(make_set: MakeSet) -> None:
         make_set(week=2, date=date(2026, 2, 9)),
         make_set(week=3, date=date(2026, 2, 16), logged_kg=0.0),
     ]
-    [block] = derive_blocks(sets)
+    [block] = derive_blocks(sets, LATER)
     assert (block.end_date, block.deload_start) == (date(2026, 2, 15), None)
 
 
 def test_block_without_filled_week_has_no_end_and_no_deload(make_set: MakeSet) -> None:
-    [block] = derive_blocks([make_set(logged_kg=0.0)])
+    [block] = derive_blocks([make_set(logged_kg=0.0)], LATER)
     assert (block.start_date, block.end_date, block.deload_start) == (date(2026, 2, 2), None, None)
 
 
@@ -116,6 +118,22 @@ def test_later_block_is_by_number_not_tab_order(make_set: MakeSet) -> None:
         make_set(block="Program - blok 10", week=1, date=date(2026, 1, 19), logged_kg=0.0),
     ]
     # blok 10 exists but has no filled week: blok 9 is not finished yet.
-    assert [b.deload_start for b in derive_blocks(sets)] == [None, None]
+    assert [b.deload_start for b in derive_blocks(sets, LATER)] == [None, None]
     started = [*sets, make_set(block="Program - blok 10", week=1, date=date(2026, 1, 19), set_no=2)]
-    assert derive_blocks(started)[0].deload_start == date(2026, 1, 5)
+    assert derive_blocks(started, LATER)[0].deload_start == date(2026, 1, 5)
+
+
+def test_kg_logged_ahead_of_time_does_not_end_a_block(make_set: MakeSet) -> None:
+    sets = [
+        make_set(week=1, date=date(2026, 2, 2)),
+        make_set(week=2, date=date(2026, 2, 9)),  # last prescribed week, entered early
+    ]
+    [before] = derive_blocks(sets, today=date(2026, 2, 8))
+    assert (before.end_date, before.deload_start) == (date(2026, 2, 8), None)
+    [after] = derive_blocks(sets, today=date(2026, 2, 9))
+    assert (after.end_date, after.deload_start) == (date(2026, 2, 15), date(2026, 2, 9))
+
+
+def test_has_block_number() -> None:
+    assert has_block_number("Program - blok 12 (styrke)")
+    assert not has_block_number("Program - blok skabelon")
