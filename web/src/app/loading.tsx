@@ -1,11 +1,6 @@
 import { Card } from "@/components/Card";
-
-/** One skeleton bar, one text line tall at the given text size (so the shape matches the page). */
-function Bar({ className }: { readonly className: string }) {
-  return (
-    <span className={`block h-lh rounded-control bg-border motion-safe:animate-pulse ${className}`} />
-  );
-}
+import { SkeletonBar as Bar } from "@/components/Skeleton";
+import { WeekDaysSkeleton } from "@/components/WeekDays";
 
 /** Skeleton in the exact shape of page.tsx: header, hero, chart card, week card. */
 export default function Loading() {
@@ -35,12 +30,16 @@ export default function Loading() {
       </Card>
 
       <Card id="week" title="This week">
-        <div aria-hidden="true" className="flex flex-col gap-2">
-          <Bar className="w-1/2 text-14" />
-          <Bar className="w-full text-14" />
-          <Bar className="w-full text-14" />
-          <Bar className="w-full text-14" />
+        {/* Week switcher: two 44px step links around the date range. */}
+        <div aria-hidden="true" className="flex items-center gap-2">
+          <span className="size-11 shrink-0 rounded-control bg-border motion-safe:animate-pulse" />
+          <span className="flex flex-1 flex-col items-center">
+            <Bar className="w-2/3 text-14" />
+            <Bar className="w-1/3 text-12" />
+          </span>
+          <span className="size-11 shrink-0" />
         </div>
+        <WeekDaysSkeleton rows={7} />
       </Card>
     </>
   );

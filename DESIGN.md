@@ -53,7 +53,7 @@ Read by the `ui` agent before any UI work. Project-specific overrides go at the 
 - **Question:** "How loaded am I right now, and is fitness going up?" — one screen, no other routes.
 - **Key figure (hero):** TSB today (form = CTL − ATL) from the latest `daily_load` row, with a one-line status.
 - **Chart:** CTL, ATL and TSB per day since 2026-01-01. Strength blocks shaded (`blocks.start_date` → `end_date`, an ongoing block runs to today); deload weeks marked (`blocks.deload_start` → `end_date`).
-- **Secondary:** this week's sessions (ISO week, Mon–Sun) — cycling TSS and strength TSS per day, plus the week total from `weekly_load`.
+- **Secondary:** this week's sessions (ISO week, Mon–Sun) — cycling TSS and strength TSS per day, plus the week total from `weekly_load`. A week switcher (`?week=2026-W33`, previous / next ISO week, "Back to this week") looks back; days expand to their rides and strength exercises.
 - **Freshness:** "updated <time>" from the latest `daily_load` row; stale when older than 26 h (the job runs daily ≈ 05:00 Europe/Copenhagen).
 - **Units:** load in TSS; CTL / ATL / TSB in TSS/day.
 - **Data:** read-only, server-side, from `daily_load`, `blocks` and `weekly_load`. The UI never calculates training metrics (Python owns them).
@@ -78,3 +78,11 @@ Defined once in `web/src/app/globals.css` (CSS variables, switched by `prefers-c
 - Width: `max-w-content` = 720px.
 - Deload weeks: diagonal hatch (`--chart-mark` on `--block-fill`), so they differ from block shading by pattern, not only colour. Block labels above the plot read `B<n>` (block number).
 - Motion: no chart animation at all (nothing to explain); skeletons pulse only under `motion-safe`.
+
+### Week card (added by `ui`, M2 week detail)
+- Title "This week · week N" for the latest week, "Week N" otherwise; the "Back to this week" link sits in the card action.
+- Switcher: previous / next are real links (44 × 44, `aria-label` names the target week), absent at the ends (an empty 44px box keeps the label centred). They use `scroll={false}` so switching keeps the scroll position and keyboard focus. Label: date range + ISO week (`2026-W33`).
+- Switching weeks re-renders only the day list: a `<Suspense>` keyed by the week shows its skeleton; hero and chart never flash. Detail errors show an ErrorState inside the card.
+- Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days are a plain row reading "Rest". Column heads are visual only; each row speaks "cycling N TSS, …".
+- Row grid: day + three 64px TSS columns when the list is ≥ 20rem wide (Tailwind `@xs` container query, so it tracks text size); narrower, e.g. at 200% text, the day moves above the numbers instead of scrolling sideways.
+- Missing values show "–", spoken as "not recorded". A blank kg on a weighted exercise reads "no kg logged", never "0 kg". Score/set is labelled as the raw score before the strength factor.

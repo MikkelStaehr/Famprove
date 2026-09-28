@@ -90,3 +90,8 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Day rows draw their own chevron; Safari still paints the native <summary> marker otherwise. */
+summary::-webkit-details-marker {
+  display: none;
+}

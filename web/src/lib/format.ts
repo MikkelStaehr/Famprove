@@ -50,3 +50,71 @@ export function formatDay(date: IsoDate): string {
 export function formatUpdatedAt(computedAt: string): string {
   return UPDATED_FORMAT.format(new Date(computedAt));
 }
+
+const KG_FORMAT = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
+
+/** Seconds as h:mm, rounded to the minute: 3720 -> "1:02", 2700 -> "0:45". */
+export function formatDuration(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+/** Intensity factor from intervals.icu's percent, as a fraction with 2 decimals: 85.3 -> "0.85". */
+export function formatIf(percent: number): string {
+  return (Math.round(percent) / 100).toFixed(2);
+}
+
+/** Power in whole watts with its unit: 249.6 -> "250 W". */
+export function formatWatts(watts: number): string {
+  return `${formatLoad(watts)} W`;
+}
+
+/** Kilograms as logged, up to 2 decimals: 120 -> "120", 22.5 -> "22.5". */
+export function formatKg(kg: number): string {
+  return KG_FORMAT.format(kg);
+}
+
+/**
+ * The load of one set: "120 kg"; bodyweight exercises add the logged kg to "bodyweight".
+ * null when nothing was logged (logged_kg is 0 for a blank cell on a weighted exercise).
+ */
+export function formatSetLoad(loggedKg: number, bodyweight: boolean): string | null {
+  if (!bodyweight) return loggedKg === 0 ? null : `${formatKg(loggedKg)} kg`;
+  if (loggedKg === 0) return "bodyweight";
+  return loggedKg > 0
+    ? `bodyweight + ${formatKg(loggedKg)} kg`
+    : `bodyweight − ${formatKg(-loggedKg)} kg`;
+}
+
+/** A raw strength score as a whole number: 336.8 -> "337". */
+export function formatScore(score: number): string {
+  return formatLoad(score);
+}
+
+/** intervals.icu upper-cases the maker in device_name; show it as the maker writes it. */
+const DEVICE_MAKERS: Readonly<Record<string, string>> = {
+  HAMMERHEAD: "Hammerhead",
+  WAHOO_FITNESS: "Wahoo",
+  WAHOO: "Wahoo",
+  GARMIN: "Garmin",
+  ZWIFT: "Zwift",
+};
+
+/** "HAMMERHEAD Karoo" -> "Hammerhead Karoo", "WAHOO_FITNESS ELEMNT BOLT" -> "Wahoo ELEMNT BOLT". */
+export function formatDevice(device: string | null): string {
+  const words = (device ?? "").trim().split(/\s+/).filter((w) => w !== "");
+  if (words.length === 0) return "Unknown device";
+  const [maker, ...model] = words;
+  const shown = Object.hasOwn(DEVICE_MAKERS, maker) ? DEVICE_MAKERS[maker] : maker.replaceAll("_", " ");
+  return [shown, ...model].join(" ");
+}
+
+const WEEK_PARAM = /^(\d{4})-W(\d{2})$/;
+
+/** A `?week=` value in words: "2026-W09" -> "week 9"; the year only when it isn't `year`. */
+export function formatWeekParam(param: string, year: number): string {
+  const match = WEEK_PARAM.exec(param);
+  if (match === null) return param;
+  const week = `week ${Number(match[2])}`;
+  return Number(match[1]) === year ? week : `${week}, ${match[1]}`;
+}

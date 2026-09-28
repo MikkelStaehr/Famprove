@@ -1,33 +1,50 @@
+import { Suspense } from "react";
+
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { KeyFigure, type Delta } from "@/components/KeyFigure";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TrendChart } from "@/components/TrendChart";
-import { WeekTable } from "@/components/WeekTable";
-import { buildDashboardView, type DashboardView, type Freshness } from "@/lib/dashboard-view";
+import { WeekDays, WeekDaysSkeleton } from "@/components/WeekDays";
+import { LatestWeekLink, weekHref, WeekSwitcher } from "@/components/WeekSwitcher";
+import {
+  buildDashboardView,
+  dayDetails,
+  type DashboardView,
+  type DayDetail,
+  type Freshness,
+  type WeekNav,
+} from "@/lib/dashboard-view";
 import { EnvError } from "@/lib/db/env";
 import { PostgrestError } from "@/lib/db/postgrest";
-import { loadDashboardData } from "@/lib/db/queries";
+import { loadDashboardData, loadWeekDetail } from "@/lib/db/queries";
 import { RowError } from "@/lib/db/rows";
 import { formatDay, formatLoad, formatSigned, formatUpdatedAt, TSS_PER_DAY } from "@/lib/format";
 
 type ReadyView = Extract<DashboardView, { kind: "ready" }>;
 type DataError = EnvError | PostgrestError | RowError;
-type PageState = DashboardView | { readonly kind: "error"; readonly error: DataError; readonly at: Date };
+type Failed = { readonly kind: "error"; readonly error: DataError; readonly at: Date };
+type PageState = DashboardView | Failed;
+type WeekState = { readonly kind: "ready"; readonly days: readonly DayDetail[] } | Failed;
 
 const CHART_TITLE = "Fitness, fatigue and form";
+
+function isDataError(error: unknown): error is DataError {
+  return error instanceof EnvError || error instanceof PostgrestError || error instanceof RowError;
+}
 
 /**
  * Loads and shapes the data. Only the data layer's own errors become an ErrorState;
  * anything else (including Next's internal control-flow errors) is rethrown.
+ * `week` is the raw `?week=` value: buildDashboardView only matches it against weekly_load rows.
  */
-async function loadPageState(): Promise<PageState> {
+async function loadPageState(week: string | undefined): Promise<PageState> {
   try {
     const data = await loadDashboardData();
-    return buildDashboardView(data, new Date());
+    return buildDashboardView(data, new Date(), week);
   } catch (error) {
-    if (error instanceof EnvError || error instanceof PostgrestError || error instanceof RowError) {
+    if (isDataError(error)) {
       console.error("dashboard: loading data failed", error);
       return { kind: "error", error, at: new Date() };
     }
@@ -35,8 +52,23 @@ async function loadPageState(): Promise<PageState> {
   }
 }
 
-export default async function Page() {
-  const state = await loadPageState();
+/** The selected week's rides and sets; same error policy as loadPageState. */
+async function loadWeekState(nav: WeekNav): Promise<WeekState> {
+  try {
+    const detail = await loadWeekDetail(nav.selected.weekStart, nav.selected.weekEnd);
+    return { kind: "ready", days: dayDetails(nav.selected, detail) };
+  } catch (error) {
+    if (isDataError(error)) {
+      console.error("dashboard: loading week detail failed", error);
+      return { kind: "error", error, at: new Date() };
+    }
+    throw error;
+  }
+}
+
+export default async function Page({ searchParams }: PageProps<"/">) {
+  const { week } = await searchParams;
+  const state = await loadPageState(typeof week === "string" ? week : undefined);
   return (
     <>
       <header className="flex flex-col gap-1">
@@ -80,15 +112,64 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
         </figure>
       </Card>
 
-      <Card id="week" title={week === null ? "This week" : `This week · week ${week.isoWeek}`}>
+      <Card
+        id="week"
+        title={weekTitle(week)}
+        action={week !== null && !week.isLatest ? <LatestWeekLink /> : undefined}
+      >
         {week === null ? (
           <EmptyState message="No weekly total for this week yet." />
         ) : (
-          <WeekTable week={week} />
+          <>
+            <WeekSwitcher nav={week} />
+            {week.selected.days.length === 0 ? (
+              <EmptyState message={`No training days recorded in week ${week.selected.isoWeek}.`} />
+            ) : (
+              // Keyed by week: switching weeks shows this skeleton; hero and chart stay put.
+              <Suspense key={week.param} fallback={<WeekFallback nav={week} />}>
+                <WeekSessions nav={week} />
+              </Suspense>
+            )}
+          </>
         )}
       </Card>
     </>
   );
+}
+
+function weekTitle(week: WeekNav | null): string {
+  if (week === null) return "This week";
+  const n = week.selected.isoWeek;
+  return week.isLatest ? `This week · week ${n}` : `Week ${n}`;
+}
+
+function WeekFallback({ nav }: { readonly nav: WeekNav }) {
+  return (
+    <>
+      <p className="sr-only" role="status">
+        Loading week {nav.selected.isoWeek}…
+      </p>
+      <WeekDaysSkeleton rows={nav.selected.days.length} />
+    </>
+  );
+}
+
+/** Streams in under the week's Suspense boundary; a failure stays inside the week card. */
+async function WeekSessions({ nav }: { readonly nav: WeekNav }) {
+  const state = await loadWeekState(nav);
+  if (state.kind === "error") {
+    const at = state.at.toISOString();
+    return (
+      <ErrorState
+        title="Couldn't load this week's sessions"
+        what={describeDataError(state.error)}
+        detail={state.error.message}
+        at={{ iso: at, text: formatUpdatedAt(at) }}
+        retry={{ href: weekHref(nav.param) }}
+      />
+    );
+  }
+  return <WeekDays week={nav.selected} days={state.days} />;
 }
 
 /** CTL ramp as "is fitness going up?". Direction follows the displayed (rounded) value. */
@@ -129,17 +210,17 @@ function UpdatedLine({ freshness }: { readonly freshness: Freshness }) {
   );
 }
 
+function describeDataError(error: DataError): string {
+  if (error instanceof EnvError) return "The server is missing its database settings.";
+  if (error instanceof PostgrestError) return `Reading ${error.table} from the database failed.`;
+  return "The database returned data in an unexpected shape.";
+}
+
 function LoadError({ error, at }: { readonly error: DataError; readonly at: Date }) {
-  const what =
-    error instanceof EnvError
-      ? "The server is missing its database settings."
-      : error instanceof PostgrestError
-        ? `Reading ${error.table} from the database failed.`
-        : "The database returned data in an unexpected shape.";
   return (
     <ErrorState
       title="Couldn't load training data"
-      what={what}
+      what={describeDataError(error)}
       detail={error.message}
       at={{ iso: at.toISOString(), text: formatUpdatedAt(at.toISOString()) }}
       retry={{ href: "/" }}
