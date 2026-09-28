@@ -64,7 +64,7 @@ Owner: design-lead · 2026-09-28 · for `ui`. Contract: `DESIGN.md` (tokens, com
     - Visible text always stays exactly as written.
 - **Check:** a 28px circle.
   - Unticked: a 2px `--text-muted` ring.
-  - Ticked: filled `--positive` with a `--surface` ✓. The row's text switches to `--text-muted`, which is still ≥ 4.5:1 and readable.
+  - Ticked: filled `--positive` with a `--surface` ✓. The row's text switches to `--text-muted`, which is still ≥ 4.5:1 and readable. The run's name (shown on its first row) turns muted only when every row of the run is ticked, so "Squat" never looks done after the first top set.
   - No strike-through, no reordering, no animation.
   - Tapping again unticks, which is the undo.
   - Focus: a 2px `--accent` ring around the whole row (`label:has(:focus-visible)`).
@@ -83,16 +83,19 @@ Owner: design-lead · 2026-09-28 · for `ui`. Contract: `DESIGN.md` (tokens, com
 - **FTP line** in text-14 muted: "Targets from FTP 250 W".
 - **Steps** `<ol aria-label="Workout steps">`, in order. Rows have a 1px `--border` divider and `py-3`, with two columns:
   - **Left:** the label in text-20 semibold ("Warm-up", "On"), with the duration below it in text-20 regular ("10 min"). A step with no label shows the duration alone, in semibold.
-  - **Right, right-aligned:** watts in text-28 bold tabular with " W" in text-20 ("263 W", "225–250 W"). Below that, % FTP in text-16 muted ("105% FTP", "90–100% FTP").
+  - **Right, right-aligned:** watts in text-28 bold tabular, with " W" in the same text-28 bold ("263 W", "225–250 W"). A smaller capital W reads as a lowercase "w" beside 28px digits. Below that, % FTP in text-16 muted ("105% FTP", "90–100% FTP").
   - **Repeated group:** a header row "Repeat 4 times" in text-16 semibold. Its steps are indented 16px with a 2px `--chart-mark` rule on the left. Durations are per repetition.
 - **Formats:**
   - Whole watts and whole %.
   - Ranges use an en dash with no spaces.
   - Durations read "8 min", "30 s", "1 min 30 s".
+  - Singular counts: "Repeat 1 time", "1 rep".
 - **Gaps in the data:**
-  - No FTP: the right column shows % FTP in text-28 bold, and the FTP line reads "No FTP from intervals.icu, so targets are in % FTP only."
-  - A step with no target: the right column shows "No target" in text-16 muted.
+  - No FTP: the right column shows % FTP in text-28 bold (" FTP" in text-20), and the FTP line reads "No FTP from intervals.icu, so targets are in % FTP only."
+  - Every step has a % FTP target (Python rejects steps without one), so there is no "No target" state.
+  - Unreadable steps (`problem` from Python, plain words): no "Total", no FTP line, no steps. A `WarningLine` reads "Couldn't read the steps, so no targets are shown. Fix them in planned_sessions ({problem})."
   - A ride with no steps: `EmptyState` "No steps entered for this ride."
+- **Several strength sessions on one date:** one Strength card each, in sheet order; the identity line tells them apart.
 
 ### Rest card (`Card id="rest"`)
 - **Title:** "Rest day". Body in text-20: "Nothing planned today."
@@ -123,8 +126,10 @@ In a real iPhone Safari viewport (≈ 390 × 660), at least the first run (Squat
 | Unknown `computed_at` | Updated line, `--warning` + triangle | "Update time unknown, so form and the strength plan may be out of date." |
 | No `daily_load` rows | Form line (text-14 muted); updated line hidden | "Form not computed yet. The daily job fills it at about 05:00." |
 | Zone null | Badge | `StatusBadge` neutral "Zone not computed" (as /load) |
-| Form read fails | Form line, `--warning` + triangle | "Couldn't load form (TSB)." followed by the link "Try again" (href `/`, `min-h-11`). The plan still renders. |
+| Form read fails | Form line, `--warning` + triangle | "Couldn't load form (TSB)." followed by the link "Try again" (href `/`, `min-h-11`). The plan still renders. When the plan also failed, drop this link: the ErrorState's "Try again" retries both. |
 | Plan read fails (strength or planned sessions) | In place of all day cards | `ErrorState`: title "Couldn't load today's plan", `what` from `describeDataError` (as /load), retry href `/`. The form line still renders. **Never show "Rest day" when a plan source failed.** |
+
+Every "Try again" (Today and `/load`) is an in-app navigation (`next/link`, `prefetch={false}`), never a full reload, so the ticks survive a retry. Only a real browser reload clears them.
 | Empty (no session today) | Rest card | See §3 |
 | Nothing ahead | Rest card | See §3 |
 | Offline | – | No special UI. Once the page has loaded, ticking needs no network. |

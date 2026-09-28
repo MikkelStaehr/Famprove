@@ -105,7 +105,8 @@ Defined once in `web/src/app/globals.css` (CSS variables, switched by `prefers-c
 - **Tick rows:**
   - Each sheet row is a `<label>` wrapping a native checkbox, and the whole row is the target.
   - The check is a 28px circle, left of the text: a `--text-muted` ring, or filled `--positive` with a ✓ when ticked. The ✓ shape carries the meaning, not only colour.
-  - Ticked text turns `--text-muted`. No strike-through, no reordering, no motion.
+  - Ticked text turns `--text-muted`; a run's name only once the whole run is ticked. No strike-through, no reordering, no motion.
+  - Retries ("Try again") are in-app navigations, so ticks survive them; only a browser reload clears ticks.
   - The focus ring surrounds the whole row.
   - Consecutive rows with the same name show the name once. Dividers go between runs only.
 - **Tick state:**
@@ -114,7 +115,7 @@ Defined once in `web/src/app/globals.css` (CSS variables, switched by `prefers-c
   - One footnote says so: "Ticks clear when the page reloads. Log kg in the sheet."
 - **Ride steps:**
   - Left column: label and duration.
-  - Right column: watts in text-28, % FTP below it in muted text.
+  - Right column: watts in text-28, unit included ("238 W": a smaller capital W reads as "w"), % FTP below it in muted text.
   - Repeat groups get a "Repeat N times" header, with their steps indented 16px behind a 2px `--chart-mark` rule.
 - **Order:** ride card(s), then the strength card, then (only when neither) the rest card.
 - **Freshness:**
