@@ -24,6 +24,37 @@ Personal training-load app for one user. It combines cycling (intervals.icu) and
 - Collectors are idempotent: re-running a day overwrites, never duplicates.
 - Single user. No auth UI, no multi-tenancy. RLS on every table.
 
+## Milestone 1 brief (current)
+Goal: one weekly key figure — total TSS across cycling and strength — plus daily CTL (42 d), ATL (7 d), TSB = CTL − ATL, with strength-block markers. No UI in M1; M2 is a Next.js dashboard reading `daily_load` (+ weekly view).
+
+Sources:
+1. intervals.icu API (cycling): activities with TSS, NP, IF, duration, FTP. ~2 Zwift sessions/week (Thu, Sun) plus other rides.
+2. Google Sheets (strength coach's program): one workbook, one tab per block named `Program - blok N ...`. Parsing and the strength-TSS formula live in `strength_collector.py` — reuse, don't redesign. Read-only.
+3. Later: Garmin (HRV, resting HR, sleep). Keep the schema open for it; don't implement.
+
+Deliverables:
+- Supabase schema: `activities` (cycling), `strength_sets`, `daily_load` (date, cycling_tss, strength_tss, ctl, atl, tsb), `blocks` (name, start, end, deload flag). RLS on everything, single user.
+- Python collectors (uv, no FastAPI): one CLI entry per source, idempotent, runnable daily from GitHub Actions.
+- Compute step that rebuilds `daily_load` from `activities` + `strength_sets`.
+- Config via env (`.env.local` locally, GitHub secrets in CI) — see `.env.example`.
+- Tests for the parser and the CTL/ATL math, with fixtures.
+
+Decisions (agreed with the user):
+- Sheet is plan + log: coach prescribes sets/reps/RPE, the user logs kg on the day. Dates come from `strength_collector.py`.
+- Block = tab name; start = first week date; end = last filled week; deload = last filled week of each tab. Derived from the sheet — no hand-kept list.
+- Cycling = intervals.icu types `Ride` and `VirtualRide` only. Everything else (incl. Garmin-synced `WeightTraining`) is excluded.
+- Cycling TSS = intervals.icu's own load value as-is; rides without power use its HR-based load (never skipped).
+- Backfill from 2026-01-01 with CTL = ATL = 0 on that date. Strength only from the current workbook (blok 11 onward).
+- CTL/ATL update uses factor 1/τ: `x_t = x_{t-1} + (load_t − x_{t-1}) / τ`, τ = 42 / 7. TSB = CTL − ATL (same day).
+- Cycling-only CTL must match intervals.icu — enforced by a test.
+- Weekly figure = ISO week (Mon–Sun), as a SQL view over `daily_load`.
+- Private: RLS on, no anon policies; Python and Next.js read server-side only; Vercel password protection.
+- Daily run: last 14 days from intervals.icu + whole workbook; upsert on source id; mirror deletions inside that window; rebuild `daily_load` fully. Days bucketed by local date. Cron ≈ 05:00 Europe/Copenhagen.
+- `BODYWEIGHT` / `STRENGTH_K` are current-value tunables; changing them recomputes all history. `GOOGLE_SERVICE_ACCOUNT_JSON` holds the JSON content.
+- Garmin later gets its own `daily_wellness` table keyed by date. No planned/future workouts in M1.
+- Layout: `python/` (uv project), `supabase/migrations/` (Supabase CLI), `web/` in M2.
+- Infra: Supabase project `iutgmfnqlmogfitezjnj`, GitHub repo `MikkelStaehr/Famprove` (public — nothing sensitive in git).
+
 ## Development team (user-level subagents in ~/.claude/agents/)
 | When | Agent |
 |---|---|
