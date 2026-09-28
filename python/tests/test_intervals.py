@@ -109,6 +109,17 @@ def test_run_upserts_and_mirrors_deletions_only_inside_window(
     assert (summary.fetched, summary.upserted, summary.deleted) == (3, 1, 1)
     assert (summary.stubs_skipped, summary.excluded) == (1, 1)
     assert "1 Strava-sourced activities skipped" in caplog.text
+    assert "12345678" not in caplog.text  # counts only: the Actions logs are public
+
+
+def test_run_never_logs_activity_ids(
+    db: InMemoryPostgrest, caplog: pytest.LogCaptureFixture
+) -> None:
+    body = [raw_ride("i_noload", "2026-03-14T18:00:00", load=None), STRAVA_STUB]
+    with caplog.at_level(logging.INFO):
+        run(SETTINGS, send=FakeSend(FakeResponse(body=body)), db=db, since=TODAY, today=TODAY)
+    assert "1 rides have no training load" in caplog.text
+    assert "i_noload" not in caplog.text and "12345678" not in caplog.text
 
 
 def test_run_is_idempotent(db: InMemoryPostgrest) -> None:

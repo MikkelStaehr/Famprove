@@ -16,6 +16,7 @@ from training_load.config import (
     IntervalsSettings,
     collect_intervals_config,
     load_dotenv_file,
+    mask_in_ci,
 )
 from training_load.db.activities import delete_ids, ids_between, upsert_activities
 from training_load.db.client import Postgrest
@@ -60,8 +61,8 @@ def run(
 ) -> IntervalsRunSummary:
     """1. fetch_activities(oldest=since - 1 day, newest=today + 1 day): one day of margin on
           both edges of the delete window, whatever day boundary the API applies.
-    2. parse_activities; log a WARNING with the count (and ids) of Strava stubs and of rides
-       with a null load.
+    2. parse_activities; log a WARNING with the count (never the ids) of Strava stubs and of
+       rides with a null load.
     3. upsert the cycling activities.
     4. Mirror deletions, window [since, today] only:
        stale = ids_between(db, since, today) - cycling ids - stub ids; delete_ids(stale).
@@ -110,6 +111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ConfigError as exc:
         log.error("%s", exc)
         return 2
+    mask_in_ci(config.intervals.athlete_id)
     send = requests_send()
     db = Postgrest(config.supabase.url, config.supabase.service_key, send)
     summary = run(config.intervals, send=send, db=db, since=since, today=today)
