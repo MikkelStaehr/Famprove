@@ -72,6 +72,7 @@ def test_parse_maps_fields_intensity_as_percent_and_naive_start() -> None:
     assert activity.start_date_local.tzinfo is None
     assert (activity.training_load, activity.weighted_avg_watts, activity.ftp) == (80, 250, 290)
     assert (activity.moving_time_s, activity.elapsed_time_s) == (3600, 3700)
+    assert activity.device_name == "HAMMERHEAD Karoo"
 
 
 def test_parse_since_default_is_14_days() -> None:

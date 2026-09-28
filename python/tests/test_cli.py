@@ -109,6 +109,7 @@ def ok_set(**overrides: object) -> ParsedSet:
         "bodyweight": False,
         "rpe": 7.0,
         "score": 100.0,
+        "prescribed": "RPE 7",
     }
     return cast(ParsedSet, base | overrides)
 

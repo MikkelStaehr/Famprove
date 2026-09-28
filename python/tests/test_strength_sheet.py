@@ -108,3 +108,9 @@ def test_score_golden_values_regression(
     parsed: list[ParsedSet], block: str, name: str, week: int, score: float
 ) -> None:
     assert first(parsed, block, name, week)["score"] == score
+
+
+def test_prescribed_load_cell_is_passed_through_as_text(parsed: list[ParsedSet]) -> None:
+    assert first(parsed, BLOK_11, "Squat", 1)["prescribed"] == "RPE 7 - 8"
+    assert first(parsed, BLOK_11, "Bench press", 1)["prescribed"] == "-10%"
+    assert first(parsed, BLOK_11, "Abs rollout", 1)["prescribed"] is None

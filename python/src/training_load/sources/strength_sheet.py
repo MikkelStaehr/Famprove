@@ -22,6 +22,7 @@ class ParsedSet(TypedDict):
     kg: float             # kg brugt i scoren (logged_kg + bodyweight for kropsvægtøvelser)
     bodyweight: bool
     rpe: float | None
+    prescribed: str | None  # foreskrevet load-celle som tekst (fx 'RPE 7 - 8'), kun til visning
     score: float          # rå score, før STRENGTH_K
 
 ABS_SET_SCORE = 10*20*(0.6**2)   # fast score pr. abs-sæt (10 reps @ 20 kg RPE 6)
@@ -88,5 +89,6 @@ def parse_tab(ws, tab, bodyweight):
                 score = reps * kg * (rpe/10)**2 * factor
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, type=typ, name=name, set=s+1,
-                                      reps=reps, logged_kg=logged, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1)))
+                                      reps=reps, logged_kg=logged, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
+                                      prescribed=None if load in (None,"") else str(load).strip()))
     return sets

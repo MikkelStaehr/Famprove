@@ -7,6 +7,7 @@ from training_load.db.client import JsonRow, Postgrest
 from training_load.domain.strength import StrengthSet
 from training_load.narrow import (
     opt_float,
+    opt_str,
     req_bool,
     req_date,
     req_float,
@@ -37,6 +38,7 @@ class StrengthSetRow(TypedDict):
     bodyweight: bool
     rpe: float | None
     score: float
+    prescribed: str | None
 
 
 COLUMNS: Final = ",".join(StrengthSetRow.__annotations__)
@@ -58,6 +60,7 @@ def to_row(s: StrengthSet) -> StrengthSetRow:
         bodyweight=s.bodyweight,
         rpe=s.rpe,
         score=s.score,
+        prescribed=s.prescribed,
     )
 
 
@@ -78,6 +81,7 @@ def from_row(row: JsonRow) -> StrengthSet:
         bodyweight=req_bool(row, "bodyweight"),
         rpe=opt_float(row, "rpe"),
         score=req_float(row, "score"),
+        prescribed=opt_str(row, "prescribed"),
     )
 
 

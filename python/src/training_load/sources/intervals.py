@@ -91,7 +91,7 @@ def parse_activities(raw: Sequence[RawActivity]) -> ParsedActivities:
 
     id, start_date_local ("YYYY-MM-DDTHH:MM:SS", naive), type, name, icu_training_load,
     icu_weighted_avg_watts, icu_intensity (percent, stored as-is), icu_ftp, moving_time,
-    elapsed_time, power_load, hr_load.
+    elapsed_time, power_load, hr_load, device_name.
     A stub is an object with no "type" (typically source == "STRAVA").
     """
     parsed = ParsedActivities(
@@ -120,6 +120,7 @@ def parse_activities(raw: Sequence[RawActivity]) -> ParsedActivities:
             elapsed_time_s=opt_int(obj, "elapsed_time"),
             power_load=opt_int(obj, "power_load"),
             hr_load=opt_int(obj, "hr_load"),
+            device_name=opt_str(obj, "device_name"),
         )
         if activity.training_load is None:
             parsed.missing_load_ids.append(activity.id)

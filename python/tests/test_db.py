@@ -121,7 +121,7 @@ def test_row_round_trip_activity_and_strength_set(make_set: MakeSet) -> None:
         "i1", datetime(2026, 3, 1, 7, 5), "Ride", None, 80, 250, 85.3, 290, 3600, 3700, 80, None
     )
     assert activities.from_row(dict(activities.to_row(ride))) == ride
-    s = make_set(rpe=None)
+    s = make_set(rpe=None, prescribed="RPE 7 - 8")
     assert strength_sets.from_row(dict(strength_sets.to_row(s))) == s
 
 

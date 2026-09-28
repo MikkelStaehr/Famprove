@@ -23,6 +23,7 @@ class CyclingActivity:
     elapsed_time_s: int | None
     power_load: int | None
     hr_load: int | None
+    device_name: str | None = None  # intervals.icu device_name; display only
 
 
 def is_cycling(activity_type: str | None) -> bool:

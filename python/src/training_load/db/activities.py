@@ -25,6 +25,7 @@ class ActivityRow(TypedDict):
     elapsed_time_s: int | None
     power_load: int | None
     hr_load: int | None
+    device_name: str | None
 
 
 COLUMNS: Final = ",".join(ActivityRow.__annotations__)
@@ -46,6 +47,7 @@ def to_row(activity: CyclingActivity) -> ActivityRow:
         elapsed_time_s=activity.elapsed_time_s,
         power_load=activity.power_load,
         hr_load=activity.hr_load,
+        device_name=activity.device_name,
     )
 
 
@@ -64,6 +66,7 @@ def from_row(row: JsonRow) -> CyclingActivity:
         elapsed_time_s=opt_int(row, "elapsed_time_s"),
         power_load=opt_int(row, "power_load"),
         hr_load=opt_int(row, "hr_load"),
+        device_name=opt_str(row, "device_name"),
     )
 
 

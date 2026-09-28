@@ -192,6 +192,7 @@ def raw_ride(
         "elapsed_time": 3700,
         "power_load": load,
         "hr_load": 70,
+        "device_name": "HAMMERHEAD Karoo",
     }
 
 

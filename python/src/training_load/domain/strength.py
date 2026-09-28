@@ -50,6 +50,7 @@ class StrengthSet:
     bodyweight: bool
     rpe: float | None
     score: float  # raw, before STRENGTH_K
+    prescribed: str | None = None  # coach's load cell as text; display only
 
 
 @dataclass(frozen=True, slots=True)
