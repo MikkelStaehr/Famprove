@@ -9,6 +9,7 @@ import {
   ACTIVITIES_SELECT,
   BLOCKS_SELECT,
   DAILY_LOAD_SELECT,
+  ISO_DATE,
   parseActivityRow,
   parseBlockRow,
   parseDailyLoadRow,
@@ -48,8 +49,6 @@ export async function loadDashboardData(): Promise<DashboardData> {
   ]);
   return { daily, blocks, weeks };
 }
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Rides and strength sets dated inside [start, end] (a weekly_load row's week, never raw

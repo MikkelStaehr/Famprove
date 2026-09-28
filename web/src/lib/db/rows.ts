@@ -125,7 +125,7 @@ export const STRENGTH_SETS_SELECT = {
 
 export class RowError extends Error {}
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 /** Narrows one JSON row; every accessor names table + column on failure, never the value. */

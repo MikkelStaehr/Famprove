@@ -264,7 +264,7 @@ function rideDetail(a: ActivityRow): RideDetail {
 
 function strengthDetail(strengthTss: number, sets: readonly StrengthSetRow[]): StrengthDetail {
   const ordered = sets.toSorted(
-    (a, b) => a.sheetRow - b.sheetRow || a.block.localeCompare(b.block) || a.setNo - b.setNo,
+    (a, b) => a.block.localeCompare(b.block) || a.sheetRow - b.sheetRow || a.setNo - b.setNo,
   );
   const exercises = new Map<string, { first: StrengthSetRow; sets: number }>();
   const sessions = new Map<string, { block: string; week: number }>();
