@@ -81,7 +81,9 @@ def _step(raw: Mapping[str, object], where: str) -> Step:
     else:
         low = high = _number(pct, f"{where}: pct_ftp")
     if not 0 < low <= high <= MAX_PCT_FTP:
-        raise PlanError(f"{where}: pct_ftp must be between 1 and {MAX_PCT_FTP:g}, low before high")
+        raise PlanError(
+            f"{where}: pct_ftp must be above 0 and at most {MAX_PCT_FTP:g}, low before high"
+        )
     clean_label = (label.strip() or None) if label else None
     return Step(label=clean_label, minutes=minutes, pct_low=low, pct_high=high)
 

@@ -56,6 +56,14 @@ jobs:
           BODYWEIGHT: ${{ secrets.BODYWEIGHT }}
         run: uv run --no-dev collect-strength
 
+      - name: compute
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          STRENGTH_K: ${{ secrets.STRENGTH_K }}
+        run: uv run --no-dev compute
+
+      # Planned rides don't feed daily_load: last, so a plan problem never blocks compute.
       - name: collect-plan
         env:
           INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}
@@ -63,10 +71,3 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: uv run --no-dev collect-plan
-
-      - name: compute
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          STRENGTH_K: ${{ secrets.STRENGTH_K }}
-        run: uv run --no-dev compute

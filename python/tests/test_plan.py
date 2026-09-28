@@ -60,7 +60,7 @@ def test_targets_round_watts_from_ftp_and_are_none_without_ftp() -> None:
         ("warm up then go hard", "non-empty list"),
         ([{"minutes": 10}], "step 1: pct_ftp must be a number"),
         ([{"minutes": 0, "pct_ftp": 50}], "step 1: minutes"),
-        ([{"minutes": 10, "pct_ftp": 950}], "step 1: pct_ftp must be between"),
+        ([{"minutes": 10, "pct_ftp": 950}], "step 1: pct_ftp must be above 0"),
         ([{"minutes": 10, "pct_ftp": [80, 60]}], "low before high"),
         ([{"minutes": 10, "pct_ftp": 50, "watts": 200}], "unknown field 'watts'"),
         ([{"repeat": 0, "steps": [{"minutes": 1, "pct_ftp": 50}]}], "step 1: repeat"),

@@ -79,36 +79,12 @@ export async function selectAll<T>(
 ): Promise<T[]> {
   const rows: T[] = [];
   for (;;) {
-    const params = new URLSearchParams({ select: query.columns });
-    for (const [column, expression] of query.filters ?? []) params.append(column, expression);
-    params.set("order", query.order);
+    const params = selectParams(query);
     params.set("limit", String(PAGE_SIZE));
     params.set("offset", String(rows.length));
-
-    let response: Response;
-    try {
-      response = await client.fetch(`${client.restUrl}/${table}?${params.toString()}`, {
-        method: "GET",
-        headers: { ...authHeaders(client.key), Accept: "application/json", Prefer: "count=exact" },
-        cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-    } catch (cause) {
-      throw new PostgrestError(table, null, `${table}: request failed`, { cause });
-    }
-    if (!response.ok) {
-      throw new PostgrestError(table, response.status, `${table}: HTTP ${response.status}`);
-    }
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch (cause) {
-      throw new PostgrestError(table, response.status, `${table}: invalid JSON`, { cause });
-    }
-    if (!Array.isArray(body)) {
-      throw new PostgrestError(table, response.status, `${table}: expected a JSON array`);
-    }
-    const page: readonly unknown[] = body;
+    const { rows: page, response } = await getRows(client, table, params, {
+      Prefer: "count=exact",
+    });
     const total = contentRangeTotal(table, response.headers.get("content-range"));
     for (const raw of page) rows.push(parseRow(raw));
     if (rows.length >= total) return rows;
@@ -132,16 +108,36 @@ export async function selectFirst<T>(
   query: SelectQuery,
   parseRow: (raw: unknown) => T,
 ): Promise<T | null> {
+  const params = selectParams(query);
+  params.set("limit", "1");
+  const { rows } = await getRows(client, table, params);
+  return rows.length === 0 ? null : parseRow(rows[0]);
+}
+
+/** URL params shared by every select: select, filters, order. */
+function selectParams(query: SelectQuery): URLSearchParams {
   const params = new URLSearchParams({ select: query.columns });
   for (const [column, expression] of query.filters ?? []) params.append(column, expression);
   params.set("order", query.order);
-  params.set("limit", "1");
+  return params;
+}
 
+/**
+ * One GET of `table` with `params`: authHeaders + Accept: application/json (+ `extraHeaders`),
+ * no-store, REQUEST_TIMEOUT_MS. PostgrestError on network failure, non-2xx, invalid JSON or a
+ * body that is not a JSON array.
+ */
+async function getRows(
+  client: PostgrestClient,
+  table: string,
+  params: URLSearchParams,
+  extraHeaders: Readonly<Record<string, string>> = {},
+): Promise<{ readonly rows: readonly unknown[]; readonly response: Response }> {
   let response: Response;
   try {
     response = await client.fetch(`${client.restUrl}/${table}?${params.toString()}`, {
       method: "GET",
-      headers: { ...authHeaders(client.key), Accept: "application/json" },
+      headers: { ...authHeaders(client.key), Accept: "application/json", ...extraHeaders },
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -161,5 +157,5 @@ export async function selectFirst<T>(
     throw new PostgrestError(table, response.status, `${table}: expected a JSON array`);
   }
   const rows: readonly unknown[] = body;
-  return rows.length === 0 ? null : parseRow(rows[0]);
+  return { rows, response };
 }
