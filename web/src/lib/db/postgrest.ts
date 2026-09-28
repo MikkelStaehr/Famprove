@@ -121,3 +121,45 @@ export async function selectAll<T>(
     }
   }
 }
+
+/**
+ * The first row of `table` matching `query` in `order` (e.g. "date" or "date.desc"), or null.
+ * One request with limit=1; same headers, timeout and errors as selectAll.
+ */
+export async function selectFirst<T>(
+  client: PostgrestClient,
+  table: string,
+  query: SelectQuery,
+  parseRow: (raw: unknown) => T,
+): Promise<T | null> {
+  const params = new URLSearchParams({ select: query.columns });
+  for (const [column, expression] of query.filters ?? []) params.append(column, expression);
+  params.set("order", query.order);
+  params.set("limit", "1");
+
+  let response: Response;
+  try {
+    response = await client.fetch(`${client.restUrl}/${table}?${params.toString()}`, {
+      method: "GET",
+      headers: { ...authHeaders(client.key), Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (cause) {
+    throw new PostgrestError(table, null, `${table}: request failed`, { cause });
+  }
+  if (!response.ok) {
+    throw new PostgrestError(table, response.status, `${table}: HTTP ${response.status}`);
+  }
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (cause) {
+    throw new PostgrestError(table, response.status, `${table}: invalid JSON`, { cause });
+  }
+  if (!Array.isArray(body)) {
+    throw new PostgrestError(table, response.status, `${table}: expected a JSON array`);
+  }
+  const rows: readonly unknown[] = body;
+  return rows.length === 0 ? null : parseRow(rows[0]);
+}

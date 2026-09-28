@@ -178,6 +178,21 @@ class Fields {
     return this.get(column) === null ? null : this.date(column);
   }
 
+  /** The raw JSON value; the caller narrows it (e.g. a jsonb column). */
+  unknown(column: string): unknown {
+    return this.get(column);
+  }
+
+  array(column: string): readonly unknown[] {
+    const value = this.get(column);
+    return Array.isArray(value) ? value : this.fail(column, "an array");
+  }
+
+  timestamp(column: string): string {
+    const value = this.string(column);
+    return Number.isNaN(Date.parse(value)) ? this.fail(column, "a timestamp") : value;
+  }
+
   boolean(column: string): boolean {
     const value = this.get(column);
     return typeof value === "boolean" ? value : this.fail(column, "a boolean");
@@ -268,5 +283,124 @@ export function parseStrengthSetRow(raw: unknown): StrengthSetRow {
     rpe: f.numberOrNull("rpe"),
     prescribed: f.stringOrNull("prescribed"),
     score: f.number("score"),
+  };
+}
+
+// --- Today screen ------------------------------------------------------------------------
+
+/** One prescribed set of the coach's sheet (plan + what was logged), for the Today screen. */
+export type PrescribedSetRow = {
+  readonly date: IsoDate;
+  readonly block: string;
+  readonly week: number;
+  readonly sheetRow: number;
+  readonly setNo: number;
+  readonly name: string;
+  readonly type: string;
+  readonly setsText: string | null; // as written, e.g. "2"
+  readonly repsText: string | null; // as written, e.g. "8 - 12"
+  readonly prescribed: string | null; // as written, e.g. "RPE 6 - 7", "-10%"
+  readonly loggedKg: number;
+  readonly bodyweight: boolean;
+};
+
+export const PRESCRIBED_SETS_SELECT = {
+  table: "strength_sets",
+  columns:
+    "date,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight",
+  order: "date,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
+} as const;
+
+export function parsePrescribedSetRow(raw: unknown): PrescribedSetRow {
+  const f = new Fields(PRESCRIBED_SETS_SELECT.table, raw);
+  return {
+    date: f.date("date"),
+    block: f.string("block"),
+    week: f.number("week"),
+    sheetRow: f.number("sheet_row"),
+    setNo: f.number("set_no"),
+    name: f.string("name"),
+    type: f.string("type"),
+    setsText: f.stringOrNull("sets_text"),
+    repsText: f.stringOrNull("reps_text"),
+    prescribed: f.stringOrNull("prescribed"),
+    loggedKg: f.number("logged_kg"),
+    bodyweight: f.boolean("bodyweight"),
+  };
+}
+
+/** A planned-ride step with Python's watt targets (null watts when no FTP). */
+export type PlanStep = {
+  readonly kind: "step";
+  readonly label: string | null;
+  readonly minutes: number;
+  readonly pctLow: number;
+  readonly pctHigh: number;
+  readonly wattsLow: number | null;
+  readonly wattsHigh: number | null;
+};
+
+export type PlanItem =
+  | PlanStep
+  | { readonly kind: "repeat"; readonly repeat: number; readonly steps: readonly PlanStep[] };
+
+/** public.planned_targets: a planned ride, derived by collect-plan. */
+export type PlannedTargetRow = {
+  readonly date: IsoDate;
+  readonly name: string;
+  readonly notes: string | null;
+  readonly ftp: number | null;
+  readonly totalMinutes: number;
+  readonly steps: readonly PlanItem[];
+  readonly problem: string | null; // plain words when the steps couldn't be read
+  readonly computedAt: string;
+};
+
+export const PLANNED_TARGETS_SELECT = {
+  table: "planned_targets",
+  columns: "date,name,notes,ftp,total_minutes,steps,problem,computed_at",
+  order: "date,name", // the primary key
+} as const;
+
+function parsePlanStep(raw: unknown, where: string): PlanStep {
+  const f = new Fields(where, raw);
+  if (f.string("kind") !== "step") throw new RowError(`${where}.kind: expected "step"`);
+  return {
+    kind: "step",
+    label: f.stringOrNull("label"),
+    minutes: f.number("minutes"),
+    pctLow: f.number("pct_low"),
+    pctHigh: f.number("pct_high"),
+    wattsLow: f.numberOrNull("watts_low"),
+    wattsHigh: f.numberOrNull("watts_high"),
+  };
+}
+
+function parsePlanItems(raw: unknown, where: string): PlanItem[] {
+  if (!Array.isArray(raw)) throw new RowError(`${where}: expected a JSON array`);
+  const items: readonly unknown[] = raw;
+  return items.map((item, i) => {
+    const f = new Fields(`${where}[${i}]`, item);
+    if (f.string("kind") !== "repeat") return parsePlanStep(item, `${where}[${i}]`);
+    const inner = f.array("steps");
+    return {
+      kind: "repeat",
+      repeat: f.number("repeat"),
+      steps: inner.map((s, j) => parsePlanStep(s, `${where}[${i}].steps[${j}]`)),
+    };
+  });
+}
+
+export function parsePlannedTargetRow(raw: unknown): PlannedTargetRow {
+  const f = new Fields(PLANNED_TARGETS_SELECT.table, raw);
+  return {
+    date: f.date("date"),
+    name: f.string("name"),
+    notes: f.stringOrNull("notes"),
+    ftp: f.numberOrNull("ftp"),
+    totalMinutes: f.number("total_minutes"),
+    steps: parsePlanItems(f.unknown("steps"), `${PLANNED_TARGETS_SELECT.table}.steps`),
+    problem: f.stringOrNull("problem"),
+    computedAt: f.timestamp("computed_at"),
   };
 }
