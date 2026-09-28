@@ -9,7 +9,14 @@ Personal training-load app for one user. It combines cycling (intervals.icu) and
 - Package manager: pnpm (frontend) · uv (Python)
 
 ## Commands
-- dev: `<TBD>`   build: `<TBD>`   test: `<TBD>`   lint: `<TBD>`
+All Python commands run from `python/` (they read the repo-root `.env.local`).
+- run: `uv run collect-intervals [--since 2026-01-01]` · `uv run collect-strength` · `uv run compute` (in that order)
+- test: `uv run pytest` (offline, synthetic fixtures) · `uv run pytest -m live` (hits intervals.icu, read-only)
+- lint: `uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy`
+- db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
+- frontend (M2): `<TBD>`
+
+CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain/load.py`.
 
 ## Conventions
 - Strict types. No `any` / untyped dict without a comment.
