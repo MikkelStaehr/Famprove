@@ -14,6 +14,8 @@ import "server-only";
 
 export const PAGE_SIZE = 1000;
 export const LEGACY_JWT_PREFIX = "eyJ";
+/** Same bound as the Python client (http.DEFAULT_TIMEOUT_S): a hung Supabase fails the page fast. */
+export const REQUEST_TIMEOUT_MS = 30_000;
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -89,6 +91,7 @@ export async function selectAll<T>(
         method: "GET",
         headers: { ...authHeaders(client.key), Accept: "application/json", Prefer: "count=exact" },
         cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (cause) {
       throw new PostgrestError(table, null, `${table}: request failed`, { cause });
@@ -96,7 +99,12 @@ export async function selectAll<T>(
     if (!response.ok) {
       throw new PostgrestError(table, response.status, `${table}: HTTP ${response.status}`);
     }
-    const body: unknown = await response.json();
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch (cause) {
+      throw new PostgrestError(table, response.status, `${table}: invalid JSON`, { cause });
+    }
     if (!Array.isArray(body)) {
       throw new PostgrestError(table, response.status, `${table}: expected a JSON array`);
     }

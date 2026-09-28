@@ -6,6 +6,7 @@ import type { IsoDate } from "./db/rows.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
 export const LOCALE = "en-GB"; // 24 h clock, day-month order
+export const TSS_PER_DAY = "TSS/day"; // unit of CTL / ATL / TSB (DESIGN.md)
 
 const DAY_FORMAT = new Intl.DateTimeFormat(LOCALE, {
   weekday: "short",
@@ -38,14 +39,14 @@ export function formatSigned(value: number): string {
 }
 
 /**
- * Calendar date, e.g. "2026-09-28" -> "Mon 28 Sep". Formats the date as-is (parse as UTC
+ * Calendar date, e.g. "2026-09-28" -> "Mon 28 Sept" (en-GB CLDR). Formats the date as-is (parse as UTC
  * midnight, format with timeZone "UTC") so no time-zone shift can move it a day.
  */
 export function formatDay(date: IsoDate): string {
   return DAY_FORMAT.format(new Date(`${date}T00:00:00Z`));
 }
 
-/** computed_at (ISO timestamptz) in LOCAL_TZ, e.g. "28 Sep, 05:03". */
+/** computed_at (ISO timestamptz) in LOCAL_TZ, e.g. "28 Sept, 05:03". */
 export function formatUpdatedAt(computedAt: string): string {
   return UPDATED_FORMAT.format(new Date(computedAt));
 }

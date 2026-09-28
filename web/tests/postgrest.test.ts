@@ -95,3 +95,26 @@ test("selectAll refuses a non-array body and an early empty page", async () => {
     /pagination stopped at 0\/5/,
   );
 });
+
+test("selectAll maps invalid JSON and network failures to PostgrestError", async () => {
+  const badJson: FetchLike = async () =>
+    new Response("<html>gateway</html>", { headers: { "Content-Range": "0-0/1" } });
+  await assert.rejects(
+    selectAll(createClient("https://x.supabase.co", "k", badJson), "t", { columns: "id", order: "id" }, parseId),
+    (err: unknown) => err instanceof PostgrestError && err.message === "t: invalid JSON",
+  );
+  const offline: FetchLike = async () => {
+    throw new TypeError("fetch failed");
+  };
+  await assert.rejects(
+    selectAll(createClient("https://x.supabase.co", "k", offline), "t", { columns: "id", order: "id" }, parseId),
+    (err: unknown) => err instanceof PostgrestError && err.status === null,
+  );
+});
+
+test("selectAll bounds every request with a timeout signal", async () => {
+  const calls: Call[] = [];
+  const client = createClient("https://x.supabase.co", "k", pagedFetch(1, 1000, calls));
+  await selectAll(client, "t", { columns: "id", order: "id" }, parseId);
+  assert.ok(calls[0]?.init.signal instanceof AbortSignal);
+});

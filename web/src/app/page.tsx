@@ -10,13 +10,12 @@ import { EnvError } from "@/lib/db/env";
 import { PostgrestError } from "@/lib/db/postgrest";
 import { loadDashboardData } from "@/lib/db/queries";
 import { RowError } from "@/lib/db/rows";
-import { formatDay, formatLoad, formatSigned, formatUpdatedAt } from "@/lib/format";
+import { formatDay, formatLoad, formatSigned, formatUpdatedAt, TSS_PER_DAY } from "@/lib/format";
 
 type ReadyView = Extract<DashboardView, { kind: "ready" }>;
 type DataError = EnvError | PostgrestError | RowError;
 type PageState = DashboardView | { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 
-const UNIT = "TSS/day";
 const CHART_TITLE = "Fitness, fatigue and form";
 
 /**
@@ -62,7 +61,7 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
         label="Form (TSB)"
         context={formatDay(hero.date)}
         value={formatSigned(hero.tsb)}
-        unit={UNIT}
+        unit={TSS_PER_DAY}
         status={
           hero.zone === null ? (
             <StatusBadge tone="neutral" label="Zone not computed" />
@@ -151,7 +150,7 @@ function LoadError({ error, at }: { readonly error: DataError; readonly at: Date
 /** Text alternative for the chart: today's values, the 7-day fitness change and the blocks. */
 function chartSummary({ hero, chart, blocks }: ReadyView): string {
   const parts = [
-    `Daily fitness (CTL), fatigue (ATL) and form (TSB) in ${UNIT} from ${formatDay(chart[0].date)} to ${formatDay(hero.date)}.`,
+    `Daily fitness (CTL), fatigue (ATL) and form (TSB) in ${TSS_PER_DAY} from ${formatDay(chart[0].date)} to ${formatDay(hero.date)}.`,
     `On ${formatDay(hero.date)}: fitness ${formatLoad(hero.ctl)}, fatigue ${formatLoad(hero.atl)}, form ${formatSigned(hero.tsb)}.`,
   ];
   if (hero.ctlRamp7d !== null) {

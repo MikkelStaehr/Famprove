@@ -3,7 +3,7 @@
 import pytest
 
 from training_load.domain.daily import build_daily_load
-from training_load.domain.dates import SERIES_START, date_range
+from training_load.domain.dates import SERIES_START
 from training_load.domain.form import (
     FORM_BASIS,
     FORM_ZONES,
@@ -66,7 +66,7 @@ def test_ctl_ramp_is_difference_to_seven_days_earlier() -> None:
 
 
 def test_build_daily_load_fills_ramp_and_zone() -> None:
-    end = date_range(SERIES_START, SERIES_START.replace(day=10))[-1]
+    end = SERIES_START.replace(day=10)
     days = build_daily_load({SERIES_START: 300.0}, {}, start=SERIES_START, end=end)
     assert [d.ctl_ramp_7d for d in days[:7]] == [None] * 7
     assert days[7].ctl_ramp_7d == pytest.approx(days[7].ctl - days[0].ctl)

@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import type { BlockSpan, ChartPoint } from "@/lib/dashboard-view";
-import { formatDay, formatLoad, formatSigned, LOCALE } from "@/lib/format";
+import { formatDay, formatLoad, formatSigned, LOCALE, TSS_PER_DAY } from "@/lib/format";
 
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
@@ -48,7 +48,6 @@ const SERIES: readonly Series[] = [
   { key: "tsb", label: "Form (TSB)", color: "var(--series-tsb)", dash: "1 4", format: formatSigned },
 ];
 
-const UNIT = "TSS/day";
 const STROKE_WIDTH = 2;
 const HATCH_ID = "deload-hatch";
 const LEGEND_HATCH_ID = "deload-hatch-legend";
@@ -111,7 +110,7 @@ export function TrendChart(props: TrendChartProps) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-12 text-text-muted" aria-hidden="true">
-        {UNIT}
+        {TSS_PER_DAY}
       </p>
       <ChartBoundary what="The trend chart could not be drawn. The figures above are unaffected.">
         <Chart {...props} />
@@ -147,7 +146,8 @@ function Chart({ points, blocks, title }: TrendChartProps) {
         <CartesianGrid vertical={false} stroke="var(--border)" />
         {blocks.map((b) => (
           <ReferenceArea
-            key={`block-${b.start}`}
+            key={`block-${b.start}-${b.name}`}
+            ifOverflow="hidden"
             x1={dayNumber(b.start) - 0.5}
             x2={dayNumber(b.end) + 0.5}
             fill="var(--block-fill)"
@@ -158,7 +158,8 @@ function Chart({ points, blocks, title }: TrendChartProps) {
         {blocks.map((b) =>
           b.deloadStart === null ? null : (
             <ReferenceArea
-              key={`deload-${b.start}`}
+              key={`deload-${b.start}-${b.name}`}
+              ifOverflow="hidden"
               x1={dayNumber(b.deloadStart) - 0.5}
               x2={dayNumber(b.end) + 0.5}
               fill={`url(#${HATCH_ID})`}
@@ -246,7 +247,7 @@ function ChartTooltip({ active, x, byDay, blocks }: ChartTooltipProps) {
           </div>
         ))}
       </dl>
-      <p className="text-12 text-text-muted">{UNIT}</p>
+      <p className="text-12 text-text-muted">{TSS_PER_DAY}</p>
     </div>
   );
 }

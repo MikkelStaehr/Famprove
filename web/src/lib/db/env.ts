@@ -10,8 +10,6 @@ export type SupabaseEnv = {
   readonly serviceKey: string; // sb_secret_... or a legacy JWT (eyJ...)
 };
 
-export const ENV_VARS = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY"] as const;
-
 /** Missing/invalid configuration. The message names the variable, never its value. */
 export class EnvError extends Error {}
 
