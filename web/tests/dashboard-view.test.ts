@@ -63,8 +63,8 @@ test("blockSpans clips to the series end and runs an ongoing block to it", () =>
     "2026-09-30",
   );
   assert.deepEqual(spans, [
-    { name: "blok 11", start: "2026-08-10", end: "2026-09-13", deloadStart: "2026-09-07", ongoing: false },
-    { name: "blok 12", start: "2026-09-28", end: "2026-09-30", deloadStart: null, ongoing: true },
+    { name: "blok 11", blockNo: 11, start: "2026-08-10", end: "2026-09-13", deloadStart: "2026-09-07", ongoing: false },
+    { name: "blok 12", blockNo: 12, start: "2026-09-28", end: "2026-09-30", deloadStart: null, ongoing: true },
   ]);
 });
 

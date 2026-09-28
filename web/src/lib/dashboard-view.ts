@@ -35,6 +35,7 @@ export type ChartPoint = {
 
 export type BlockSpan = {
   readonly name: string;
+  readonly blockNo: number; // blocks.block_no (parsed by Python); short chart label "B<n>"
   readonly start: IsoDate;
   readonly end: IsoDate; // clipped to the series end; an ongoing block runs to it
   readonly deloadStart: IsoDate | null; // deload shading = [deloadStart, end]
@@ -112,7 +113,7 @@ export function blockSpans(blocks: readonly BlockRow[], seriesEnd: IsoDate): Blo
       const end =
         ongoing || b.endDate === null || b.endDate > seriesEnd ? seriesEnd : b.endDate;
       const deloadStart = b.deloadStart !== null && b.deloadStart <= end ? b.deloadStart : null;
-      return { name: b.name, start: b.startDate, end, deloadStart, ongoing };
+      return { name: b.name, blockNo: b.blockNo, start: b.startDate, end, deloadStart, ongoing };
     });
 }
 

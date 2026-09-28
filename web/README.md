@@ -1,36 +1,8 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# web — training-load dashboard (M2)
 
-## Getting Started
+One read-only screen over Supabase `daily_load`, `blocks` and `weekly_load`: form (TSB) today, the CTL/ATL/TSB trend with strength blocks, and this ISO week. Python owns every calculation; this app only reads and formats.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Install: `pnpm install` · dev: `pnpm dev` (http://localhost:3000)
+- Checks: `pnpm lint && pnpm typecheck && pnpm test && pnpm build` (build needs no secrets; the route renders at request time)
+- Env (`web/.env.local` locally, Vercel server env in prod): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. Read server-side only; never prefix them with `NEXT_PUBLIC_`.
+- Data access lives in `src/lib/db/*` (server-only); view shaping in `src/lib/dashboard-view.ts`; UI contract in `../DESIGN.md`.

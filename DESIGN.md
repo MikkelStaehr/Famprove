@@ -57,3 +57,24 @@ Read by the `ui` agent before any UI work. Project-specific overrides go at the 
 - **Freshness:** "updated <time>" from the latest `daily_load` row; stale when older than 26 h (the job runs daily ≈ 05:00 Europe/Copenhagen).
 - **Units:** load in TSS; CTL / ATL / TSB in TSS/day.
 - **Data:** read-only, server-side, from `daily_load`, `blocks` and `weekly_load`. The UI never calculates training metrics (Python owns them).
+
+### Token values (added by `ui`, M2)
+Defined once in `web/src/app/globals.css` (CSS variables, switched by `prefers-color-scheme`) and exposed to Tailwind via `@theme inline`; Tailwind's default colour, text-size and radius scales are removed so nothing off-token can be used.
+
+| Token | Light | Dark | Reason |
+|---|---|---|---|
+| `--bg` / `--surface` | `#f5f6f8` / `#ffffff` | `#0f1114` / `#181b20` | page vs card, no shadows |
+| `--border` | `#d8dce2` | `#2e333b` | card border, grid lines, skeleton fill |
+| `--text` / `--text-muted` | `#15181c` / `#586069` | `#eceef1` / `#a3aab4` | ≥ 5.9:1 on bg and surface |
+| `--accent` | `#1f5bd0` | `#7aa7ff` | focus ring, links |
+| `--positive` / `--warning` / `--negative` | `#18743a` / `#8a4f00` / `#b42318` | `#5cc98a` / `#f0b44c` / `#ff8a80` | used as text: ≥ 5.4:1 on bg and surface |
+| `--series-ctl` / `--series-atl` / `--series-tsb` | `#1f5bd0` / `#c2410c` / `#7c3aed` | `#7aa7ff` / `#f59e5b` / `#b794ff` | the three chart lines; ≥ 4.4:1 on surface and on block shading. Colour is never alone: solid / dashed / dotted strokes |
+| `--block-fill` | `#eceff3` | `#242931` | strength-block shading behind the lines |
+| `--chart-mark` | `#8b94a1` | `#6b7480` | non-data marks (zero line, deload hatch); ≥ 3:1 on surface |
+| `--chart-height` | 240px | 240px | the one chart height; keeps hero + chart above the fold at 390 × 844 |
+
+- Type: Tailwind's default `--font-sans` is already a system stack (no web fonts). Utilities are named by px: `text-12 … text-40`; 12–20 at line-height 1.4, 28/40 at 1.1.
+- Radius: `rounded-control` (8) also for badges and the chart tooltip (small, control-like); `rounded-card` (12) for cards.
+- Width: `max-w-content` = 720px.
+- Deload weeks: diagonal hatch (`--chart-mark` on `--block-fill`), so they differ from block shading by pattern, not only colour. Block labels above the plot read `B<n>` (block number).
+- Motion: no chart animation at all (nothing to explain); skeletons pulse only under `motion-safe`.
