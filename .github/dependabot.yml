@@ -12,3 +12,5 @@ updates:
     directory: /web
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7 # don't pick up a version on the day it is published
