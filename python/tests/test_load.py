@@ -20,8 +20,8 @@ def intervals_reference(loads: Sequence[float], days: int) -> list[float]:
     return out
 
 
-def test_default_decay_is_inverse_tau() -> None:
-    assert DECAY is Decay.INVERSE_TAU
+def test_default_decay_is_exponential_like_intervals() -> None:
+    assert DECAY is Decay.EXPONENTIAL
 
 
 def test_smoothing_factors() -> None:
@@ -35,11 +35,12 @@ def test_zero_loads_stay_zero() -> None:
     assert ctl_atl([0.0] * 5) == [ZERO] * 5
 
 
-def test_first_day_includes_its_own_load() -> None:
-    [day] = ctl_atl([100.0])
-    assert day.ctl == pytest.approx(100 / 42)
-    assert day.atl == pytest.approx(100 / 7)
-    assert day.tsb == pytest.approx(100 / 42 - 100 / 7)
+@pytest.mark.parametrize("decay", list(Decay))
+def test_first_day_includes_its_own_load(decay: Decay) -> None:
+    [day] = ctl_atl([100.0], decay=decay)
+    assert day.ctl == pytest.approx(100 * smoothing_factor(42, decay))
+    assert day.atl == pytest.approx(100 * smoothing_factor(7, decay))
+    assert day.tsb == pytest.approx(day.ctl - day.atl)
 
 
 def test_hand_computed_three_days_inverse_tau() -> None:
@@ -47,7 +48,7 @@ def test_hand_computed_three_days_inverse_tau() -> None:
     ctl1, atl1 = 100 / 42, 100 / 7
     ctl2, atl2 = ctl1 * 41 / 42, atl1 * 6 / 7
     ctl3, atl3 = ctl2 + (50 - ctl2) / 42, atl2 + (50 - atl2) / 7
-    days = ctl_atl([100.0, 0.0, 50.0])
+    days = ctl_atl([100.0, 0.0, 50.0], decay=Decay.INVERSE_TAU)
     assert [d.ctl for d in days] == pytest.approx([ctl1, ctl2, ctl3])
     assert [d.atl for d in days] == pytest.approx([atl1, atl2, atl3])
 
@@ -70,7 +71,9 @@ def test_exponential_matches_intervals_published_recurrence() -> None:
 
 
 def test_initial_state_seeds_recurrence() -> None:
-    [day] = ctl_atl([0.0], initial=LoadState(ctl=42.0, atl=70.0, tsb=-28.0))
+    [day] = ctl_atl(
+        [0.0], decay=Decay.INVERSE_TAU, initial=LoadState(ctl=42.0, atl=70.0, tsb=-28.0)
+    )
     assert [day.ctl, day.atl] == pytest.approx([41.0, 60.0])
 
 

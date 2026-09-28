@@ -4,9 +4,9 @@ Recurrence, per day t (day t's own load is included, missing days carry load 0):
 
     x_t = x_{t-1} + (load_t - x_{t-1}) * k(tau)
 
-    k(tau) = 1 / tau               Decay.INVERSE_TAU  (user's choice, the default)
-    k(tau) = 1 - exp(-1 / tau)     Decay.EXPONENTIAL  (what intervals.icu uses:
+    k(tau) = 1 - exp(-1 / tau)     Decay.EXPONENTIAL  (the default; what intervals.icu uses:
                                                        w = exp(-1/days); x = x*w + load*(1-w))
+    k(tau) = 1 / tau               Decay.INVERSE_TAU  (TrainingPeaks/Coggan; the alternative)
 
 CTL uses tau = CTL_TAU_DAYS (42), ATL uses tau = ATL_TAU_DAYS (7), TSB = CTL - ATL of the same
 day. No seeding in production: CTL = ATL = 0 going into SERIES_START.
@@ -24,8 +24,9 @@ class Decay(Enum):
     EXPONENTIAL = "exponential"
 
 
-DECAY: Final = Decay.INVERSE_TAU
-"""THE switch between the two smoothing factors. Changing it recomputes all history."""
+DECAY: Final = Decay.EXPONENTIAL
+"""THE switch between the two smoothing factors. Changing it recomputes all history.
+EXPONENTIAL so cycling-only CTL matches intervals.icu (user decision, 2026-09-28)."""
 
 CTL_TAU_DAYS: Final = 42
 ATL_TAU_DAYS: Final = 7

@@ -52,7 +52,7 @@ Decisions (agreed with the user):
 - Cycling = intervals.icu types `Ride` and `VirtualRide` only. Everything else (incl. Garmin-synced `WeightTraining`) is excluded.
 - Cycling TSS = intervals.icu's own load value as-is; rides without power use its HR-based load (never skipped).
 - Backfill from 2026-01-01 with CTL = ATL = 0 on that date. Strength only from the current workbook (blok 11 onward).
-- CTL/ATL update uses factor 1/τ: `x_t = x_{t-1} + (load_t − x_{t-1}) / τ`, τ = 42 / 7. TSB = CTL − ATL (same day).
+- CTL/ATL use intervals.icu's exponential form: `x_t = x_{t-1}·w + load_t·(1 − w)`, `w = e^(−1/τ)`, τ = 42 / 7. TSB = CTL − ATL (same day). 1/τ (TrainingPeaks) stays available as `Decay.INVERSE_TAU`.
 - Cycling-only CTL must match intervals.icu — enforced by a test.
 - Weekly figure = ISO week (Mon–Sun), as a SQL view over `daily_load`.
 - Private: RLS on, no anon policies; Python and Next.js read server-side only; Vercel password protection.

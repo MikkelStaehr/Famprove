@@ -26,7 +26,7 @@ from training_load.sources.intervals import (
 pytestmark = pytest.mark.live
 
 WINDOW_DAYS = 90
-CTL_TOLERANCE = 0.5  # intervals.icu shows CTL rounded; 1/tau vs exp differs by ~1 at CTL ~60
+CTL_TOLERANCE = 0.1  # measured with EXPONENTIAL: 0.00 (1/tau drifts ~0.2 at CTL 20)
 
 
 def _credentials() -> tuple[str, str]:
@@ -83,7 +83,7 @@ def test_cycling_only_ctl_matches_intervals_ctl(
     assert days == date_range(days[0], days[-1]), "wellness must be one row per day"
     loads = [cycling.get(d.isoformat(), 0.0) for d in days]
     gap = _max_ctl_gap(wellness, loads, DECAY)
-    other = Decay.EXPONENTIAL if DECAY is Decay.INVERSE_TAU else Decay.INVERSE_TAU
+    other = next(d for d in Decay if d is not DECAY)
     assert gap < CTL_TOLERANCE, (
         f"max |CTL - intervals CTL| = {gap:.2f} with {DECAY.value}; "
         f"with {other.value} it would be {_max_ctl_gap(wellness, loads, other):.2f} "
