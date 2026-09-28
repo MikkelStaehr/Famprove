@@ -1,6 +1,6 @@
 """collect-strength and compute end to end: fake Drive over FakeSend, in-memory PostgREST."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import cast
 
 import pytest
@@ -72,12 +72,18 @@ def test_compute_rebuilds_daily_load_and_blocks(
     upsert_activities(db, parse_activities(rides).cycling)
     db.tables["daily_load"] = [{"date": "2025-12-31"}]  # stale row outside the range
 
-    summary = compute.run(db, strength_k=0.02, today=FIXED_TODAY)
+    run_at = datetime(2026, 3, 15, 3, 0, tzinfo=UTC)
+    summary = compute.run(db, strength_k=0.02, today=FIXED_TODAY, computed_at=run_at)
 
     rows = {r["date"]: r for r in db.tables["daily_load"]}
     assert summary.days == len(rows) == (FIXED_TODAY - date(2026, 1, 1)).days + 1
     assert "2025-12-31" not in rows
     assert rows["2026-01-01"]["ctl"] == pytest.approx(ctl_atl([100.0])[0].ctl)
+    assert {r["computed_at"] for r in rows.values()} == {run_at.isoformat()}
+    assert rows["2026-01-01"]["ctl_ramp_7d"] is None
+    jan1_ctl, jan8_ctl = rows["2026-01-01"]["ctl"], rows["2026-01-08"]["ctl"]
+    assert isinstance(jan1_ctl, float) and isinstance(jan8_ctl, float)
+    assert rows["2026-01-08"]["ctl_ramp_7d"] == pytest.approx(jan8_ctl - jan1_ctl)
     feb5 = rows["2026-02-05"]
     assert feb5["cycling_tss"] == 60.0
     assert feb5["strength_tss"] == pytest.approx((3 * 90.7 + 3 * 307.2) * 0.02)

@@ -1,7 +1,7 @@
 """db.client against a fake HttpSend; table modules against the in-memory PostgREST."""
 
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -95,14 +95,25 @@ def test_sync_blocks_prunes_stale_keys(db: InMemoryPostgrest) -> None:
 def test_sync_daily_load_deletes_outside_range_and_rejects_gaps(db: InMemoryPostgrest) -> None:
     db.tables["daily_load"] = [{"date": "2025-12-31"}, {"date": "2026-01-09"}]
     days = build_daily_load({}, {}, start=date(2026, 1, 1), end=date(2026, 1, 3))
-    daily_load.sync_daily_load(db, days, start=date(2026, 1, 1), end=date(2026, 1, 3))
+    run_at = datetime(2026, 1, 3, 3, 0, tzinfo=UTC)
+    daily_load.sync_daily_load(
+        db, days, start=date(2026, 1, 1), end=date(2026, 1, 3), computed_at=run_at
+    )
     assert sorted(str(r["date"]) for r in db.tables["daily_load"]) == [
         "2026-01-01",
         "2026-01-02",
         "2026-01-03",
     ]
+    assert {r["computed_at"] for r in db.tables["daily_load"]} == {"2026-01-03T03:00:00+00:00"}
+    assert {r["form_zone"] for r in db.tables["daily_load"]} == {"grey_zone"}
     with pytest.raises(ValueError, match="one row per day"):
-        daily_load.sync_daily_load(db, days[:2], start=date(2026, 1, 1), end=date(2026, 1, 3))
+        daily_load.sync_daily_load(
+            db, days[:2], start=date(2026, 1, 1), end=date(2026, 1, 3), computed_at=run_at
+        )
+    with pytest.raises(ValueError, match="timezone-aware"):
+        daily_load.sync_daily_load(
+            db, days, start=date(2026, 1, 1), end=date(2026, 1, 3), computed_at=datetime(2026, 1, 3)
+        )
 
 
 def test_row_round_trip_activity_and_strength_set(make_set: MakeSet) -> None:

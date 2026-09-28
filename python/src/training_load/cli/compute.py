@@ -7,7 +7,7 @@ import logging
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 
 from training_load.config import ConfigError, compute_config, load_dotenv_file
 from training_load.db.activities import all_activities
@@ -35,11 +35,11 @@ class ComputeSummary:
     blocks: int
 
 
-def run(db: Postgrest, *, strength_k: float, today: date) -> ComputeSummary:
+def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime) -> ComputeSummary:
     """1. all_activities + all_sets (paginated)
     2. daily_cycling_tss(activities); daily_strength_tss(sets, today, strength_k)
     3. build_daily_load(start=SERIES_START, end=today) with load.DECAY
-    4. sync_daily_load(start=SERIES_START, end=today)
+    4. sync_daily_load(start=SERIES_START, end=today, computed_at=run start, UTC)
     5. sync_blocks(derive_blocks(sets, today))
     """
     activities = all_activities(db)
@@ -49,7 +49,7 @@ def run(db: Postgrest, *, strength_k: float, today: date) -> ComputeSummary:
     ignored = sum(1 for d in (*cycling, *strength) if not SERIES_START <= d <= today)
 
     days = build_daily_load(cycling, strength, start=SERIES_START, end=today, decay=DECAY)
-    sync_daily_load(db, days, start=SERIES_START, end=today)
+    sync_daily_load(db, days, start=SERIES_START, end=today, computed_at=computed_at)
     blocks = derive_blocks(sets, today)
     sync_blocks(db, blocks)
 
@@ -68,7 +68,7 @@ def run(db: Postgrest, *, strength_k: float, today: date) -> ComputeSummary:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """load_dotenv_file -> compute_config(os.environ) -> run(today=today_local()) -> log."""
+    """load_dotenv_file -> compute_config(os.environ) -> run(today, computed_at=now) -> log."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     load_dotenv_file()
     try:
@@ -77,6 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         log.error("%s", exc)
         return 2
     db = Postgrest(config.supabase.url, config.supabase.service_key, requests_send())
-    summary = run(db, strength_k=config.strength_k, today=today_local())
+    now = datetime.now(UTC)
+    summary = run(db, strength_k=config.strength_k, today=today_local(now), computed_at=now)
     log.info("daily_load rebuilt (%s): %s", DECAY.value, summary)
     return 0

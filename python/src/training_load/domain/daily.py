@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from training_load.domain.dates import date_range
+from training_load.domain.form import FormZone, ctl_ramp, form_zone
 from training_load.domain.load import DECAY, Decay, ctl_atl
 
 
@@ -19,6 +20,8 @@ class DailyLoad:
     ctl: float
     atl: float
     tsb: float
+    ctl_ramp_7d: float | None  # CTL today - CTL 7 days earlier; None for the first 7 days
+    form_zone: FormZone
 
 
 def build_daily_load(
@@ -31,7 +34,8 @@ def build_daily_load(
 ) -> list[DailyLoad]:
     """One row per date in [start, end] (inclusive), gaps filled with 0 load.
 
-    total_tss = cycling + strength; CTL/ATL/TSB via ``load.ctl_atl`` starting from ZERO.
+    total_tss = cycling + strength; CTL/ATL/TSB via ``load.ctl_atl`` starting from ZERO;
+    ctl_ramp_7d and form_zone via ``domain.form``.
     Loads dated outside [start, end] are ignored (the caller logs how many).
     """
     days = date_range(start, end)
@@ -39,9 +43,18 @@ def build_daily_load(
     strength = [strength_tss.get(d, 0.0) for d in days]
     totals = [c + s for c, s in zip(cycling, strength, strict=True)]
     states = ctl_atl(totals, decay=decay)
+    ramps = ctl_ramp([st.ctl for st in states])
     return [
         DailyLoad(
-            date=d, cycling_tss=c, strength_tss=s, total_tss=t, ctl=st.ctl, atl=st.atl, tsb=st.tsb
+            date=d,
+            cycling_tss=c,
+            strength_tss=s,
+            total_tss=t,
+            ctl=st.ctl,
+            atl=st.atl,
+            tsb=st.tsb,
+            ctl_ramp_7d=ramp,
+            form_zone=form_zone(st.tsb, st.ctl),
         )
-        for d, c, s, t, st in zip(days, cycling, strength, totals, states, strict=True)
+        for d, c, s, t, st, ramp in zip(days, cycling, strength, totals, states, ramps, strict=True)
     ]

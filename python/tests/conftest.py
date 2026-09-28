@@ -322,7 +322,13 @@ class InMemoryPostgrest(Postgrest):
         rows.sort(key=lambda r: tuple(str(r[c]) for c in order.split(",")))
         return [{c: r[c] for c in wanted} for r in rows]
 
+    @staticmethod
+    def _same_keys(rows: Sequence[Mapping[str, object]]) -> None:
+        """PostgREST bulk writes require identical keys on every row."""
+        assert len({tuple(sorted(r)) for r in rows}) <= 1, "bulk rows must share keys"
+
     def insert(self, table: str, rows: Sequence[Mapping[str, object]]) -> None:
+        self._same_keys(rows)
         existing = {self._pk(table, r) for r in self.tables[table]}
         for row in rows:
             key = self._pk(table, row)
@@ -333,6 +339,7 @@ class InMemoryPostgrest(Postgrest):
 
     def upsert(self, table: str, rows: Sequence[Mapping[str, object]], *, on_conflict: str) -> None:
         assert tuple(on_conflict.split(",")) == PRIMARY_KEYS[table]
+        self._same_keys(rows)
         by_key = {self._pk(table, r): r for r in self.tables[table]}
         for row in rows:
             by_key[self._pk(table, row)] = dict(row)
