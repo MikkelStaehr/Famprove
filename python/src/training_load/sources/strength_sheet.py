@@ -1,15 +1,29 @@
 """
 Læser Benjamins program-tab (Powerlifting Now-template) fra xlsx-eksport
-og producerer en sæt-tabel + styrke-TSS pr. session.
+og producerer en sæt-tabel med rå score pr. sæt (formlen er uændret fra strength_collector.py).
 
-Brug:  python strength_collector.py sheet.xlsx   (læser alle "Program - blok *"-tabs)
-Output: sets.csv (én række pr. sæt), sessions.csv (TSS pr. dato)
+Brug:  parse_all(xlsx_bytes, bodyweight)   (læser alle "Program - blok *"-tabs)
+STRENGTH_K (tidl. K) ganges på i domain.strength; BODYWEIGHT kommer fra env via parameteren.
 """
-import sys, re, csv, datetime as dt
+import io, re, datetime as dt
+from typing import TypedDict
 import openpyxl
 
-K = 0.02              # kalibreringsfaktor – justeres mod cykel-TSS
-BODYWEIGHT = 0        # kg, bruges til dips/kropsvægtøvelser (sæt din vægt)
+class ParsedSet(TypedDict):
+    date: dt.date
+    block: str
+    row: int              # 1-baseret række i fanen
+    week: int             # 1-baseret uge i fanen
+    type: str
+    name: str
+    set: int
+    reps: float
+    logged_kg: float      # kg som logget (0 hvis tom), før kropsvægt lægges til
+    kg: float             # kg brugt i scoren (logged_kg + bodyweight for kropsvægtøvelser)
+    bodyweight: bool
+    rpe: float | None
+    score: float          # rå score, før STRENGTH_K
+
 ABS_SET_SCORE = 10*20*(0.6**2)   # fast score pr. abs-sæt (10 reps @ 20 kg RPE 6)
 LEG_TYPES = ("SQUAT","DEADLIFT","QUADS","HAMSTRINGS","GLUTES","ADDUCTORS","CALVES","LOWER BACK")
 BODYWEIGHT_EX = ("dips","chin","pull-up","pullup","push-up")
@@ -28,14 +42,14 @@ def mid(txt):
     nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", str(txt))]
     return sum(nums)/len(nums) if nums else None
 
-def parse_all(path):
-    wb = openpyxl.load_workbook(path, data_only=True)
+def parse_all(data: bytes, bodyweight: float) -> list[ParsedSet]:
+    wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     sets = []
     for tab in wb.sheetnames:
-        if tab.startswith("Program - blok"): sets += parse_tab(wb[tab], tab)
+        if tab.startswith("Program - blok"): sets += parse_tab(wb[tab], tab, bodyweight)
     return sets
 
-def parse_tab(ws, tab):
+def parse_tab(ws, tab, bodyweight):
     rows = list(ws.iter_rows(values_only=True))
     e1rm = {}
     for r in rows[:15]:
@@ -44,7 +58,7 @@ def parse_tab(ws, tab):
                 e1rm[c] = float(r[i+5])
     sets = []
     week_dates = None
-    for r in rows:
+    for ri, r in enumerate(rows, start=1):
         if r and isinstance(r[1],dt.datetime) and "WEEK 1" in [str(x) for x in r]:
             # dato-række: dato står 2 kolonner efter 'WEEK n'
             week_dates = [r[i+2] for i,c in enumerate(r) if isinstance(c,str) and c.startswith("WEEK")]
@@ -60,10 +74,12 @@ def parse_tab(ws, tab):
             if nsets in (None,0,"") or reps in (None,"") : continue
             nsets, reps = int(mid(nsets)), mid(reps)
             kg = float(kg) if isinstance(kg,(int,float)) else 0.0
+            logged = kg
+            bw = any(b in name.lower() for b in BODYWEIGHT_EX)
             if typ == "ABS":
                 score = ABS_SET_SCORE; rpe=None
             else:
-                if any(b in name.lower() for b in BODYWEIGHT_EX): kg += BODYWEIGHT
+                if bw: kg += bodyweight
                 main = typ in e1rm and "tempo" not in name.lower()   # tempo ≈ 20-25% lettere, brug foreskrevet RPE
                 rpe = rpe_from_pct(kg/e1rm[typ], reps) if (main and kg) else None
                 if rpe is None: rpe = mid(load) if isinstance(load,str) and "RPE" in str(load) else None
@@ -71,17 +87,6 @@ def parse_tab(ws, tab):
                 factor = 1.0 if typ.startswith(LEG_TYPES) else 0.6
                 score = reps * kg * (rpe/10)**2 * factor
             for s in range(nsets):
-                sets.append(dict(date=date.date(), block=tab, type=typ, name=name, set=s+1,
-                                 reps=reps, kg=kg, rpe=rpe, score=round(score,1)))
+                sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, type=typ, name=name, set=s+1,
+                                      reps=reps, logged_kg=logged, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1)))
     return sets
-
-if __name__ == "__main__":
-    sets = parse_all(sys.argv[1])
-    with open("sets.csv","w",newline="") as f:
-        w = csv.DictWriter(f, fieldnames=sets[0].keys()); w.writeheader(); w.writerows(sets)
-    sess = {}
-    for s in sets: sess[s["date"]] = sess.get(s["date"],0)+s["score"]
-    with open("sessions.csv","w",newline="") as f:
-        w = csv.writer(f); w.writerow(["date","strength_tss"])
-        for d in sorted(sess): w.writerow([d, round(sess[d]*K,1)])
-    for d in sorted(sess): print(d, round(sess[d]*K,1))
