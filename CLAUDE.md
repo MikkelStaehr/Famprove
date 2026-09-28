@@ -14,7 +14,7 @@ All Python commands run from `python/` (they read the repo-root `.env.local`).
 - test: `uv run pytest` (offline, synthetic fixtures) · `uv run pytest -m live` (hits intervals.icu, read-only)
 - lint: `uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy`
 - db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
-- frontend (M2): `<TBD>`
+- web (from `web/`, reads `web/.env.local`): `pnpm dev` · `pnpm build && pnpm start` · checks: `pnpm lint && pnpm typecheck && pnpm test`
 
 CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain/load.py`.
 
@@ -55,7 +55,7 @@ Decisions (agreed with the user):
 - CTL/ATL use intervals.icu's exponential form: `x_t = x_{t-1}·w + load_t·(1 − w)`, `w = e^(−1/τ)`, τ = 42 / 7. TSB = CTL − ATL (same day). 1/τ (TrainingPeaks) stays available as `Decay.INVERSE_TAU`.
 - Cycling-only CTL must match intervals.icu — enforced by a test.
 - Weekly figure = ISO week (Mon–Sun), as a SQL view over `daily_load`.
-- Private: RLS on, no anon policies; Python and Next.js read server-side only; Vercel password protection.
+- Private: RLS on, no anon policies; Python and Next.js read server-side only; Vercel Authentication (All Deployments).
 - Daily run: last 14 days from intervals.icu + whole workbook; upsert on source id; mirror deletions inside that window; rebuild `daily_load` fully. Days bucketed by local date. Cron ≈ 05:00 Europe/Copenhagen.
 - `BODYWEIGHT` / `STRENGTH_K` are current-value tunables; changing them recomputes all history. `GOOGLE_SERVICE_ACCOUNT_JSON` holds the JSON content.
 - Garmin later gets its own `daily_wellness` table keyed by date. No planned/future workouts in M1.
@@ -67,7 +67,7 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 - One screen, mobile first (390px), answering "how loaded am I right now, and is fitness going up?"
 - Reads Supabase server-side only (service key in server env, never in the client bundle), from `daily_load`, `blocks` and `weekly_load`. No writes.
 - "updated <time>" from the latest `daily_load` row; stale when older than 26 h.
-- Deploy on Vercel behind Vercel password protection or a single shared secret (simplest safe option).
+- Deploy on Vercel behind Vercel Authentication, scope "All Deployments" (tech-lead: free on Hobby, no auth code; Password Protection needs Pro + $20/mo). Root directory `web`.
 - No auth UI, no settings page, no extra routes. pnpm, TypeScript strict, Tailwind; the simplest chart library that meets `DESIGN.md`.
 
 ## Development team (user-level subagents in ~/.claude/agents/)
