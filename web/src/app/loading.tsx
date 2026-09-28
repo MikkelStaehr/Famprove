@@ -1,46 +1,53 @@
-import { Card } from "@/components/Card";
 import { SkeletonBar as Bar } from "@/components/Skeleton";
-import { WeekDaysSkeleton } from "@/components/WeekDays";
 
-/** Skeleton in the exact shape of page.tsx: header, hero, chart card, week card. */
+const ROWS = 4;
+
+/**
+ * Today's skeleton (the nav is real, from the layout): the real h1 with a bar for the date,
+ * bars for the updated and form lines, then one card with a title bar and tick rows
+ * (28px circle, name bar, prescription bar). Pulses only under motion-safe.
+ */
 export default function Loading() {
   return (
     <>
-      <header className="flex flex-col gap-1">
-        <h1 className="text-20 font-bold">Training load</h1>
-        <Bar className="w-1/3 text-14" />
+      <header className="flex flex-col">
+        <h1 className="flex items-center gap-2 text-20 font-bold">
+          Today
+          <Bar className="w-1/4 text-20" />
+        </h1>
+        <div aria-hidden="true" className="mt-1">
+          <Bar className="w-1/3 text-14" />
+        </div>
+        <div aria-hidden="true" className="mt-2">
+          <Bar className="w-1/2 text-20" />
+        </div>
       </header>
       <p className="sr-only" role="status">
-        Loading training data…
+        Loading today&apos;s plan…
       </p>
 
-      <div aria-hidden="true" className="flex flex-col gap-2">
-        <Bar className="w-1/3 text-14" />
-        <Bar className="w-1/4 text-40" />
-        <Bar className="w-1/2 text-14" />
-        <Bar className="w-1/2 text-14" />
+      {/* Card shape (Card.tsx) without a heading: the card's title isn't known yet. */}
+      <div aria-hidden="true" className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+        <Bar className="w-1/4 text-16" />
+        <div className="flex flex-col">
+          {Array.from({ length: ROWS }, (_, i) => (
+            <div
+              key={i}
+              className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 border-t border-border py-3 first:border-t-0"
+            >
+              <span className="col-start-2 row-start-1">
+                <Bar className="w-1/2 text-20" />
+              </span>
+              <span className="col-start-1 row-start-2 flex h-lh items-center text-28">
+                <span className="size-7 rounded-full bg-border motion-safe:animate-pulse" />
+              </span>
+              <span className="col-start-2 row-start-2">
+                <Bar className="w-2/3 text-28" />
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
-
-      <Card id="trend" title="Fitness, fatigue and form">
-        <div aria-hidden="true" className="flex flex-col gap-2">
-          <Bar className="w-12 text-12" />
-          <div className="h-(--chart-height) w-full rounded-control bg-border motion-safe:animate-pulse" />
-          <Bar className="w-3/4 text-12" />
-        </div>
-      </Card>
-
-      <Card id="week" title="This week">
-        {/* Week switcher: two 44px step links around the date range. */}
-        <div aria-hidden="true" className="flex items-center gap-2">
-          <span className="size-11 shrink-0 rounded-control bg-border motion-safe:animate-pulse" />
-          <span className="flex flex-1 flex-col items-center">
-            <Bar className="w-2/3 text-14" />
-            <Bar className="w-1/3 text-12" />
-          </span>
-          <span className="size-11 shrink-0" />
-        </div>
-        <WeekDaysSkeleton rows={7} />
-      </Card>
     </>
   );
 }

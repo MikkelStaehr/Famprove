@@ -5,7 +5,7 @@ import { formatDay, formatWeekParam } from "@/lib/format";
 
 /** Where a `?week=` value links. The value comes from weekly_load (WeekNav), never raw input. */
 export function weekHref(param: string): string {
-  return `/?week=${param}`;
+  return `/load?week=${param}`;
 }
 
 const STEP_CLASS =
@@ -69,7 +69,7 @@ function Step({ target, direction, year }: StepProps) {
 export function LatestWeekLink() {
   return (
     <Link
-      href="/"
+      href="/load"
       scroll={false}
       className="inline-flex min-h-11 items-center rounded-control border border-border px-3 text-14 font-semibold text-accent"
     >

@@ -118,3 +118,82 @@ export function formatWeekParam(param: string, year: number): string {
   const week = `week ${Number(match[2])}`;
   return Number(match[1]) === year ? week : `${week}, ${match[1]}`;
 }
+
+// --- Today screen ------------------------------------------------------------------------
+
+/**
+ * Whole-number range with an en dash and no spaces: (225, 250) -> "225–250". Ends that round
+ * to the same number show once: (238, 238) -> "238". For watts and % FTP (Python's numbers).
+ */
+export function formatRange(low: number, high: number): string {
+  const a = formatLoad(low);
+  const b = formatLoad(high);
+  return a === b ? a : `${a}–${b}`;
+}
+
+/** A planned step's length (minutes, per repetition): 8 -> "8 min", 0.5 -> "30 s", 1.5 -> "1 min 30 s". */
+export function formatStepDuration(minutes: number): string {
+  const seconds = Math.round(minutes * 60);
+  const whole = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  if (whole === 0) return `${rest} s`;
+  return rest === 0 ? `${whole} min` : `${whole} min ${rest} s`;
+}
+
+/**
+ * Screen-reader wording of a range between numbers: "8 - 12" -> "8 to 12", "RPE 6 - 7" ->
+ * "RPE 6 to 7", "225–250" -> "225 to 250". Anything else stays as written ("-10%").
+ * Visible text never uses this; it shows sheet strings exactly as written.
+ */
+export function spokenRange(text: string): string {
+  return text.replace(/(\d)(?:\s+-\s+|–)(?=\d)/g, "$1 to ");
+}
+
+/** "1" (as written, trimmed) takes the singular word; any other value the plural. */
+function counted(text: string, one: string, many: string): string {
+  return `${text} ${text.trim() === "1" ? one : many}`;
+}
+
+/**
+ * Visible sets × reps from the sheet cells as written: ("2", "8 - 12") -> "2 × 8 - 12".
+ * With one cell missing, that one's word: "10 - 15 reps", "2 sets". null when both are blank.
+ */
+export function formatSetsReps(sets: string | null, reps: string | null): string | null {
+  if (sets !== null && reps !== null) return `${sets} × ${reps}`;
+  if (reps !== null) return counted(reps, "rep", "reps");
+  if (sets !== null) return counted(sets, "set", "sets");
+  return null;
+}
+
+/** Spoken sets and reps: ("1", "3") -> "1 set of 3 reps", ("2", "8 - 12") -> "2 sets of 8 to 12 reps". */
+export function spokenSetsReps(sets: string | null, reps: string | null): string | null {
+  const spokenReps = reps === null ? null : counted(spokenRange(reps), "rep", "reps");
+  if (sets !== null && spokenReps !== null) return `${counted(sets, "set", "sets")} of ${spokenReps}`;
+  if (spokenReps !== null) return spokenReps;
+  if (sets !== null) return counted(sets, "set", "sets");
+  return null;
+}
+
+/** What one prescribed sheet row asks for. The sheet strings stay as written apart from ranges. */
+export type ExerciseWords = {
+  readonly name: string;
+  readonly setsText: string | null;
+  readonly repsText: string | null;
+  readonly prescribed: string | null;
+};
+
+/**
+ * The accessible name of a tick row, e.g. "Squat, 1 set of 3 reps at RPE 5, last week 100 kg".
+ * `lastWeek`: undefined in week 1 (no reference line), null when nothing was logged, else the
+ * formatted load ("100 kg", "bodyweight + 10 kg").
+ */
+export function spokenExercise(e: ExerciseWords, lastWeek: string | null | undefined): string {
+  const amount = spokenSetsReps(e.setsText, e.repsText);
+  const load = e.prescribed === null ? null : spokenRange(e.prescribed);
+  const what = amount !== null && load !== null ? `${amount} at ${load}` : (amount ?? load);
+  const parts = [e.name.trim()];
+  if (what !== null) parts.push(what);
+  if (lastWeek === null) parts.push("nothing logged last week");
+  else if (lastWeek !== undefined) parts.push(`last week ${lastWeek}`);
+  return parts.join(", ");
+}
