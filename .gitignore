@@ -42,3 +42,8 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# --- Real data exports (the repo is public) ---
+*.xlsx
+*.xls
+*.csv

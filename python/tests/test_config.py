@@ -12,6 +12,7 @@ from training_load.config import (
     collect_strength_config,
     compute_config,
     load_dotenv_file,
+    mask_in_ci,
 )
 
 SERVICE_ACCOUNT = json.dumps(
@@ -146,3 +147,14 @@ def test_dotenv_local_is_loaded_without_overriding_real_env(
 def test_no_dotenv_file_is_not_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     load_dotenv_file()
+
+
+def test_mask_in_ci_only_prints_inside_github_actions(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    mask_in_ci(SHEET_ID)
+    assert capsys.readouterr().out == ""
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    mask_in_ci(SHEET_ID, "")
+    assert capsys.readouterr().out == f"::add-mask::{SHEET_ID}\n"

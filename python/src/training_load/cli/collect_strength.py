@@ -11,6 +11,7 @@ from training_load.config import (
     GoogleSettings,
     collect_strength_config,
     load_dotenv_file,
+    mask_in_ci,
 )
 from training_load.db.client import Postgrest
 from training_load.db.strength_sets import replace_for_sheet
@@ -90,6 +91,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ConfigError as exc:
         log.error("%s", exc)
         return 2
+    mask_in_ci(config.google.sheet_id, config.google.service_account_info["client_email"])
     send = requests_send()
     db = Postgrest(config.supabase.url, config.supabase.service_key, send)
     written = run(config.google, bodyweight=config.bodyweight, send=send, db=db)

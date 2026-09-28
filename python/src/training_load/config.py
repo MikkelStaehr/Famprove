@@ -7,6 +7,7 @@ in one ``ConfigError``. Secret fields are excluded from ``repr`` so they never r
 
 import json
 import math
+import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -70,6 +71,16 @@ def load_dotenv_file() -> None:
     path = find_dotenv(".env.local", usecwd=True)
     if path:
         load_dotenv(path, override=False)
+
+
+def mask_in_ci(*values: str) -> None:
+    """In GitHub Actions, hide derived identifiers in the (public) job log for the rest of the
+    job. Secrets are masked by GitHub already, but only as the exact secret string: a sheet id
+    extracted from a pasted URL, or a field inside a JSON secret, would otherwise print."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        for value in values:
+            if value:
+                print(f"::add-mask::{value}", flush=True)
 
 
 class _Reader:

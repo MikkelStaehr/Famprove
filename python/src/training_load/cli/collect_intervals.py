@@ -74,19 +74,15 @@ def run(
         newest=today + timedelta(days=1),
     )
     parsed = parse_activities(raw)
+    # Counts only: the Actions logs of this public repo are world-readable.
     if parsed.stub_ids:
         log.warning(
             "%d Strava-sourced activities skipped: intervals.icu does not expose them via its "
-            "API (ids: %s). Sync rides to intervals.icu directly (e.g. Zwift/Garmin) instead.",
+            "API. Sync rides to intervals.icu directly (e.g. Zwift/Garmin) instead.",
             len(parsed.stub_ids),
-            ", ".join(parsed.stub_ids[:10]),
         )
     if parsed.missing_load_ids:
-        log.warning(
-            "%d rides have no training load; counted as 0 (ids: %s)",
-            len(parsed.missing_load_ids),
-            ", ".join(parsed.missing_load_ids[:10]),
-        )
+        log.warning("%d rides have no training load; counted as 0", len(parsed.missing_load_ids))
 
     upsert_activities(db, parsed.cycling)
     keep = {a.id for a in parsed.cycling} | set(parsed.stub_ids)
