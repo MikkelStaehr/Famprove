@@ -43,6 +43,13 @@ def mid(txt):
     nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", str(txt))]
     return sum(nums)/len(nums) if nums else None
 
+def prescribed_text(load: object) -> str | None:
+    """Load-cellen som i arket: tekst uændret, procent-tal (-0.1) som '-10%', andre tal som tekst."""
+    if load is None or load == "": return None
+    if isinstance(load, (int, float)) and not isinstance(load, bool):
+        return f"{load*100:g}%" if abs(load) < 1 else f"{load:g}"
+    return str(load).strip()
+
 def parse_all(data: bytes, bodyweight: float) -> list[ParsedSet]:
     wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     sets = []
@@ -90,5 +97,5 @@ def parse_tab(ws, tab, bodyweight):
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
-                                      prescribed=None if load in (None,"") else str(load).strip()))
+                                      prescribed=prescribed_text(load)))
     return sets

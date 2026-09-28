@@ -9,7 +9,7 @@ from datetime import date
 import pytest
 
 from conftest import BLOK_11, BLOK_12, SYNTHETIC_BODYWEIGHT
-from training_load.sources.strength_sheet import ParsedSet, parse_all
+from training_load.sources.strength_sheet import ParsedSet, parse_all, prescribed_text
 
 
 @pytest.fixture
@@ -114,3 +114,19 @@ def test_prescribed_load_cell_is_passed_through_as_text(parsed: list[ParsedSet])
     assert first(parsed, BLOK_11, "Squat", 1)["prescribed"] == "RPE 7 - 8"
     assert first(parsed, BLOK_11, "Bench press", 1)["prescribed"] == "-10%"
     assert first(parsed, BLOK_11, "Abs rollout", 1)["prescribed"] is None
+
+
+@pytest.mark.parametrize(
+    ("cell", "text"),
+    [
+        ("RPE 6 - 7", "RPE 6 - 7"),
+        (" BW ", "BW"),
+        (-0.1, "-10%"),
+        (-0.125, "-12.5%"),
+        (100, "100"),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_prescribed_text_shows_the_cell_as_the_sheet_does(cell: object, text: str | None) -> None:
+    assert prescribed_text(cell) == text
