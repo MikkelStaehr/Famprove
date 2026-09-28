@@ -1,0 +1,110 @@
+"""Parser (sources.strength_sheet) against the synthetic workbook. Formula must stay untouched.
+
+Golden scores were cross-checked against the original strength_collector.py (git 6810767) on
+the same workbook: all 55 sets matched field by field.
+"""
+
+from datetime import date
+
+import pytest
+
+from conftest import BLOK_11, BLOK_12, SYNTHETIC_BODYWEIGHT
+from training_load.sources.strength_sheet import ParsedSet, parse_all
+
+
+@pytest.fixture
+def parsed(workbook_bytes: bytes) -> list[ParsedSet]:
+    return parse_all(workbook_bytes, SYNTHETIC_BODYWEIGHT)
+
+
+def first(parsed: list[ParsedSet], block: str, name: str, week: int) -> ParsedSet:
+    return next(
+        p for p in parsed if p["block"] == block and p["name"] == name and p["week"] == week
+    )
+
+
+def test_only_program_blok_tabs_are_parsed(parsed: list[ParsedSet]) -> None:
+    assert {p["block"] for p in parsed} == {BLOK_11, BLOK_12}
+    assert len(parsed) == 55
+
+
+def test_dates_come_from_each_day_sections_date_row(parsed: list[ParsedSet]) -> None:
+    assert first(parsed, BLOK_11, "Squat", 1)["date"] == date(2026, 2, 2)
+    assert first(parsed, BLOK_11, "Squat", 3)["date"] == date(2026, 2, 16)
+    # Second day section of the same week has its own date row.
+    assert first(parsed, BLOK_11, "Tempo bench", 1)["date"] == date(2026, 2, 5)
+
+
+def test_header_micro_and_day_rows_are_skipped(parsed: list[ParsedSet]) -> None:
+    assert not {p["type"] for p in parsed} & {"TYPE", "DAY", "MICRO 1"}
+
+
+def test_nsets_expands_to_one_row_per_set_with_1_based_numbers(parsed: list[ParsedSet]) -> None:
+    squat_w1 = [
+        p for p in parsed if p["block"] == BLOK_11 and p["name"] == "Squat" and p["week"] == 1
+    ]
+    assert [p["set"] for p in squat_w1] == [1, 2, 3]
+    assert {p["row"] for p in squat_w1} == {9}
+
+
+def test_unprescribed_weeks_emit_no_sets(parsed: list[ParsedSet]) -> None:
+    assert [p["week"] for p in parsed if p["name"] == "Chin-ups"] == [1, 1, 1]
+
+
+def test_reps_range_uses_midpoint(parsed: list[ParsedSet]) -> None:
+    assert first(parsed, BLOK_11, "Dips", 1)["reps"] == 10.0
+
+
+def test_logged_kg_excludes_bodyweight_and_kg_includes_it(parsed: list[ParsedSet]) -> None:
+    dips = first(parsed, BLOK_11, "Dips", 1)
+    assert (dips["logged_kg"], dips["kg"], dips["bodyweight"]) == (10.0, 90.0, True)
+    squat = first(parsed, BLOK_11, "Squat", 1)
+    assert (squat["logged_kg"], squat["kg"], squat["bodyweight"]) == (120.0, 120.0, False)
+
+
+def test_bodyweight_param_only_changes_bodyweight_exercise_scores(workbook_bytes: bytes) -> None:
+    light = parse_all(workbook_bytes, 70.0)
+    heavy = parse_all(workbook_bytes, 90.0)
+    changed = {a["name"] for a, b in zip(light, heavy, strict=True) if a["score"] != b["score"]}
+    assert changed == {"Dips", "Chin-ups"}
+
+
+def test_abs_rows_get_fixed_score_and_no_rpe(parsed: list[ParsedSet]) -> None:
+    abs_sets = [p for p in parsed if p["type"] == "ABS"]
+    assert abs_sets and all(p["score"] == 72.0 and p["rpe"] is None for p in abs_sets)
+
+
+def test_main_lift_rpe_derived_from_e1rm_percentage(parsed: list[ParsedSet]) -> None:
+    # 120 / 150 = 80 % e1RM at 5 reps -> RPE ~7.49, not the prescribed "RPE 7 - 8" (7.5).
+    assert first(parsed, BLOK_11, "Squat", 1)["rpe"] == pytest.approx(7.492492, abs=1e-6)
+
+
+def test_main_lift_without_kg_uses_prescribed_rpe(parsed: list[ParsedSet]) -> None:
+    assert first(parsed, BLOK_11, "Squat", 2)["rpe"] == 8.0
+
+
+def test_tempo_variant_uses_prescribed_rpe(parsed: list[ParsedSet]) -> None:
+    assert first(parsed, BLOK_11, "Tempo bench", 1)["rpe"] == 6.0
+
+
+def test_unknown_rpe_defaults_to_6(parsed: list[ParsedSet]) -> None:
+    assert first(parsed, BLOK_11, "Bench press", 1)["rpe"] == 6.0
+    assert first(parsed, BLOK_11, "Chin-ups", 1)["rpe"] == 6.0
+
+
+@pytest.mark.parametrize(
+    ("block", "name", "week", "score"),
+    [
+        (BLOK_11, "Squat", 1, 336.8),  # leg factor 1.0, RPE from e1RM
+        (BLOK_11, "Dips", 1, 264.6),  # upper-body factor 0.6, kg + bodyweight
+        (BLOK_11, "Chin-ups", 1, 86.4),  # bodyweight only, RPE fallback 6
+        (BLOK_11, "Tempo bench", 1, 90.7),  # tempo -> prescribed RPE
+        (BLOK_11, "Leg extension", 1, 307.2),  # QUADS is a leg type
+        (BLOK_11, "Squat", 2, 0.0),  # nothing logged
+        (BLOK_12, "Squat", 1, 271.6),
+    ],
+)
+def test_score_golden_values_regression(
+    parsed: list[ParsedSet], block: str, name: str, week: int, score: float
+) -> None:
+    assert first(parsed, block, name, week)["score"] == score

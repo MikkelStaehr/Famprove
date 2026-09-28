@@ -1,0 +1,79 @@
+[project]
+name = "training-load"
+version = "0.1.0"
+description = "Famprove collectors (intervals.icu, coach's Google Sheet) and compute step (daily TSS, CTL/ATL/TSB) writing to Supabase."
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "openpyxl>=3.1",       # the existing strength parser reads the workbook with openpyxl
+    "requests>=2.32",      # plain HTTP to intervals.icu, the Drive API and Supabase PostgREST
+    "google-auth>=2.40",   # service-account OAuth token for the Drive API (drive.readonly)
+    "python-dotenv>=1.1",  # loads repo-root .env.local for local runs
+    "tzdata>=2025.2",      # Europe/Copenhagen for zoneinfo on Windows / slim CI images
+]
+
+[project.scripts]
+collect-intervals = "training_load.cli.collect_intervals:main"
+collect-strength = "training_load.cli.collect_strength:main"
+compute = "training_load.cli.compute:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "ruff>=0.13",
+    "mypy>=1.18",
+    "types-requests",   # stubs for requests (mypy strict)
+    "types-openpyxl",   # stubs for openpyxl (mypy strict)
+]
+
+[build-system]
+requires = ["uv_build>=0.8"]
+build-backend = "uv_build"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-ra --import-mode=importlib -m 'not live'"
+markers = [
+    "live: calls real external APIs with real credentials; run explicitly with `pytest -m live`",
+]
+
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["src", "tests"]
+mypy_path = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+# google-auth may ship without inline types; only google.oauth2 / google.auth.transport are used.
+module = ["google.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Legacy parser moved from strength_collector.py with history preserved. Its public entry
+# point (parse_all) is annotated; the original cell-handling body is not rewritten for the
+# type checker ("no rewrites for style"). Tighten if the parser is ever fully annotated.
+module = ["training_load.sources.strength_sheet"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = false
+warn_return_any = false
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Legacy parser keeps its original compact style (one-line ifs, multi-imports, Danish comments).
+"src/training_load/sources/strength_sheet.py" = ["E401", "E501", "E701", "E702", "I001", "B", "SIM", "UP", "RUF"]
+
+[tool.ruff.format]
+# Do not reformat the legacy parser: keeps `git blame` / `git log --follow` meaningful.
+exclude = ["src/training_load/sources/strength_sheet.py"]
