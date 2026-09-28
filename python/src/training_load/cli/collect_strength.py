@@ -61,6 +61,8 @@ def to_domain(parsed: ParsedSet, sheet_id: str) -> StrengthSet:
         rpe=parsed["rpe"],
         score=parsed["score"],
         prescribed=parsed["prescribed"],
+        sets_text=parsed["sets_text"],
+        reps_text=parsed["reps_text"],
     )
 
 

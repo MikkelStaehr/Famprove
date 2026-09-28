@@ -23,6 +23,8 @@ class ParsedSet(TypedDict):
     bodyweight: bool
     rpe: float | None
     prescribed: str | None  # foreskrevet load-celle som tekst (fx 'RPE 7 - 8'), kun til visning
+    sets_text: str | None   # sets-cellen som skrevet (fx '2'), kun til visning
+    reps_text: str | None   # reps-cellen som skrevet (fx '8 - 12'), kun til visning
     score: float          # rå score, før STRENGTH_K
 
 ABS_SET_SCORE = 10*20*(0.6**2)   # fast score pr. abs-sæt (10 reps @ 20 kg RPE 6)
@@ -42,6 +44,12 @@ def mid(txt):
     if isinstance(txt,(int,float)): return float(txt)
     nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", str(txt))]
     return sum(nums)/len(nums) if nums else None
+
+def cell_text(cell: object) -> str | None:
+    """En celle som i arket: tekst uændret, tal uden overflødige decimaler (3.0 -> '3')."""
+    if cell is None or cell == "": return None
+    if isinstance(cell, (int, float)) and not isinstance(cell, bool): return f"{cell:g}"
+    return str(cell).strip() or None
 
 def prescribed_text(load: object) -> str | None:
     """Load-cellen som i arket: tekst uændret, procent-tal (-0.1) som '-10%', andre tal som tekst."""
@@ -79,6 +87,7 @@ def parse_tab(ws, tab, bodyweight):
         for w,date in enumerate(week_dates):
             base = 4 + w*8          # SETS-kolonne for uge w
             nsets, reps, load, kg = r[base], r[base+1], r[base+2], r[base+3]
+            sets_text, reps_text = cell_text(nsets), cell_text(reps)
             if nsets in (None,0,"") or reps in (None,"") : continue
             nsets, reps = int(mid(nsets)), mid(reps)
             kg = float(kg) if isinstance(kg,(int,float)) else 0.0
@@ -97,5 +106,6 @@ def parse_tab(ws, tab, bodyweight):
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
-                                      prescribed=prescribed_text(load)))
+                                      prescribed=prescribed_text(load),
+                                      sets_text=sets_text, reps_text=reps_text))
     return sets

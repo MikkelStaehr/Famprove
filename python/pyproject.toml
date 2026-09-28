@@ -14,6 +14,7 @@ dependencies = [
 [project.scripts]
 collect-intervals = "training_load.cli.collect_intervals:main"
 collect-strength = "training_load.cli.collect_strength:main"
+collect-plan = "training_load.cli.collect_plan:main"
 compute = "training_load.cli.compute:main"
 
 [dependency-groups]

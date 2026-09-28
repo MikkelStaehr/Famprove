@@ -9,7 +9,7 @@ from datetime import date
 import pytest
 
 from conftest import BLOK_11, BLOK_12, SYNTHETIC_BODYWEIGHT
-from training_load.sources.strength_sheet import ParsedSet, parse_all, prescribed_text
+from training_load.sources.strength_sheet import ParsedSet, cell_text, parse_all, prescribed_text
 
 
 @pytest.fixture
@@ -130,3 +130,18 @@ def test_prescribed_load_cell_is_passed_through_as_text(parsed: list[ParsedSet])
 )
 def test_prescribed_text_shows_the_cell_as_the_sheet_does(cell: object, text: str | None) -> None:
     assert prescribed_text(cell) == text
+
+
+def test_sets_and_reps_cells_are_passed_through_as_written(parsed: list[ParsedSet]) -> None:
+    dips = first(parsed, BLOK_11, "Dips", 1)
+    assert (dips["sets_text"], dips["reps_text"], dips["reps"]) == ("3", "8 - 12", 10.0)
+    squat = first(parsed, BLOK_11, "Squat", 1)
+    assert (squat["sets_text"], squat["reps_text"]) == ("3", "5")
+
+
+@pytest.mark.parametrize(
+    ("cell", "text"),
+    [(3.0, "3"), (2, "2"), (" 8 - 12 ", "8 - 12"), (12.5, "12.5"), ("", None), (None, None)],
+)
+def test_cell_text_shows_numbers_without_trailing_zeros(cell: object, text: str | None) -> None:
+    assert cell_text(cell) == text

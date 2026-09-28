@@ -110,6 +110,8 @@ def ok_set(**overrides: object) -> ParsedSet:
         "rpe": 7.0,
         "score": 100.0,
         "prescribed": "RPE 7",
+        "sets_text": "1",
+        "reps_text": "5",
     }
     return cast(ParsedSet, base | overrides)
 

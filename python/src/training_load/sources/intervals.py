@@ -148,3 +148,30 @@ def fetch_wellness(
         )
         for day in days
     ]
+
+
+RIDE_TYPES_FOR_FTP: Final = frozenset({"Ride", "VirtualRide"})
+
+
+def parse_ride_ftp(athlete: object) -> int | None:
+    """The FTP (W) of the first sport-settings entry covering Ride or VirtualRide, else None."""
+    if not isinstance(athlete, dict):
+        raise ValueError("intervals.icu athlete: expected a JSON object")
+    for settings in json_objects(athlete.get("sportSettings") or [], "intervals.icu sportSettings"):
+        types = settings.get("types")
+        if isinstance(types, list) and RIDE_TYPES_FOR_FTP & {
+            t for t in types if isinstance(t, str)
+        }:
+            return opt_int(settings, "ftp")
+    return None
+
+
+def fetch_ride_ftp(send: HttpSend, *, api_key: str, athlete_id: str) -> int | None:
+    """GET /athlete/{athlete_id} -> ride FTP from sportSettings (read-only)."""
+    response = request(
+        send,
+        "GET",
+        f"{BASE_URL}/athlete/{quote(athlete_id, safe='')}",
+        headers={"Authorization": basic_auth_header(api_key), "Accept": "application/json"},
+    )
+    return parse_ride_ftp(response.json())

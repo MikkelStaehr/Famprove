@@ -56,6 +56,14 @@ jobs:
           BODYWEIGHT: ${{ secrets.BODYWEIGHT }}
         run: uv run --no-dev collect-strength
 
+      - name: collect-plan
+        env:
+          INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}
+          INTERVALS_ATHLETE_ID: ${{ secrets.INTERVALS_ATHLETE_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: uv run --no-dev collect-plan
+
       - name: compute
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

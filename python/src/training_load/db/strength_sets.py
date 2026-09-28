@@ -39,6 +39,8 @@ class StrengthSetRow(TypedDict):
     rpe: float | None
     score: float
     prescribed: str | None
+    sets_text: str | None
+    reps_text: str | None
 
 
 COLUMNS: Final = ",".join(StrengthSetRow.__annotations__)
@@ -61,6 +63,8 @@ def to_row(s: StrengthSet) -> StrengthSetRow:
         rpe=s.rpe,
         score=s.score,
         prescribed=s.prescribed,
+        sets_text=s.sets_text,
+        reps_text=s.reps_text,
     )
 
 
@@ -82,6 +86,8 @@ def from_row(row: JsonRow) -> StrengthSet:
         rpe=opt_float(row, "rpe"),
         score=req_float(row, "score"),
         prescribed=opt_str(row, "prescribed"),
+        sets_text=opt_str(row, "sets_text"),
+        reps_text=opt_str(row, "reps_text"),
     )
 
 
