@@ -29,6 +29,7 @@ Read by the `ui` agent before any UI work. Project-specific overrides go at the 
 - `StatusBadge` – text + semantic colour.
 - `EmptyState` – icon, one sentence, optional action.
 - `ErrorState` – what failed, when, retry.
+- `ScreenNav` – two-tab strip in the root layout; current tab = `aria-current="page"`, semibold + 2px bar (see "Today").
 
 ## Interaction
 - Touch targets ≥ 44×44px. Tap, not hover, for anything essential.
@@ -50,7 +51,12 @@ Read by the `ui` agent before any UI work. Project-specific overrides go at the 
 - No charts without units.
 
 ## Project overrides
-- **Question:** "How loaded am I right now, and is fitness going up?" — one screen, no other routes.
+- **Screens:** two routes linked by a two-tab `ScreenNav` ("Today" · "Training load").
+  - `/` **Today** answers "What am I doing in this session, and how hard?" (spec `design/specs/today.md`, rules in "Today" below).
+  - `/load` **Training load** answers "How loaded am I right now, and is fitness going up?". The bullets below, from "Key figure" to "Data", describe `/load`.
+- **Pattern packs:**
+  - `/load` follows [`design/patterns/data-dashboard.md`](design/patterns/data-dashboard.md). Conflict: the pack rounds kg to 1 decimal, but this app shows kg as logged (up to 2 decimals), because the user compares against their own sheet. DESIGN.md wins.
+  - `/` Today is not a dashboard, so the pack's "key figure is the largest element" does not apply there: the session's prescription numbers are. Its data-honesty rules do apply: freshness, gaps never shown as zeros, whole watts.
 - **Key figure (hero):** TSB today (form = CTL − ATL) from the latest `daily_load` row, with a one-line status.
 - **Chart:** CTL, ATL and TSB per day since 2026-01-01. Strength blocks shaded (`blocks.start_date` → `end_date`, an ongoing block runs to today); deload weeks marked (`blocks.deload_start` → `end_date`).
 - **Secondary:** this week's sessions (ISO week, Mon–Sun) — cycling TSS and strength TSS per day, plus the week total from `weekly_load`. A week switcher (`?week=2026-W33`, previous / next ISO week, "Back to this week") looks back; days expand to their rides and strength exercises.
@@ -86,3 +92,32 @@ Defined once in `web/src/app/globals.css` (CSS variables, switched by `prefers-c
 - Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days are a plain row reading "Rest". Column heads are visual only; each row speaks "cycling N TSS, …".
 - Row grid: day + three 64px TSS columns when the list is ≥ 20rem wide (Tailwind `@xs` container query, so it tracks text size); narrower, e.g. at 200% text, the day moves above the numbers instead of scrolling sideways.
 - Missing values show "–", spoken as "not recorded". A blank kg on a weighted exercise reads "no kg logged", never "0 kg". Score/set is labelled as the raw score before the strength factor.
+
+### Today (`/`, added by design-lead; full spec `design/specs/today.md`)
+- **Use:** a companion screen, read at arm's length (≈ 60–80 cm) in the gym or from the handlebar. The session is the hero. Form (TSB) is one header line, not a key figure.
+- **Data:** read-only and server-side. It uses the latest `daily_load` row for the form line, today's strength plan from the sheet data, and `planned_sessions` for rides. Python computes every number, including target watts. "Today" is the Europe/Copenhagen date at request time.
+- **Glance sizes** (existing tokens, no new sizes):
+  - text-28 bold tabular: anything read mid-set or mid-interval, i.e. sets × reps, prescribed load, target watts.
+  - text-20: exercise names, the last-week reference, step labels and durations.
+  - text-16 / 14 muted: supporting lines.
+  - Nothing in a session card is smaller than 14px.
+- **As written:** sheet strings (name, sets, reps, prescribed load) are shown verbatim, e.g. "8 - 12", "RPE 6 - 7", "-10%". Only screen-reader text rewrites " - " to " to ". Python-computed numbers (watts, % FTP, durations) use the shared formatters: whole W, en-dash ranges.
+- **Tick rows:**
+  - Each sheet row is a `<label>` wrapping a native checkbox, and the whole row is the target.
+  - The check is a 28px circle, left of the text: a `--text-muted` ring, or filled `--positive` with a ✓ when ticked. The ✓ shape carries the meaning, not only colour.
+  - Ticked text turns `--text-muted`. No strike-through, no reordering, no motion.
+  - The focus ring surrounds the whole row.
+  - Consecutive rows with the same name show the name once. Dividers go between runs only.
+- **Tick state:**
+  - In memory only (client provider in the root layout). It survives in-app navigation and clears on reload.
+  - No storage and no requests.
+  - One footnote says so: "Ticks clear when the page reloads. Log kg in the sheet."
+- **Ride steps:**
+  - Left column: label and duration.
+  - Right column: watts in text-28, % FTP below it in muted text.
+  - Repeat groups get a "Repeat N times" header, with their steps indented 16px behind a 2px `--chart-mark` rule.
+- **Order:** ride card(s), then the strength card, then (only when neither) the rest card.
+- **Freshness:**
+  - The same "updated" line as `/load`. The stale sentence names the consequence: "Form and the strength plan may be out of date."
+  - A failed plan read is an ErrorState, never a rest day.
+- **Nav:** `ScreenNav` is a two-tab strip ("Today" · "Training load") at the top of both screens. **Not sticky**, which overrides "Sticky header only if there is navigation": in the gym the 44px goes to the session, and the nav is used rarely.

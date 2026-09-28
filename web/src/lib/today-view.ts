@@ -5,8 +5,9 @@
  */
 import { freshness, zoneDisplay } from "./dashboard-view.ts";
 import type { Freshness, Hero } from "./dashboard-view.ts";
-import type { TodayData } from "./db/queries.ts";
-import type { IsoDate, PlanItem, PrescribedSetRow } from "./db/rows.ts";
+import { addDays } from "./dates.ts";
+import type { TodayPlanData } from "./db/queries.ts";
+import type { DailyLoadRow, IsoDate, PlanItem, PrescribedSetRow } from "./db/rows.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
 
@@ -66,9 +67,16 @@ export type RideView = {
   readonly problem: string | null;
 };
 
-export type NextSession =
-  | { readonly kind: "strength"; readonly date: IsoDate; readonly block: string; readonly week: number }
-  | { readonly kind: "ride"; readonly date: IsoDate; readonly name: string };
+export type NextSessionItem =
+  | { readonly kind: "strength"; readonly block: string; readonly week: number }
+  | { readonly kind: "ride"; readonly name: string };
+
+/** The first date after today (within the lookahead) with something planned, and all of it. */
+export type NextDay = {
+  readonly date: IsoDate;
+  readonly isTomorrow: boolean;
+  readonly sessions: readonly NextSessionItem[]; // ride(s) first, then strength
+};
 
 export type TodayHeader = {
   readonly date: IsoDate; // the daily_load row's date (normally today)
@@ -77,13 +85,13 @@ export type TodayHeader = {
   readonly freshness: Freshness;
 };
 
-export type TodayView = {
+/** The day's plan. The form line (TodayHeader) is built and loaded separately. */
+export type TodayPlan = {
   readonly date: IsoDate;
   readonly kind: "strength" | "ride" | "both" | "rest";
-  readonly header: TodayHeader | null; // null when daily_load is empty
   readonly strength: readonly StrengthSession[];
   readonly rides: readonly RideView[];
-  readonly next: NextSession | null; // the first session after today
+  readonly next: NextDay | null; // null when nothing is planned within the lookahead
 };
 
 function rowKey(s: { readonly block: string; readonly sheetRow: number }): string {
@@ -101,7 +109,7 @@ function references(previous: readonly PrescribedSetRow[]): Map<string, Referenc
   return refs;
 }
 
-export function strengthSessions(data: TodayData): StrengthSession[] {
+export function strengthSessions(data: TodayPlanData): StrengthSession[] {
   const refs = references(data.previousWeek);
   const sessions = new Map<string, { block: string; week: number; rows: Map<string, ExerciseView> }>();
   const ordered = data.sets.toSorted(
@@ -135,23 +143,35 @@ export function strengthSessions(data: TodayData): StrengthSession[] {
   }));
 }
 
-function nextSession(data: TodayData): NextSession | null {
-  const strength: NextSession | null =
-    data.nextStrength === null
-      ? null
-      : {
-          kind: "strength",
-          date: data.nextStrength.date,
-          block: data.nextStrength.block,
-          week: data.nextStrength.week,
-        };
-  const ride: NextSession | null =
-    data.nextRide === null ? null : { kind: "ride", date: data.nextRide.date, name: data.nextRide.name };
-  if (strength === null || ride === null) return strength ?? ride;
-  return ride.date < strength.date ? ride : strength;
+function nextDay(data: TodayPlanData, today: IsoDate): NextDay | null {
+  const dates = [
+    ...(data.nextStrength === null ? [] : [data.nextStrength.date]),
+    ...data.upcomingRides.map((r) => r.date),
+  ].filter((d) => d > today);
+  if (dates.length === 0) return null;
+  const date = dates.reduce((a, b) => (b < a ? b : a));
+  const sessions: NextSessionItem[] = data.upcomingRides
+    .filter((r) => r.date === date)
+    .map((r) => ({ kind: "ride", name: r.name }));
+  if (data.nextStrength !== null && data.nextStrength.date === date) {
+    sessions.push({ kind: "strength", block: data.nextStrength.block, week: data.nextStrength.week });
+  }
+  return { date, isTomorrow: date === addDays(today, 1), sessions };
 }
 
-export function buildTodayView(data: TodayData, today: IsoDate, now: Date): TodayView {
+/** The form line from the latest daily_load row (null when there is none). */
+export function todayHeader(latest: DailyLoadRow | null, now: Date): TodayHeader | null {
+  return latest === null
+    ? null
+    : {
+        date: latest.date,
+        tsb: latest.tsb,
+        zone: zoneDisplay(latest.formZone),
+        freshness: freshness(latest.computedAt, now),
+      };
+}
+
+export function buildTodayPlan(data: TodayPlanData, today: IsoDate): TodayPlan {
   const strength = strengthSessions(data);
   const rides: RideView[] = data.rides.map((r) => ({
     name: r.name,
@@ -169,21 +189,5 @@ export function buildTodayView(data: TodayData, today: IsoDate, now: Date): Toda
         : rides.length > 0
           ? "ride"
           : "rest";
-  const latest = data.latest;
-  return {
-    date: today,
-    kind,
-    header:
-      latest === null
-        ? null
-        : {
-            date: latest.date,
-            tsb: latest.tsb,
-            zone: zoneDisplay(latest.formZone),
-            freshness: freshness(latest.computedAt, now),
-          },
-    strength,
-    rides,
-    next: nextSession(data),
-  };
+  return { date: today, kind, strength, rides, next: nextDay(data, today) };
 }

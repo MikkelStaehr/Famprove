@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { TodayData } from "../src/lib/db/queries.ts";
+import type { TodayPlanData } from "../src/lib/db/queries.ts";
 import {
   parsePlannedTargetRow,
   parsePrescribedSetRow,
   RowError,
 } from "../src/lib/db/rows.ts";
 import type { DailyLoadRow, PlannedTargetRow, PrescribedSetRow } from "../src/lib/db/rows.ts";
-import { buildTodayView, localToday, resolveToday } from "../src/lib/today-view.ts";
+import { buildTodayPlan, localToday, resolveToday, todayHeader } from "../src/lib/today-view.ts";
 
 const BLOK = "Program - blok 12 (offseason)";
 
@@ -56,16 +56,8 @@ const RIDE: PlannedTargetRow = {
   computedAt: "2026-10-05T03:00:00Z",
 };
 
-function data(overrides: Partial<TodayData>): TodayData {
-  return {
-    latest: LATEST,
-    sets: [],
-    previousWeek: [],
-    rides: [],
-    nextStrength: null,
-    nextRide: null,
-    ...overrides,
-  };
+function data(overrides: Partial<TodayPlanData>): TodayPlanData {
+  return { sets: [], previousWeek: [], rides: [], nextStrength: null, upcomingRides: [], ...overrides };
 }
 
 const NOW = new Date("2026-10-05T10:00:00Z");
@@ -84,7 +76,7 @@ test("resolveToday honours DEV_TODAY only in development", () => {
 });
 
 test("strength day: exercises in sheet order, one per row, with last week's kg as reference", () => {
-  const view = buildTodayView(
+  const view = buildTodayPlan(
     data({
       sets: [
         set({ sheetRow: 27, setNo: 2, name: "Squat", setsText: "2", repsText: "5", prescribed: "-10%" }),
@@ -99,7 +91,6 @@ test("strength day: exercises in sheet order, one per row, with last week's kg a
       ],
     }),
     "2026-10-05",
-    NOW,
   );
   assert.equal(view.kind, "strength");
   const [session] = view.strength;
@@ -113,40 +104,53 @@ test("strength day: exercises in sheet order, one per row, with last week's kg a
       ["Dips", "1", "8 - 12", "RPE 5.5", { kg: 10, bodyweight: true }],
     ],
   );
-  assert.equal(view.header?.zone?.label, "Fresh");
-  assert.equal(view.header?.freshness.kind, "fresh");
 });
 
-test("ride day, both, and rest day with the next session", () => {
-  const ride = buildTodayView(data({ rides: [{ ...RIDE, date: "2026-10-05" }] }), "2026-10-05", NOW);
+test("todayHeader: TSB, zone and freshness from the latest row; null without rows", () => {
+  const header = todayHeader(LATEST, NOW);
+  assert.equal(header?.tsb, 10.8);
+  assert.equal(header?.zone?.label, "Fresh");
+  assert.equal(header?.freshness.kind, "fresh");
+  assert.equal(header?.date, "2026-10-05");
+  assert.equal(todayHeader(null, NOW), null);
+});
+
+test("ride day, both, and rest day with every session on the next date", () => {
+  const ride = buildTodayPlan(data({ rides: [{ ...RIDE, date: "2026-10-05" }] }), "2026-10-05");
   assert.equal(ride.kind, "ride");
   assert.equal(ride.rides[0]?.steps[0]?.kind, "step");
 
-  const both = buildTodayView(
+  const both = buildTodayPlan(
     data({ sets: [set({})], rides: [{ ...RIDE, date: "2026-10-05" }] }),
     "2026-10-05",
-    NOW,
   );
   assert.equal(both.kind, "both");
 
-  const rest = buildTodayView(
-    data({ nextStrength: set({ date: "2026-10-07", week: 2 }), nextRide: RIDE }),
+  const rest = buildTodayPlan(
+    data({ nextStrength: set({ date: "2026-10-07", week: 2 }), upcomingRides: [RIDE] }),
     "2026-10-06",
-    NOW,
   );
   assert.equal(rest.kind, "rest");
-  assert.deepEqual(rest.next, { kind: "strength", date: "2026-10-07", block: BLOK, week: 2 });
+  assert.deepEqual(rest.next, {
+    date: "2026-10-07",
+    isTomorrow: true,
+    sessions: [{ kind: "strength", block: BLOK, week: 2 }],
+  });
 
-  const rideFirst = buildTodayView(
-    data({ nextStrength: set({ date: "2026-10-09" }), nextRide: RIDE }),
+  const sameDay = buildTodayPlan(
+    data({ nextStrength: set({ date: "2026-10-08" }), upcomingRides: [RIDE] }),
     "2026-10-06",
-    NOW,
   );
-  assert.deepEqual(rideFirst.next, { kind: "ride", date: "2026-10-08", name: "Zwift - Over-unders" });
+  assert.deepEqual(sameDay.next, {
+    date: "2026-10-08",
+    isTomorrow: false,
+    sessions: [
+      { kind: "ride", name: "Zwift - Over-unders" },
+      { kind: "strength", block: BLOK, week: 2 },
+    ],
+  });
 
-  const nothing = buildTodayView(data({ latest: null }), "2026-10-06", NOW);
-  assert.equal(nothing.next, null);
-  assert.equal(nothing.header, null);
+  assert.equal(buildTodayPlan(data({}), "2026-10-06").next, null);
 });
 
 test("parsers for the Today rows", () => {

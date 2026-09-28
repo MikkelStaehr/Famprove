@@ -94,32 +94,41 @@ export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<Week
   return { activities, sets };
 }
 
-/** Everything the Today screen reads for one local date. */
-export type TodayData = {
-  readonly latest: DailyLoadRow | null; // latest daily_load row on or before `today`
-  readonly sets: readonly PrescribedSetRow[]; // today's prescription, all sets, sheet order
+/** Days ahead the rest state looks for the next session. */
+export const NEXT_SESSION_DAYS = 28;
+
+/** The form line: the latest daily_load row on or before `today` (null when none). */
+export async function loadTodayForm(today: IsoDate): Promise<DailyLoadRow | null> {
+  await connection();
+  if (!ISO_DATE.test(today)) throw new RangeError("loadTodayForm: invalid date");
+  return selectFirst(
+    client(),
+    DAILY_LOAD_SELECT.table,
+    { ...DAILY_LOAD_SELECT, order: "date.desc", filters: [["date", `lte.${today}`]] },
+    parseDailyLoadRow,
+  );
+}
+
+/** Everything the Today screen's plan reads for one local date (form is loaded separately). */
+export type TodayPlanData = {
+  readonly sets: readonly PrescribedSetRow[]; // today's prescription, all sets
   readonly previousWeek: readonly PrescribedSetRow[]; // same tabs, week - 1 (references)
   readonly rides: readonly PlannedTargetRow[]; // planned rides today
-  readonly nextStrength: PrescribedSetRow | null; // first prescribed set after today
-  readonly nextRide: PlannedTargetRow | null; // first planned ride after today
+  readonly nextStrength: PrescribedSetRow | null; // first prescribed set in (today, today + 28]
+  readonly upcomingRides: readonly PlannedTargetRow[]; // planned rides in (today, today + 28]
 };
 
 /**
- * Today's prescription, last week's sets of the same tabs, planned rides and the next
- * sessions. `today` is a local date chosen by the server (never raw user input); it is
- * validated again here. Reads only; throws like loadDashboardData.
+ * Today's prescription, last week's sets of the same tabs, planned rides and what comes
+ * next. `today` is a local date chosen by the server (never raw user input); it is
+ * validated again here. Reads only; throws EnvError / PostgrestError / RowError.
  */
-export async function loadToday(today: IsoDate): Promise<TodayData> {
+export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
   await connection();
-  if (!ISO_DATE.test(today)) throw new RangeError("loadToday: invalid date");
+  if (!ISO_DATE.test(today)) throw new RangeError("loadTodayPlan: invalid date");
   const db = client();
-  const [latest, sets, rides, nextStrength, nextRide] = await Promise.all([
-    selectFirst(
-      db,
-      DAILY_LOAD_SELECT.table,
-      { ...DAILY_LOAD_SELECT, order: "date.desc", filters: [["date", `lte.${today}`]] },
-      parseDailyLoadRow,
-    ),
+  const horizon = addDays(today, NEXT_SESSION_DAYS);
+  const [sets, rides, nextStrength, upcomingRides] = await Promise.all([
     selectAll(
       db,
       PRESCRIBED_SETS_SELECT.table,
@@ -135,13 +144,19 @@ export async function loadToday(today: IsoDate): Promise<TodayData> {
     selectFirst(
       db,
       PRESCRIBED_SETS_SELECT.table,
-      { ...PRESCRIBED_SETS_SELECT, filters: [["date", `gt.${today}`]] },
+      {
+        ...PRESCRIBED_SETS_SELECT,
+        filters: [["date", `gt.${today}`], ["date", `lte.${horizon}`]],
+      },
       parsePrescribedSetRow,
     ),
-    selectFirst(
+    selectAll(
       db,
       PLANNED_TARGETS_SELECT.table,
-      { ...PLANNED_TARGETS_SELECT, filters: [["date", `gt.${today}`]] },
+      {
+        ...PLANNED_TARGETS_SELECT,
+        filters: [["date", `gt.${today}`], ["date", `lte.${horizon}`]],
+      },
       parsePlannedTargetRow,
     ),
   ]);
@@ -149,7 +164,9 @@ export async function loadToday(today: IsoDate): Promise<TodayData> {
   // today's rows (server data) and go through URLSearchParams as eq. values.
   const previousKeys = new Map<string, { block: string; week: number }>();
   for (const s of sets) {
-    if (s.week > 1) previousKeys.set(`${s.block}#${s.week - 1}`, { block: s.block, week: s.week - 1 });
+    if (s.week > 1) {
+      previousKeys.set(`${s.block}#${s.week - 1}`, { block: s.block, week: s.week - 1 });
+    }
   }
   const previous = await Promise.all(
     [...previousKeys.values()].map(({ block, week }) =>
@@ -161,5 +178,5 @@ export async function loadToday(today: IsoDate): Promise<TodayData> {
       ),
     ),
   );
-  return { latest, sets, previousWeek: previous.flat(), rides, nextStrength, nextRide };
+  return { sets, previousWeek: previous.flat(), rides, nextStrength, upcomingRides };
 }
