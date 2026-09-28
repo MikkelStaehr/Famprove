@@ -18,14 +18,16 @@ export function StrengthCard({ id, date, session }: StrengthCardProps) {
       title="Strength"
       action={<TickProgress date={date} rowKeys={session.exercises.map((e) => e.key)} />}
     >
-      <p className="text-16">
-        {session.block} · week {session.week}
-      </p>
-      {session.week === 1 && (
-        <p className="text-14 text-text-muted">
-          Week 1 of the block: no kg from last week to compare yet.
+      <div className="flex flex-col gap-1">
+        <p className="text-16">
+          {session.block} · week {session.week}
         </p>
-      )}
+        {session.week === 1 && (
+          <p className="text-14 text-text-muted">
+            Week 1 of the block: no kg from last week to compare yet.
+          </p>
+        )}
+      </div>
       <ExerciseList date={date} week={session.week} exercises={session.exercises} />
       <p className="text-14 text-text-muted">Ticks clear when the page reloads. Log kg in the sheet.</p>
     </Card>

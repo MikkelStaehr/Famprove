@@ -1,5 +1,9 @@
+import Link from "next/link";
+
 type Retry =
-  | { readonly href: string } // server-rendered: reload the route
+  // Server-rendered: a soft navigation re-reads the route. Never a full reload, so Today's
+  // ticks (held in the root layout) survive a retry.
+  | { readonly href: string }
   | { readonly onRetry: () => void }; // client boundary: re-render
 
 type ErrorStateProps = {
@@ -34,9 +38,9 @@ export function ErrorState({ title, what, detail, at, retry }: ErrorStateProps) 
         </p>
       )}
       {"href" in retry ? (
-        <a href={retry.href} className={RETRY_CLASS}>
+        <Link href={retry.href} prefetch={false} className={RETRY_CLASS}>
           Try again
-        </a>
+        </Link>
       ) : (
         <button type="button" onClick={retry.onRetry} className={RETRY_CLASS}>
           Try again

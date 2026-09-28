@@ -46,25 +46,35 @@ export function FormLine({ header, today }: FormLineProps) {
   );
 }
 
+type FormLineErrorProps = {
+  /**
+   * Show this line's own "Try again". False when the plan failed too: the plan's ErrorState
+   * retry re-reads both, so a double failure shows one retry.
+   */
+  readonly retry: boolean;
+};
+
 /**
  * The form read failed; the plan still renders. "Try again" is a soft navigation to "/": it
  * re-reads the (request-time) page and, unlike a reload, keeps the ticks.
  */
-export function FormLineError() {
+export function FormLineError({ retry }: FormLineErrorProps) {
   return (
     <p className="flex flex-wrap items-center gap-x-2 text-14 text-warning">
       <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0" fill="currentColor">
         <path d="M6 1 11 11H1Z" />
       </svg>
       <span>Couldn&apos;t load form (TSB).</span>
-      {/* Underlined: inside a sentence the link must not differ by colour alone. */}
-      <Link
-        href="/"
-        prefetch={false}
-        className="inline-flex min-h-11 items-center font-semibold text-accent underline"
-      >
-        Try again
-      </Link>
+      {retry && (
+        // Underlined: inside a sentence the link must not differ by colour alone.
+        <Link
+          href="/"
+          prefetch={false}
+          className="inline-flex min-h-11 items-center font-semibold text-accent underline"
+        >
+          Try again
+        </Link>
+      )}
     </p>
   );
 }

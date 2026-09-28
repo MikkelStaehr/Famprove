@@ -39,7 +39,9 @@ export function RideCard({ id, ride }: RideCardProps) {
       <p className="text-20 font-semibold">{ride.name}</p>
       {ride.notes !== null && ride.notes.trim() !== "" && <p className="text-16">{ride.notes}</p>}
       {ride.problem !== null ? (
-        <WarningLine>Couldn&apos;t read the steps: {ride.problem}</WarningLine>
+        <WarningLine>
+          {`Couldn't read the steps, so no targets are shown. Fix them in planned_sessions (${ride.problem}).`}
+        </WarningLine>
       ) : ride.steps.length === 0 ? (
         <EmptyState message="No steps entered for this ride." />
       ) : (
@@ -115,16 +117,18 @@ function StepRow({ step }: { readonly step: PlanStep }) {
         )}
       </p>
       <p aria-hidden="true" className="ml-auto flex flex-col items-end text-right">
-        {/* nowrap: a range never breaks after its en dash ("125–" / "188 W"). */}
+        {/* A range never breaks after its en dash ("125–" / "188 W" reads like a 188 W target).
+            Only the unit may wrap under it, when the card is narrower than the value (200% text). */}
         {watts === null ? (
-          <span className="text-28 font-bold whitespace-nowrap tabular-nums">
-            {pct}%<span className="text-20"> FTP</span>
+          <span className="text-28 font-bold tabular-nums">
+            <span className="whitespace-nowrap">{pct}%</span>
+            <span className="text-20"> FTP</span>
           </span>
         ) : (
           <>
-            <span className="text-28 font-bold whitespace-nowrap tabular-nums">
-              {watts}
-              <span className="text-20"> W</span>
+            {/* Full-size unit: a smaller capital W beside 28px digits reads as a lowercase "w". */}
+            <span className="text-28 font-bold tabular-nums">
+              <span className="whitespace-nowrap">{watts}</span> W
             </span>
             <span className="text-16 text-text-muted tabular-nums">{pct}% FTP</span>
           </>

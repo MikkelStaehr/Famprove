@@ -83,7 +83,11 @@ export default async function TodayPage() {
           </div>
         )}
         <div className={header !== null ? "mt-2" : "mt-1"}>
-          {form.kind === "error" ? <FormLineError /> : <FormLine header={form.header} today={today} />}
+          {form.kind === "error" ? (
+            <FormLineError retry={plan.kind !== "error"} />
+          ) : (
+            <FormLine header={form.header} today={today} />
+          )}
         </div>
       </header>
       {plan.kind === "error" ? <PlanError error={plan.error} at={plan.at} /> : <DayCards plan={plan.plan} />}

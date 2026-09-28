@@ -43,8 +43,17 @@ export function ExerciseList({ date, week, exercises }: ListProps) {
   return (
     <ol aria-label="Exercises" className="flex flex-col">
       {exercises.map((exercise, i) => {
-        const runStart = i === 0 || exercises[i - 1].name.trim() !== exercise.name.trim();
+        const name = exercise.name.trim();
+        const runStart = i === 0 || exercises[i - 1].name.trim() !== name;
         const key = tickKey(date, exercise.key);
+        // The run's name only reads as done once every row of the run is ticked, so "Squat"
+        // never looks finished after the first top set. Only the run's first row shows it.
+        let runDone = false;
+        if (runStart) {
+          let end = i + 1;
+          while (end < exercises.length && exercises[end].name.trim() === name) end += 1;
+          runDone = exercises.slice(i, end).every((row) => ticked.has(tickKey(date, row.key)));
+        }
         return (
           // Dividers go between runs only, never inside one.
           <li key={exercise.key} className={runStart && i > 0 ? "border-t border-border" : undefined}>
@@ -52,6 +61,7 @@ export function ExerciseList({ date, week, exercises }: ListProps) {
               exercise={exercise}
               week={week}
               showName={runStart}
+              runDone={runDone}
               done={ticked.has(key)}
               onToggle={(done) => setTicked(key, done)}
             />
@@ -67,11 +77,13 @@ type RowProps = {
   readonly week: number;
   /** First row of a run: the name shows. Continuation rows carry it in the sr-only sentence. */
   readonly showName: boolean;
+  /** Every row of this row's run is ticked (only read when showName). */
+  readonly runDone: boolean;
   readonly done: boolean;
   readonly onToggle: (done: boolean) => void;
 };
 
-function ExerciseRow({ exercise: e, week, showName, done, onToggle }: RowProps) {
+function ExerciseRow({ exercise: e, week, showName, runDone, done, onToggle }: RowProps) {
   const amount = formatSetsReps(e.setsText, e.repsText);
   // undefined: week 1 has no reference line; null: nothing logged last week (never "0 kg").
   const lastWeek =
@@ -93,7 +105,10 @@ function ExerciseRow({ exercise: e, week, showName, done, onToggle }: RowProps) 
       />
       <span className="sr-only">{spokenExercise(e, lastWeek)}</span>
       {showName && (
-        <span aria-hidden="true" className="col-start-2 row-start-1 text-20 font-semibold">
+        <span
+          aria-hidden="true"
+          className={`col-start-2 row-start-1 text-20 font-semibold ${runDone ? "" : "text-text"}`}
+        >
           {e.name}
         </span>
       )}
