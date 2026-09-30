@@ -85,3 +85,54 @@ Structure unchanged (DESIGN.md › Week card).
 4. The chart has no zone shading; block shading and deload hatch remain; the legend and tooltip are Danish; the chart card is fully visible at 390 × 844.
 5. Card titles on `/load` are 20px Barlow 700, sentence case.
 6. No English UI string remains in the hero, chart, page chrome or states (week card: after the §6 follow-up).
+
+## 8. Explainer: lines, zones and today's reading (added 2026-09-30, M)
+Question: "What do these three lines and five zones mean for my training?" No new data: the zone comes from `daily_load.form_zone` (`high_risk` · `optimal` · `grey_zone` · `fresh` · `transition` · `null`), never from comparing TSB in the UI. `ZoneBar` itself is **not changed** (shared with Today; Today stays as is).
+
+### 8a. Zone reading (one sentence under the hero)
+- New `/load`-only element after `ZoneBar` (hero), before the fitness delta. Spacing: 12px under the threshold numbers (or under ZoneBar's own "Zone ikke beregnet." line), then 8px to the fitness delta, which keeps its 4px to the detail line.
+- `text-16` Barlow 400, `--text`, `max-width: 60ch`, wraps freely (≤ 2 lines at 390px; 200% text may wrap more, never truncates). No icon, no colour, no tint: the flag above already carries the zone name.
+- Visible plain text, read in DOM order right after the hero sr sentence. No `aria-live` (it does not change after load).
+- **No TSB** (`tsb` null): render nothing (ZoneBar already says "Form er ikke beregnet endnu.").
+- Out of range: the zone's sentence as normal. Stale: unchanged (the updated line carries staleness). Loading: one extra skeleton bar (`text-16` height, w-3/4) between the threshold numbers and the delta bar.
+
+| `form_zone` | Sentence (exact) |
+|---|---|
+| `high_risk` | `Du er langt mere træt, end din fitness kan bære. Tag lette dage, før du belaster igen.` |
+| `optimal` | `Du er træt på den gode måde: belastningen bygger fitness op.` |
+| `grey_zone` | `Du er hverken træt nok til at bygge fitness eller frisk nok til at præstere.` |
+| `fresh` | `Du er frisk og klar til at præstere, men fitness bygges ikke op lige nu.` |
+| `transition` | `Du er så frisk, at fitness falder. Fint i en pause, ellers er det tid til at træne.` |
+| `null` (TSB exists) | `Uden zone kan dagens form ikke tolkes. Brug tallet på skalaen ovenfor.` |
+
+### 8b. "Hvad betyder det?" disclosure (chart card)
+- Placement: inside the chart card, **8px under the legend, 12px above the plot**. Native `<details>` (no `open` attribute: collapsed by default) with a `<summary>`. No JS, no custom ARIA: the browser exposes expanded/collapsed.
+- Summary: full card width, `min-height: 44px`, flex, items centred, `text-16` Barlow 600 `--text`, sentence case. Default marker removed (`list-style: none` + `::-webkit-details-marker { display: none }`); a 20px chevron-down icon (`aria-hidden`, `--text-muted`) 8px after the text, rotated 180° when `[open]`: 180ms ease-out under `motion-safe` only, instant otherwise. Focus: Part B ring (3px `--focus`, 3px offset, `rounded-control`). No hover-only affordance. Accessible name: visible text + sr-only suffix, i.e. `Hvad betyder det?` + `<span class="sr-only"> Forklaring af fitness, træthed, form og formzoner</span>` (starts with the visible label, WCAG 2.5.3).
+- Open body: `max-width: 65ch`, 8px under the summary, 16px bottom padding, 16px between groups, 12px between items. No inner boxes, no dividers (group by proximity). No height animation.
+- **Group 1 – lines:** a `<dl>`. Term: the legend's line swatch (same solid/dashed/dotted mark and token as the legend, 24px, `aria-hidden`) + term in `text-16` 700. Description: `text-16` 400 `--text`, 4px below. Then the method note in `text-14` `--text-muted`.
+- **Group 2 – zones:** `<h3>` `Formzoner` (`text-14` 700 uppercase +0.04em). Then a `<dl>`, one item per zone, in scale order (low to high). Term line: 12px `rounded-mark` swatch in `--zone-*` with a 1px `--text-muted` ring (`aria-hidden`), 8px gap, zone name `text-16` 700, then the range in `text-14` 600 tabular `--text-muted` on the same line (wraps under it at 200%). Range: visible text `aria-hidden` + an `sr-only` twin with "minus" written out. Description: `text-16` 400, 4px below.
+- The disclosure renders whenever the chart card renders its legend (incl. chart empty/error). Page Empty/Error: no chart card, so no disclosure. Loading: a 44px row with a `text-16` bar w-1/3 in its place, so nothing jumps.
+- Fold: closed, and with a 2-line zone sentence, the **240px plot** must still end ≤ 844px at 390px (this replaces §7.4's "chart card fully visible"). If it doesn't, report it; don't shrink type or move the disclosure.
+
+| Key | Danish (exact) |
+|---|---|
+| Summary | `Hvad betyder det?` (+ sr-only ` Forklaring af fitness, træthed, form og formzoner`) |
+| Term / text: Fitness | `Fitness (CTL)` · `Din gennemsnitlige daglige belastning over de sidste ca. 6 uger. Stiger langsomt og viser den kapacitet, du har bygget op.` |
+| Term / text: Træthed | `Træthed (ATL)` · `Din gennemsnitlige daglige belastning over den sidste ca. uge. Svinger hurtigt og viser, hvor træt du er lige nu.` |
+| Term / text: Form | `Form (TSB)` · `Fitness minus træthed. Negativ: du bygger op og er træt. Positiv: du er frisk.` |
+| Method note | `Belastning er TSS pr. dag fra cykling og styrke tilsammen. Fitness og træthed er vægtede gennemsnit: de nyeste dage tæller mest, og ældre dage fylder gradvist mindre uden at forsvinde helt. Tidskonstanterne er 42 og 7 dage, samme formel som intervals.icu.` |
+| Zones heading | `Formzoner` |
+| Høj risiko | range `−30 og lavere` (sr `minus 30 og lavere`) · `Træthed langt over fitness. Risiko for overbelastning og sygdom, så læg lette dage ind.` |
+| Optimal | range `over −30 til og med −10` (sr `over minus 30 til og med minus 10`) · `Træt nok til at bygge fitness uden at køre dig selv ned. Her skal en god træningsblok ligge.` |
+| Gråzone | range `over −10 til under 5` (sr `over minus 10 til under 5`) · `Hverken træt nok til at bygge fitness eller frisk nok til at præstere.` |
+| Frisk | range `5 til under 20` · `Udhvilet og klar til at præstere, fx til løb eller test. Fitness bygges ikke op.` |
+| Overgang | range `20 og højere` · `Så frisk, at fitness falder. Fint i en pause mellem sæsoner, ellers er det tid til at træne mere.` |
+
+All minus signs U+2212. Boundaries follow `python/src/training_load/domain/form.py`: −30 and −10 belong to the lower zone, 5 and 20 to the higher.
+
+### 8c. Acceptance criteria (for `tester`)
+1. For each `form_zone` value (`DEV_TODAY` on days in each zone, or a stubbed row) and for zone `null` with a TSB, `/load` shows exactly the §8a sentence directly under the hero ZoneBar and above the fitness delta; with TSB null no sentence appears. Today (`/`) is pixel-unchanged.
+2. The disclosure is a native `<details>` directly under the legend, closed on load; its summary is ≥ 44px high, reachable by Tab, toggles with Enter and Space, shows the 3px focus ring, and the chevron does not animate under `prefers-reduced-motion: reduce`.
+3. Opened, it shows every §8b string verbatim, including "vægtede gennemsnit" and "42 og 7 dage"; the zone ranges use U+2212 and match form.py's boundaries; no text is smaller than 14px.
+4. At 390 × 844 with the disclosure closed, the chart plot ends ≤ 844px; at 200% text size nothing in the sentence or the open disclosure is clipped or overlaps, in light and dark.
+5. A screen reader announces the summary as a collapsed/expanded control named "Hvad betyder det? Forklaring af fitness, træthed, form og formzoner", and reads the ranges with "minus".
