@@ -31,16 +31,19 @@ export function localToday(now: Date): IsoDate {
 
 /**
  * The date the Today screen shows: the local date, or DEV_TODAY (YYYY-MM-DD) when running
- * under `next dev` — for looking at other days while developing. Ignored in production.
+ * under `next dev` — for looking at other days while developing. `nodeEnv` defaults to the
+ * literal `process.env.NODE_ENV`, which the build inlines, so production never reads DEV_TODAY.
+ * A malformed value is warned about, never silently ignored.
  */
 export function resolveToday(
   now: Date,
   env: Readonly<Record<string, string | undefined>>,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
 ): IsoDate {
   const override = env.DEV_TODAY;
-  if (env.NODE_ENV === "development" && override !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(override)) {
-    return override;
-  }
+  if (nodeEnv !== "development" || !override) return localToday(now);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(override)) return override;
+  console.warn(`DEV_TODAY=${override} ignored: expected YYYY-MM-DD`);
   return localToday(now);
 }
 

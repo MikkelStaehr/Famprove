@@ -22,16 +22,16 @@ if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyCon
 if ($DevToday) {
   if ($Mode -ne 'dev') { throw 'DEV_TODAY only works in dev mode (next dev)' }
   if ($DevToday -notmatch '^\d{4}-\d{2}-\d{2}$') { throw 'DevToday must be YYYY-MM-DD' }
-  $env:DEV_TODAY = $DevToday
 }
-if ($DevFixture) {
-  if ($Mode -ne 'dev') { throw 'DEV_FIXTURE only works in dev mode (next dev)' }
-  $env:DEV_FIXTURE = $DevFixture
-}
+if ($DevFixture -and $Mode -ne 'dev') { throw 'DEV_FIXTURE only works in dev mode (next dev)' }
 
 $pnpmArgs = if ($Mode -eq 'dev') { @('dev', '--port', "$Port") } else { @('start', '--port', "$Port") }
-$server = Start-Process -FilePath $pnpm -ArgumentList $pnpmArgs -WorkingDirectory $web -PassThru -WindowStyle Hidden
+$server = $null
 try {
+  # Set inside try: the finally below always clears them, even if the server fails to start.
+  if ($DevToday) { $env:DEV_TODAY = $DevToday }
+  if ($DevFixture) { $env:DEV_FIXTURE = $DevFixture }
+  $server = Start-Process -FilePath $pnpm -ArgumentList $pnpmArgs -WorkingDirectory $web -PassThru -WindowStyle Hidden
   $ok = $false
   for ($i = 0; $i -lt 120 -and -not $ok; $i++) {
     try { $ok = (Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:$Port/" -TimeoutSec 60).StatusCode -eq 200 }
@@ -45,7 +45,7 @@ try {
 } finally {
   Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
     ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
-  Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+  if ($server) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
   Remove-Item Env:DEV_TODAY -ErrorAction SilentlyContinue
   Remove-Item Env:DEV_FIXTURE -ErrorAction SilentlyContinue
   Start-Sleep -Milliseconds 800

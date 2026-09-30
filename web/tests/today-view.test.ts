@@ -106,9 +106,11 @@ test("localToday uses Copenhagen, not UTC", () => {
 
 test("resolveToday honours DEV_TODAY only in development", () => {
   const now = new Date("2026-09-28T10:00:00Z");
-  assert.equal(resolveToday(now, { NODE_ENV: "development", DEV_TODAY: "2026-10-01" }), "2026-10-01");
-  assert.equal(resolveToday(now, { NODE_ENV: "production", DEV_TODAY: "2026-10-01" }), "2026-09-28");
-  assert.equal(resolveToday(now, { NODE_ENV: "development", DEV_TODAY: "tomorrow" }), "2026-09-28");
+  assert.equal(resolveToday(now, { DEV_TODAY: "2026-10-01" }, "development"), "2026-10-01");
+  assert.equal(resolveToday(now, { DEV_TODAY: "2026-10-01" }, "production"), "2026-09-28");
+  // Even with NODE_ENV=development in the environment, production code passes "production".
+  assert.equal(resolveToday(now, { NODE_ENV: "development", DEV_TODAY: "2026-10-01" }, "production"), "2026-09-28");
+  assert.equal(resolveToday(now, { DEV_TODAY: "tomorrow" }, "development"), "2026-09-28"); // warned
   assert.equal(resolveToday(now, {}), "2026-09-28");
 });
 

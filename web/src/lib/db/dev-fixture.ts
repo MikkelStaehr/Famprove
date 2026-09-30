@@ -4,8 +4,9 @@
  *   empty  every loader returns no rows (nothing is read)
  *   stale  real rows, with computed_at STALE_AGE_MS old (the "Opdateret" warning)
  *   error  every loader throws a PostgrestError (nothing is read)
- * Ignored unless NODE_ENV is "development" (the same guard as DEV_TODAY), so a production build
- * never sees it, whatever the environment holds.
+ * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
+ * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
+ * value is warned about, never silently ignored (a mislabelled screenshot would look real).
  */
 import { PostgrestError } from "./postgrest.ts";
 
@@ -16,10 +17,13 @@ export const STALE_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
 export function devFixture(
   env: Readonly<Record<string, string | undefined>> = process.env,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
 ): DevFixture | null {
-  if (env.NODE_ENV !== "development") return null;
+  if (nodeEnv !== "development") return null;
   const value = env.DEV_FIXTURE;
-  return value === "empty" || value === "stale" || value === "error" ? value : null;
+  if (value === "empty" || value === "stale" || value === "error") return value;
+  if (value) console.warn(`DEV_FIXTURE=${value} ignored: expected empty, stale or error`);
+  return null;
 }
 
 /** The error DEV_FIXTURE=error throws in place of reading `table`. */

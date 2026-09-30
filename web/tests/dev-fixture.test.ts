@@ -7,12 +7,22 @@ import { freshness } from "../src/lib/dashboard-view.ts";
 
 test("DEV_FIXTURE only switches under next dev, and only to known states", () => {
   for (const state of ["empty", "stale", "error"] as const) {
-    assert.equal(devFixture({ NODE_ENV: "development", DEV_FIXTURE: state }), state);
-    assert.equal(devFixture({ NODE_ENV: "production", DEV_FIXTURE: state }), null);
-    assert.equal(devFixture({ NODE_ENV: "test", DEV_FIXTURE: state }), null);
+    assert.equal(devFixture({ DEV_FIXTURE: state }, "development"), state);
+    assert.equal(devFixture({ DEV_FIXTURE: state }, "production"), null);
+    assert.equal(devFixture({ DEV_FIXTURE: state }, "test"), null);
+    // The build inlines NODE_ENV; an env var claiming "development" changes nothing.
+    assert.equal(devFixture({ NODE_ENV: "development", DEV_FIXTURE: state }, "production"), null);
   }
-  assert.equal(devFixture({ NODE_ENV: "development", DEV_FIXTURE: "broken" }), null);
-  assert.equal(devFixture({ NODE_ENV: "development" }), null);
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (message: string) => warnings.push(message);
+  try {
+    assert.equal(devFixture({ DEV_FIXTURE: "stal" }, "development"), null);
+  } finally {
+    console.warn = warn;
+  }
+  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale or error"]);
+  assert.equal(devFixture({}, "development"), null);
 });
 
 test("the error fixture is an ordinary data error and the stale one is past the 26 h limit", () => {
