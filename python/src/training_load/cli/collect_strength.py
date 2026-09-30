@@ -26,28 +26,35 @@ from training_load.domain.strength import (
 )
 from training_load.http import HttpSend, requests_send
 from training_load.sources.google_drive import access_token, download_workbook
-from training_load.sources.strength_sheet import ParsedSet, parse_all
+from training_load.sources.strength_sheet import KG_NOT_A_NUMBER, ParsedSet, parse_all
 
 log = logging.getLogger(__name__)
 
 MAX_ISSUE_SHARE: Final = 0.05
-"""Fail the run when more than this share of the prescribed row-weeks can't be read: the
-template has probably changed, and writing a half-parsed sheet would look like missing training."""
+"""Fail the run when more than this share of the prescribed row-weeks (one exercise row in one
+week) can't be read: the template has probably changed, and writing a half-parsed sheet would
+look like missing training."""
 
 
 class TooManyIssuesError(RuntimeError):
     """The workbook parsed, but too much of it was unreadable; nothing was written."""
 
 
-def check_issues(issues: Counter[str], sets: int) -> None:
+def check_issues(issues: Counter[str], parsed: Sequence[ParsedSet]) -> None:
     """Log unreadable cells per reason (counts only: the Actions logs are public) and raise
-    TooManyIssuesError above MAX_ISSUE_SHARE of (sets + issues)."""
+    TooManyIssuesError when they exceed MAX_ISSUE_SHARE of the row-weeks tried.
+
+    Unreadable kg still yields sets (kg None), so those row-weeks are already in ``parsed``; the
+    other reasons are row-weeks (or rows) that yielded nothing.
+    """
     total = sum(issues.values())
     for reason, count in sorted(issues.items()):
         log.warning("%d cells unreadable: %s", count, reason)
-    if total and total > MAX_ISSUE_SHARE * (sets + total):
+    row_weeks = len({(p["block"], p["row"], p["week"]) for p in parsed})
+    tried = row_weeks + total - issues[KG_NOT_A_NUMBER]
+    if total and total > MAX_ISSUE_SHARE * tried:
         raise TooManyIssuesError(
-            f"{total} unreadable cells against {sets} sets (limit {MAX_ISSUE_SHARE:.0%}); "
+            f"{total} unreadable cells in {tried} row-weeks (limit {MAX_ISSUE_SHARE:.0%}); "
             "nothing written - check the sheet's layout"
         )
 
@@ -113,12 +120,12 @@ def run(google: GoogleSettings, *, bodyweight: float, send: HttpSend, db: Postgr
     token = access_token(google.service_account_info)
     xlsx = download_workbook(send, token=token, file_id=google.sheet_id)
     issues: Counter[str] = Counter()
-    parsed = parse_all(xlsx, bodyweight, issues)
-    check_issues(issues, len(parsed))
+    parsed = parse_all(xlsx, bodyweight, issues, counts_issues=has_block_number)
     unnumbered = sorted({p["block"] for p in parsed if not has_block_number(p["block"])})
     if unnumbered:
         log.warning("skipping tabs without a block number: %s", ", ".join(unnumbered))
         parsed = [p for p in parsed if p["block"] not in unnumbered]
+    check_issues(issues, parsed)
     slots = number_sessions((section_key(p), p["date"]) for p in parsed)
     if shared := shared_weeks(slots):
         log.warning("%d weeks have sessions from more than one tab", len(shared))

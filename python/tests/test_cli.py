@@ -151,7 +151,7 @@ def test_bad_numbers_fail_before_anything_is_deleted(
     monkeypatch.setattr(
         collect_strength,
         "parse_all",
-        lambda _x, _bw, _issues=None: [ok_set(), ok_set(reps=reps, row=11)],
+        lambda _x, _bw, _issues=None, counts_issues=None: [ok_set(), ok_set(reps=reps, row=11)],
     )
     with pytest.raises(ValueError, match="row 11 week 1: reps is not a number"):
         collect_strength.run(GOOGLE, bodyweight=80.0, send=drive(workbook_bytes), db=db)
@@ -163,7 +163,9 @@ def test_tabs_without_block_number_are_skipped(
 ) -> None:
     template = ok_set(block="Program - blok skabelon")
     monkeypatch.setattr(
-        collect_strength, "parse_all", lambda _x, _bw, _issues=None: [ok_set(), template]
+        collect_strength,
+        "parse_all",
+        lambda _x, _bw, _issues=None, counts_issues=None: [ok_set(), template],
     )
     assert collect_strength.run(GOOGLE, bodyweight=80.0, send=drive(workbook_bytes), db=db) == 1
     assert {r["block"] for r in db.tables["strength_sets"]} == {BLOK_11}

@@ -164,7 +164,7 @@ def test_text_number_reads_numbers_typed_as_text() -> None:
     assert text_number("137,5") == 137.5
     assert text_number(" 140 ") == 140.0
     assert text_number(125) == 125  # numbers pass through
-    for keep in ("BW", "137.5 kg", "", None, "RPE 7"):
+    for keep in ("BW", "137.5 kg", "", None, "RPE 7", "110,115", "110,115,120"):
         assert text_number(keep) == keep
 
 

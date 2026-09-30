@@ -49,7 +49,8 @@ def mid(txt):
     nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", str(txt))]
     return sum(nums)/len(nums) if nums else None
 
-_NUMBER_TEXT = re.compile(r"^\s*-?\d+(?:[.,]\d+)?\s*$")
+# Decimal comma only with 1-2 decimals: "110,115" is the template's list of weights, not 110.115.
+_NUMBER_TEXT = re.compile(r"^\s*-?\d+(?:\.\d+|,\d{1,2})?\s*$")
 
 def text_number(cell: object) -> object:
     """Et tal skrevet som tekst ('137.5', '137,5', '140') -> float; alt andet uændret.
@@ -77,11 +78,16 @@ SETS_REPS_NOT_A_NUMBER = "sets/reps not a number"
 WEEK_DATE_NOT_A_DATE = "week date not a date"
 ROW_WITHOUT_TYPE = "prescribed row without type"
 
-def parse_all(data: bytes, bodyweight: float, issues: Counter[str] | None = None) -> list[ParsedSet]:
+def parse_all(data: bytes, bodyweight: float, issues: Counter[str] | None = None,
+              counts_issues=None) -> list[ParsedSet]:
+    """``counts_issues(tab)`` False: the tab is parsed but its unreadable cells aren't counted
+    (the caller drops it anyway, e.g. a template tab without a block number)."""
     wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     sets = []
     for tab in wb.sheetnames:
-        if tab.startswith("Program - blok"): sets += parse_tab(wb[tab], tab, bodyweight, issues)
+        if tab.startswith("Program - blok"):
+            counted = counts_issues is None or counts_issues(tab)
+            sets += parse_tab(wb[tab], tab, bodyweight, issues if counted else Counter())
     return sets
 
 def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
