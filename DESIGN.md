@@ -181,6 +181,8 @@ Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the
 - **Nav current tab:** `--text` fill with `--bg` text, weight 700 (fill + weight, not colour alone). It deliberately does not use `--slab`.
 
 ## Type
+**Decision (2026-09-30): Barlow + Barlow Condensed stay.** Chosen over Instrument Sans (one family with a width axis), Inter + Roboto Condensed, and Manrope + Sofia Sans Condensed. Those were rendered on Today at 390px, light and dark, against a brief for a calmer grotesk, and the user kept Barlow. Checked on the way: Barlow's default figures are proportional, but `tabular-nums` makes every digit the same width, so tabular figures work as specified below.
+
 Two families, self-hosted with `next/font/google`, which downloads the files at build time and serves them from the app (no Google `<link>`, no runtime request to Google).
 
 ```ts
