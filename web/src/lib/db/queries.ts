@@ -18,7 +18,9 @@ import {
   PRESCRIBED_SETS_SELECT,
   parseBlockRow,
   parseDailyLoadRow,
+  parseProjectionRow,
   parseStrengthSessionRow,
+  PROJECTION_SELECT,
   parseStrengthSetRow,
   parseWeeklyLoadRow,
   STRENGTH_SESSIONS_SELECT,
@@ -58,18 +60,25 @@ export async function loadDashboardData(): Promise<DashboardData> {
   await connection();
   const fixture = devFixture();
   if (fixture === "error") throw fixtureError(DAILY_LOAD_SELECT.table);
-  if (fixture === "empty") return { daily: [], blocks: [], weeks: [] };
+  if (fixture === "empty") return { daily: [], blocks: [], weeks: [], projection: [] };
   const db = client();
   const [daily, blocks, weeks] = await Promise.all([
     selectAll(db, DAILY_LOAD_SELECT.table, DAILY_LOAD_SELECT, parseDailyLoadRow),
     selectAll(db, BLOCKS_SELECT.table, BLOCKS_SELECT, parseBlockRow),
     selectAll(db, WEEKLY_LOAD_SELECT.table, WEEKLY_LOAD_SELECT, parseWeeklyLoadRow),
   ]);
+  // The prognose is secondary: if it can't be read, the rest of /load still renders (null).
+  const projection = await selectAll(db, PROJECTION_SELECT.table, PROJECTION_SELECT, parseProjectionRow).catch(
+    (error: unknown) => {
+      console.error("dashboard: loading the projection failed", error);
+      return null;
+    },
+  );
   if (fixture === "stale") {
     const computedAt = staleComputedAt(new Date());
-    return { daily: daily.map((d) => ({ ...d, computedAt })), blocks, weeks };
+    return { daily: daily.map((d) => ({ ...d, computedAt })), blocks, weeks, projection };
   }
-  return { daily, blocks, weeks };
+  return { daily, blocks, weeks, projection };
 }
 
 /**

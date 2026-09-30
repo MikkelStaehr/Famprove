@@ -49,6 +49,7 @@ const DATA: DashboardData = {
   daily: [day("2026-09-14"), day("2026-09-21"), day("2026-09-28")],
   blocks: [],
   weeks: [week(39, "2026-09-21"), week(38, "2026-09-14"), week(40, "2026-09-28")],
+  projection: [],
 };
 
 function set(overrides: Partial<StrengthSetRow>): StrengthSetRow {
@@ -147,6 +148,7 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
       ],
       blocks: [],
       weeks: [],
+      projection: [],
     },
     week(40, "2026-09-28"),
   );

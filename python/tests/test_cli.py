@@ -114,9 +114,16 @@ def test_compute_rebuilds_daily_load_and_blocks(
     }
     assert first_week == {1: "2026-02-03", 2: "2026-02-05"}
 
-    before = {t: sorted(map(str, db.tables[t])) for t in ("daily_load", "strength_sessions")}
+    projection = sorted(r["date"] for r in db.tables["daily_projection"])
+    assert (
+        len(projection) == 56 and projection[0] == "2026-03-16" and projection[-1] == "2026-05-10"
+    )
+    assert max(str(r["date"]) for r in db.tables["daily_load"]) == FIXED_TODAY.isoformat()
+
+    tables = ("daily_load", "strength_sessions", "daily_projection")
+    before = {t: sorted(map(str, db.tables[t])) for t in tables}
     compute.run(db, strength_k=0.02, today=FIXED_TODAY, computed_at=run_at)
-    after = {t: sorted(map(str, db.tables[t])) for t in ("daily_load", "strength_sessions")}
+    after = {t: sorted(map(str, db.tables[t])) for t in tables}
     assert before == after  # idempotent
 
 

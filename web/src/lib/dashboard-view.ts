@@ -8,10 +8,12 @@
  * The week switcher picks among weekly_load rows; a `?week=` value that names no row falls
  * back to the latest week, so user input never reaches a query.
  */
+import { addDays } from "./dates.ts";
 import type {
   ActivityRow,
   BlockRow,
   DailyLoadRow,
+  DailyProjectionRow,
   DashboardData,
   IsoDate,
   StrengthSessionRow,
@@ -43,7 +45,19 @@ export type ChartPoint = {
   readonly ctl: number;
   readonly atl: number;
   readonly tsb: number;
+  readonly kind: "actual" | "projected";
+  /** Projected days only: what Python assumed (all estimates). */
+  readonly estimate: {
+    readonly cyclingTss: number;
+    readonly cyclingSource: DailyProjectionRow["cyclingSource"];
+    readonly strengthTss: number;
+    readonly rides: DailyProjectionRow["rides"];
+    readonly sessions: DailyProjectionRow["sessions"];
+  } | null;
 };
+
+/** The chart window: this many days back and forward from the latest actual day (spec load.md §9a). */
+export const CHART_WINDOW_DAYS = 56;
 
 export type BlockSpan = {
   readonly name: string;
@@ -78,7 +92,10 @@ export type DashboardView =
       readonly kind: "ready";
       readonly hero: Hero;
       readonly freshness: Freshness;
-      readonly chart: readonly ChartPoint[];
+      readonly chart: readonly ChartPoint[]; // latest − 56 .. latest + 56 (actual, then projected)
+      readonly lastActual: IsoDate; // the latest daily_load date: the "i dag" rule
+      /** ready: projected points exist; none: nothing after lastActual; error: couldn't be read. */
+      readonly projection: "ready" | "none" | "error";
       readonly blocks: readonly BlockSpan[];
       readonly week: WeekNav | null; // null if weekly_load has no row for the latest date
     };
@@ -330,6 +347,35 @@ export function dayDetails(week: WeekView, detail: WeekDetailData): DayDetail[] 
   });
 }
 
+/**
+ * The chart's points: the last CHART_WINDOW_DAYS actual days, then the prognose strictly after
+ * the latest actual day (older projection rows are from a stale run and are never drawn).
+ */
+export function chartPoints(data: DashboardData, lastActual: IsoDate): ChartPoint[] {
+  const from = addDays(lastActual, -CHART_WINDOW_DAYS);
+  const to = addDays(lastActual, CHART_WINDOW_DAYS);
+  const actual: ChartPoint[] = data.daily
+    .filter((d) => d.date >= from)
+    .map((d) => ({ date: d.date, ctl: d.ctl, atl: d.atl, tsb: d.tsb, kind: "actual", estimate: null }));
+  const projected: ChartPoint[] = (data.projection ?? [])
+    .filter((p) => p.date > lastActual && p.date <= to)
+    .map((p) => ({
+      date: p.date,
+      ctl: p.ctl,
+      atl: p.atl,
+      tsb: p.tsb,
+      kind: "projected",
+      estimate: {
+        cyclingTss: p.cyclingTss,
+        cyclingSource: p.cyclingSource,
+        strengthTss: p.strengthTss,
+        rides: p.rides,
+        sessions: p.sessions,
+      },
+    }));
+  return [...actual, ...projected];
+}
+
 /** Composes the helpers above. "empty" when data.daily is empty. */
 export function buildDashboardView(
   data: DashboardData,
@@ -342,7 +388,14 @@ export function buildDashboardView(
     kind: "ready",
     hero: hero(latest),
     freshness: freshness(latest.computedAt, now),
-    chart: data.daily.map((d) => ({ date: d.date, ctl: d.ctl, atl: d.atl, tsb: d.tsb })),
+    chart: chartPoints(data, latest.date),
+    lastActual: latest.date,
+    projection:
+      data.projection === null
+        ? "error"
+        : data.projection.some((p) => p.date > latest.date)
+          ? "ready"
+          : "none",
     blocks: blockSpans(data.blocks, latest.date),
     week: selectWeek(data, latest.date, week),
   };

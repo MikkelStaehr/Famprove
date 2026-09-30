@@ -51,7 +51,38 @@ export type DashboardData = {
   readonly daily: readonly DailyLoadRow[]; // ascending by date
   readonly blocks: readonly BlockRow[]; // ascending by startDate
   readonly weeks: readonly WeeklyLoadRow[]; // ascending by weekStart
+  /** The prognose, ascending by date; null when it couldn't be read (the page still renders). */
+  readonly projection: readonly DailyProjectionRow[] | null;
 };
+
+/** A planned ride in daily_projection.basis: its NP-style TSS, or null with Python's reason. */
+export type ProjectedRide = { readonly name: string; readonly tss: number | null };
+
+/** A strength session Python placed on a future day (an estimate). */
+export type ProjectedSession = {
+  readonly session: number;
+  readonly tss: number | null; // null: no done session with this number to learn from
+  readonly dayEstimated: boolean; // the weekday was spread or moved, not learnt
+};
+
+/** public.daily_projection: the prognose (estimates only), rebuilt by compute. */
+export type DailyProjectionRow = {
+  readonly date: IsoDate;
+  readonly cyclingTss: number;
+  readonly strengthTss: number;
+  readonly ctl: number;
+  readonly atl: number;
+  readonly tsb: number;
+  readonly cyclingSource: "planned" | "typical_week";
+  readonly rides: readonly ProjectedRide[];
+  readonly sessions: readonly ProjectedSession[];
+};
+
+export const PROJECTION_SELECT = {
+  table: "daily_projection",
+  columns: "date,cycling_tss,strength_tss,ctl,atl,tsb,basis",
+  order: "date", // the primary key
+} as const;
 
 export const DAILY_LOAD_SELECT = {
   table: "daily_load",
@@ -324,6 +355,36 @@ export function parseStrengthSessionRow(raw: unknown): StrengthSessionRow {
     activityName: f.stringOrNull("activity_name"),
     movingTimeS: f.numberOrNull("moving_time_s"),
     tss: f.number("tss"),
+  };
+}
+
+export function parseProjectionRow(raw: unknown): DailyProjectionRow {
+  const f = new Fields(PROJECTION_SELECT.table, raw);
+  const basis = new Fields(`${PROJECTION_SELECT.table}.basis`, f.unknown("basis"));
+  const source = basis.string("cycling");
+  if (source !== "planned" && source !== "typical_week") {
+    throw new RowError(`${PROJECTION_SELECT.table}.basis.cycling: unexpected value`);
+  }
+  return {
+    date: f.date("date"),
+    cyclingTss: f.number("cycling_tss"),
+    strengthTss: f.number("strength_tss"),
+    ctl: f.number("ctl"),
+    atl: f.number("atl"),
+    tsb: f.number("tsb"),
+    cyclingSource: source,
+    rides: basis.array("rides").map((r, i) => {
+      const ride = new Fields(`${PROJECTION_SELECT.table}.basis.rides[${i}]`, r);
+      return { name: ride.string("name"), tss: ride.numberOrNull("tss") };
+    }),
+    sessions: basis.array("strength").map((s, i) => {
+      const entry = new Fields(`${PROJECTION_SELECT.table}.basis.strength[${i}]`, s);
+      return {
+        session: entry.number("session"),
+        tss: entry.numberOrNull("tss"),
+        dayEstimated: entry.boolean("day_estimated"),
+      };
+    }),
   };
 }
 

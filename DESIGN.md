@@ -175,7 +175,7 @@ Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the
 | `--zone-fresh` | `#b9d4ec` | `#234159` | as above |
 | `--zone-transition` | `#f0d9a0` | `#514525` | as above |
 | `--shadow-card` | `0 1px 0 rgb(0 0 0 / .05), 0 12px 28px -18px rgb(0 0 0 / .35)` | `none` | light cards lift off the warm grey; dark uses tone |
-| `--chart-height` | 240px | 240px | keeps hero + chart above the fold at 390 × 844 |
+| `--chart-height` | 224px below 640px, 240px from 640px | same | keeps hero + chart above the fold at 390 × 844 (load.md §9a) |
 
 - **Links** (e.g. "Tilbage til denne uge"): `--text`, weight 600, underline 1px offset 3px. Volt is never a link colour.
 - **Nav current tab:** `--text` fill with `--bg` text, weight 700 (fill + weight, not colour alone). It deliberately does not use `--slab`.

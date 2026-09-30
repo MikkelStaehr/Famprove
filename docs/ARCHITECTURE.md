@@ -24,7 +24,7 @@ Next.js (web/), server components only
 | Path | What lives there |
 |---|---|
 | `python/src/training_load/sources/` | Adapters that read the outside world: `intervals.py`, `google_drive.py`, `strength_sheet.py` (the coach-sheet parser and strength formula; formula lines never change) |
-| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `dates.py` |
+| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: typical week, planned rides, strength estimates), `dates.py` |
 | `python/src/training_load/db/` | The only code that talks to Supabase (PostgREST over `requests`), one module per table |
 | `python/src/training_load/cli/` | The five console scripts, one per step of the daily job (`check-config` first) |
 | `python/src/training_load/*.py` | `config.py` (env, fail-fast), `http.py` (retrying HTTP seam), `narrow.py` (JSON → typed fields) |
@@ -44,7 +44,7 @@ Next.js (web/), server components only
 `strength_sessions` (derived: per ISO week and session number, the activity that did it, its date, TSS) ·
 `daily_load` (one row per day since 2026-01-01: TSS, CTL, ATL, TSB, ramp, zone, `computed_at`) ·
 `blocks` (strength blocks + deload) · `weekly_load` (view) · `planned_sessions` (you fill) ·
-`planned_targets` (derived watts).
+`planned_targets` (derived watts) · `daily_projection` (the prognose, next 56 days, rebuilt by `compute`; estimates only).
 
 ## Commands
 - Python, from `python/` (reads repo-root `.env.local`): `uv run check-config` · `uv run collect-intervals [--since 2026-01-01]`,

@@ -136,3 +136,54 @@ All minus signs U+2212. Boundaries follow `python/src/training_load/domain/form.
 3. Opened, it shows every §8b string verbatim, including "vægtede gennemsnit" and "42 og 7 dage"; the zone ranges use U+2212 and match form.py's boundaries; no text is smaller than 14px.
 4. At 390 × 844 with the disclosure closed, the chart plot ends ≤ 844px; at 200% text size nothing in the sentence or the open disclosure is clipped or overlaps, in light and dark.
 5. A screen reader announces the summary as a collapsed/expanded control named "Hvad betyder det? Forklaring af fitness, træthed, form og formzoner", and reads the ranges with "minus".
+
+## 9. Today-centred chart with prognose (added 2026-09-30, L · Feature A)
+Question: "Where am I today, and where does my usual training take fitness in the next 8 weeks?" Data: `daily_load` (measured) + `daily_projection` (Python). The UI never computes a projection. **Supersedes** §3's month ticks and "since 1 Jan", §2.3's 240px and §8b/§8c's fold line. Everything else in §3 and §8 stays as built.
+
+### 9a. Window, fold, axis
+- **Window:** `today − 56` … `today + 56` days (`today` = `DEV_TODAY` or the local date). Measured rows and block shading are clipped to the window's left edge. The y domain covers measured and projected values.
+- **Measured vs prognose:** measured lines run up to the latest `daily_load` date (`lastActual`). Projection rows are drawn only when `date > lastActual`. The first projection point joins the `lastActual` point, so there is no gap. Block shading and the deload hatch stop at `lastActual` (no future blocks are stored).
+- **Fold fix:** below 640px `--chart-height` = **224px** (240px from 640px). This absorbs the 12px overrun plus 4px of margin. Type, spacing and the disclosure stay where they are. The row in DESIGN.md's token table follows (design-lead).
+- **Annotation strip:** the top 24px of the plot is headroom (y domain padded, no gridline label there). The "i dag" and prognose labels sit in it.
+- **X ticks** (`text-12`, `--text-muted`, tabular, format `5. aug.`, no weekday): below 640px, 5 ticks at today −56, −28, 0, +28 and +56. From 640px, 9 ticks every 14 days, anchored on today. The first label is start-anchored and the last end-anchored, so none are clipped. Today's tick label is 600 `--text`. Without projection rows, the ticks stop at 0.
+
+### 9b. "i dag" marker and prognose region
+- **"i dag" rule:** 1px solid `--text` vertical line at today, running the full plot height. It sits above the region fill and block shading and below the series. Label `i dag`: `text-14` 600 `--text` in the strip, end-anchored 4px left of the rule, on a `--surface` backing (`rounded-mark`, 2px/4px padding) so that lines never cut through it. On today, each series gets a 7px dot in its series colour with a 2px `--surface` ring (it ties the chart to the hero).
+- **Prognose region:** from `lastActual` to the right edge, fill `--track` at **60% opacity**, drawn behind the lines. Series keep their full colour, width and dash (ATL dashed, TSB dotted, as Part B). **Do not** lower line opacity: ATL at 55% falls to 2.5:1. Line contrast on the fill: light ≥ 4.3:1, dark ≥ 5.1:1. The fill is supplementary. The meaning is carried by the label, the rule, the legend, the tooltip and the sr text.
+- **Region label** `Prognose · anslået`: `text-14` 600 `--text-muted` in the strip, start-anchored 6px right of the rule (≥ 6:1 on the fill). At 200% text it wraps to two lines (`Prognose ·` / `anslået`), and the strip grows with it. Never truncated. If `lastActual` < today (stale), the region begins left of the rule and the label stays right of the rule.
+- **Legend:** last item `Prognose (anslået)`. Swatch 24×12, `--track` 60% fill with a 1px `--chart-mark` ring (3.5:1). At 390px it must fit on the Deload-uge line (no extra legend line). Shown only when projection rows are drawn.
+- **Disclosure (§8b group 1):** add a 4th term after Form, with the legend swatch. Term `Prognose (anslået)`, text: `Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer: cykling som dit gennemsnit for hver ugedag de sidste 28 dage (en planlagt tur erstatter dagen), styrke som dine seneste tre gange af hver session. Det er et skøn, ikke en plan.`
+- No motion: the chart, the rule and the region never animate.
+
+### 9c. Tooltip on a prognose day (same component; values tabular, U+2212)
+| Line | Danish (exact) |
+|---|---|
+| Date | `tors. 8. okt.` |
+| Status (`text-14` 600 `--text-muted`) | `Prognose` · `Prognose · dag anslået` when any placement on that day is estimated (`basis` day-estimated flag) |
+| Values | `Fitness (CTL) ≈ 46` · `Træthed (ATL) ≈ 44` · `Form (TSB) ≈ +2` |
+| Basis, cycling | `Cykel ≈ 62 TSS · typisk torsdag` · `Cykel 80 TSS · planlagt tur` · line omitted when 0/none |
+| Basis, strength | `Styrke ≈ 45 TSS · session 2` (+ ` · dag anslået` when that session's weekday is estimated) · omitted when none |
+Measured days keep the §4 tooltip, with no "≈". Today's tooltip is measured.
+
+### 9d. Screen-reader text (extends §4 "Chart sr text")
+- Range sentence: `Daglig fitness (CTL), træthed (ATL) og form (TSB) i TSS/dag fra ons. 5. aug. til ons. 30. sep., og en anslået prognose til ons. 25. nov.` (without projection: the text up to `30. sep.`).
+- Added after the today sentence: `Prognose, anslået ud fra en typisk uge: den ons. 25. nov. cirka fitness 48, træthed 40, form plus 8.`
+- Table: new last column `Type`, values `Målt` · `Prognose` · `Prognose, dag anslået`. Prognose cells are prefixed `ca.` (e.g. `ca. 46`).
+
+### 9e. States
+| State | Treatment |
+|---|---|
+| No projection rows (none, or all dates ≤ `lastActual`) | Window ends at today. No region, no region label, no legend item. The "i dag" rule sits at the right edge with its label end-anchored. Note under the plot, 8px, `text-14` `--text-muted`: `Ingen prognose endnu. Den beregnes af det daglige job omkring kl. 05.00.` |
+| Projection read fails, `daily_load` OK | As above, with the note `Prognosen kunne ikke hentes, så grafen viser kun målte dage. Genindlæs siden for at prøve igen.` in `--warning` + alert icon. The hero is unaffected. |
+| `DEV_FIXTURE=empty` / `error` | Page states as §5. No projection is read or drawn. |
+| `DEV_FIXTURE=stale` / real stale | Updated line as §5. Region from `lastActual` (left of the rule), label unchanged. |
+| Chart empty (< 2 measured days) | §4 chart-empty copy. The prognose is never drawn alone. |
+| Loading | §5 skeleton, with the block at `--chart-height` (224px below 640). |
+
+### 9f. Acceptance criteria (for `tester`)
+1. At 390 × 844 (disclosure closed, 2-line zone sentence, light and dark) the plot including the x labels ends ≤ 844px. The plot is 224px high below 640px and 240px from 640px. No text size changed.
+2. With `DEV_TODAY=2026-09-30` the x axis runs 5. aug. → 25. nov. The 390px ticks read `5. aug.` `2. sep.` `30. sep.` `28. okt.` `25. nov.`, with no label clipped. A 1px solid rule labelled `i dag` sits at 30. sep.
+3. Right of `lastActual` a `--track` 60% region is labelled `Prognose · anslået`. Series keep the Part B colour and dash (no reduced line opacity). Block shading and the deload hatch end at `lastActual`. The legend shows `Prognose (anslået)` without adding a legend line at 390px.
+4. The tooltip on a future day follows §9c verbatim: date, `Prognose`, values with `≈`, then the cycling/strength basis lines. On a day whose `basis` flags an estimated placement the status reads `Prognose · dag anslået`. Measured days show no `≈`.
+5. Projection rows dated ≤ the latest `daily_load` date are never drawn. With no projection rows the chart ends at today and shows the §9e note. With `DEV_FIXTURE=empty|error` no prognose appears anywhere.
+6. The sr text includes the prognose sentence with "cirka" and "plus"/"minus". The sr table has a `Type` column (`Målt`/`Prognose`/`Prognose, dag anslået`) with `ca.` on projected values. At 200% text the region label wraps and never overlaps the `i dag` label or the lines' annotation strip.
