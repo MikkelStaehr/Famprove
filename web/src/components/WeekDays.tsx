@@ -66,7 +66,7 @@ function ColumnHeads() {
   return (
     <div
       aria-hidden="true"
-      className={`${ROW} border-b border-border py-2 text-12 font-semibold text-text-muted`}
+      className={`${ROW} border-b border-border py-2 text-14 font-semibold text-text-muted`}
     >
       <span className={`hidden @xs:block ${DAY_INDENT}`}>Day</span>
       {["Cycling", "Strength", "Total"].map((label) => (
@@ -161,7 +161,7 @@ function Cycling({ date, tss, rides }: CyclingProps) {
           <li key={ride.id} className="flex flex-col gap-1 border-t border-border py-2 first:border-t-0">
             <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14">
               <span className="font-semibold">{ride.name ?? "Untitled ride"}</span>
-              <span className="text-12 text-text-muted">
+              <span className="text-14 text-text-muted">
                 Started <time dateTime={`${date}T${ride.startTime}`}>{ride.startTime}</time>
               </span>
             </p>
@@ -211,7 +211,7 @@ function Strength({ strength }: { readonly strength: StrengthDetail }) {
         <StrengthSession key={s.key} session={s} />
       ))}
       {anyExercises && (
-        <p className="text-12 text-text-muted">
+        <p className="text-14 text-text-muted">
           Score/set is the raw score of one set, before the strength factor that turns it into TSS.
         </p>
       )}
@@ -255,7 +255,7 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
       <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14">
         <span className="font-semibold">{e.name}</span>
         {e.prescribed !== null && (
-          <span className="text-12 text-text-muted">Prescribed {e.prescribed}</span>
+          <span className="text-14 text-text-muted">Prescribed {e.prescribed}</span>
         )}
       </p>
       <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14 tabular-nums">
@@ -275,7 +275,7 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
             </span>
           )}
         </span>
-        <span className="text-12 text-text-muted">
+        <span className="text-14 text-text-muted">
           <span aria-hidden="true">{score} score/set</span>
           <span className="sr-only">raw score {score} per set</span>
         </span>
@@ -293,7 +293,7 @@ export function WeekDaysSkeleton({ rows }: { readonly rows: number }) {
   ));
   return (
     <div aria-hidden="true" className="@container flex flex-col">
-      <div className={`${ROW} border-b border-border py-2 text-12`}>
+      <div className={`${ROW} border-b border-border py-2 text-14`}>
         <span className={`hidden @xs:block ${DAY_INDENT}`}>
           <SkeletonBar className="w-1/3" />
         </span>

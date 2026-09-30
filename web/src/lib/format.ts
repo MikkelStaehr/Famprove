@@ -6,7 +6,7 @@ import type { IsoDate } from "./db/rows.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
 export const LOCALE = "da-DK"; // "ons. 30. sep.", "kl. 05.03", decimal comma
-export const TSS_PER_DAY = "TSS/day"; // unit of CTL / ATL / TSB (DESIGN.md)
+export const TSS_PER_DAY = "TSS/dag"; // unit of CTL / ATL / TSB (DESIGN.md)
 
 const DAY_FORMAT = new Intl.DateTimeFormat(LOCALE, {
   weekday: "short",
@@ -48,6 +48,13 @@ export function formatSigned(value: number): string {
  */
 export function formatDay(date: IsoDate): string {
   return DAY_FORMAT.format(new Date(`${date}T00:00:00Z`));
+}
+
+const DATE_FORMAT = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", timeZone: "UTC" });
+
+/** Calendar date without the weekday, e.g. "2026-09-14" -> "14. sep." (as-is, like formatDay). */
+export function formatDate(date: IsoDate): string {
+  return DATE_FORMAT.format(new Date(`${date}T00:00:00Z`));
 }
 
 const DAY_LONG_FORMAT = new Intl.DateTimeFormat(LOCALE, {

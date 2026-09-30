@@ -9,9 +9,8 @@ type CardProps = {
   /**
    * "session": Today's cards (Part B: 32px Condensed 800 italic, uppercase via CSS).
    * "calm": /load's cards (20px Barlow 700, sentence case).
-   * Omitted: the pre-Spurt look /load keeps until it is restyled.
    */
-  readonly variant?: "session" | "calm";
+  readonly variant: "session" | "calm";
   readonly children: ReactNode;
 };
 
@@ -22,22 +21,6 @@ const TITLE = {
 
 /** DESIGN.md Card. Part B: --surface, light --shadow-card (dark: tone only), no border, 24/16 padding. */
 export function Card({ id, title, action, variant, children }: CardProps) {
-  if (variant === undefined) {
-    return (
-      <section
-        aria-labelledby={id}
-        className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4"
-      >
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id={id} className="text-16 font-semibold">
-            {title}
-          </h2>
-          {action}
-        </div>
-        {children}
-      </section>
-    );
-  }
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3 rounded-card bg-surface px-4 pt-6 pb-4 shadow-card">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

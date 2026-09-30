@@ -38,21 +38,21 @@ type Series = {
   readonly label: string;
   readonly color: string;
   readonly dash: string | undefined; // stroke pattern: lines never differ by colour alone
+  readonly width: number;
   readonly format: (value: number) => string;
 };
 
-/** Legend and tooltip order. */
+/** Legend and tooltip order. Part B: CTL ink solid 2.5px, ATL dashed 2px (6 4), TSB dotted 2px (round caps). */
 const SERIES: readonly Series[] = [
-  { key: "ctl", label: "Fitness (CTL)", color: "var(--series-ctl)", dash: undefined, format: formatLoad },
-  { key: "atl", label: "Fatigue (ATL)", color: "var(--series-atl)", dash: "6 4", format: formatLoad },
-  { key: "tsb", label: "Form (TSB)", color: "var(--series-tsb)", dash: "1 4", format: formatSigned },
+  { key: "ctl", label: "Fitness (CTL)", color: "var(--series-ctl)", dash: undefined, width: 2.5, format: formatLoad },
+  { key: "atl", label: "Træthed (ATL)", color: "var(--series-atl)", dash: "6 4", width: 2, format: formatLoad },
+  { key: "tsb", label: "Form (TSB)", color: "var(--series-tsb)", dash: "0.5 4", width: 2, format: formatSigned },
 ];
 
-const STROKE_WIDTH = 2;
 const HATCH_ID = "deload-hatch";
 const LEGEND_HATCH_ID = "deload-hatch-legend";
 const DAY_MS = 86_400_000;
-const TICK = { fill: "var(--text-muted)", fontSize: 12 } as const;
+const TICK = { fill: "var(--text-muted)", fontSize: 12, fontWeight: 500 } as const;
 const MONTH_FORMAT = new Intl.DateTimeFormat(LOCALE, { month: "short", timeZone: "UTC" });
 
 type Row = ChartPoint & { readonly x: number };
@@ -75,10 +75,9 @@ function monthTicks(first: number, last: number): number[] {
   }
 }
 
-/** "Feb", "Mar", …; January shows the year instead. */
+/** "jan.", "feb.", … "okt." (da-DK). */
 function formatMonthTick(day: number): string {
-  const date = new Date(day * DAY_MS);
-  return date.getUTCMonth() === 0 ? String(date.getUTCFullYear()) : MONTH_FORMAT.format(date);
+  return MONTH_FORMAT.format(new Date(day * DAY_MS));
 }
 
 /** Axis tick with a real minus sign. */
@@ -98,24 +97,24 @@ function useHydrated(): boolean {
 }
 
 function ChartFailed({ what }: { readonly what: string }, { reset }: ErrorInfo) {
-  return <ErrorState title="Chart unavailable" what={what} retry={{ onRetry: reset }} />;
+  return <ErrorState title="Grafen kan ikke vises" what={what} retry={{ onRetry: reset }} />;
 }
 
 const ChartBoundary = catchError(ChartFailed);
 
 export function TrendChart(props: TrendChartProps) {
   if (props.points.length < 2) {
-    return <EmptyState message="The trend appears once there are at least two days of training load." />;
+    return <EmptyState message="Trenden vises, når der er mindst to dages træningsbelastning." />;
   }
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-12 text-text-muted" aria-hidden="true">
+      <Legend />
+      <p className="text-12 font-medium text-text-muted" aria-hidden="true">
         {TSS_PER_DAY}
       </p>
-      <ChartBoundary what="The trend chart could not be drawn. The figures above are unaffected.">
+      <ChartBoundary what="Grafen kunne ikke tegnes. Tallene ovenfor er ikke berørt.">
         <Chart {...props} />
       </ChartBoundary>
-      <Legend />
     </div>
   );
 }
@@ -123,7 +122,7 @@ export function TrendChart(props: TrendChartProps) {
 function Chart({ points, blocks, title }: TrendChartProps) {
   const hydrated = useHydrated();
   if (!hydrated) {
-    return <div className="h-(--chart-height) w-full rounded-control bg-border motion-safe:animate-pulse" />;
+    return <div className="h-(--chart-height) w-full rounded-control bg-track motion-safe:animate-pulse" />;
   }
 
   const rows: Row[] = points.map((p) => ({ ...p, x: dayNumber(p.date) }));
@@ -202,11 +201,11 @@ function Chart({ points, blocks, title }: TrendChartProps) {
             name={s.label}
             type="linear"
             stroke={s.color}
-            strokeWidth={STROKE_WIDTH}
+            strokeWidth={s.width}
             strokeDasharray={s.dash}
             strokeLinecap="round"
             dot={false}
-            activeDot={{ r: 4, fill: s.color, stroke: "var(--surface)", strokeWidth: STROKE_WIDTH }}
+            activeDot={{ r: 4, fill: s.color, stroke: "var(--surface)", strokeWidth: 2 }}
             isAnimationActive={false}
           />
         ))}
@@ -228,14 +227,8 @@ function ChartTooltip({ active, x, byDay, blocks }: ChartTooltipProps) {
   const block = blocks.find((b) => b.start <= row.date && row.date <= b.end);
   const deload = block !== undefined && block.deloadStart !== null && block.deloadStart <= row.date;
   return (
-    <div className="flex flex-col gap-1 rounded-control border border-border bg-surface px-3 py-2 text-14 text-text">
+    <div className="flex flex-col gap-1 rounded-control border border-border bg-surface px-3 py-2 text-14 text-text shadow-card">
       <p className="font-semibold">{formatDay(row.date)}</p>
-      {block !== undefined && (
-        <p className="text-12 text-text-muted">
-          Strength block {block.blockNo}
-          {deload && " · deload week"}
-        </p>
-      )}
       <dl className="grid grid-cols-[auto_auto] items-center gap-x-3 tabular-nums">
         {SERIES.map((s) => (
           <div key={s.key} className="contents">
@@ -247,14 +240,19 @@ function ChartTooltip({ active, x, byDay, blocks }: ChartTooltipProps) {
           </div>
         ))}
       </dl>
-      <p className="text-12 text-text-muted">{TSS_PER_DAY}</p>
+      {block !== undefined && (
+        <p className="text-14 text-text-muted">
+          {block.name}
+          {deload && " · deload"}
+        </p>
+      )}
     </div>
   );
 }
 
 function Legend() {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-12" aria-label="Legend">
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-14 text-text" aria-label="Forklaring">
       {SERIES.map((s) => (
         <li key={s.key} className="flex items-center gap-2">
           <LineSample series={s} />
@@ -265,7 +263,7 @@ function Legend() {
         <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0">
           <rect x="0.5" y="0.5" width="11" height="11" fill="var(--block-fill)" stroke="var(--chart-mark)" />
         </svg>
-        Strength block (B = block no.)
+        Styrkeblok
       </li>
       <li className="flex items-center gap-2">
         <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0">
@@ -274,7 +272,7 @@ function Legend() {
           </defs>
           <rect x="0.5" y="0.5" width="11" height="11" fill={`url(#${LEGEND_HATCH_ID})`} stroke="var(--chart-mark)" />
         </svg>
-        Deload week
+        Deload-uge
       </li>
     </ul>
   );
@@ -290,7 +288,7 @@ function LineSample({ series }: { readonly series: Series }) {
         x2="22"
         y2="6"
         stroke={series.color}
-        strokeWidth={STROKE_WIDTH}
+        strokeWidth={series.width}
         strokeDasharray={series.dash}
         strokeLinecap="round"
       />

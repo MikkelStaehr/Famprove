@@ -121,11 +121,6 @@
   --text-44--line-height: 1;
   --text-56: 3.5rem;
   --text-56--line-height: 1;
-  /* Retired placeholder sizes: kept until the Spurt build replaces their last use. */
-  --text-28: 1.75rem;
-  --text-28--line-height: 1.1;
-  --text-40: 2.5rem;
-  --text-40--line-height: 1.1;
 
   --radius-mark: 4px;
   --radius-control: 16px;

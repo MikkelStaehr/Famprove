@@ -9,7 +9,7 @@ export function weekHref(param: string): string {
 }
 
 const STEP_CLASS =
-  "inline-flex size-11 shrink-0 items-center justify-center rounded-control border border-border text-accent";
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-pill bg-track text-text";
 
 /**
  * Previous / next ISO week as real links (server-rendered, no JS needed). `scroll={false}`
@@ -24,10 +24,10 @@ export function WeekSwitcher({ nav }: { readonly nav: WeekNav }) {
     <nav aria-label="Choose week" className="flex items-center gap-2">
       <Step target={nav.prev} direction="prev" year={week.isoYear} />
       <p className="flex min-w-0 flex-1 flex-col items-center text-center">
-        <span className="text-14 font-semibold">
+        <span className="text-14 font-semibold tabular-nums">
           {formatDay(week.weekStart)} – {formatDay(week.weekEnd)}
         </span>
-        <span className="text-12 text-text-muted">
+        <span className="text-14 text-text-muted tabular-nums">
           {nav.param}
           {note}
         </span>
@@ -71,7 +71,7 @@ export function LatestWeekLink() {
     <Link
       href="/load"
       scroll={false}
-      className="inline-flex min-h-11 items-center rounded-control border border-border px-3 text-14 font-semibold text-accent"
+      className="inline-flex min-h-11 items-center text-14 font-semibold text-text underline decoration-1 underline-offset-3"
     >
       Back to this week
     </Link>
