@@ -78,6 +78,24 @@ SETS_REPS_NOT_A_NUMBER = "sets/reps not a number"
 WEEK_DATE_NOT_A_DATE = "week date not a date"
 ROW_WITHOUT_TYPE = "prescribed row without type"
 
+E1RM_RANGE = (20.0, 400.0)   # kg; et 1RM udenfor er aldrig et rigtigt 1RM
+E1RM_OUT_OF_RANGE = "1RM out of range"
+
+def read_e1rm(rows, issues: Counter[str]) -> dict[str, float]:
+    """1RM pr. løft fra fanens top (de første 15 rækker): løftets navn med tallet 5 kolonner til højre.
+    Kun FØRSTE match tæller: skabelonen har længere nede en BLOCK SBD METRICS-tabel med de samme
+    navne og tonnage i samme kolonne. Et tal udenfor E1RM_RANGE tælles i issues og bruges ikke."""
+    e1rm = {}
+    for r in rows[:15]:
+        for i,c in enumerate(r):
+            if c in ("SQUAT","BENCH","DEADLIFT") and c not in e1rm and i+5 < len(r) and isinstance(r[i+5],(int,float)):
+                e1rm[c] = float(r[i+5])
+    for lift, kg in list(e1rm.items()):
+        if not E1RM_RANGE[0] <= kg <= E1RM_RANGE[1]:
+            issues[E1RM_OUT_OF_RANGE] += 1
+            del e1rm[lift]
+    return e1rm
+
 def parse_all(data: bytes, bodyweight: float, issues: Counter[str] | None = None,
               counts_issues=None) -> list[ParsedSet]:
     """``counts_issues(tab)`` False: the tab is parsed but its unreadable cells aren't counted
@@ -93,11 +111,7 @@ def parse_all(data: bytes, bodyweight: float, issues: Counter[str] | None = None
 def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
     issues = Counter() if issues is None else issues
     rows = list(ws.iter_rows(values_only=True))
-    e1rm = {}
-    for r in rows[:15]:
-        for i,c in enumerate(r):
-            if c in ("SQUAT","BENCH","DEADLIFT") and i+5 < len(r) and isinstance(r[i+5],(int,float)):
-                e1rm[c] = float(r[i+5])
+    e1rm = read_e1rm(rows, issues)
     sets = []
     week_dates = None
     section = 0

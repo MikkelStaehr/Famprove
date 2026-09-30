@@ -20,11 +20,13 @@ from conftest import SYNTHETIC_SHEET_ID, InMemoryPostgrest
 from training_load.cli import collect_strength
 from training_load.config import GoogleSettings
 from training_load.sources.strength_sheet import (
+    E1RM_OUT_OF_RANGE,
     KG_NOT_A_NUMBER,
     ROW_WITHOUT_TYPE,
     SETS_REPS_NOT_A_NUMBER,
     ParsedSet,
     parse_all,
+    read_e1rm,
 )
 
 SLICE = json.loads((Path(__file__).parent / "fixtures" / "blok12_slice.json").read_text("utf-8"))
@@ -68,6 +70,31 @@ def test_real_slice_parses_without_issues() -> None:
     # "8 - 12" and the coach's "RPE 7 - 5" typo still parse.
     assert sets_of(parsed, 31, 1)[0]["reps"] == 10.0
     assert sets_of(parsed, 31, 4)[0]["prescribed"] == "RPE 7 - 5"
+
+
+def slice_rows(edits: Mapping[tuple[int, int], object] | None = None) -> list[tuple[object, ...]]:
+    wb = openpyxl.load_workbook(io.BytesIO(workbook(edits)), data_only=True)
+    return list(wb[TAB].iter_rows(values_only=True))
+
+
+def test_1rm_comes_from_the_1rm_table_not_the_tonnage_table_below_it() -> None:
+    issues: Counter[str] = Counter()
+    # The slice's 1RM table (anonymised); rows 12-14 repeat the lift names with tonnage (1000s).
+    assert read_e1rm(slice_rows(), issues) == {"SQUAT": 145.0, "BENCH": 82.5, "DEADLIFT": 145.0}
+    assert issues == Counter()
+    # With the real 1RM a logged bench single (78% of 1RM) gets its %1RM-based RPE; with the
+    # tonnage as "1RM" every main lift fell to the clamp's floor of 4.
+    parsed = parse_all(workbook(), BODYWEIGHT)
+    assert (sets_of(parsed, 28, 1)[0]["rpe"] or 0) > 4.5
+
+
+def test_an_implausible_1rm_is_counted_and_never_used() -> None:
+    issues: Counter[str] = Counter()
+    assert read_e1rm(slice_rows({(6, 9): 14008}), issues) == {"BENCH": 82.5, "DEADLIFT": 145.0}
+    assert issues == Counter({E1RM_OUT_OF_RANGE: 1})
+    # Without a squat 1RM the squat falls back to the coach's prescribed RPE ("RPE 5").
+    parsed = parse_all(workbook({(6, 9): 14008}), BODYWEIGHT)
+    assert sets_of(parsed, 25, 1)[0]["rpe"] == 5.0
 
 
 def test_unreadable_kg_is_counted_and_stored_as_none() -> None:

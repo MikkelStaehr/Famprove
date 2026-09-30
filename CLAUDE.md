@@ -34,7 +34,7 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - Secrets only in env files/vault. `.env.example` lists every var. Nothing secret is committed.
 - Small commits, conventional-commit messages (`feat:`, `fix:`, `refactor:`).
 - Prefer boring **code**. No new dependency without a one-line justification.
-- **No silent defaults.** A value that can't be parsed never silently becomes 0 or empty. Missing is `null`, not 0. Collectors count and log unparseable values per run, and fail loudly above a threshold.
+- **No silent defaults.** A value that can't be parsed never silently becomes 0 or empty. Missing is `null`, not 0. Collectors count and log unparseable values per run, and fail loudly above a threshold. Key derived values get sanity bounds; implausible values are flagged, not used.
 - **External input is messy.** Numbers may arrive as text, with dot or comma decimals; junk rows exist. Parse defensively and test it.
 - **Real-data fixtures.** Features that read external data are also tested against a current slice of real data (anonymised: this repo is public). Refresh it when the source changes (new block, season, file).
 - Store external source rows raw once (e.g. a `raw jsonb` column) so new views don't need new migrations.
