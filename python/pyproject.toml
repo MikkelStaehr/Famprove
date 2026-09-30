@@ -12,6 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
+check-config = "training_load.cli.check_config:main"
 collect-intervals = "training_load.cli.collect_intervals:main"
 collect-strength = "training_load.cli.collect_strength:main"
 collect-plan = "training_load.cli.collect_plan:main"

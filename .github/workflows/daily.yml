@@ -38,6 +38,19 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --no-dev
 
+      # Every variable of every step, checked at once: one run lists all config mistakes.
+      - name: check-config
+        env:
+          INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}
+          INTERVALS_ATHLETE_ID: ${{ secrets.INTERVALS_ATHLETE_ID }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BODYWEIGHT: ${{ secrets.BODYWEIGHT }}
+          STRENGTH_K: ${{ secrets.STRENGTH_K }}
+        run: uv run --no-dev check-config
+
       - name: collect-intervals
         env:
           SINCE: ${{ inputs.since }}

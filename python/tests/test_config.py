@@ -6,8 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from training_load.cli import check_config
 from training_load.config import (
     ConfigError,
+    all_problems,
     collect_intervals_config,
     collect_strength_config,
     compute_config,
@@ -158,3 +160,42 @@ def test_mask_in_ci_only_prints_inside_github_actions(
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     mask_in_ci(SHEET_ID, "")
     assert capsys.readouterr().out == f"::add-mask::{SHEET_ID}\n"
+
+
+def test_all_problems_lists_every_job_at_once_without_values() -> None:
+    env = {
+        "INTERVALS_API_KEY": "k-secret",
+        "GOOGLE_SERVICE_ACCOUNT_JSON": '\'{"type": "service_account"}\'',
+        "SUPABASE_URL": "https://x.supabase.co",
+        "SUPABASE_SERVICE_KEY": "sb_secret_x",
+        "BODYWEIGHT": "82.5",
+        "STRENGTH_K": "0,10",
+    }
+    problems = all_problems(env)
+    assert problems == [
+        "INTERVALS_ATHLETE_ID is missing",
+        "GOOGLE_SHEET_ID is missing",
+        "GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON "
+        "(remove the quotes around it: they belong in .env.local only)",
+        "STRENGTH_K must be a number (use a decimal point, not a comma)",
+    ]
+    assert not any("k-secret" in p or "sb_secret_x" in p for p in problems)
+
+
+def test_check_config_exit_codes(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(check_config, "load_dotenv_file", lambda: None)
+    for name in (
+        "INTERVALS_API_KEY",
+        "INTERVALS_ATHLETE_ID",
+        "GOOGLE_SHEET_ID",
+        "GOOGLE_SERVICE_ACCOUNT_JSON",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_KEY",
+        "BODYWEIGHT",
+        "STRENGTH_K",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    assert check_config.main([]) == 2
+    assert "8 configuration problems" in caplog.text

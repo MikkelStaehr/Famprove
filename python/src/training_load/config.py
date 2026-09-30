@@ -22,6 +22,10 @@ _DRIVE_ID_IN_URL: Final = re.compile(r"/d/([A-Za-z0-9_-]{10,})")
 class ConfigError(ValueError):
     """One or more required env vars are missing or invalid. Lists every problem, no values."""
 
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("invalid configuration: " + "; ".join(problems))
+        self.problems = problems
+
 
 @dataclass(frozen=True, slots=True)
 class SupabaseSettings:
@@ -103,7 +107,8 @@ class _Reader:
         try:
             value = float(raw)
         except ValueError:
-            self.problems.append(f"{name} must be a number")
+            hint = " (use a decimal point, not a comma)" if _decimal_comma(raw) else ""
+            self.problems.append(f"{name} must be a number{hint}")
             return 0.0
         if not math.isfinite(value) or value <= above or (below is not None and value >= below):
             bounds = f"> {above}" + (f" and < {below}" if below is not None else "")
@@ -132,7 +137,11 @@ class _Reader:
         try:
             parsed: object = json.loads(raw)
         except json.JSONDecodeError:
-            self.problems.append(f"{name} is not valid JSON")
+            quoted = raw[0] in "'\"" and raw[-1] == raw[0]
+            hint = (
+                " (remove the quotes around it: they belong in .env.local only)" if quoted else ""
+            )
+            self.problems.append(f"{name} is not valid JSON{hint}")
             return {}
         if not isinstance(parsed, dict) or parsed.get("type") != "service_account":
             self.problems.append(f"{name} must be a service-account key (type service_account)")
@@ -145,7 +154,16 @@ class _Reader:
 
     def done(self) -> None:
         if self.problems:
-            raise ConfigError("invalid configuration: " + "; ".join(self.problems))
+            raise ConfigError(self.problems)
+
+
+def _decimal_comma(raw: str) -> bool:
+    """True for "0,10": a number with a decimal comma instead of a point."""
+    try:
+        float(raw.replace(",", ".", 1))
+    except ValueError:
+        return False
+    return "," in raw
 
 
 def collect_intervals_config(env: Mapping[str, str]) -> CollectIntervalsConfig:
@@ -179,6 +197,21 @@ def collect_strength_config(env: Mapping[str, str]) -> CollectStrengthConfig:
     )
     r.done()
     return config
+
+
+def all_problems(env: Mapping[str, str]) -> list[str]:
+    """Every problem of every job's configuration at once, each listed once, in job order.
+
+    Used by ``check-config`` as the daily workflow's first step, so one run shows all mistakes
+    (names and reasons only, never values) instead of one failing step per run.
+    """
+    problems: list[str] = []
+    for build in (collect_intervals_config, collect_strength_config, compute_config):
+        try:
+            build(env)
+        except ConfigError as exc:
+            problems.extend(p for p in exc.problems if p not in problems)
+    return problems
 
 
 def compute_config(env: Mapping[str, str]) -> ComputeConfig:
