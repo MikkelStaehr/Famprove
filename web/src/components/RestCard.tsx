@@ -19,18 +19,18 @@ type RestCardProps = {
  */
 export function RestCard({ next, lookaheadDays, doneToday }: RestCardProps) {
   return (
-    <Card id="rest" title={doneToday ? "Done for today" : "Rest day"}>
-      <p className="text-20">{doneToday ? "Nothing more planned today." : "Nothing planned today."}</p>
+    <Card id="rest" variant="session" title={doneToday ? "Færdig for i dag" : "Hviledag"}>
+      <p className="text-20">{doneToday ? "Ikke mere planlagt i dag." : "Intet planlagt i dag."}</p>
       {next === null ? (
         <EmptyState
-          message={`No ride planned in the next ${lookaheadDays} days. Rides come from planned_sessions.`}
+          message={`Ingen tur planlagt de næste ${lookaheadDays} dage. Ture kommer fra planned_sessions.`}
         />
       ) : (
         <div className="flex flex-col gap-1">
-          <h3 className="text-14 font-semibold text-text-muted">Next ride</h3>
-          <p className="text-20 font-semibold">
+          <h3 className="text-14 font-bold tracking-[0.04em] text-text-muted uppercase">Næste tur</h3>
+          <p className="text-20 font-bold">
             <time dateTime={next.date}>
-              {next.isTomorrow ? `Tomorrow · ${formatDay(next.date)}` : formatDay(next.date)}
+              {next.isTomorrow ? `I morgen · ${formatDay(next.date)}` : formatDay(next.date)}
             </time>
           </p>
           <ul className="flex flex-col text-16">

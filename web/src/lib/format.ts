@@ -5,7 +5,7 @@
 import type { IsoDate } from "./db/rows.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
-export const LOCALE = "en-GB"; // 24 h clock, day-month order
+export const LOCALE = "da-DK"; // "ons. 30. sep.", "kl. 05.03", decimal comma
 export const TSS_PER_DAY = "TSS/day"; // unit of CTL / ATL / TSB (DESIGN.md)
 
 const DAY_FORMAT = new Intl.DateTimeFormat(LOCALE, {
@@ -15,9 +15,13 @@ const DAY_FORMAT = new Intl.DateTimeFormat(LOCALE, {
   timeZone: "UTC",
 });
 
-const UPDATED_FORMAT = new Intl.DateTimeFormat(LOCALE, {
+const UPDATED_DATE_FORMAT = new Intl.DateTimeFormat(LOCALE, {
   day: "numeric",
   month: "short",
+  timeZone: LOCAL_TZ,
+});
+
+const UPDATED_TIME_FORMAT = new Intl.DateTimeFormat(LOCALE, {
   hour: "2-digit",
   minute: "2-digit",
   hourCycle: "h23",
@@ -39,16 +43,29 @@ export function formatSigned(value: number): string {
 }
 
 /**
- * Calendar date, e.g. "2026-09-28" -> "Mon 28 Sept" (en-GB CLDR). Formats the date as-is (parse as UTC
+ * Calendar date, e.g. "2026-09-28" -> "man. 28. sep." (da-DK CLDR). Formats the date as-is (parse as UTC
  * midnight, format with timeZone "UTC") so no time-zone shift can move it a day.
  */
 export function formatDay(date: IsoDate): string {
   return DAY_FORMAT.format(new Date(`${date}T00:00:00Z`));
 }
 
-/** computed_at (ISO timestamptz) in LOCAL_TZ, e.g. "28 Sept, 05:03". */
+const DAY_LONG_FORMAT = new Intl.DateTimeFormat(LOCALE, {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: "UTC",
+});
+
+/** Calendar date in words for screen readers: "2026-09-27" -> "søndag 27. september". */
+export function formatDayLong(date: IsoDate): string {
+  return DAY_LONG_FORMAT.format(new Date(`${date}T00:00:00Z`));
+}
+
+/** computed_at (ISO timestamptz) in LOCAL_TZ, e.g. "28. sep. kl. 05.03". */
 export function formatUpdatedAt(computedAt: string): string {
-  return UPDATED_FORMAT.format(new Date(computedAt));
+  const at = new Date(computedAt);
+  return `${UPDATED_DATE_FORMAT.format(at)} kl. ${UPDATED_TIME_FORMAT.format(at)}`;
 }
 
 const KG_FORMAT = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
@@ -69,21 +86,21 @@ export function formatWatts(watts: number): string {
   return `${formatLoad(watts)} W`;
 }
 
-/** Kilograms as logged, up to 2 decimals: 120 -> "120", 22.5 -> "22.5". */
+/** Kilograms as logged, up to 2 decimals: 120 -> "120", 22.5 -> "22,5". */
 export function formatKg(kg: number): string {
   return KG_FORMAT.format(kg);
 }
 
 /**
- * The load of one set: "120 kg"; bodyweight exercises add the logged kg to "bodyweight".
+ * The load of one set: "120 kg"; bodyweight exercises add the logged kg to "kropsvægt".
  * null when nothing was logged (logged_kg is 0 for a blank cell on a weighted exercise).
  */
 export function formatSetLoad(loggedKg: number, bodyweight: boolean): string | null {
   if (!bodyweight) return loggedKg === 0 ? null : `${formatKg(loggedKg)} kg`;
-  if (loggedKg === 0) return "bodyweight";
+  if (loggedKg === 0) return "kropsvægt";
   return loggedKg > 0
-    ? `bodyweight + ${formatKg(loggedKg)} kg`
-    : `bodyweight − ${formatKg(-loggedKg)} kg`;
+    ? `kropsvægt + ${formatKg(loggedKg)} kg`
+    : `kropsvægt − ${formatKg(-loggedKg)} kg`;
 }
 
 /** A raw strength score as a whole number: 336.8 -> "337". */
@@ -141,12 +158,12 @@ export function formatStepDuration(minutes: number): string {
 }
 
 /**
- * Screen-reader wording of a range between numbers: "8 - 12" -> "8 to 12", "RPE 6 - 7" ->
- * "RPE 6 to 7", "225–250" -> "225 to 250". Anything else stays as written ("-10%").
+ * Screen-reader wording of a range between numbers: "8 - 12" -> "8 til 12", "RPE 6 - 7" ->
+ * "RPE 6 til 7", "225–250" -> "225 til 250". Anything else stays as written ("-10%").
  * Visible text never uses this; it shows sheet strings exactly as written.
  */
 export function spokenRange(text: string): string {
-  return text.replace(/(\d)(?:\s+-\s+|–)(?=\d)/g, "$1 to ");
+  return text.replace(/(\d)(?:\s+-\s+|–)(?=\d)/g, "$1 til ");
 }
 
 /** "1" (as written, trimmed) takes the singular word; any other value the plural. */
@@ -156,21 +173,21 @@ function counted(text: string, one: string, many: string): string {
 
 /**
  * Visible sets × reps from the sheet cells as written: ("2", "8 - 12") -> "2 × 8 - 12".
- * With one cell missing, that one's word: "10 - 15 reps", "2 sets". null when both are blank.
+ * With one cell missing, that one's word: "10 - 15 reps", "2 sæt". null when both are blank.
  */
 export function formatSetsReps(sets: string | null, reps: string | null): string | null {
   if (sets !== null && reps !== null) return `${sets} × ${reps}`;
   if (reps !== null) return counted(reps, "rep", "reps");
-  if (sets !== null) return counted(sets, "set", "sets");
+  if (sets !== null) return counted(sets, "sæt", "sæt");
   return null;
 }
 
-/** Spoken sets and reps: ("1", "3") -> "1 set of 3 reps", ("2", "8 - 12") -> "2 sets of 8 to 12 reps". */
+/** Spoken sets and reps: ("1", "3") -> "1 sæt af 3 reps", ("2", "8 - 12") -> "2 sæt af 8 til 12 reps". */
 export function spokenSetsReps(sets: string | null, reps: string | null): string | null {
   const spokenReps = reps === null ? null : counted(spokenRange(reps), "rep", "reps");
-  if (sets !== null && spokenReps !== null) return `${counted(sets, "set", "sets")} of ${spokenReps}`;
+  if (sets !== null && spokenReps !== null) return `${counted(sets, "sæt", "sæt")} af ${spokenReps}`;
   if (spokenReps !== null) return spokenReps;
-  if (sets !== null) return counted(sets, "set", "sets");
+  if (sets !== null) return counted(sets, "sæt", "sæt");
   return null;
 }
 
@@ -183,17 +200,17 @@ export type ExerciseWords = {
 };
 
 /**
- * The accessible name of a tick row, e.g. "Squat, 1 set of 3 reps at RPE 5, last week 100 kg".
+ * The accessible name of a tick row, e.g. "Squat, 1 sæt af 3 reps ved RPE 5, sidste uge 100 kg".
  * `lastWeek`: undefined in week 1 (no reference line), null when nothing was logged, else the
- * formatted load ("100 kg", "bodyweight + 10 kg").
+ * formatted load ("100 kg", "kropsvægt + 10 kg").
  */
 export function spokenExercise(e: ExerciseWords, lastWeek: string | null | undefined): string {
   const amount = spokenSetsReps(e.setsText, e.repsText);
   const load = e.prescribed === null ? null : spokenRange(e.prescribed);
-  const what = amount !== null && load !== null ? `${amount} at ${load}` : (amount ?? load);
+  const what = amount !== null && load !== null ? `${amount} ved ${load}` : (amount ?? load);
   const parts = [e.name.trim()];
   if (what !== null) parts.push(what);
-  if (lastWeek === null) parts.push("nothing logged last week");
-  else if (lastWeek !== undefined) parts.push(`last week ${lastWeek}`);
+  if (lastWeek === null) parts.push("intet logget sidste uge");
+  else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);
   return parts.join(", ");
 }

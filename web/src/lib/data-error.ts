@@ -13,7 +13,7 @@ export function isDataError(error: unknown): error is DataError {
 
 /** What failed, in one sentence for ErrorState (names the table, never values or secrets). */
 export function describeDataError(error: DataError): string {
-  if (error instanceof EnvError) return "The server is missing its database settings.";
-  if (error instanceof PostgrestError) return `Reading ${error.table} from the database failed.`;
-  return "The database returned data in an unexpected shape.";
+  if (error instanceof EnvError) return "Serveren mangler sine databaseindstillinger.";
+  if (error instanceof PostgrestError) return `Læsning af ${error.table} fra databasen mislykkedes.`;
+  return "Databasen returnerede data i et uventet format.";
 }

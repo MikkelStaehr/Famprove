@@ -53,3 +53,37 @@ export const BANDS: readonly Band[] = LOWERS.map(([key, lower], i) => {
 
 /** The threshold numbers printed under the bar: −30, −10, 5, 20. */
 export const THRESHOLDS: readonly number[] = BANDS.flatMap((b) => (b.lower === null ? [] : [b.lower]));
+
+/** A TSB number written out for screen readers: 4 -> "plus 4", −12 -> "minus 12", 0 -> "0". */
+function spokenSigned(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded > 0) return `plus ${rounded}`;
+  if (rounded < 0) return `minus ${Math.abs(rounded)}`;
+  return "0";
+}
+
+/** Each band's name and range as spoken (design/specs/today.md §5a, ZoneBar sr sentence). */
+const SPOKEN_BAND: Readonly<Record<ZoneKey, string>> = {
+  high_risk: "høj risiko, under minus 30",
+  optimal: "optimal, som går fra minus 30 til minus 10",
+  grey_zone: "gråzone, som går fra minus 10 til 5",
+  fresh: "frisk, som går fra 5 til 20",
+  transition: "overgang, over 20",
+};
+
+export function isZoneKey(key: string | null): key is ZoneKey {
+  return key !== null && Object.hasOwn(SPOKEN_BAND, key);
+}
+
+/**
+ * The zone bar's one sr-only sentence, e.g. "Form plus 4 TSS per dag: gråzone, som går fra
+ * minus 10 til 5." `zone` is daily_load.form_zone as-is (never derived from `tsb` here);
+ * `fromDate` is the spoken date when the row is not today's ("søndag 27. september").
+ */
+export function zoneSentence(tsb: number, zone: string | null, fromDate?: string): string {
+  const value = `Form ${spokenSigned(tsb)} TSS per dag`;
+  const parts = [isZoneKey(zone) ? `${value}: ${SPOKEN_BAND[zone]}.` : `${value}. Zone ikke beregnet.`];
+  if (pinned(tsb) !== null) parts.push("Uden for skalaen, som går fra minus 40 til 30.");
+  if (fromDate !== undefined) parts.push(`Tallet er fra ${fromDate}.`);
+  return parts.join(" ");
+}

@@ -47,7 +47,7 @@ test("freshness: fresh up to 26 h, stale after, unknown without computed_at", ()
 });
 
 test("zoneDisplay maps Python keys and falls back to neutral for unknown ones", () => {
-  assert.deepEqual(zoneDisplay("high_risk"), { key: "high_risk", label: "High risk", tone: "negative" });
+  assert.deepEqual(zoneDisplay("high_risk"), { key: "high_risk", label: "Høj risiko", tone: "negative" });
   assert.deepEqual(zoneDisplay("new_zone"), { key: "new_zone", label: "new_zone", tone: "neutral" });
   assert.deepEqual(zoneDisplay("toString"), { key: "toString", label: "toString", tone: "neutral" });
   assert.equal(zoneDisplay(null), null);
@@ -91,7 +91,7 @@ test("buildDashboardView: empty without rows, hero from the latest row otherwise
   assert.equal(view.kind, "ready");
   if (view.kind !== "ready") return;
   assert.equal(view.hero.tsb, 10.8);
-  assert.equal(view.hero.zone?.label, "Fresh");
+  assert.equal(view.hero.zone?.label, "Frisk");
   assert.equal(view.freshness.kind, "fresh");
   assert.equal(view.chart.length, 2);
   assert.equal(view.week?.selected.isoWeek, 40);

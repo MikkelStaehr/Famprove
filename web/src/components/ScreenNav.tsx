@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/", label: "Today" },
-  { href: "/load", label: "Training load" },
+  { href: "/", label: "I dag" },
+  { href: "/load", label: "Belastning" },
 ] as const;
 
 function isCurrent(pathname: string, href: string): boolean {
@@ -13,25 +13,24 @@ function isCurrent(pathname: string, href: string): boolean {
 }
 
 /**
- * DESIGN.md ScreenNav: two tabs in the root layout, not sticky. The current tab has
- * aria-current="page", semibold --text and a 2px --text bar on the strip line; the other is
- * regular --accent. Weight and bar mark the current page, so colour is never the only signal.
+ * DESIGN.md ScreenNav (Part B): a --track pill with two tabs, not sticky. The current tab has
+ * aria-current="page", a --text fill with --bg text and weight 700: fill and weight, never
+ * colour alone (and deliberately not --slab).
  */
 export function ScreenNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Main">
-      <ul className="flex gap-2 border-b border-border">
+    <nav aria-label="Hovedmenu">
+      <ul className="grid grid-cols-2 gap-1 rounded-pill bg-track p-1">
         {TABS.map((tab) => {
           const current = isCurrent(pathname, tab.href);
           return (
-            // -mb-px puts the link's 2px bottom bar on top of the strip's 1px line.
-            <li key={tab.href} className="-mb-px">
+            <li key={tab.href} className="flex">
               <Link
                 href={tab.href}
                 aria-current={current ? "page" : undefined}
-                className={`inline-flex min-h-11 items-center border-b-2 px-3 text-16 ${
-                  current ? "border-text font-semibold text-text" : "border-transparent text-accent"
+                className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-pill px-4 text-16 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus ${
+                  current ? "bg-text font-bold text-bg" : "font-semibold text-text"
                 }`}
               >
                 {tab.label}

@@ -36,10 +36,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="da" className={`${barlow.variable} ${barlowCondensed.variable}`}>
       <body className="bg-bg font-sans text-16 text-text antialiased">
-        <header className="mx-auto w-full max-w-content px-4 pt-2">
+        <header className="mx-auto w-full max-w-content px-3 pt-3">
           <ScreenNav />
         </header>
-        <main className="mx-auto flex w-full max-w-content flex-col gap-6 px-4 py-6 sm:py-8">
+        <main className="mx-auto flex w-full max-w-content flex-col gap-4 px-3 pt-4 pb-12">
           <TickProvider>{children}</TickProvider>
         </main>
       </body>

@@ -5,7 +5,7 @@ import { formatDay } from "@/lib/format";
 import type { DoneSession, StrengthSession, StrengthWeek } from "@/lib/today-view";
 
 import { Card } from "./Card";
-import { ExerciseList, TickProgress } from "./ExerciseChecklist";
+import { ExerciseList, TickProgress, TickSegments } from "./ExerciseChecklist";
 import { ActivityWords, hasActivityWords } from "./MovingTime";
 
 type StrengthCardProps = {
@@ -21,14 +21,15 @@ type StrengthCardProps = {
  */
 export function StrengthCard({ id, date, strength }: StrengthCardProps) {
   const next = strength.state === "next" ? strength.next : null;
+  const rowKeys = next?.exercises.map((e) => e.key) ?? [];
   return (
     <Card
       id={id}
-      title="Strength"
-      action={
-        next !== null ? <TickProgress date={date} rowKeys={next.exercises.map((e) => e.key)} /> : undefined
-      }
+      variant="session"
+      title="Styrke"
+      action={next !== null ? <TickProgress date={date} rowKeys={rowKeys} /> : undefined}
     >
+      {next !== null && <TickSegments date={date} rowKeys={rowKeys} />}
       {strength.done.length > 0 && <DoneList done={strength.done} />}
       {next !== null ? (
         <NextSession date={date} session={next} />
@@ -36,45 +37,45 @@ export function StrengthCard({ id, date, strength }: StrengthCardProps) {
         <WeekNote
           title={
             strength.planned === 1
-              ? "This week's session is done."
-              : `All ${strength.planned} sessions done this week.`
+              ? "Ugens session er udført."
+              : `Alle ${strength.planned} sessioner er udført i denne uge.`
           }
           body={
             <>
-              Next week&apos;s session 1 shows here from{" "}
+              Næste uges session 1 vises her fra{" "}
               <time dateTime={strength.nextWeekStart}>{formatDay(strength.nextWeekStart)}</time>.
             </>
           }
         />
       ) : (
         <WeekNote
-          title="No strength program this week."
-          body={`The coach's sheet has nothing for week ${strength.isoWeek} yet. It shows here once it's added.`}
+          title="Intet styrkeprogram i denne uge."
+          body={`Trænerens ark har intet for uge ${strength.isoWeek} endnu. Det vises her, når det er tilføjet.`}
         />
       )}
     </Card>
   );
 }
 
-/** Strength activities logged this week, in session order, each with a filled ✓ circle. */
+/** Strength activities logged this week, in session order, each with a --slab ✓ circle (done = slab). */
 function DoneList({ done }: { readonly done: readonly DoneSession[] }) {
   return (
-    <ul aria-label="Done this week" className="flex flex-col gap-1 border-b border-border pb-3 text-16">
+    <ul aria-label="Udført i denne uge" className="mt-1 flex flex-col gap-1 border-b border-border pb-3 text-16">
       {done.map((d) => (
         <li key={`${d.session}#${d.date}`} className="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-2">
           <span aria-hidden="true" className="flex h-lh items-center">
             <DoneMark />
           </span>
           <span>
-            {d.extra ? "Extra session" : `Session ${d.session}`} done{" "}
-            {d.isToday ? "today" : <time dateTime={d.date}>{formatDay(d.date)}</time>}
+            {d.extra ? "Ekstra session" : `Session ${d.session}`} udført{" "}
+            {d.isToday ? "i dag" : <time dateTime={d.date}>{formatDay(d.date)}</time>}
             {hasActivityWords(d.activityName, d.movingTimeS) && (
               <>
                 {" · "}
                 <ActivityWords name={d.activityName} movingTimeS={d.movingTimeS} />
               </>
             )}
-            {d.extra && " · not in the program"}
+            {d.extra && " · ikke i programmet"}
           </span>
         </li>
       ))}
@@ -82,10 +83,10 @@ function DoneList({ done }: { readonly done: readonly DoneSession[] }) {
   );
 }
 
-/** 20px filled --positive circle with a --surface ✓ (the shape carries the meaning). */
+/** 20px filled --slab circle with a --slab-mark ✓ (the shape carries the meaning). */
 function DoneMark() {
   return (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-positive text-surface">
+    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-slab text-slab-mark">
       <svg
         viewBox="0 0 16 16"
         className="size-3"
@@ -106,20 +107,20 @@ function NextSession({ date, session }: { readonly date: IsoDate; readonly sessi
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h3 className="text-20 font-semibold">
-          Session {session.session} of {session.of} this week
+        <h3 className="text-20 font-bold">
+          Session {session.session} af {session.of} i denne uge
         </h3>
         <p className="text-16">
-          {session.block} · week {session.week}
+          {session.block} · uge {session.week}
         </p>
         {session.week === 1 && (
           <p className="text-14 text-text-muted">
-            Week 1 of the block: no kg from last week to compare yet.
+            Uge 1 i blokken: ingen kg fra sidste uge at sammenligne med endnu.
           </p>
         )}
       </div>
       <ExerciseList date={date} week={session.week} exercises={session.exercises} />
-      <p className="text-14 text-text-muted">Ticks clear when the page reloads. Log kg in the sheet.</p>
+      <p className="text-14 text-text-muted">Flueben forsvinder, når siden genindlæses. Log kg i arket.</p>
     </>
   );
 }
@@ -128,7 +129,7 @@ function NextSession({ date, session }: { readonly date: IsoDate; readonly sessi
 function WeekNote({ title, body }: { readonly title: string; readonly body: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-20 font-semibold">{title}</p>
+      <p className="text-20 font-bold">{title}</p>
       <p className="text-16">{body}</p>
     </div>
   );

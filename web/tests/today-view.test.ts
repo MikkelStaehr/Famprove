@@ -233,7 +233,7 @@ test("an extra activity beyond the program is listed as extra; no program means 
 test("todayHeader: TSB, zone and freshness from the latest row; null without rows", () => {
   const header = todayHeader(LATEST, NOW);
   assert.equal(header?.tsb, 10.8);
-  assert.equal(header?.zone?.label, "Fresh");
+  assert.equal(header?.zone?.label, "Frisk");
   assert.equal(header?.freshness.kind, "fresh");
   assert.equal(header?.date, "2026-10-05");
   assert.equal(todayHeader(null, NOW), null);

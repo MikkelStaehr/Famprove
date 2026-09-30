@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { BANDS, pinned, position, THRESHOLDS } from "../src/lib/zone-scale.ts";
+import { BANDS, pinned, position, THRESHOLDS, zoneSentence } from "../src/lib/zone-scale.ts";
 
 const FORM_PY = readFileSync(
   new URL("../../python/src/training_load/domain/form.py", import.meta.url),
@@ -49,4 +49,17 @@ test("off-scale values pin the marker to the end but keep their own number", () 
   assert.equal(pinned(34), "high");
   assert.equal(pinned(-40), null);
   assert.equal(pinned(-35), null);
+});
+
+test("zoneSentence reads the zone from form_zone and writes the sign out", () => {
+  assert.equal(zoneSentence(4, "grey_zone"), "Form plus 4 TSS per dag: gråzone, som går fra minus 10 til 5.");
+  assert.equal(zoneSentence(-34, "high_risk"), "Form minus 34 TSS per dag: høj risiko, under minus 30.");
+  assert.equal(zoneSentence(0.2, "grey_zone"), "Form 0 TSS per dag: gråzone, som går fra minus 10 til 5.");
+  assert.equal(zoneSentence(4, null), "Form plus 4 TSS per dag. Zone ikke beregnet.");
+  // The zone comes from Python, even when it disagrees with the drawing thresholds.
+  assert.equal(zoneSentence(24, "fresh"), "Form plus 24 TSS per dag: frisk, som går fra 5 til 20.");
+  assert.equal(
+    zoneSentence(-46, "high_risk", "søndag 27. september"),
+    "Form minus 46 TSS per dag: høj risiko, under minus 30. Uden for skalaen, som går fra minus 40 til 30. Tallet er fra søndag 27. september.",
+  );
 });

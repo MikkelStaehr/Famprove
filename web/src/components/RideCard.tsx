@@ -27,35 +27,36 @@ export function RideCard({ id, ride }: RideCardProps) {
   return (
     <Card
       id={id}
-      title="Ride"
+      variant="session"
+      title="Cykel"
       action={
         readable ? (
           <p className="text-16 font-semibold tabular-nums">
-            Total {formatDuration(ride.totalMinutes * 60)} h
+            I alt {formatDuration(ride.totalMinutes * 60)} t
           </p>
         ) : undefined
       }
     >
-      <p className="text-20 font-semibold">{ride.name}</p>
+      <p className="text-20 font-bold">{ride.name}</p>
       {ride.notes !== null && ride.notes.trim() !== "" && <p className="text-16">{ride.notes}</p>}
       {ride.problem !== null ? (
         <WarningLine>
-          {`Couldn't read the steps, so no targets are shown. Fix them in planned_sessions (${ride.problem}).`}
+          {`Kunne ikke læse trinene, så der vises ingen mål. Ret dem i planned_sessions (${ride.problem}).`}
         </WarningLine>
       ) : ride.steps.length === 0 ? (
-        <EmptyState message="No steps entered for this ride." />
+        <EmptyState message="Der er ikke indtastet trin for denne tur." />
       ) : (
         <>
           <p className="text-14 text-text-muted">
             {ride.ftp === null ? (
-              "No FTP from intervals.icu, so targets are in % FTP only."
+              "Ingen FTP fra intervals.icu, så målene står kun i % FTP."
             ) : (
               <>
-                Targets from FTP <span className="whitespace-nowrap">{formatWatts(ride.ftp)}</span>
+                Mål ud fra FTP <span className="whitespace-nowrap">{formatWatts(ride.ftp)}</span>
               </>
             )}
           </p>
-          <ol aria-label="Workout steps" className="flex flex-col">
+          <ol aria-label="Trin" className="flex flex-col">
             {ride.steps.map((item, i) => (
               <li key={i} className={i > 0 ? "border-t border-border" : undefined}>
                 {item.kind === "step" ? (
@@ -63,7 +64,7 @@ export function RideCard({ id, ride }: RideCardProps) {
                 ) : (
                   <>
                     <p id={`${id}-repeat-${i}`} className="pt-3 text-16 font-semibold">
-                      Repeat {item.repeat} {item.repeat === 1 ? "time" : "times"}
+                      Gentag {item.repeat} {item.repeat === 1 ? "gang" : "gange"}
                     </p>
                     <ol
                       aria-labelledby={`${id}-repeat-${i}`}
@@ -87,7 +88,7 @@ export function RideCard({ id, ride }: RideCardProps) {
 }
 
 /**
- * Left: label (text-20 semibold) over the duration (text-20). Right: watts (text-28 bold) over
+ * Left: label (text-20 semibold) over the duration (text-20). Right: watts (text-32 Condensed 700) over
  * % FTP (text-16 muted); without watts (no FTP) the % FTP takes the big line.
  */
 function StepRow({ step }: { readonly step: PlanStep }) {
@@ -98,7 +99,7 @@ function StepRow({ step }: { readonly step: PlanStep }) {
   const spoken = [
     step.label,
     duration,
-    watts === null ? null : `${spokenRange(watts)} watts`,
+    watts === null ? null : `${spokenRange(watts)} watt`,
     `${spokenRange(pct)}% FTP`,
   ]
     .filter((part) => part !== null)
@@ -108,10 +109,10 @@ function StepRow({ step }: { readonly step: PlanStep }) {
       <span className="sr-only">{spoken}</span>
       <p aria-hidden="true" className="flex flex-col text-20">
         {step.label === null ? (
-          <span className="font-semibold">{duration}</span>
+          <span className="font-bold">{duration}</span>
         ) : (
           <>
-            <span className="font-semibold">{step.label}</span>
+            <span className="font-bold">{step.label}</span>
             <span>{duration}</span>
           </>
         )}
@@ -120,14 +121,14 @@ function StepRow({ step }: { readonly step: PlanStep }) {
         {/* A range never breaks after its en dash ("125–" / "188 W" reads like a 188 W target).
             Only the unit may wrap under it, when the card is narrower than the value (200% text). */}
         {watts === null ? (
-          <span className="text-28 font-bold tabular-nums">
+          <span className="font-display text-32 font-bold tabular-nums">
             <span className="whitespace-nowrap">{pct}%</span>
             <span className="text-20"> FTP</span>
           </span>
         ) : (
           <>
             {/* Full-size unit: a smaller capital W beside 28px digits reads as a lowercase "w". */}
-            <span className="text-28 font-bold tabular-nums">
+            <span className="font-display text-32 font-bold tabular-nums">
               <span className="whitespace-nowrap">{watts}</span> W
             </span>
             <span className="text-16 text-text-muted tabular-nums">{pct}% FTP</span>

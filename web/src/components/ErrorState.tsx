@@ -18,7 +18,7 @@ type ErrorStateProps = {
 };
 
 const RETRY_CLASS =
-  "inline-flex min-h-11 items-center rounded-control border border-border bg-surface px-4 text-14 font-semibold text-accent";
+  "inline-flex min-h-11 items-center rounded-pill bg-track px-4 text-16 font-semibold text-text focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus";
 
 /** DESIGN.md ErrorState: what failed, when, retry. */
 export function ErrorState({ title, what, detail, at, retry }: ErrorStateProps) {
@@ -30,20 +30,20 @@ export function ErrorState({ title, what, detail, at, retry }: ErrorStateProps) 
         </svg>
         {title}
       </p>
-      <p className="text-14">{what}</p>
-      {detail !== undefined && <p className="text-12 text-text-muted">{detail}</p>}
+      <p className="text-16">{what}</p>
+      {detail !== undefined && <p className="text-14 text-text-muted">{detail}</p>}
       {at !== undefined && (
-        <p className="text-12 text-text-muted">
-          Tried at <time dateTime={at.iso}>{at.text}</time>
+        <p className="text-14 text-text-muted">
+          Forsøgt <time dateTime={at.iso}>{at.text}</time>
         </p>
       )}
       {"href" in retry ? (
         <Link href={retry.href} prefetch={false} className={RETRY_CLASS}>
-          Try again
+          Prøv igen
         </Link>
       ) : (
         <button type="button" onClick={retry.onRetry} className={RETRY_CLASS}>
-          Try again
+          Prøv igen
         </button>
       )}
     </div>

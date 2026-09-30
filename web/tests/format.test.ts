@@ -30,13 +30,13 @@ test("formatSigned uses + and a real minus sign", () => {
 });
 
 test("formatDay formats the calendar date without a time-zone shift", () => {
-  assert.equal(formatDay("2026-03-02"), "Mon 2 Mar");
-  assert.equal(formatDay("2026-01-01"), "Thu 1 Jan");
+  assert.equal(formatDay("2026-03-02"), "man. 2. mar.");
+  assert.equal(formatDay("2026-01-01"), "tors. 1. jan.");
 });
 
 test("formatUpdatedAt shows Copenhagen time (CEST in summer, CET in winter)", () => {
-  assert.equal(formatUpdatedAt("2026-09-28T03:05:00Z"), "28 Sept, 05:05");
-  assert.equal(formatUpdatedAt("2026-01-15T23:30:00Z"), "16 Jan, 00:30");
+  assert.equal(formatUpdatedAt("2026-09-28T03:05:00Z"), "28. sep. kl. 05.05");
+  assert.equal(formatUpdatedAt("2026-01-15T23:30:00Z"), "16. jan. kl. 00.30");
 });
 
 test("formatDuration shows h:mm rounded to the minute", () => {
@@ -56,16 +56,16 @@ test("formatIf turns intervals.icu's percent into a 2-decimal fraction", () => {
 
 test("formatKg keeps logged decimals without trailing zeros", () => {
   assert.equal(formatKg(120), "120");
-  assert.equal(formatKg(22.5), "22.5");
+  assert.equal(formatKg(22.5), "22,5");
   assert.equal(formatKg(0), "0");
 });
 
 test("formatSetLoad names bodyweight, signs the added kg, and is null when nothing was logged", () => {
   assert.equal(formatSetLoad(120, false), "120 kg");
   assert.equal(formatSetLoad(0, false), null);
-  assert.equal(formatSetLoad(0, true), "bodyweight");
-  assert.equal(formatSetLoad(10, true), "bodyweight + 10 kg");
-  assert.equal(formatSetLoad(-12.5, true), "bodyweight − 12.5 kg");
+  assert.equal(formatSetLoad(0, true), "kropsvægt");
+  assert.equal(formatSetLoad(10, true), "kropsvægt + 10 kg");
+  assert.equal(formatSetLoad(-12.5, true), "kropsvægt − 12,5 kg");
 });
 
 test("formatScore rounds the raw score to a whole number", () => {

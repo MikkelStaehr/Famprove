@@ -8,7 +8,7 @@ type EmptyStateProps = {
 export function EmptyState({ message, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-start gap-3 py-2">
-      <p className="flex items-start gap-2 text-14 text-text-muted">
+      <p className="flex items-start gap-2 text-16 text-text-muted">
         <span className="flex h-lh shrink-0 items-center">
           <svg
             aria-hidden="true"
@@ -27,7 +27,7 @@ export function EmptyState({ message, action }: EmptyStateProps) {
       {action !== undefined && (
         <a
           href={action.href}
-          className="inline-flex min-h-11 items-center rounded-control border border-border px-4 text-14 font-semibold text-accent"
+          className="inline-flex min-h-11 items-center rounded-pill bg-track px-4 text-16 font-semibold text-text focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus"
         >
           {action.label}
         </a>

@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 
 import { ErrorState } from "@/components/ErrorState";
-import { FormLine, FormLineError } from "@/components/FormLine";
 import { RestCard } from "@/components/RestCard";
 import { RideCard } from "@/components/RideCard";
 import { StrengthCard } from "@/components/StrengthCard";
 import { UpdatedLine } from "@/components/UpdatedLine";
+import { ZoneBar, ZoneBarError } from "@/components/ZoneBar";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { loadTodayForm, loadTodayPlan, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
@@ -20,7 +20,7 @@ import {
 } from "@/lib/today-view";
 
 export const metadata: Metadata = {
-  title: "Today · Training load",
+  title: "I dag · Belastning",
 };
 
 type Failed = { readonly kind: "error"; readonly error: DataError; readonly at: Date };
@@ -66,27 +66,27 @@ export default async function TodayPage() {
   return (
     <>
       <header className="flex flex-col">
-        <h1 className="text-20 font-bold">
-          Today
-          <span className="font-normal text-text-muted">
-            {" · "}
-            <time dateTime={today}>{formatDay(today)}</time>
-          </span>
+        <h1 className="flex flex-wrap items-baseline gap-x-3">
+          <span className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">I dag</span>
+          <span className="sr-only">, </span>
+          <time dateTime={today} className="text-16 font-medium text-text-muted">
+            {formatDay(today)}
+          </time>
         </h1>
         {header !== null && (
           <div className="mt-1">
             <UpdatedLine
               freshness={header.freshness}
-              staleNote="Form and the strength plan may be out of date."
-              unknownNote="Update time unknown, so form and the strength plan may be out of date."
+              staleNote="Form og styrkeprogrammet kan være forældet."
+              unknownNote="Opdateringstidspunkt ukendt, så form og styrkeprogrammet kan være forældet."
             />
           </div>
         )}
-        <div className={header !== null ? "mt-2" : "mt-1"}>
+        <div className="mt-3">
           {form.kind === "error" ? (
-            <FormLineError retry={plan.kind !== "error"} />
+            <ZoneBarError retry={plan.kind !== "error"} />
           ) : (
-            <FormLine header={form.header} today={today} />
+            <ZoneBar header={form.header} today={today} size="compact" />
           )}
         </div>
       </header>
@@ -117,7 +117,7 @@ function DayCards({ plan }: { readonly plan: TodayPlan }) {
 function PlanError({ error, at }: { readonly error: DataError; readonly at: Date }) {
   return (
     <ErrorState
-      title="Couldn't load today's plan"
+      title="Kunne ikke hente dagens plan"
       what={describeDataError(error)}
       detail={error.message}
       at={{ iso: at.toISOString(), text: formatUpdatedAt(at.toISOString()) }}

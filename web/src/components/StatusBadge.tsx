@@ -11,7 +11,7 @@ const TONE_CLASS: Readonly<Record<Tone, string>> = {
 export function StatusBadge({ tone, label }: { readonly tone: Tone; readonly label: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-control border border-current px-2 py-1 text-14 font-semibold ${TONE_CLASS[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-pill border border-current px-2 py-1 text-14 font-semibold ${TONE_CLASS[tone]}`}
     >
       <ToneIcon tone={tone} />
       {label}
