@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { BANDS, pinned, position, THRESHOLDS, zoneSentence } from "../src/lib/zone-scale.ts";
+import { BANDS, pinned, position, THRESHOLDS, zoneReading, zoneSentence } from "../src/lib/zone-scale.ts";
 
 const FORM_PY = readFileSync(
   new URL("../../python/src/training_load/domain/form.py", import.meta.url),
@@ -62,4 +62,18 @@ test("zoneSentence reads the zone from form_zone and writes the sign out", () =>
     zoneSentence(-46, "high_risk", "søndag 27. september"),
     "Form minus 46 TSS per dag: høj risiko, under minus 30. Uden for skalaen, som går fra minus 40 til 30. Tallet er fra søndag 27. september.",
   );
+});
+
+test("zoneReading gives load.md §8a's sentence per form_zone, from the key only", () => {
+  const cases: readonly (readonly [string | null, string])[] = [
+    ["high_risk", "Du er langt mere træt, end din fitness kan bære. Tag lette dage, før du belaster igen."],
+    ["optimal", "Du er træt på den gode måde: belastningen bygger fitness op."],
+    ["grey_zone", "Du er hverken træt nok til at bygge fitness eller frisk nok til at præstere."],
+    ["fresh", "Du er frisk og klar til at præstere, men fitness bygges ikke op lige nu."],
+    ["transition", "Du er så frisk, at fitness falder. Fint i en pause, ellers er det tid til at træne."],
+    [null, "Uden zone kan dagens form ikke tolkes. Brug tallet på skalaen ovenfor."],
+  ];
+  for (const [zone, sentence] of cases) assert.equal(zoneReading(zone), sentence, String(zone));
+  // An unknown key is not a zone: the same "can't interpret" sentence, never a guess.
+  assert.equal(zoneReading("peaking"), zoneReading(null));
 });

@@ -87,3 +87,23 @@ export function zoneSentence(tsb: number, zone: string | null, fromDate?: string
   if (fromDate !== undefined) parts.push(`Tallet er fra ${fromDate}.`);
   return parts.join(" ");
 }
+
+/** What each zone means for training today (design/specs/load.md §8a). */
+const READING: Readonly<Record<ZoneKey, string>> = {
+  high_risk: "Du er langt mere træt, end din fitness kan bære. Tag lette dage, før du belaster igen.",
+  optimal: "Du er træt på den gode måde: belastningen bygger fitness op.",
+  grey_zone: "Du er hverken træt nok til at bygge fitness eller frisk nok til at præstere.",
+  fresh: "Du er frisk og klar til at præstere, men fitness bygges ikke op lige nu.",
+  transition: "Du er så frisk, at fitness falder. Fint i en pause, ellers er det tid til at træne.",
+};
+
+/**
+ * `/load`'s one-sentence zone reading under the hero, from daily_load.form_zone as-is (never
+ * from TSB). null or an unknown key: the "can't interpret" sentence. The caller renders nothing
+ * when there is no TSB at all.
+ */
+export function zoneReading(zone: string | null): string {
+  return isZoneKey(zone)
+    ? READING[zone]
+    : "Uden zone kan dagens form ikke tolkes. Brug tallet på skalaen ovenfor.";
+}

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { LoadExplainer } from "@/components/LoadExplainer";
 import { TrendChart } from "@/components/TrendChart";
 import { UpdatedLine } from "@/components/UpdatedLine";
 import { ZoneBar } from "@/components/ZoneBar";
@@ -28,6 +29,7 @@ import {
   TSS_PER_DAY,
 } from "@/lib/format";
 import { resolveToday } from "@/lib/today-view";
+import { zoneReading } from "@/lib/zone-scale";
 
 export const metadata: Metadata = {
   title: "Belastning",
@@ -108,7 +110,10 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
   );
 }
 
-/** DESIGN.md Part B › Zone bar, hero size, on --bg (no card); then the fitness delta and detail line. */
+/**
+ * DESIGN.md Part B › Zone bar, hero size, on --bg (no card); then the zone reading (load.md §8a,
+ * from form_zone, never from TSB), the fitness delta and the detail line.
+ */
 function Hero({ view }: { readonly view: ReadyView }) {
   const { hero } = view;
   const delta = fitnessDelta(hero.ctlRamp7d);
@@ -119,7 +124,8 @@ function Hero({ view }: { readonly view: ReadyView }) {
         today={resolveToday(new Date(), process.env)}
         size="hero"
       />
-      <p className="mt-3 flex items-center gap-1.5 text-16 font-semibold">
+      <p className="mt-3 max-w-[60ch] text-16 text-text">{zoneReading(hero.zone?.key ?? null)}</p>
+      <p className="mt-2 flex items-center gap-1.5 text-16 font-semibold">
         {delta.direction !== null && <DirectionIcon direction={delta.direction} />}
         {delta.text}
       </p>
@@ -156,7 +162,12 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
     <>
       <Card id="trend" variant="calm" title={CHART_TITLE}>
         <figure className="flex flex-col gap-2">
-          <TrendChart points={view.chart} blocks={view.blocks} title={CHART_TITLE} />
+          <TrendChart
+            points={view.chart}
+            blocks={view.blocks}
+            title={CHART_TITLE}
+            explainer={<LoadExplainer />}
+          />
           <figcaption className="sr-only">{chartSummary(view)}</figcaption>
         </figure>
       </Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import { catchError, type ErrorInfo } from "next/error";
-import { useSyncExternalStore } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import {
   CartesianGrid,
   Line,
@@ -14,8 +14,9 @@ import {
 } from "recharts";
 
 import type { BlockSpan, ChartPoint } from "@/lib/dashboard-view";
-import { formatDay, formatLoad, formatSigned, LOCALE, TSS_PER_DAY } from "@/lib/format";
+import { formatDay, LOCALE, TSS_PER_DAY } from "@/lib/format";
 
+import { LineSample, SERIES } from "./ChartSeries";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
 
@@ -29,25 +30,9 @@ type TrendChartProps = {
   readonly blocks: readonly BlockSpan[];
   /** Accessible name of the SVG; the page renders the text alternative (figcaption). */
   readonly title: string;
+  /** Rendered under the legend, above the plot, whenever the legend is (load.md §8b). */
+  readonly explainer?: ReactNode;
 };
-
-type SeriesKey = "ctl" | "atl" | "tsb";
-
-type Series = {
-  readonly key: SeriesKey;
-  readonly label: string;
-  readonly color: string;
-  readonly dash: string | undefined; // stroke pattern: lines never differ by colour alone
-  readonly width: number;
-  readonly format: (value: number) => string;
-};
-
-/** Legend and tooltip order. Part B: CTL ink solid 2.5px, ATL dashed 2px (6 4), TSB dotted 2px (round caps). */
-const SERIES: readonly Series[] = [
-  { key: "ctl", label: "Fitness (CTL)", color: "var(--series-ctl)", dash: undefined, width: 2.5, format: formatLoad },
-  { key: "atl", label: "Træthed (ATL)", color: "var(--series-atl)", dash: "6 4", width: 2, format: formatLoad },
-  { key: "tsb", label: "Form (TSB)", color: "var(--series-tsb)", dash: "0.5 4", width: 2, format: formatSigned },
-];
 
 const HATCH_ID = "deload-hatch";
 const LEGEND_HATCH_ID = "deload-hatch-legend";
@@ -109,17 +94,18 @@ export function TrendChart(props: TrendChartProps) {
   return (
     <div className="flex flex-col gap-2">
       <Legend />
+      {props.explainer !== undefined && <div className="mb-1">{props.explainer}</div>}
       <p className="text-12 font-medium text-text-muted" aria-hidden="true">
         {TSS_PER_DAY}
       </p>
       <ChartBoundary what="Grafen kunne ikke tegnes. Tallene ovenfor er ikke berørt.">
-        <Chart {...props} />
+        <Chart points={props.points} blocks={props.blocks} title={props.title} />
       </ChartBoundary>
     </div>
   );
 }
 
-function Chart({ points, blocks, title }: TrendChartProps) {
+function Chart({ points, blocks, title }: Omit<TrendChartProps, "explainer">) {
   const hydrated = useHydrated();
   if (!hydrated) {
     return <div className="h-(--chart-height) w-full rounded-control bg-track motion-safe:animate-pulse" />;
@@ -275,24 +261,6 @@ function Legend() {
         Deload-uge
       </li>
     </ul>
-  );
-}
-
-/** Stroke sample in the series' colour and dash pattern (decorative; the label names it). */
-function LineSample({ series }: { readonly series: Series }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
-      <line
-        x1="2"
-        y1="6"
-        x2="22"
-        y2="6"
-        stroke={series.color}
-        strokeWidth={series.width}
-        strokeDasharray={series.dash}
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }
 

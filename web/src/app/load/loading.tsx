@@ -15,7 +15,8 @@ export default function Loading() {
         <div className="mt-3">
           <ZoneBarSkeleton size="hero" />
           <div aria-hidden="true">
-            <Bar className="mt-3 w-1/2 text-16" />
+            <Bar className="mt-3 w-3/4 text-16" />
+            <Bar className="mt-2 w-1/2 text-16" />
             <Bar className="mt-1 w-2/3 text-14" />
           </div>
         </div>
@@ -27,6 +28,10 @@ export default function Loading() {
       <Card id="trend" variant="calm" title="Fitness, træthed og form">
         <div aria-hidden="true" className="flex flex-col gap-2">
           <Bar className="w-3/4 text-12" />
+          {/* "Hvad betyder det?" summary row (load.md §8b), so nothing jumps. */}
+          <div className="mb-1 flex min-h-11 items-center">
+            <Bar className="w-1/3 text-16" />
+          </div>
           <Bar className="w-12 text-12" />
           <div className="h-(--chart-height) w-full rounded-control bg-track motion-safe:animate-pulse" />
         </div>
