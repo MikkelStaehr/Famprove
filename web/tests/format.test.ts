@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  formatDateRange,
   formatDay,
   formatDevice,
   formatDuration,
@@ -49,10 +50,10 @@ test("formatDuration shows h:mm rounded to the minute", () => {
 });
 
 test("formatIf turns intervals.icu's percent into a 2-decimal fraction", () => {
-  assert.equal(formatIf(85.3), "0.85");
-  assert.equal(formatIf(85.5), "0.86");
-  assert.equal(formatIf(100), "1.00");
-  assert.equal(formatIf(104.9), "1.05");
+  assert.equal(formatIf(85.3), "0,85");
+  assert.equal(formatIf(85.5), "0,86");
+  assert.equal(formatIf(100), "1,00");
+  assert.equal(formatIf(104.9), "1,05");
 });
 
 test("formatKg keeps logged decimals without trailing zeros", () => {
@@ -79,14 +80,14 @@ test("formatDevice shows the maker readably and never invents one", () => {
   assert.equal(formatDevice("WAHOO_FITNESS ELEMNT BOLT"), "Wahoo ELEMNT BOLT");
   assert.equal(formatDevice("Zwift"), "Zwift");
   assert.equal(formatDevice("SOME_MAKER Thing"), "SOME MAKER Thing");
-  assert.equal(formatDevice(null), "Unknown device");
-  assert.equal(formatDevice("  "), "Unknown device");
+  assert.equal(formatDevice(null), "Ukendt enhed");
+  assert.equal(formatDevice("  "), "Ukendt enhed");
 });
 
 test("formatWeekParam names the week, with the year only when it differs", () => {
-  assert.equal(formatWeekParam("2026-W09", 2026), "week 9");
-  assert.equal(formatWeekParam("2026-W40", 2026), "week 40");
-  assert.equal(formatWeekParam("2025-W52", 2026), "week 52, 2025");
+  assert.equal(formatWeekParam("2026-W09", 2026), "uge 9");
+  assert.equal(formatWeekParam("2026-W40", 2026), "uge 40");
+  assert.equal(formatWeekParam("2025-W52", 2026), "uge 52 2025");
   assert.equal(formatWeekParam("garbage", 2026), "garbage");
 });
 
@@ -98,4 +99,9 @@ test("formatWatts shows whole watts with the unit", () => {
 test("stopAfter never doubles the full stop after a Danish date", () => {
   assert.equal(stopAfter("man. 5. okt."), "");
   assert.equal(stopAfter("fre. 1. maj"), ".");
+});
+
+test("formatDateRange shares the month when it can", () => {
+  assert.equal(formatDateRange("2026-09-21", "2026-09-27"), "21.–27. sep.");
+  assert.equal(formatDateRange("2026-09-28", "2026-10-04"), "28. sep.–4. okt.");
 });

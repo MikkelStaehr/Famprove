@@ -57,6 +57,11 @@ export function formatDate(date: IsoDate): string {
   return DATE_FORMAT.format(new Date(`${date}T00:00:00Z`));
 }
 
+/** A week's span, sharing the month when it can: "21.–27. sep.", "28. sep.–4. okt.". */
+export function formatDateRange(start: IsoDate, end: IsoDate): string {
+  return DATE_FORMAT.formatRange(new Date(`${start}T00:00:00Z`), new Date(`${end}T00:00:00Z`));
+}
+
 const DAY_LONG_FORMAT = new Intl.DateTimeFormat(LOCALE, {
   weekday: "long",
   day: "numeric",
@@ -83,9 +88,11 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
-/** Intensity factor from intervals.icu's percent, as a fraction with 2 decimals: 85.3 -> "0.85". */
+const IF_FORMAT = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Intensity factor from intervals.icu's percent, as a fraction with 2 decimals: 85.3 -> "0,85". */
 export function formatIf(percent: number): string {
-  return (Math.round(percent) / 100).toFixed(2);
+  return IF_FORMAT.format(Math.round(percent) / 100);
 }
 
 /** Power in whole watts with its unit: 249.6 -> "250 W". */
@@ -127,7 +134,7 @@ const DEVICE_MAKERS: Readonly<Record<string, string>> = {
 /** "HAMMERHEAD Karoo" -> "Hammerhead Karoo", "WAHOO_FITNESS ELEMNT BOLT" -> "Wahoo ELEMNT BOLT". */
 export function formatDevice(device: string | null): string {
   const words = (device ?? "").trim().split(/\s+/).filter((w) => w !== "");
-  if (words.length === 0) return "Unknown device";
+  if (words.length === 0) return "Ukendt enhed";
   const [maker, ...model] = words;
   const shown = Object.hasOwn(DEVICE_MAKERS, maker) ? DEVICE_MAKERS[maker] : maker.replaceAll("_", " ");
   return [shown, ...model].join(" ");
@@ -135,12 +142,12 @@ export function formatDevice(device: string | null): string {
 
 const WEEK_PARAM = /^(\d{4})-W(\d{2})$/;
 
-/** A `?week=` value in words: "2026-W09" -> "week 9"; the year only when it isn't `year`. */
+/** A `?week=` value in words: "2026-W09" -> "uge 9"; the year only when it isn't `year`. */
 export function formatWeekParam(param: string, year: number): string {
   const match = WEEK_PARAM.exec(param);
   if (match === null) return param;
-  const week = `week ${Number(match[2])}`;
-  return Number(match[1]) === year ? week : `${week}, ${match[1]}`;
+  const week = `uge ${Number(match[2])}`;
+  return Number(match[1]) === year ? week : `${week} ${match[1]}`;
 }
 
 // --- Today screen ------------------------------------------------------------------------

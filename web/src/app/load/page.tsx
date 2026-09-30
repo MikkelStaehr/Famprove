@@ -168,12 +168,12 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
         action={week !== null && !week.isLatest ? <LatestWeekLink /> : undefined}
       >
         {week === null ? (
-          <EmptyState message="No weekly total for this week yet." />
+          <EmptyState message="Ingen ugetotal for denne uge endnu." />
         ) : (
           <>
             <WeekSwitcher nav={week} />
             {week.selected.days.length === 0 ? (
-              <EmptyState message={`No training days recorded in week ${week.selected.isoWeek}.`} />
+              <EmptyState message={`Ingen træningsdage registreret i uge ${week.selected.isoWeek}.`} />
             ) : (
               // Keyed by week: switching weeks shows this skeleton; hero and chart stay put.
               <Suspense key={week.param} fallback={<WeekFallback nav={week} />}>
@@ -188,16 +188,16 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
 }
 
 function weekTitle(week: WeekNav | null): string {
-  if (week === null) return "This week";
+  if (week === null) return "Denne uge";
   const n = week.selected.isoWeek;
-  return week.isLatest ? `This week · week ${n}` : `Week ${n}`;
+  return week.isLatest ? `Denne uge · uge ${n}` : `Uge ${n}`;
 }
 
 function WeekFallback({ nav }: { readonly nav: WeekNav }) {
   return (
     <>
       <p className="sr-only" role="status">
-        Loading week {nav.selected.isoWeek}…
+        Henter uge {nav.selected.isoWeek}…
       </p>
       <WeekDaysSkeleton rows={nav.selected.days.length} />
     </>
@@ -211,7 +211,7 @@ async function WeekSessions({ nav }: { readonly nav: WeekNav }) {
     const at = state.at.toISOString();
     return (
       <ErrorState
-        title="Couldn't load this week's sessions"
+        title="Kunne ikke hente ugens træninger"
         what={describeDataError(state.error)}
         detail={state.error.message}
         at={{ iso: at, text: formatUpdatedAt(at) }}
