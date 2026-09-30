@@ -17,7 +17,7 @@ All Python commands run from `python/` (they read the repo-root `.env.local`).
 - db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
 - web (from `web/`, reads `web/.env.local`): `pnpm dev` · `pnpm build && pnpm start` · checks: `pnpm lint && pnpm typecheck && pnpm test`
 - **Run & screenshot:** use the `run-web` skill (`.claude/skills/run-web/`). Never invent a new screenshot method.
-- **Dev switches** (only under `next dev`, ignored in production): `DEV_TODAY=YYYY-MM-DD` shows another day; `DEV_FIXTURE=empty|stale|error` makes the data layer return that state instead of reading Supabase, so every designed state can be screenshotted. Specs name their states with these words. (`DEV_FIXTURE` is not built yet; it is a queued M task.)
+- **Dev switches** (only under `next dev`, ignored in production): `DEV_TODAY=YYYY-MM-DD` shows another day; `DEV_FIXTURE=empty|stale|error` makes the data layer show that state (`empty` and `error` without reading Supabase; `stale` ages real rows by 3 days), so every designed state can be screenshotted: `serve.ps1 -DevFixture <state>`. Specs name their states with these words.
 
 CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain/load.py`.
 

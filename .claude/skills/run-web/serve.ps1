@@ -7,6 +7,7 @@
 param(
   [ValidateSet('dev', 'prod')][string]$Mode = 'dev',
   [string]$DevToday = '',
+  [ValidateSet('', 'empty', 'stale', 'error')][string]$DevFixture = '',
   [Parameter(Mandatory = $true)][string]$Cmd
 )
 $ErrorActionPreference = 'Stop'
@@ -23,6 +24,10 @@ if ($DevToday) {
   if ($DevToday -notmatch '^\d{4}-\d{2}-\d{2}$') { throw 'DevToday must be YYYY-MM-DD' }
   $env:DEV_TODAY = $DevToday
 }
+if ($DevFixture) {
+  if ($Mode -ne 'dev') { throw 'DEV_FIXTURE only works in dev mode (next dev)' }
+  $env:DEV_FIXTURE = $DevFixture
+}
 
 $pnpmArgs = if ($Mode -eq 'dev') { @('dev', '--port', "$Port") } else { @('start', '--port', "$Port") }
 $server = Start-Process -FilePath $pnpm -ArgumentList $pnpmArgs -WorkingDirectory $web -PassThru -WindowStyle Hidden
@@ -33,7 +38,8 @@ try {
     catch { Start-Sleep -Milliseconds 500 }
   }
   if (-not $ok) { throw "server on $Port did not answer 200 within about a minute" }
-  $note = if ($DevToday) { " with DEV_TODAY=$DevToday" } else { '' }
+  $note = (@(if ($DevToday) { "DEV_TODAY=$DevToday" }) + @(if ($DevFixture) { "DEV_FIXTURE=$DevFixture" })) -join ' '
+  if ($note) { $note = " with $note" }
   Write-Output "web ($Mode) up on http://localhost:$Port$note"
   Invoke-Expression $Cmd
 } finally {
@@ -41,6 +47,7 @@ try {
     ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
   Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
   Remove-Item Env:DEV_TODAY -ErrorAction SilentlyContinue
+  Remove-Item Env:DEV_FIXTURE -ErrorAction SilentlyContinue
   Start-Sleep -Milliseconds 800
   $left = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue).Count
   Write-Output "port $Port listeners left: $left"

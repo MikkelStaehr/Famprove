@@ -27,6 +27,9 @@ contain personal training data: write them to the session scratchpad or `%TEMP%`
 # Another day: DEV_TODAY only works in dev mode (next dev); it is ignored in production
 .claude/skills/run-web/serve.ps1 -DevToday 2026-09-29 -Cmd "node .claude/skills/run-web/shoot.mjs --out $env:TEMP\rest-390.png"
 
+# A designed state without touching the database: empty | stale | error (dev mode only)
+.claude/skills/run-web/serve.ps1 -DevFixture error -Cmd "node .claude/skills/run-web/shoot.mjs --out $env:TEMP\error-390.png --path /load"
+
 # Several shots against one server
 .claude/skills/run-web/serve.ps1 -Cmd "node .claude/skills/run-web/shoot.mjs --out $env:TEMP\load-390.png --path /load; node .claude/skills/run-web/shoot.mjs --out $env:TEMP\load-1280.png --path /load --width 1280"
 ```

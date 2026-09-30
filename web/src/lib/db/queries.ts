@@ -2,6 +2,7 @@ import "server-only";
 
 import { connection } from "next/server";
 
+import { devFixture, fixtureError, staleComputedAt } from "./dev-fixture.ts";
 import { readSupabaseEnv } from "./env.ts";
 import { createClient, selectAll, selectFirst } from "./postgrest.ts";
 import { addDays, isoWeekStart } from "../dates.ts";
@@ -55,12 +56,19 @@ function client() {
  */
 export async function loadDashboardData(): Promise<DashboardData> {
   await connection();
+  const fixture = devFixture();
+  if (fixture === "error") throw fixtureError(DAILY_LOAD_SELECT.table);
+  if (fixture === "empty") return { daily: [], blocks: [], weeks: [] };
   const db = client();
   const [daily, blocks, weeks] = await Promise.all([
     selectAll(db, DAILY_LOAD_SELECT.table, DAILY_LOAD_SELECT, parseDailyLoadRow),
     selectAll(db, BLOCKS_SELECT.table, BLOCKS_SELECT, parseBlockRow),
     selectAll(db, WEEKLY_LOAD_SELECT.table, WEEKLY_LOAD_SELECT, parseWeeklyLoadRow),
   ]);
+  if (fixture === "stale") {
+    const computedAt = staleComputedAt(new Date());
+    return { daily: daily.map((d) => ({ ...d, computedAt })), blocks, weeks };
+  }
   return { daily, blocks, weeks };
 }
 
@@ -74,6 +82,9 @@ export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<Week
   if (!ISO_DATE.test(start) || !ISO_DATE.test(end) || end < start) {
     throw new RangeError("loadWeekDetail: invalid week range");
   }
+  const fixture = devFixture();
+  if (fixture === "error") throw fixtureError(ACTIVITIES_SELECT.table);
+  if (fixture === "empty") return { activities: [], sessions: [], sets: [] };
   const db = client();
   const [activities, sessions, sets] = await Promise.all([
     selectAll(
@@ -114,12 +125,18 @@ export const NEXT_SESSION_DAYS = 28;
 export async function loadTodayForm(today: IsoDate): Promise<DailyLoadRow | null> {
   await connection();
   if (!ISO_DATE.test(today)) throw new RangeError("loadTodayForm: invalid date");
-  return selectFirst(
+  const fixture = devFixture();
+  if (fixture === "error") throw fixtureError(DAILY_LOAD_SELECT.table);
+  if (fixture === "empty") return null;
+  const latest = await selectFirst(
     client(),
     DAILY_LOAD_SELECT.table,
     { ...DAILY_LOAD_SELECT, order: "date.desc", filters: [["date", `lte.${today}`]] },
     parseDailyLoadRow,
   );
+  return fixture === "stale" && latest !== null
+    ? { ...latest, computedAt: staleComputedAt(new Date()) }
+    : latest;
 }
 
 /** Everything the Today screen's plan reads for one local date (form is loaded separately). */
@@ -141,9 +158,14 @@ export type TodayPlanData = {
 export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
   await connection();
   if (!ISO_DATE.test(today)) throw new RangeError("loadTodayPlan: invalid date");
+  const weekStart = isoWeekStart(today);
+  const fixture = devFixture();
+  if (fixture === "error") throw fixtureError(STRENGTH_SESSIONS_SELECT.table);
+  if (fixture === "empty") {
+    return { weekStart, sessions: [], sets: [], previousWeek: [], rides: [], upcomingRides: [] };
+  }
   const db = client();
   const horizon = addDays(today, NEXT_SESSION_DAYS);
-  const weekStart = isoWeekStart(today);
   const [sessions, sets, rides, upcomingRides] = await Promise.all([
     selectAll(
       db,
