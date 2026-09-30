@@ -221,3 +221,11 @@ export function spokenExercise(e: ExerciseWords, lastWeek: string | null | undef
   else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);
   return parts.join(", ");
 }
+
+/**
+ * The full stop that ends a sentence after `text`: none when `text` already ends with one.
+ * Danish short months carry their own ("5. okt."), "maj" does not.
+ */
+export function stopAfter(text: string): string {
+  return text.endsWith(".") ? "" : ".";
+}

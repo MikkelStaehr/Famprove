@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { IsoDate } from "@/lib/db/rows";
-import { formatDay } from "@/lib/format";
+import { formatDay, stopAfter } from "@/lib/format";
 import type { DoneSession, StrengthSession, StrengthWeek } from "@/lib/today-view";
 
 import { Card } from "./Card";
@@ -43,7 +43,8 @@ export function StrengthCard({ id, date, strength }: StrengthCardProps) {
           body={
             <>
               Næste uges session 1 vises her fra{" "}
-              <time dateTime={strength.nextWeekStart}>{formatDay(strength.nextWeekStart)}</time>.
+              <time dateTime={strength.nextWeekStart}>{formatDay(strength.nextWeekStart)}</time>
+              {stopAfter(formatDay(strength.nextWeekStart))}
             </>
           }
         />

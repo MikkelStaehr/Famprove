@@ -101,6 +101,11 @@
   --color-zone-grey: var(--zone-grey);
   --color-zone-fresh: var(--zone-fresh);
   --color-zone-transition: var(--zone-transition);
+  --color-series-ctl: var(--series-ctl);
+  --color-series-atl: var(--series-atl);
+  --color-series-tsb: var(--series-tsb);
+  --color-block-fill: var(--block-fill);
+  --color-chart-mark: var(--chart-mark);
 
   --font-sans: var(--font-barlow), system-ui, sans-serif;
   --font-display: var(--font-barlow-condensed), system-ui, sans-serif;

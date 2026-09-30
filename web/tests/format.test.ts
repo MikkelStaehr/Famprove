@@ -14,6 +14,7 @@ import {
   formatUpdatedAt,
   formatWatts,
   formatWeekParam,
+  stopAfter,
 } from "../src/lib/format.ts";
 
 test("formatLoad rounds to whole TSS and never prints -0", () => {
@@ -92,4 +93,9 @@ test("formatWeekParam names the week, with the year only when it differs", () =>
 test("formatWatts shows whole watts with the unit", () => {
   assert.equal(formatWatts(249.6), "250 W");
   assert.equal(formatWatts(231), "231 W");
+});
+
+test("stopAfter never doubles the full stop after a Danish date", () => {
+  assert.equal(stopAfter("man. 5. okt."), "");
+  assert.equal(stopAfter("fre. 1. maj"), ".");
 });

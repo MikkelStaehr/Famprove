@@ -24,6 +24,7 @@ import {
   formatLoad,
   formatSigned,
   formatUpdatedAt,
+  stopAfter,
   TSS_PER_DAY,
 } from "@/lib/format";
 import { resolveToday } from "@/lib/today-view";
@@ -245,7 +246,7 @@ function LoadError({ error, at }: { readonly error: DataError; readonly at: Date
 /** Text alternative for the chart: today's values, the 7-day fitness change and the blocks. */
 function chartSummary({ hero, chart, blocks }: ReadyView): string {
   const parts = [
-    `Daglig fitness (CTL), træthed (ATL) og form (TSB) i ${TSS_PER_DAY} fra ${formatDay(chart[0].date)} til ${formatDay(hero.date)}.`,
+    `Daglig fitness (CTL), træthed (ATL) og form (TSB) i ${TSS_PER_DAY} fra ${formatDay(chart[0].date)} til ${formatDay(hero.date)}`,
     `Den ${formatDay(hero.date)}: fitness ${formatLoad(hero.ctl)}, træthed ${formatLoad(hero.atl)}, form ${formatSigned(hero.tsb)}.`,
   ];
   if (hero.ctlRamp7d !== null) {
@@ -257,7 +258,7 @@ function chartSummary({ hero, chart, blocks }: ReadyView): string {
       ? `fra ${formatDate(b.start)}, igangværende`
       : `${formatDate(b.start)} til ${formatDate(b.end)}`;
     const deload = b.deloadStart === null ? "" : `, deload-uge fra ${formatDate(b.deloadStart)}`;
-    parts.push(`Styrkeblok ${b.blockNo}: ${span}${deload}.`);
+    parts.push(`Styrkeblok ${b.blockNo}: ${span}${deload}`);
   }
-  return parts.join(" ");
+  return parts.map((p) => `${p}${stopAfter(p)}`).join(" ");
 }
