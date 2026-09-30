@@ -1,7 +1,7 @@
 "use client";
 
 import type { IsoDate } from "@/lib/db/rows";
-import { formatSetLoad, formatSetsReps, spokenExercise } from "@/lib/format";
+import { formatSetLoad, formatSetsReps, prescriptionKg, spokenExercise } from "@/lib/format";
 import type { ExerciseView } from "@/lib/today-view";
 
 import { tickKey, useTicks } from "./TickProvider";
@@ -175,10 +175,9 @@ function ExerciseRow({ exercise: e, week, showName, runDone, next, done, onToggl
             <KeepRanges text={e.prescribed} />
           </span>
         )}
-        {/* A no-break space keeps "140 kg" together; at 200% text the item may still break
-            (even inside "kropsvægt") rather than push the page sideways. */}
+        {/* At 200% text the item may break (even inside "kropsvægt") rather than scroll sideways. */}
         {kg !== null && (
-          <span className="min-w-0 [overflow-wrap:anywhere]">{kg.replace(/ kg$/, " kg")}</span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">{prescriptionKg(e.kg, e.bodyweight)}</span>
         )}
       </span>
       {lastWeek !== undefined && (

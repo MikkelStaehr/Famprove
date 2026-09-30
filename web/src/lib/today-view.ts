@@ -139,11 +139,12 @@ function rowKey(s: { readonly block: string; readonly sheetRow: number }): strin
   return `${s.block}#${s.sheetRow}`;
 }
 
-/** Last week's logged kg per sheet row; nothing logged (0 kg) is no reference. */
+/** Last week's logged kg per sheet row. Nothing logged (null) is no reference; on a bodyweight
+ * exercise 0 is a real entry ("kropsvægt"), on a weighted one the parser already made it null. */
 function references(previous: readonly PrescribedSetRow[]): Map<string, Reference> {
   const refs = new Map<string, Reference>();
   for (const s of previous) {
-    if (s.loggedKg !== null && s.loggedKg > 0 && !refs.has(rowKey(s))) {
+    if (s.loggedKg !== null && (s.loggedKg > 0 || s.bodyweight) && !refs.has(rowKey(s))) {
       refs.set(rowKey(s), { kg: s.loggedKg, bodyweight: s.bodyweight });
     }
   }

@@ -206,6 +206,15 @@ export function spokenSetsReps(sets: string | null, reps: string | null): string
 }
 
 /** What one prescribed sheet row asks for. The sheet strings stay as written apart from ranges. */
+/**
+ * This week's kg for the prescription line (spec today.md §3b): null -> nothing (never "0 kg");
+ * a no-break space keeps "140 kg" together at normal text sizes.
+ */
+export function prescriptionKg(kg: number | null, bodyweight: boolean): string | null {
+  const text = kg === null ? null : formatSetLoad(kg, bodyweight);
+  return text === null ? null : text.replace(/ kg$/, "\u00A0kg");
+}
+
 export type ExerciseWords = {
   readonly name: string;
   readonly setsText: string | null;

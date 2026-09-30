@@ -167,7 +167,7 @@ test("next session: exercises in sheet order, one per row, with last week's kg a
       previousWeek: [
         set({ week: 0, weekStart: "2026-09-21", sheetRow: 25, loggedKg: 140 }),
         set({ week: 0, weekStart: "2026-09-21", sheetRow: 27, loggedKg: 0 }),
-        set({ week: 0, weekStart: "2026-09-21", sheetRow: 31, loggedKg: 10, bodyweight: true }),
+        set({ week: 0, weekStart: "2026-09-21", sheetRow: 31, loggedKg: 0, bodyweight: true }),
       ],
     }),
     "2026-09-28",
@@ -178,7 +178,7 @@ test("next session: exercises in sheet order, one per row, with last week's kg a
     [
       ["Squat", "1", "3", "RPE 5.5", 137.5, { kg: 140, bodyweight: false }],
       ["Squat", "2", "5", "-10%", null, null], // no kg this week, nothing logged last week: never 0
-      ["Dips", "1", "8 - 12", "RPE 5.5", null, { kg: 10, bodyweight: true }],
+      ["Dips", "1", "8 - 12", "RPE 5.5", null, { kg: 0, bodyweight: true }], // bodyweight only is a real entry
     ],
   );
 });
