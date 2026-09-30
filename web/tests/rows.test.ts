@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   parseBlockRow,
   parseDailyLoadRow,
+  parseProjectionRow,
   parseWeeklyLoadRow,
   RowError,
 } from "../src/lib/db/rows.ts";
@@ -102,4 +103,30 @@ test("parseWeeklyLoadRow maps every column", () => {
   assert.equal(row.isoWeek, 40);
   assert.equal(row.weekEnd, "2026-10-04");
   assert.equal(row.days, 1);
+});
+
+test("parseProjectionRow: basis entries may leave out reason (null), but a reason must be text", () => {
+  const raw = {
+    date: "2026-10-06",
+    cycling_tss: 0,
+    strength_tss: 152.9,
+    ctl: 15.1,
+    atl: 31.9,
+    tsb: -16.8,
+    basis: {
+      cycling: "typical_week",
+      rides: [{ name: "Zwift", tss: null, reason: "step 1: minutes must be a number" }],
+      strength: [
+        { session: 1, tss: 152.9, weekday: "learnt", moved: false, day_estimated: false, planned_in_sheet: true },
+        { session: 2, tss: null, day_estimated: true, reason: "no day left this week" },
+      ],
+    },
+  };
+  const row = parseProjectionRow(raw);
+  assert.deepEqual(row.sessions.map((s) => s.reason), [null, "no day left this week"]);
+  assert.equal(row.rides[0]?.reason, "step 1: minutes must be a number");
+  assert.throws(
+    () => parseProjectionRow({ ...raw, basis: { ...raw.basis, strength: [{ session: 1, tss: 1, day_estimated: false, reason: 7 }] } }),
+    RowError,
+  );
 });

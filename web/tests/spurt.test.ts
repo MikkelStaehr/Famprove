@@ -58,7 +58,10 @@ test("every Part B colour token has its DESIGN.md value in light and in dark", (
   assert.match(LIGHT.get("--card-shadow") ?? "", /rgb\(/);
   assert.equal(DARK.get("--card-shadow"), "none");
   assert.equal(THEME_INLINE.get("--shadow-card"), "var(--card-shadow)");
-  assert.equal(LIGHT.get("--chart-height"), "240px");
+  // DESIGN.md: 224px below 640px, 240px from 640px (load.md §9a).
+  assert.equal(LIGHT.get("--chart-height"), "224px");
+  const wide = vars(block(block(CSS, CSS.indexOf("@media (min-width: 640px)")), 0));
+  assert.equal(wide.get("--chart-height"), "240px");
 });
 
 test("every Part B colour token is exposed through @theme inline as --color-*", () => {

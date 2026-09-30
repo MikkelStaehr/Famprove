@@ -56,13 +56,18 @@ export type DashboardData = {
 };
 
 /** A planned ride in daily_projection.basis: its NP-style TSS, or null with Python's reason. */
-export type ProjectedRide = { readonly name: string; readonly tss: number | null };
+export type ProjectedRide = {
+  readonly name: string;
+  readonly tss: number | null;
+  readonly reason: string | null; // why tss is null (the steps couldn't be read)
+};
 
 /** A strength session Python placed on a future day (an estimate). */
 export type ProjectedSession = {
   readonly session: number;
-  readonly tss: number | null; // null: no done session with this number to learn from
+  readonly tss: number | null; // null: not counted; `reason` says why
   readonly dayEstimated: boolean; // the weekday was spread or moved, not learnt
+  readonly reason: string | null; // e.g. "no day left this week"
 };
 
 /** public.daily_projection: the prognose (estimates only), rebuilt by compute. */
@@ -212,6 +217,12 @@ class Fields {
 
   stringOrNull(column: string): string | null {
     return this.get(column) === null ? null : this.string(column);
+  }
+
+  /** For JSON objects whose writer leaves a key out when it has nothing to say (basis.reason). */
+  optionalString(column: string): string | null {
+    const value = this.get(column);
+    return value === undefined || value === null ? null : this.string(column);
   }
 
   number(column: string): number {
@@ -375,7 +386,7 @@ export function parseProjectionRow(raw: unknown): DailyProjectionRow {
     cyclingSource: source,
     rides: basis.array("rides").map((r, i) => {
       const ride = new Fields(`${PROJECTION_SELECT.table}.basis.rides[${i}]`, r);
-      return { name: ride.string("name"), tss: ride.numberOrNull("tss") };
+      return { name: ride.string("name"), tss: ride.numberOrNull("tss"), reason: ride.optionalString("reason") };
     }),
     sessions: basis.array("strength").map((s, i) => {
       const entry = new Fields(`${PROJECTION_SELECT.table}.basis.strength[${i}]`, s);
@@ -383,6 +394,7 @@ export function parseProjectionRow(raw: unknown): DailyProjectionRow {
         session: entry.number("session"),
         tss: entry.numberOrNull("tss"),
         dayEstimated: entry.boolean("day_estimated"),
+        reason: entry.optionalString("reason"),
       };
     }),
   };

@@ -25,7 +25,7 @@
   --series-tsb: #1f5bd0;
   --block-fill: #efeee9;
   --chart-mark: #807e78;
-  --chart-height: 240px;
+  --chart-height: 224px; /* 240px from 640px, below (load.md §9a fold fix) */
 
   --zone-risk: #f0b9aa;
   --zone-optimal: #c3e0b0;
@@ -68,6 +68,12 @@
     --zone-transition: #514525;
 
     --card-shadow: none;
+  }
+}
+
+@media (min-width: 640px) {
+  :root {
+    --chart-height: 240px;
   }
 }
 

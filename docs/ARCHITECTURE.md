@@ -12,7 +12,8 @@ GitHub Actions daily.yml (≈05:00 Copenhagen; also "Run workflow")
   collect-intervals  intervals.icu API (last 14 d)      → activities (rides), strength_activities (WeightTraining)
   collect-strength   Google Drive xlsx export (read)    → strength_sets (ISO week + session 1..N, no dates)
   compute            activities + strength_sets + strength_activities
-                                                        → strength_sessions, daily_load, blocks (+ view weekly_load)
+                                                        → strength_sessions, daily_load, blocks (+ view weekly_load),
+                                                          daily_projection (the 56-day prognose; + planned_sessions)
   collect-plan       planned_sessions (hand-filled) + FTP from intervals.icu → planned_targets
 
 Next.js (web/), server components only

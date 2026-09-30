@@ -165,6 +165,8 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
           <TrendChart
             points={view.chart}
             blocks={view.blocks}
+            lastActual={view.lastActual}
+            projection={view.projection}
             title={CHART_TITLE}
             explainer={<LoadExplainer />}
           />
@@ -254,12 +256,27 @@ function LoadError({ error, at }: { readonly error: DataError; readonly at: Date
   );
 }
 
+/** "+8" -> "plus 8", "−8" -> "minus 8" (load.md §9d: the sign in words). */
+function spokenSigned(value: number): string {
+  const signed = formatSigned(value);
+  if (signed.startsWith("+")) return `plus ${signed.slice(1)}`;
+  if (signed.startsWith("−")) return `minus ${signed.slice(1)}`;
+  return signed;
+}
+
 /** Text alternative for the chart: today's values, the 7-day fitness change and the blocks. */
 function chartSummary({ hero, chart, blocks }: ReadyView): string {
+  const end = chart.findLast((p) => p.kind === "projected");
+  const range = `Daglig fitness (CTL), træthed (ATL) og form (TSB) i ${TSS_PER_DAY} fra ${formatDay(chart[0].date)} til ${formatDay(hero.date)}`;
   const parts = [
-    `Daglig fitness (CTL), træthed (ATL) og form (TSB) i ${TSS_PER_DAY} fra ${formatDay(chart[0].date)} til ${formatDay(hero.date)}`,
+    end === undefined ? range : `${range}, og en anslået prognose til ${formatDay(end.date)}`,
     `Den ${formatDay(hero.date)}: fitness ${formatLoad(hero.ctl)}, træthed ${formatLoad(hero.atl)}, form ${formatSigned(hero.tsb)}.`,
   ];
+  if (end !== undefined) {
+    parts.push(
+      `Prognose, anslået ud fra en typisk uge: den ${formatDay(end.date)} cirka fitness ${formatLoad(end.ctl)}, træthed ${formatLoad(end.atl)}, form ${spokenSigned(end.tsb)}.`,
+    );
+  }
   if (hero.ctlRamp7d !== null) {
     parts.push(`Fitness ændrede sig med ${formatSigned(hero.ctlRamp7d)} over de sidste 7 dage.`);
   }

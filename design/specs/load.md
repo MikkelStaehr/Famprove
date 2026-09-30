@@ -151,7 +151,7 @@ Question: "Where am I today, and where does my usual training take fitness in th
 - **"i dag" rule:** 1px solid `--text` vertical line at today, running the full plot height. It sits above the region fill and block shading and below the series. Label `i dag`: `text-14` 600 `--text` in the strip, end-anchored 4px left of the rule, on a `--surface` backing (`rounded-mark`, 2px/4px padding) so that lines never cut through it. On today, each series gets a 7px dot in its series colour with a 2px `--surface` ring (it ties the chart to the hero).
 - **Prognose region:** from `lastActual` to the right edge, fill `--track` at **60% opacity**, drawn behind the lines. Series keep their full colour, width and dash (ATL dashed, TSB dotted, as Part B). **Do not** lower line opacity: ATL at 55% falls to 2.5:1. Line contrast on the fill: light ≥ 4.3:1, dark ≥ 5.1:1. The fill is supplementary. The meaning is carried by the label, the rule, the legend, the tooltip and the sr text.
 - **Region label** `Prognose · anslået`: `text-14` 600 `--text-muted` in the strip, start-anchored 6px right of the rule (≥ 6:1 on the fill). At 200% text it wraps to two lines (`Prognose ·` / `anslået`), and the strip grows with it. Never truncated. If `lastActual` < today (stale), the region begins left of the rule and the label stays right of the rule.
-- **Legend:** last item `Prognose (anslået)`. Swatch 24×12, `--track` 60% fill with a 1px `--chart-mark` ring (3.5:1). At 390px it must fit on the Deload-uge line (no extra legend line). Shown only when projection rows are drawn.
+- **Legend:** no prognose item (review 2026-09-30: as a legend item it wrapped to a 3rd line and broke the fold by ~14px). The region label is the key, placed right beside the fill. The swatch (24×12, `--track` 60% fill, 1px `--chart-mark` ring) appears only in the disclosure term below. The legend stays at 2 lines at 390px.
 - **Disclosure (§8b group 1):** add a 4th term after Form, with the legend swatch. Term `Prognose (anslået)`, text: `Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer: cykling som dit gennemsnit for hver ugedag de sidste 28 dage (en planlagt tur erstatter dagen), styrke som dine seneste tre gange af hver session. Det er et skøn, ikke en plan.`
 - No motion: the chart, the rule and the region never animate.
 
@@ -162,13 +162,16 @@ Question: "Where am I today, and where does my usual training take fitness in th
 | Status (`text-14` 600 `--text-muted`) | `Prognose` · `Prognose · dag anslået` when any placement on that day is estimated (`basis` day-estimated flag) |
 | Values | `Fitness (CTL) ≈ 46` · `Træthed (ATL) ≈ 44` · `Form (TSB) ≈ +2` |
 | Basis, cycling | `Cykel ≈ 62 TSS · typisk torsdag` · `Cykel 80 TSS · planlagt tur` · line omitted when 0/none |
+| Basis, cycling, planned ride unreadable (source falls back to typical) | `Cykel ≈ 62 TSS · typisk torsdag (planlagt tur kunne ikke læses)` |
 | Basis, strength | `Styrke ≈ 45 TSS · session 2` (+ ` · dag anslået` when that session's weekday is estimated) · omitted when none |
+| Basis, strength, `tss` null (counts as 0 in Python) | reason "no done session…": `Styrke · session 2 · ikke talt med (ikke lavet før)` · reason "no day left this week": `Styrke · session 2 · ikke talt med (ingen dag tilbage i ugen)` |
 Measured days keep the §4 tooltip, with no "≈". Today's tooltip is measured.
 
 ### 9d. Screen-reader text (extends §4 "Chart sr text")
 - Range sentence: `Daglig fitness (CTL), træthed (ATL) og form (TSB) i TSS/dag fra ons. 5. aug. til ons. 30. sep., og en anslået prognose til ons. 25. nov.` (without projection: the text up to `30. sep.`).
 - Added after the today sentence: `Prognose, anslået ud fra en typisk uge: den ons. 25. nov. cirka fitness 48, træthed 40, form plus 8.`
-- Table: new last column `Type`, values `Målt` · `Prognose` · `Prognose, dag anslået`. Prognose cells are prefixed `ca.` (e.g. `ca. 46`).
+- No sr table (review 2026-09-30): the chart has none (§4 made it optional). The three sentences carry the chart's purpose (range, today, where the prognose ends). If a table is added later, it gets a `Type` column (`Målt` · `Prognose` · `Prognose, dag anslået`), and prognose cells get a `ca.` prefix.
+- At 200% text the SVG tick labels stay 12px. Browser zoom scales them with the plot, so that is accepted. Labels must not overlap at 100% text.
 
 ### 9e. States
 | State | Treatment |
@@ -183,7 +186,7 @@ Measured days keep the §4 tooltip, with no "≈". Today's tooltip is measured.
 ### 9f. Acceptance criteria (for `tester`)
 1. At 390 × 844 (disclosure closed, 2-line zone sentence, light and dark) the plot including the x labels ends ≤ 844px. The plot is 224px high below 640px and 240px from 640px. No text size changed.
 2. With `DEV_TODAY=2026-09-30` the x axis runs 5. aug. → 25. nov. The 390px ticks read `5. aug.` `2. sep.` `30. sep.` `28. okt.` `25. nov.`, with no label clipped. A 1px solid rule labelled `i dag` sits at 30. sep.
-3. Right of `lastActual` a `--track` 60% region is labelled `Prognose · anslået`. Series keep the Part B colour and dash (no reduced line opacity). Block shading and the deload hatch end at `lastActual`. The legend shows `Prognose (anslået)` without adding a legend line at 390px.
+3. Right of `lastActual` a `--track` 60% region is labelled `Prognose · anslået`. Series keep the Part B colour and dash (no reduced line opacity). Block shading and the deload hatch end at `lastActual`. The legend has no prognose item and is 2 lines at 390px. The disclosure term `Prognose (anslået)` keeps the swatch.
 4. The tooltip on a future day follows §9c verbatim: date, `Prognose`, values with `≈`, then the cycling/strength basis lines. On a day whose `basis` flags an estimated placement the status reads `Prognose · dag anslået`. Measured days show no `≈`.
 5. Projection rows dated ≤ the latest `daily_load` date are never drawn. With no projection rows the chart ends at today and shows the §9e note. With `DEV_FIXTURE=empty|error` no prognose appears anywhere.
-6. The sr text includes the prognose sentence with "cirka" and "plus"/"minus". The sr table has a `Type` column (`Målt`/`Prognose`/`Prognose, dag anslået`) with `ca.` on projected values. At 200% text the region label wraps and never overlaps the `i dag` label or the lines' annotation strip.
+6. The sr text includes the prognose sentence with "cirka" and "plus"/"minus" (no sr table required). At 200% text the region label wraps and never overlaps the `i dag` label or the lines' annotation strip.

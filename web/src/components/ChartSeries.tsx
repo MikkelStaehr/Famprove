@@ -39,3 +39,15 @@ export function LineSample({ series }: { readonly series: Series }) {
     </svg>
   );
 }
+
+/** Legend / explainer name of the prognose region (load.md §9b). */
+export const PROGNOSE_LABEL = "Prognose (anslået)";
+
+/** The prognose region's swatch: --track at 60% with a 1px --chart-mark ring, 24×12 (decorative). */
+export function PrognoseSwatch() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
+      <rect x="0.5" y="0.5" width="23" height="11" fill="var(--track)" fillOpacity={0.6} stroke="var(--chart-mark)" />
+    </svg>
+  );
+}
