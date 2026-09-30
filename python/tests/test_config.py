@@ -1,6 +1,7 @@
 """config: typed, fail-fast, per-CLI requirements."""
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -199,3 +200,22 @@ def test_check_config_exit_codes(
         monkeypatch.delenv(name, raising=False)
     assert check_config.main([]) == 2
     assert "8 configuration problems" in caplog.text
+
+    caplog.clear()
+    valid = {
+        "INTERVALS_API_KEY": "k",
+        "INTERVALS_ATHLETE_ID": "i123",
+        "GOOGLE_SHEET_ID": "1AbCdEfGhIjKlMnOp",
+        "GOOGLE_SERVICE_ACCOUNT_JSON": json.dumps(
+            {"type": "service_account", "client_email": "a@b.c", "private_key": "x"}
+        ),
+        "SUPABASE_URL": "https://x.supabase.co",
+        "SUPABASE_SERVICE_KEY": "sb_secret_x",
+        "BODYWEIGHT": "82.5",
+        "STRENGTH_K": "0.10",
+    }
+    for name, value in valid.items():
+        monkeypatch.setenv(name, value)
+    with caplog.at_level(logging.INFO):
+        assert check_config.main([]) == 0
+    assert "configuration OK" in caplog.text

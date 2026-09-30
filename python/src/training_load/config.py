@@ -83,8 +83,10 @@ def mask_in_ci(*values: str) -> None:
     extracted from a pasted URL, or a field inside a JSON secret, would otherwise print."""
     if os.environ.get("GITHUB_ACTIONS") == "true":
         for value in values:
-            if value:
-                print(f"::add-mask::{value}", flush=True)
+            # One mask per line: ::add-mask:: only covers the first line of a multi-line value.
+            for line in value.splitlines():
+                if line.strip():
+                    print(f"::add-mask::{line}", flush=True)
 
 
 class _Reader:
@@ -136,7 +138,7 @@ class _Reader:
             return {}
         try:
             parsed: object = json.loads(raw)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError, RecursionError:
             quoted = raw[0] in "'\"" and raw[-1] == raw[0]
             hint = (
                 " (remove the quotes around it: they belong in .env.local only)" if quoted else ""
@@ -206,6 +208,8 @@ def all_problems(env: Mapping[str, str]) -> list[str]:
     (names and reasons only, never values) instead of one failing step per run.
     """
     problems: list[str] = []
+    # A new job or secret goes in three places: its builder here, its step in daily.yml, and
+    # the check-config step's env block there.
     for build in (collect_intervals_config, collect_strength_config, compute_config):
         try:
             build(env)

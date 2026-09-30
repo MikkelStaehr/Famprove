@@ -38,7 +38,8 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --no-dev
 
-      # Every variable of every step, checked at once: one run lists all config mistakes.
+      # Every secret of every step, checked at once: one run lists all config mistakes.
+      # Keep this env block in sync with the steps below and config.all_problems.
       - name: check-config
         env:
           INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}

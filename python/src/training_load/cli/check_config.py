@@ -21,7 +21,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     for problem in problems:
         log.error("%s", problem)
     if problems:
-        log.error("%d configuration problems: nothing was run", len(problems))
+        log.error(
+            "%d configuration problem%s: nothing was run",
+            len(problems),
+            "" if len(problems) == 1 else "s",
+        )
         return 2
     log.info("configuration OK for collect-intervals, collect-strength, compute, collect-plan")
     return 0
