@@ -62,18 +62,20 @@ export async function loadDashboardData(): Promise<DashboardData> {
   if (fixture === "error") throw fixtureError(DAILY_LOAD_SELECT.table);
   if (fixture === "empty") return { daily: [], blocks: [], weeks: [], projection: [] };
   const db = client();
-  const [daily, blocks, weeks] = await Promise.all([
-    selectAll(db, DAILY_LOAD_SELECT.table, DAILY_LOAD_SELECT, parseDailyLoadRow),
-    selectAll(db, BLOCKS_SELECT.table, BLOCKS_SELECT, parseBlockRow),
-    selectAll(db, WEEKLY_LOAD_SELECT.table, WEEKLY_LOAD_SELECT, parseWeeklyLoadRow),
-  ]);
   // The prognose is secondary: if it can't be read, the rest of /load still renders (null).
-  const projection = await selectAll(db, PROJECTION_SELECT.table, PROJECTION_SELECT, parseProjectionRow).catch(
+  // It is read alongside the rest, with its own catch.
+  const projectionRead = selectAll(db, PROJECTION_SELECT.table, PROJECTION_SELECT, parseProjectionRow).catch(
     (error: unknown) => {
       console.error("dashboard: loading the projection failed", error);
       return null;
     },
   );
+  const [daily, blocks, weeks] = await Promise.all([
+    selectAll(db, DAILY_LOAD_SELECT.table, DAILY_LOAD_SELECT, parseDailyLoadRow),
+    selectAll(db, BLOCKS_SELECT.table, BLOCKS_SELECT, parseBlockRow),
+    selectAll(db, WEEKLY_LOAD_SELECT.table, WEEKLY_LOAD_SELECT, parseWeeklyLoadRow),
+  ]);
+  const projection = await projectionRead;
   if (fixture === "stale") {
     const computedAt = staleComputedAt(new Date());
     return { daily: daily.map((d) => ({ ...d, computedAt })), blocks, weeks, projection };

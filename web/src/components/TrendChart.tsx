@@ -14,7 +14,7 @@ import {
   YAxis,
 } from "recharts";
 
-import type { BlockSpan, ChartPoint, DashboardView } from "@/lib/dashboard-view";
+import { type BlockSpan, CHART_WINDOW_DAYS, type ChartPoint, type DashboardView } from "@/lib/dashboard-view";
 import { formatDate, formatDay, LOCALE, TSS_PER_DAY } from "@/lib/format";
 
 import { LineSample, SERIES } from "./ChartSeries";
@@ -34,7 +34,8 @@ type TrendChartProps = {
   readonly points: readonly ChartPoint[];
   readonly blocks: readonly BlockSpan[];
   /** The latest daily_load date: the "i dag" rule; measured left of it, prognose right of it. */
-  readonly lastActual: string;
+  readonly lastActual: string; // the latest computed day: the prognose region starts after it
+  readonly today: string; // the local date (or DEV_TODAY): the "i dag" rule and window centre
   readonly projection: Projection;
   /** Accessible name of the SVG; the page renders the text alternative (figcaption). */
   readonly title: string;
@@ -45,7 +46,7 @@ type TrendChartProps = {
 const HATCH_ID = "deload-hatch";
 const LEGEND_HATCH_ID = "deload-hatch-legend";
 const DAY_MS = 86_400_000;
-const WINDOW_DAYS = 56;
+const WINDOW_DAYS = CHART_WINDOW_DAYS;
 const TICK = { fill: "var(--text-muted)", fontSize: 12, fontWeight: 500 } as const;
 const WEEKDAY_FORMAT = new Intl.DateTimeFormat(LOCALE, { weekday: "long", timeZone: "UTC" });
 
@@ -125,7 +126,13 @@ export function TrendChart(props: TrendChartProps) {
         {TSS_PER_DAY}
       </p>
       <ChartBoundary what="Grafen kunne ikke tegnes. Tallene ovenfor er ikke berørt.">
-        <Chart points={props.points} blocks={props.blocks} lastActual={props.lastActual} title={props.title} />
+        <Chart
+          points={props.points}
+          blocks={props.blocks}
+          lastActual={props.lastActual}
+          today={props.today}
+          title={props.title}
+        />
       </ChartBoundary>
       {!hasPrognose && props.projection === "error" && (
         <WarningLine>
@@ -141,9 +148,9 @@ export function TrendChart(props: TrendChartProps) {
   );
 }
 
-type ChartProps = Pick<TrendChartProps, "points" | "blocks" | "lastActual" | "title">;
+type ChartProps = Pick<TrendChartProps, "points" | "blocks" | "lastActual" | "today" | "title">;
 
-function Chart({ points, blocks, lastActual, title }: ChartProps) {
+function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartProps) {
   const hydrated = useHydrated();
   const wide = useWide();
   if (!hydrated) {
@@ -152,12 +159,15 @@ function Chart({ points, blocks, lastActual, title }: ChartProps) {
 
   const rows: Row[] = points.map((p) => ({ ...p, x: dayNumber(p.date) }));
   const byDay = new Map(rows.map((r) => [r.x, r]));
-  const today = dayNumber(lastActual);
+  // Spec §9b/§9e: the rule sits on today; after a missed run the region starts left of it.
+  const today = dayNumber(todayDate);
+  const dataEnd = dayNumber(lastActual);
   const prognose = rows.some((r) => r.kind === "projected");
   const last = prognose ? today + WINDOW_DAYS : today;
   const lo = today - WINDOW_DAYS - 0.5;
   const hi = last + 0.5;
   const todayX = xCss((today - lo) / (hi - lo));
+  const regionX = xCss((Math.min(dataEnd, today) - lo) / (hi - lo));
   const step = wide ? 14 : 28;
   const ticks: number[] = [];
   for (let d = -WINDOW_DAYS; d <= WINDOW_DAYS && today + d <= last; d += step) ticks.push(today + d);
@@ -171,7 +181,7 @@ function Chart({ points, blocks, lastActual, title }: ChartProps) {
         <div
           aria-hidden="true"
           className="absolute top-0 bg-track/60"
-          style={{ left: `calc${todayX}`, right: MARGIN_RIGHT, bottom: X_AXIS_HEIGHT }}
+          style={{ left: `calc${regionX}`, right: MARGIN_RIGHT, bottom: X_AXIS_HEIGHT }}
         />
       )}
       <div
@@ -392,14 +402,14 @@ function PrognoseTooltip({ row }: { readonly row: Row }) {
       {estimate !== null && (cycling !== null || estimate.sessions.length > 0) && (
         <ul className="flex flex-col text-14 text-text-muted tabular-nums">
           {cycling !== null && <li>{cycling}</li>}
-          {estimate.sessions.map((s) => (
-            <li key={s.session}>
+          {estimate.sessions.map((s, i) => (
+            <li key={i}>{/* index: two sessions can share a number on one day */}
               {s.tss === null
                 ? `Styrke · session ${s.session} · ikke talt med (${
                     s.reason === "no day left this week" ? "ingen dag tilbage i ugen" : "ikke lavet før"
                   })`
                 : `Styrke ≈ ${Math.round(s.tss)} TSS · session ${s.session}`}
-              {s.dayEstimated && " · dag anslået"}
+              {s.dayEstimated && s.tss !== null && " · dag anslået"}
             </li>
           ))}
         </ul>

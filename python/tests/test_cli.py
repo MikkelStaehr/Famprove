@@ -114,7 +114,7 @@ def test_compute_rebuilds_daily_load_and_blocks(
     }
     assert first_week == {1: "2026-02-03", 2: "2026-02-05"}
 
-    projection = sorted(r["date"] for r in db.tables["daily_projection"])
+    projection = sorted(str(r["date"]) for r in db.tables["daily_projection"])
     assert (
         len(projection) == 56 and projection[0] == "2026-03-16" and projection[-1] == "2026-05-10"
     )

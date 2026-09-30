@@ -124,3 +124,18 @@ def test_strength_sessions_are_placed_estimated_and_continue_the_pattern(make_se
 def test_projection_starts_from_today_only() -> None:
     with pytest.raises(ValueError, match="today"):
         project(history(), [], [], [], today=TODAY + timedelta(days=1))
+
+
+def test_every_strength_entry_has_the_same_keys_even_on_a_sunday(make_set: MakeSet) -> None:
+    """The web parser needs day_estimated on every entry; on a Sunday nothing fits this week."""
+    sunday = date(2026, 10, 4)
+    sets = [make_set(week_start=WEEK_40, session=n, sheet_row=n) for n in (1, 2, 3)]
+    sessions = [done(WEEK_40, 1, date(2026, 9, 29)), planned(WEEK_40, 2), planned(WEEK_40, 3)]
+    days = build_daily_load({}, {}, start=date(2026, 1, 1), end=sunday, decay=Decay.EXPONENTIAL)
+    projected = project(days, sessions, sets, [], today=sunday, decay=Decay.EXPONENTIAL)
+    all_entries = [e for d in projected for e in entries(d, "strength")]
+    keys = {"session", "tss", "weekday", "moved", "day_estimated", "planned_in_sheet"}
+    assert all(keys <= e.keys() for e in all_entries)
+    no_day = [e for e in all_entries if e.get("reason") == "no day left this week"]
+    assert [e["session"] for e in no_day] == [2, 3]
+    assert all(e["day_estimated"] is True for e in no_day)

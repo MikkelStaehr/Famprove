@@ -118,7 +118,16 @@ test("parseProjectionRow: basis entries may leave out reason (null), but a reaso
       rides: [{ name: "Zwift", tss: null, reason: "step 1: minutes must be a number" }],
       strength: [
         { session: 1, tss: 152.9, weekday: "learnt", moved: false, day_estimated: false, planned_in_sheet: true },
-        { session: 2, tss: null, day_estimated: true, reason: "no day left this week" },
+        // Python's real shape for a session with no day left this week (a Sunday run).
+        {
+          session: 2,
+          tss: null,
+          weekday: "spread",
+          moved: true,
+          day_estimated: true,
+          planned_in_sheet: true,
+          reason: "no day left this week",
+        },
       ],
     },
   };

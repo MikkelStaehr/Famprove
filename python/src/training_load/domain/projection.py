@@ -81,11 +81,12 @@ def ride_tss(items: Sequence[PlanItem]) -> float:
 
 
 def typical_cycling(days: Sequence[DailyLoad], today: date) -> dict[int, float]:
-    """Mean cycling TSS per weekday (0 = Monday) over today - TYPICAL_DAYS + 1 .. today."""
-    first = today - timedelta(days=TYPICAL_DAYS - 1)
+    """Mean cycling TSS per weekday (0 = Monday) over the TYPICAL_DAYS before today (today's
+    row is still empty when the daily job runs at 05:00, so it would pull its weekday down)."""
+    first = today - timedelta(days=TYPICAL_DAYS)
     by_weekday: dict[int, list[float]] = {w: [] for w in range(7)}
     for d in days:
-        if first <= d.date <= today:
+        if first <= d.date < today:
             by_weekday[d.date.weekday()].append(d.cycling_tss)
     return {w: sum(v) / len(v) if v else 0.0 for w, v in by_weekday.items()}
 
@@ -160,7 +161,15 @@ def _strength_plan(
                 ]
                 if not free:
                     placed.setdefault(tomorrow, []).append(
-                        {"session": n, "tss": None, "reason": "no day left this week"}
+                        {
+                            "session": n,
+                            "tss": None,
+                            "weekday": "learnt" if learnt else "spread",
+                            "moved": True,
+                            "day_estimated": True,
+                            "planned_in_sheet": week in counts,
+                            "reason": "no day left this week",
+                        }
                     )
                     continue
                 day, moved = free[0], True

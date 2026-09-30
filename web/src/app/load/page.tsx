@@ -166,6 +166,7 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
             points={view.chart}
             blocks={view.blocks}
             lastActual={view.lastActual}
+            today={resolveToday(new Date(), process.env)}
             projection={view.projection}
             title={CHART_TITLE}
             explainer={<LoadExplainer />}
