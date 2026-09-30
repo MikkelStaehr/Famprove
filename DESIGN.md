@@ -83,7 +83,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - No decoration that serves neither the direction nor the hierarchy.
 
 ## Project rules
-- **Screens:** two routes linked by a two-tab `ScreenNav` ("I dag" · "Belastning"; the spec's English copy "Today" · "Training load" is translated when the direction is implemented).
+- **Screens:** two routes linked by a two-tab `ScreenNav` ("I dag" · "Belastning"). All UI copy is Danish; the exact strings live in `design/specs/today.md` §5a and `design/specs/load.md` §4 and §6.
   - `/` **Today / I dag** answers "What am I doing in this session, and how hard?" (spec `design/specs/today.md`, rules in "Today" below).
   - `/load` **Training load / Belastning** answers "How loaded am I right now, and is fitness going up?". The bullets below, from "Key figure" to "Data", describe `/load`.
 - **Pattern packs:**
@@ -97,19 +97,19 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - **Form zones** (intervals.icu bands, Python computes them): ≤ −30 high risk · −30..−10 optimal · −10..5 grey zone · 5..20 fresh · ≥ 20 transition. Always shown with their label.
 - **Data:** read-only, server-side, from `daily_load`, `blocks` and `weekly_load`. The UI never calculates training metrics (Python owns them).
 
-### Week card (added by `ui`, M2 week detail)
-- Title "This week · week N" for the latest week, "Week N" otherwise; the "Back to this week" link sits in the card action.
+### Week card (added by `ui`, M2 week detail; Danish copy in `design/specs/load.md` §6)
+- Title "Denne uge · uge N" for the latest week, "Uge N" otherwise; the "Tilbage til denne uge" link sits in the card action.
 - Switcher: previous / next are real links (44 × 44, `aria-label` names the target week), absent at the ends (an empty 44px box keeps the label centred). They use `scroll={false}` so switching keeps the scroll position and keyboard focus. Label: date range + ISO week (`2026-W33`).
 - Switching weeks re-renders only the day list: a `<Suspense>` keyed by the week shows its skeleton; hero and chart never flash. Detail errors show an ErrorState inside the card.
-- Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days (no ride and no strength activity) are a plain row reading "Rest". Strength sits on its matched activity's date; planned-but-undone sessions are not shown (spec `design/specs/today.md` §8). Column heads are visual only; each row speaks "cycling N TSS, …".
+- Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days (no ride and no strength activity) are a plain row reading "Hvile". Strength sits on its matched activity's date; planned-but-undone sessions are not shown (spec `design/specs/today.md` §8). Column heads are visual only; each row speaks "cykling N TSS, …".
 - Row grid: day + three 64px TSS columns when the list is ≥ 20rem wide (Tailwind `@xs` container query, so it tracks text size); narrower, e.g. at 200% text, the day moves above the numbers instead of scrolling sideways.
-- Missing values show "–", spoken as "not recorded". A blank kg on a weighted exercise reads "no kg logged", never "0 kg". Score/set is labelled as the raw score before the strength factor.
+- Missing values show "–", spoken as "ikke registreret". A blank kg on a weighted exercise reads "intet kg logget", never "0 kg". Score/set is labelled as the raw score before the strength factor.
 
 ### Today (`/`, added by design-lead; full spec `design/specs/today.md`)
 - **Use:** a companion screen, read at arm's length (≈ 60–80 cm) in the gym or from the handlebar. The session is the hero. Form (TSB) is the compact zone bar in the header (Part B), not a key figure.
 - **Data:** read-only and server-side. It uses the latest `daily_load` row for the form line, the next undone strength session of the ISO week (session k + 1 of N; the n-th strength activity of the week is session n, and undone sessions have no date), and `planned_sessions` for rides. Python computes every number, including target watts. "Today" is the Europe/Copenhagen date at request time.
 - **Glance sizes** (Part B scale):
-  - text-32 Barlow Condensed 700 tabular: anything read mid-set or mid-interval, i.e. sets × reps, prescribed load, target watts. (Approved override of the spec's 28px, see Part B.)
+  - text-32 Barlow Condensed 700 tabular: anything read mid-set or mid-interval, i.e. sets × reps, prescribed load, target watts.
   - text-20: exercise names, the last-week reference, step labels and durations.
   - text-16 / 14 muted: supporting lines.
   - Nothing in a session card is smaller than 14px.
@@ -118,22 +118,22 @@ Token **names and roles** are fixed here; their **values** come from Part B.
   - Each sheet row is a `<label>` wrapping a native checkbox, and the whole row is the target.
   - The check is a 28px circle, left of the text: a `--text-muted` ring, or filled `--slab` with a `--slab-mark` ✓ when ticked (Part B). The ✓ shape carries the meaning, not only colour.
   - Ticked text turns `--text-muted`; a run's name only once the whole run is ticked. No strike-through, no reordering, rows never move. The only motion is Part B's 120ms press and 180ms colour hand-over, off under reduced motion.
-  - Retries ("Try again") are in-app navigations, so ticks survive them; only a browser reload clears ticks.
+  - Retries ("Prøv igen") are in-app navigations, so ticks survive them; only a browser reload clears ticks.
   - The focus ring surrounds the whole row.
   - Consecutive rows with the same name show the name once, except the NÆSTE row (Part B). Dividers go between runs only.
 - **Tick state:**
   - In memory only (client provider in the root layout). It survives in-app navigation and clears on reload.
   - No storage and no requests.
-  - One footnote says so: "Ticks clear when the page reloads. Log kg in the sheet."
+  - One footnote says so: "Flueben forsvinder, når siden genindlæses. Log kg i arket."
 - **Ride steps:**
   - Left column: label and duration.
-  - Right column: watts in text-28, unit included ("238 W": a smaller capital W reads as "w"), % FTP below it in muted text.
-  - Repeat groups get a "Repeat N times" header, with their steps indented 16px behind a 2px `--chart-mark` rule.
+  - Right column: watts in text-32, unit included ("238 W": a smaller capital W reads as "w"), % FTP below it in muted text.
+  - Repeat groups get a "Gentag N gange" header, with their steps indented 16px behind a 2px `--chart-mark` rule.
 - **Order:** ride card(s), then the strength card, then the rest card (only when no ride today and no strength session left this week). Rest wording never depends on strength dates.
 - **Freshness:**
-  - The same "updated" line as `/load`. The stale sentence names the consequence: "Form and the strength plan may be out of date."
+  - The same "updated" line as `/load`. The stale sentence names the consequence: "Form og styrkeprogrammet kan være forældet."
   - A failed plan read is an ErrorState, never a rest day.
-- **Nav:** `ScreenNav` is a two-tab strip ("Today" · "Training load") at the top of both screens. **Not sticky**, which overrides "Sticky header only if there is navigation": in the gym the 44px goes to the session, and the nav is used rarely.
+- **Nav:** `ScreenNav` is a two-tab strip ("I dag" · "Belastning") at the top of both screens. **Not sticky**, which overrides "Sticky header only if there is navigation": in the gym the 44px goes to the session, and the nav is used rarely.
 
 ---
 
@@ -297,14 +297,6 @@ The thresholds are drawing constants for the scale only. They live in one fronte
 - **Stale:** the bar is unchanged. The "Opdateret" line carries staleness (Part A), so no data is greyed out.
 
 **`/load` chart: no zone band shading.** CTL, ATL and TSB share one TSS/dag axis. Bands would put a CTL of 45 inside "Overgang" (dishonest), and the chart background already encodes strength blocks and deload hatch. Consistency comes from the identical `ZoneBar` directly above the chart and from the dotted `--series-tsb` line. If TSB ever gets its own panel, the bands may go behind that panel only.
-
-## Overrides of `design/specs/today.md` (approved 2026-09-30)
-The spec is updated in the implementation task. Until then these win:
-1. Prescriptions (sets × reps, load, target watts) are `text-32` Barlow Condensed 700 tabular, not 28px.
-2. The NÆSTE row always shows the exercise name, even as a continuation of a run.
-3. The form line becomes the compact zone bar (value + zone name in the flag), replacing "Form (TSB) +N TSS/dag [badge]".
-4. Checks fill with `--slab` and show a `--slab-mark` ✓, not `--positive`.
-5. Motion: the 120ms press and 180ms hand-over above (the spec said no motion).
 
 ## Technical
 - Tokens are defined once in `web/src/app/globals.css`, exposed through `@theme inline` as `--color-*`, `--text-*` (12, 14, 16, 20, 24, 32, 44, 56), `--radius-card/control/pill/mark` and `--font-sans/--font-display`. Tailwind's default colour, text-size and radius scales stay removed. The placeholder values (system fonts, blue accent, 8/12 radii, `text-28`/`text-40`) are retired.
