@@ -133,9 +133,13 @@ If a budget is exceeded, **stop and ask**. Never keep running.
 After every L task, and whenever something went wrong, the main session writes a retro of max 5 lines:
 1. What went wrong (or cost the most time)
 2. Root cause
-3. The rule that prevents it, and **which file it belongs in** (agent file, the template, a skill)
+3. The rule that prevents it, and **which file it belongs in** (agent file, the ProjectStart template, a skill)
 
-The user approves. Approved rules go into `C:\dev\project-start` (the right file + a row in `LESSONS.md`), committed and pushed there, then `install.sh` is run. A lesson that only lives in a chat is lost.
+The user approves. Then:
+- **Project-specific rules** go into this repo's CLAUDE.md.
+- **Rules for every project** are only *proposed* here: exact wording, target file, and a `LESSONS.md` row. **This session never edits ProjectStart** (`C:\dev\project-start`: the team's agents, templates and skills). The user applies the proposal there in a separate session, pushes, and runs `install.sh`.
+
+A lesson that only lives in a chat is lost.
 
 ## Development team (user-level subagents in ~/.claude/agents/)
 `tech-lead` · `architect` · `design-lead` · `ui` · `tester` · `reviewer` · `security` · `debugger`.
