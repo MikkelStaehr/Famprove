@@ -10,6 +10,7 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  devIndicators: false, // no dev badge over the page (it covered content in screenshots)
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
