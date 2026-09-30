@@ -17,7 +17,7 @@ All Python commands run from `python/` (they read the repo-root `.env.local`).
 - db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
 - web (from `web/`, reads `web/.env.local`): `pnpm dev` · `pnpm build && pnpm start` · checks: `pnpm lint && pnpm typecheck && pnpm test`
 - **Run & screenshot:** use the `run-web` skill (`.claude/skills/run-web/`). Never invent a new screenshot method.
-- **Dev switches** (only under `next dev`, ignored in production): `DEV_TODAY=YYYY-MM-DD` shows another day; `DEV_FIXTURE=empty|stale|error` makes the data layer return that state instead of reading Supabase, so every designed state can be screenshotted. Specs name their states with these words. (`DEV_FIXTURE` is being built as part of the week-card S task.)
+- **Dev switches** (only under `next dev`, ignored in production): `DEV_TODAY=YYYY-MM-DD` shows another day; `DEV_FIXTURE=empty|stale|error` makes the data layer return that state instead of reading Supabase, so every designed state can be screenshotted. Specs name their states with these words. (`DEV_FIXTURE` is not built yet; it is a queued M task.)
 
 CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain/load.py`.
 
@@ -34,6 +34,9 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - Secrets only in env files/vault. `.env.example` lists every var. Nothing secret is committed.
 - Small commits, conventional-commit messages (`feat:`, `fix:`, `refactor:`).
 - Prefer boring **code**. No new dependency without a one-line justification.
+- **No silent defaults.** A value that can't be parsed never silently becomes 0 or empty. Missing is `null`, not 0. Collectors count and log unparseable values per run, and fail loudly above a threshold.
+- **External input is messy.** Numbers may arrive as text, with dot or comma decimals; junk rows exist. Parse defensively and test it.
+- **Real-data fixtures.** Features that read external data are also tested against a current slice of real data (anonymised: this repo is public). Refresh it when the source changes (new block, season, file).
 - Store external source rows raw once (e.g. a `raw jsonb` column) so new views don't need new migrations.
 - Python owns all calculations. The frontend only reads `daily_load`.
 - The Google Sheet is read-only. Nothing in this repo may ever write to it.
@@ -41,6 +44,14 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - `STRENGTH_K` and `BODYWEIGHT` are env-configured tunables, never hardcoded.
 - Collectors are idempotent: re-running a day overwrites, never duplicates.
 - Single user. No auth UI, no multi-tenancy. RLS on every table.
+
+## First deploy (before any push that can deploy)
+1. **Protection first:** turn on access protection (e.g. Vercel Authentication, All Deployments) before the host is connected or before the first push. Verify a logged-out request gets 401 or a login redirect.
+2. Build settings: Root Directory and framework preset match the app folder, not the repo root.
+3. Env vars: server-side names only (never `NEXT_PUBLIC_` for secrets), Production scope only, and a separate revocable key for the host.
+4. Scheduled jobs: their secrets are in CI **before** the first milestone, and the job has run green once.
+5. Auth provider: new sign-ups off if the app is single-user.
+6. Public repo: nothing with real personal data is committed (samples, fixtures, screenshots go in `.gitignore` or are anonymised).
 
 ## Orientation
 - `docs/ARCHITECTURE.md` is a one-page map of folders, data flow and commands. Agents read it **instead of scanning the repo**. Update it when structure changes.
@@ -94,7 +105,7 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 Before starting, the main session states the **size (S/M/L), the steps and the time budget** to the user. The user can change it.
 If a budget is exceeded, **stop and ask**. Never keep running.
 **Budget check at every step boundary:** when a step ends, add up the time used so far and put it in the status line (`used 34/60 min`). If the next step won't fit in what's left, stop and ask before starting it, not after.
-**Commit before `tester` ∥ `reviewer` ∥ `security`:** they check a committed tree (`git status` clean), never uncommitted work. Fixes they trigger go in a new commit, and `tester` re-runs the affected criteria on it.
+**Commit before `tester` ∥ `reviewer` ∥ `security`:** they check a committed tree (`git status` clean), never uncommitted work, and nobody edits files while they run. Fixes they trigger go in a new commit, and `tester` re-runs the affected criteria on it.
 `∥` means the steps run in parallel.
 
 | Size | When | Steps | Budget (agent time) |
@@ -116,6 +127,15 @@ If a budget is exceeded, **stop and ask**. Never keep running.
 - **S:** it works, the screenshot looks right, lint and typecheck pass.
 - **M:** plus tests for new logic, and `reviewer` has approved.
 - **L:** plus `tester` PASS on every acceptance criterion, no open **Must** from `design-lead`, and `security` approved if relevant.
+- **Milestone:** plus the production pipeline (scheduled jobs, deploy) has run green end-to-end at least once.
+
+## Retro: how the team learns
+After every L task, and whenever something went wrong, the main session writes a retro of max 5 lines:
+1. What went wrong (or cost the most time)
+2. Root cause
+3. The rule that prevents it, and **which file it belongs in** (agent file, the template, a skill)
+
+The user approves. Approved rules go into `C:\dev\project-start` (the right file + a row in `LESSONS.md`), committed and pushed there, then `install.sh` is run. A lesson that only lives in a chat is lost.
 
 ## Development team (user-level subagents in ~/.claude/agents/)
 `tech-lead` · `architect` · `design-lead` · `ui` · `tester` · `reviewer` · `security` · `debugger`.
