@@ -96,7 +96,7 @@ export type StrengthSetRow = {
   readonly type: string;
   readonly name: string;
   readonly reps: number;
-  readonly loggedKg: number | null; // null: blank or unreadable in the sheet, never a silent 0
+  readonly loggedKg: number | null; // null: not entered/unreadable; 0 is real only if bodyweight (bodyweight only)
   readonly kg: number;
   readonly bodyweight: boolean;
   readonly rpe: number | null;
@@ -342,7 +342,7 @@ export type PrescribedSetRow = {
   readonly setsText: string | null; // as written, e.g. "2"
   readonly repsText: string | null; // as written, e.g. "8 - 12"
   readonly prescribed: string | null; // as written, e.g. "RPE 6 - 7", "-10%"
-  readonly loggedKg: number | null; // null: blank or unreadable in the sheet, never a silent 0
+  readonly loggedKg: number | null; // null: not entered/unreadable; 0 is real only if bodyweight (bodyweight only)
   readonly bodyweight: boolean;
 };
 

@@ -22,7 +22,7 @@ class ParsedSet(TypedDict):
     name: str
     set: int
     reps: float
-    logged_kg: float | None  # kg som logget, før kropsvægt; None = tom, ulæselig, eller 0 på en vægtøvelse (fx -10%-formlen før topsættet er logget)
+    logged_kg: float | None  # kg som logget, før kropsvægt; None = tom, ulæselig, eller 0 på en vægtøvelse (fx -10%-formlen før topsættet er logget). 0 er en rigtig værdi KUN på kropsvægtøvelser (kun kropsvægt)
     kg: float             # kg brugt i scoren (logged_kg + bodyweight for kropsvægtøvelser)
     bodyweight: bool
     rpe: float | None

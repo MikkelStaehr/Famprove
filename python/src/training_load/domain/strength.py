@@ -53,7 +53,9 @@ class StrengthSet:
     type: str
     name: str
     reps: float
-    logged_kg: float | None  # None: blank or unreadable in the sheet (never a silent 0)
+    # None: not entered or unreadable (never a silent 0). 0 is real only when bodyweight is True
+    # (bodyweight only, no added load); the parser stores a weighted exercise's 0 as None.
+    logged_kg: float | None
     kg: float
     bodyweight: bool
     rpe: float | None
