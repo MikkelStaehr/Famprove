@@ -17,6 +17,7 @@ All Python commands run from `python/` (they read the repo-root `.env.local`).
 - db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
 - web (from `web/`, reads `web/.env.local`): `pnpm dev` · `pnpm build && pnpm start` · checks: `pnpm lint && pnpm typecheck && pnpm test`
 - **Run & screenshot:** use the `run-web` skill (`.claude/skills/run-web/`). Never invent a new screenshot method.
+- **Dev switches** (only under `next dev`, ignored in production): `DEV_TODAY=YYYY-MM-DD` shows another day; `DEV_FIXTURE=empty|stale|error` makes the data layer return that state instead of reading Supabase, so every designed state can be screenshotted. Specs name their states with these words. (`DEV_FIXTURE` is being built as part of the week-card S task.)
 
 CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain/load.py`.
 
@@ -32,7 +33,8 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - All DB access through one data layer (`src/lib/db/*` or `app/db/*`) – never inline queries in UI or handlers.
 - Secrets only in env files/vault. `.env.example` lists every var. Nothing secret is committed.
 - Small commits, conventional-commit messages (`feat:`, `fix:`, `refactor:`).
-- Prefer boring solutions. No new dependency without a one-line justification.
+- Prefer boring **code**. No new dependency without a one-line justification.
+- Store external source rows raw once (e.g. a `raw jsonb` column) so new views don't need new migrations.
 - Python owns all calculations. The frontend only reads `daily_load`.
 - The Google Sheet is read-only. Nothing in this repo may ever write to it.
 - The strength-TSS formula comes from `sources/strength_sheet.py` (ex-`strength_collector.py`). Reuse it; do not redesign it.
@@ -44,9 +46,9 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - `docs/ARCHITECTURE.md` is a one-page map of folders, data flow and commands. Agents read it **instead of scanning the repo**. Update it when structure changes.
 
 ## Design
-- `DESIGN.md` predates the Part A/B split. Its general sections are the guardrails. **No direction has been chosen yet**: the current look is a placeholder, not the product's identity. Run `design-lead` Mode 0 before the next visible L task.
-- No UI component library yet; Tailwind themed from DESIGN.md tokens. Mode 0 may propose shadcn/ui.
-- Screen specs live in `design/specs/`, template and pattern packs in `design/`.
+- `DESIGN.md` is the contract, owned by `design-lead`. Part A (guardrails) is fixed; Part B (direction: **Spurt**, chosen 2026-09-30) is this product's identity.
+- UI must express Part B. Correct but generic is not done. No UI component library (shadcn/ui considered and not adopted, see Part B); Tailwind is themed from DESIGN.md tokens.
+- Screen specs live in `design/specs/`, template and pattern packs in `design/`. `design/directions/` (Mode 0 samples with real data) is git-ignored.
 
 ## Milestone 1 brief (done 2026-09-28)
 Goal: one weekly key figure — total TSS across cycling and strength — plus daily CTL (42 d), ATL (7 d), TSB = CTL − ATL, with strength-block markers. No UI in M1; M2 is a Next.js dashboard reading `daily_load` (+ weekly view).
@@ -91,6 +93,8 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 ## How we work: size every task first
 Before starting, the main session states the **size (S/M/L), the steps and the time budget** to the user. The user can change it.
 If a budget is exceeded, **stop and ask**. Never keep running.
+**Budget check at every step boundary:** when a step ends, add up the time used so far and put it in the status line (`used 34/60 min`). If the next step won't fit in what's left, stop and ask before starting it, not after.
+**Commit before `tester` ∥ `reviewer` ∥ `security`:** they check a committed tree (`git status` clean), never uncommitted work. Fixes they trigger go in a new commit, and `tester` re-runs the affected criteria on it.
 `∥` means the steps run in parallel.
 
 | Size | When | Steps | Budget (agent time) |
@@ -121,4 +125,5 @@ Agents are called only as listed in the size table, plus `debugger` when the cau
 ## Non-goals
 - No premature scaling. Optimize when a measurement says so.
 - No rewrites for style. Preserve working behaviour.
+- No process for its own sake. If a step adds nothing for this task, skip it and say so.
 - No Garmin integration yet (HRV, resting HR, sleep come later — keep the schema open for it).
