@@ -47,3 +47,6 @@ Thumbs.db
 *.xlsx
 *.xls
 *.csv
+
+# --- Design samples with real training data (design-lead Mode 0) ---
+design/directions/
