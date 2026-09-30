@@ -85,13 +85,16 @@ try {
   await send("Page.navigate", { url: new URL(opt.path, opt.base).href });
 
   // Real time, no --virtual-time-budget: React hydrates on an animation frame virtual time never fires.
-  // Ready = a heading is rendered, no loading status shows, and every chart has drawn its lines.
+  // Ready = a heading is rendered, no loading status (English or Danish) and no skeleton shows
+  // (skeletons pulse; client parts like the chart render one until hydration), and every chart
+  // has drawn its lines.
   let ready = false;
   for (let i = 0; i < 150 && !ready; i++) {
     await sleep(200);
     ready = await evaluate(
       `!!document.querySelector('main h1')` +
-        ` && ![...document.querySelectorAll('[role=status]')].some((e) => /^Loading/.test(e.textContent))` +
+        ` && ![...document.querySelectorAll('[role=status]')].some((e) => /^\\s*(Loading|Henter|Indlæser)/.test(e.textContent))` +
+        ` && !document.querySelector('[class*="animate-pulse"]')` +
         ` && [...document.querySelectorAll('.recharts-wrapper')].every((w) => w.querySelector('.recharts-line-curve'))`,
     );
   }
@@ -101,7 +104,12 @@ try {
   }
   await sleep(400);
   if (opt.open) await evaluate(`document.querySelectorAll('details').forEach((d) => { d.open = true; }); true`);
-  if (opt.zoom200) await evaluate(`document.documentElement.style.fontSize = '200%'; true`);
+  // A stylesheet, not a style attribute on <html>: React owns that element's attributes.
+  if (opt.zoom200) {
+    await evaluate(
+      `document.head.append(Object.assign(document.createElement('style'), { textContent: 'html { font-size: 200% !important; }' })); true`,
+    );
+  }
   await sleep(200);
 
   const page = await evaluate(
