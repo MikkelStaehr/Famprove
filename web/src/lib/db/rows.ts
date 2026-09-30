@@ -96,7 +96,7 @@ export type StrengthSetRow = {
   readonly type: string;
   readonly name: string;
   readonly reps: number;
-  readonly loggedKg: number;
+  readonly loggedKg: number | null; // null: blank or unreadable in the sheet, never a silent 0
   readonly kg: number;
   readonly bodyweight: boolean;
   readonly rpe: number | null;
@@ -303,7 +303,7 @@ export function parseStrengthSetRow(raw: unknown): StrengthSetRow {
     type: f.string("type"),
     name: f.string("name"),
     reps: f.number("reps"),
-    loggedKg: f.number("logged_kg"),
+    loggedKg: f.numberOrNull("logged_kg"),
     kg: f.number("kg"),
     bodyweight: f.boolean("bodyweight"),
     rpe: f.numberOrNull("rpe"),
@@ -342,7 +342,7 @@ export type PrescribedSetRow = {
   readonly setsText: string | null; // as written, e.g. "2"
   readonly repsText: string | null; // as written, e.g. "8 - 12"
   readonly prescribed: string | null; // as written, e.g. "RPE 6 - 7", "-10%"
-  readonly loggedKg: number;
+  readonly loggedKg: number | null; // null: blank or unreadable in the sheet, never a silent 0
   readonly bodyweight: boolean;
 };
 
@@ -367,7 +367,7 @@ export function parsePrescribedSetRow(raw: unknown): PrescribedSetRow {
     setsText: f.stringOrNull("sets_text"),
     repsText: f.stringOrNull("reps_text"),
     prescribed: f.stringOrNull("prescribed"),
-    loggedKg: f.number("logged_kg"),
+    loggedKg: f.numberOrNull("logged_kg"),
     bodyweight: f.boolean("bodyweight"),
   };
 }

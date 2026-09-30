@@ -107,11 +107,11 @@ export function formatKg(kg: number): string {
 
 /**
  * The load of one set: "120 kg"; bodyweight exercises add the logged kg to "kropsvægt".
- * null when nothing was logged (logged_kg is 0 for a blank cell on a weighted exercise).
+ * null when nothing was logged on a weighted exercise (logged_kg null: blank or unreadable).
  */
-export function formatSetLoad(loggedKg: number, bodyweight: boolean): string | null {
-  if (!bodyweight) return loggedKg === 0 ? null : `${formatKg(loggedKg)} kg`;
-  if (loggedKg === 0) return "kropsvægt";
+export function formatSetLoad(loggedKg: number | null, bodyweight: boolean): string | null {
+  if (!bodyweight) return loggedKg === null ? null : `${formatKg(loggedKg)} kg`;
+  if (loggedKg === null || loggedKg === 0) return "kropsvægt";
   return loggedKg > 0
     ? `kropsvægt + ${formatKg(loggedKg)} kg`
     : `kropsvægt − ${formatKg(-loggedKg)} kg`;

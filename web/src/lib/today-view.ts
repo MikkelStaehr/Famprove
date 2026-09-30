@@ -138,7 +138,7 @@ function rowKey(s: { readonly block: string; readonly sheetRow: number }): strin
 function references(previous: readonly PrescribedSetRow[]): Map<string, Reference> {
   const refs = new Map<string, Reference>();
   for (const s of previous) {
-    if (s.loggedKg > 0 && !refs.has(rowKey(s))) {
+    if (s.loggedKg !== null && s.loggedKg > 0 && !refs.has(rowKey(s))) {
       refs.set(rowKey(s), { kg: s.loggedKg, bodyweight: s.bodyweight });
     }
   }

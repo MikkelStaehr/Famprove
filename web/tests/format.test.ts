@@ -64,7 +64,9 @@ test("formatKg keeps logged decimals without trailing zeros", () => {
 
 test("formatSetLoad names bodyweight, signs the added kg, and is null when nothing was logged", () => {
   assert.equal(formatSetLoad(120, false), "120 kg");
-  assert.equal(formatSetLoad(0, false), null);
+  assert.equal(formatSetLoad(null, false), null); // missing is null, never 0
+  assert.equal(formatSetLoad(0, false), "0 kg"); // a real 0 is shown as typed
+  assert.equal(formatSetLoad(null, true), "kropsvægt");
   assert.equal(formatSetLoad(0, true), "kropsvægt");
   assert.equal(formatSetLoad(10, true), "kropsvægt + 10 kg");
   assert.equal(formatSetLoad(-12.5, true), "kropsvægt − 12,5 kg");

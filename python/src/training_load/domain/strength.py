@@ -14,7 +14,7 @@ Sessions: the coach's sheet defines sessions 1..N per ISO week (Mon-Sun), never 
 
 Blocks (a "week" is a 1-based week index inside one tab of one sheet):
   filled week     at least one set in that week with type != ABS_TYPE, not bodyweight,
-                  and logged_kg > 0.
+                  and logged_kg > 0 (None = not logged).
   block           one per (sheet_id, tab) that has at least one set (filled weeks here must
                   also have started: week start <= today):
     start_date    earliest week start in the tab (first week with any prescribed set)
@@ -53,7 +53,7 @@ class StrengthSet:
     type: str
     name: str
     reps: float
-    logged_kg: float
+    logged_kg: float | None  # None: blank or unreadable in the sheet (never a silent 0)
     kg: float
     bodyweight: bool
     rpe: float | None
@@ -142,7 +142,9 @@ def _week_key(s: StrengthSet) -> WeekKey:
 def filled_weeks(sets: Iterable[StrengthSet]) -> frozenset[WeekKey]:
     """Keys of every filled week (see module docstring)."""
     return frozenset(
-        _week_key(s) for s in sets if s.type != ABS_TYPE and not s.bodyweight and s.logged_kg > 0
+        _week_key(s)
+        for s in sets
+        if s.type != ABS_TYPE and not s.bodyweight and s.logged_kg is not None and s.logged_kg > 0
     )
 
 

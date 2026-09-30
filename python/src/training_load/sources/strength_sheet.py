@@ -2,10 +2,13 @@
 Læser Benjamins program-tab (Powerlifting Now-template) fra xlsx-eksport
 og producerer en sæt-tabel med rå score pr. sæt (formlen er uændret fra strength_collector.py).
 
-Brug:  parse_all(xlsx_bytes, bodyweight)   (læser alle "Program - blok *"-tabs)
+Brug:  parse_all(xlsx_bytes, bodyweight, issues)   (læser alle "Program - blok *"-tabs)
+Celler der ikke kan læses bliver aldrig stille til 0: de tælles i ``issues`` (årsag -> antal),
+og manglende/ulæselig kg gemmes som None. Selve score-formlen er uændret.
 STRENGTH_K (tidl. K) ganges på i domain.strength; BODYWEIGHT kommer fra env via parameteren.
 """
 import io, re, datetime as dt
+from collections import Counter
 from typing import TypedDict
 import openpyxl
 
@@ -19,7 +22,7 @@ class ParsedSet(TypedDict):
     name: str
     set: int
     reps: float
-    logged_kg: float      # kg som logget (0 hvis tom), før kropsvægt lægges til
+    logged_kg: float | None  # kg som logget, før kropsvægt; None = tom, ulæselig, eller 0 på en vægtøvelse (fx -10%-formlen før topsættet er logget)
     kg: float             # kg brugt i scoren (logged_kg + bodyweight for kropsvægtøvelser)
     bodyweight: bool
     rpe: float | None
@@ -68,14 +71,21 @@ def prescribed_text(load: object) -> str | None:
         return f"{load*100:g}%" if abs(load) < 1 else f"{load:g}"
     return str(load).strip()
 
-def parse_all(data: bytes, bodyweight: float) -> list[ParsedSet]:
+# Årsager i issues (nøglerne logges som de er; aldrig celleværdier).
+KG_NOT_A_NUMBER = "kg not a number"
+SETS_REPS_NOT_A_NUMBER = "sets/reps not a number"
+WEEK_DATE_NOT_A_DATE = "week date not a date"
+ROW_WITHOUT_TYPE = "prescribed row without type"
+
+def parse_all(data: bytes, bodyweight: float, issues: Counter[str] | None = None) -> list[ParsedSet]:
     wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     sets = []
     for tab in wb.sheetnames:
-        if tab.startswith("Program - blok"): sets += parse_tab(wb[tab], tab, bodyweight)
+        if tab.startswith("Program - blok"): sets += parse_tab(wb[tab], tab, bodyweight, issues)
     return sets
 
-def parse_tab(ws, tab, bodyweight):
+def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
+    issues = Counter() if issues is None else issues
     rows = list(ws.iter_rows(values_only=True))
     e1rm = {}
     for r in rows[:15]:
@@ -95,13 +105,22 @@ def parse_tab(ws, tab, bodyweight):
         typ, name = str(r[1] or "").strip(), str(r[2]).strip()
         if typ in ("TYPE","Micro Length","DAY","LIFT","MUSCLE GROUP") or typ.startswith("MICRO") or name=="NAME": continue
         if not typ and name.lower().startswith("abs"): typ = "ABS"
-        if not typ: continue
+        if not typ:
+            if any(4+w*8 < len(r) and r[4+w*8] not in (None,0,"") for w in range(len(week_dates))):
+                issues[ROW_WITHOUT_TYPE] += 1   # foreskrevet, men uden TYPE: ville ellers forsvinde stille
+            continue
         for w,date in enumerate(week_dates):
             base = 4 + w*8          # SETS-kolonne for uge w
             nsets, reps, load, kg = r[base], r[base+1], r[base+2], r[base+3]
             kg = text_number(kg)
             sets_text, reps_text = cell_text(nsets), cell_text(reps)
             if nsets in (None,0,"") or reps in (None,"") : continue
+            if mid(nsets) is None or mid(reps) is None:
+                issues[SETS_REPS_NOT_A_NUMBER] += 1; continue
+            if not isinstance(date, dt.datetime):
+                issues[WEEK_DATE_NOT_A_DATE] += 1; continue
+            kg_ok = isinstance(kg,(int,float)) and not isinstance(kg,bool)
+            if not kg_ok and kg not in (None,""): issues[KG_NOT_A_NUMBER] += 1
             nsets, reps = int(mid(nsets)), mid(reps)
             kg = float(kg) if isinstance(kg,(int,float)) else 0.0
             logged = kg
@@ -118,7 +137,7 @@ def parse_tab(ws, tab, bodyweight):
                 score = reps * kg * (rpe/10)**2 * factor
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
-                                      reps=reps, logged_kg=logged, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
+                                      reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
                                       prescribed=prescribed_text(load),
                                       sets_text=sets_text, reps_text=reps_text))
     return sets

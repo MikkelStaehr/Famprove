@@ -110,7 +110,7 @@ export type ExerciseDetail = {
   readonly type: string;
   readonly sets: number;
   readonly reps: number;
-  readonly loggedKg: number; // as logged (0 when blank)
+  readonly loggedKg: number | null; // as logged; null when blank or unreadable
   readonly bodyweight: boolean; // kg in the score = BODYWEIGHT + loggedKg
   readonly prescribed: string | null; // the coach's load cell, e.g. "RPE 7 - 8"
   readonly scorePerSet: number; // raw set score (before STRENGTH_K), from Python

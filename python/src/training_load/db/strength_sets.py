@@ -34,7 +34,7 @@ class StrengthSetRow(TypedDict):
     type: str
     name: str
     reps: float
-    logged_kg: float
+    logged_kg: float | None
     kg: float
     bodyweight: bool
     rpe: float | None
@@ -83,7 +83,7 @@ def from_row(row: JsonRow) -> StrengthSet:
         type=req_str(row, "type"),
         name=req_str(row, "name"),
         reps=req_float(row, "reps"),
-        logged_kg=req_float(row, "logged_kg"),
+        logged_kg=opt_float(row, "logged_kg"),
         kg=req_float(row, "kg"),
         bodyweight=req_bool(row, "bodyweight"),
         rpe=opt_float(row, "rpe"),
