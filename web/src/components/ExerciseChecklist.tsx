@@ -146,11 +146,11 @@ function ExerciseRow({ exercise: e, week, showName, runDone, next, done, onToggl
       {nameShown && (
         <span
           aria-hidden="true"
-          className={`col-start-2 row-start-1 flex items-baseline justify-between gap-x-3 text-20 font-bold ${next || runDone ? "" : "text-text"}`}
+          className={`col-start-2 row-start-1 flex flex-wrap items-baseline justify-between gap-x-3 text-20 font-bold ${next || runDone ? "" : "text-text"}`}
         >
-          <span className="min-w-0">{e.name}</span>
+          <span className="min-w-0 break-words">{e.name}</span>
           {next && (
-            <span className="shrink-0 rounded-mark bg-slab-mark px-2 py-0.5 text-14 font-bold tracking-[0.08em] text-slab uppercase">
+            <span className="ml-auto shrink-0 rounded-mark bg-slab-mark px-2 py-0.5 text-14 font-bold tracking-[0.08em] text-slab uppercase">
               Næste
             </span>
           )}

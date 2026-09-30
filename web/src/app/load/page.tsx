@@ -84,7 +84,9 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
   return (
     <>
       <header className="flex flex-col">
-        <h1 className="font-display text-44 font-extrabold tracking-[-0.01em] break-words hyphens-auto uppercase italic">Belastning</h1>
+        <h1 className="font-display text-44 font-extrabold tracking-[-0.01em] break-words hyphens-auto uppercase italic">
+          Belast&shy;ning
+        </h1>
         {state.kind === "ready" && (
           <div className="mt-1">
             <UpdatedLine

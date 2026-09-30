@@ -21,7 +21,7 @@ export function ScreenNav() {
   const pathname = usePathname();
   return (
     <nav aria-label="Hovedmenu">
-      <ul className="grid grid-cols-2 gap-1 rounded-pill bg-track p-1">
+      <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-1 rounded-pill bg-track p-1">
         {TABS.map((tab) => {
           const current = isCurrent(pathname, tab.href);
           return (
@@ -29,7 +29,7 @@ export function ScreenNav() {
               <Link
                 href={tab.href}
                 aria-current={current ? "page" : undefined}
-                className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-pill px-4 text-16 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus ${
+                className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-pill px-3 text-16 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus ${
                   current ? "bg-text font-bold text-bg" : "font-semibold text-text"
                 }`}
               >
