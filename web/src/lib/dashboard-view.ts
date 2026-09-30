@@ -14,6 +14,7 @@ import type {
   DailyLoadRow,
   DashboardData,
   IsoDate,
+  StrengthSessionRow,
   StrengthSetRow,
   WeekDetailData,
   WeeklyLoadRow,
@@ -115,10 +116,21 @@ export type ExerciseDetail = {
   readonly scorePerSet: number; // raw set score (before STRENGTH_K), from Python
 };
 
+/** One strength activity of the day and the sheet session it did (if any). */
+export type SessionDetail = {
+  readonly key: string;
+  readonly session: number; // n: the n-th strength activity of the ISO week
+  readonly block: string | null; // null: an extra activity, "not in the program" (0 TSS)
+  readonly week: number | null;
+  readonly activityName: string | null; // e.g. "Styrke"
+  readonly movingTimeS: number | null;
+  readonly tss: number; // strength_sessions.tss (Python)
+  readonly exercises: readonly ExerciseDetail[]; // sheet order; empty for an extra
+};
+
 export type StrengthDetail = {
   readonly strengthTss: number; // daily_load.strength_tss
-  readonly sessions: readonly { readonly block: string; readonly week: number }[];
-  readonly exercises: readonly ExerciseDetail[]; // in sheet (session) order
+  readonly sessions: readonly SessionDetail[]; // by session number
 };
 
 export type DayDetail = {
@@ -127,8 +139,8 @@ export type DayDetail = {
   readonly strengthTss: number;
   readonly totalTss: number;
   readonly rides: readonly RideDetail[];
-  readonly strength: StrengthDetail | null; // only when Python counted strength that day
-  readonly rest: boolean; // no ride and no counted strength: no expander
+  readonly strength: StrengthDetail | null; // only when a strength activity was logged that day
+  readonly rest: boolean; // no ride and no strength activity: no expander
 };
 
 /**
@@ -262,48 +274,58 @@ function rideDetail(a: ActivityRow): RideDetail {
   };
 }
 
-function strengthDetail(strengthTss: number, sets: readonly StrengthSetRow[]): StrengthDetail {
+function exerciseDetails(sets: readonly StrengthSetRow[]): ExerciseDetail[] {
   const ordered = sets.toSorted(
     (a, b) => a.block.localeCompare(b.block) || a.sheetRow - b.sheetRow || a.setNo - b.setNo,
   );
   const exercises = new Map<string, { first: StrengthSetRow; sets: number }>();
-  const sessions = new Map<string, { block: string; week: number }>();
   for (const s of ordered) {
     const key = `${s.block}#${s.sheetRow}`;
     const seen = exercises.get(key);
     if (seen === undefined) exercises.set(key, { first: s, sets: 1 });
     else seen.sets += 1;
-    sessions.set(`${s.block}#${s.week}`, { block: s.block, week: s.week });
   }
+  return [...exercises].map(([key, { first, sets: count }]) => ({
+    key,
+    name: first.name,
+    type: first.type,
+    sets: count,
+    reps: first.reps,
+    loggedKg: first.loggedKg,
+    bodyweight: first.bodyweight,
+    prescribed: first.prescribed,
+    scorePerSet: first.score,
+  }));
+}
+
+function sessionDetail(row: StrengthSessionRow, sets: readonly StrengthSetRow[]): SessionDetail {
+  const own = sets.filter((s) => s.weekStart === row.weekStart && s.session === row.session);
   return {
-    strengthTss,
-    sessions: [...sessions.values()],
-    exercises: [...exercises].map(([key, { first, sets: count }]) => ({
-      key,
-      name: first.name,
-      type: first.type,
-      sets: count,
-      reps: first.reps,
-      loggedKg: first.loggedKg,
-      bodyweight: first.bodyweight,
-      prescribed: first.prescribed,
-      scorePerSet: first.score,
-    })),
+    key: `${row.weekStart}#${row.session}`,
+    session: row.session,
+    block: row.block,
+    week: row.week,
+    activityName: row.activityName,
+    movingTimeS: row.movingTimeS,
+    tss: row.tss,
+    exercises: row.block === null ? [] : exerciseDetails(own),
   };
 }
 
 /**
- * One entry per daily_load day of the week. Strength shows only when Python counted it
- * (strengthTss > 0): sets of weeks that aren't logged yet are plan, not load.
+ * One entry per daily_load day of the week. Strength sits on the date of the activity that
+ * did the session (the n-th strength activity of the ISO week is session n); planned
+ * sessions that weren't done don't appear. Rest = no ride and no strength activity.
  */
 export function dayDetails(week: WeekView, detail: WeekDetailData): DayDetail[] {
   return week.days.map((day) => {
     const rides = detail.activities
       .filter((a) => a.startDateLocal.slice(0, 10) === day.date)
       .map(rideDetail);
-    const sets = detail.sets.filter((s) => s.date === day.date);
-    const strength =
-      day.strengthTss > 0 && sets.length > 0 ? strengthDetail(day.strengthTss, sets) : null;
+    const sessions = detail.sessions
+      .filter((s) => s.date === day.date)
+      .map((s) => sessionDetail(s, detail.sets));
+    const strength = sessions.length > 0 ? { strengthTss: day.strengthTss, sessions } : null;
     return { ...day, rides, strength, rest: rides.length === 0 && strength === null };
   });
 }

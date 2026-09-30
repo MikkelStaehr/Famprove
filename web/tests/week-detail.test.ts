@@ -12,6 +12,7 @@ import type {
   ActivityRow,
   DailyLoadRow,
   DashboardData,
+  StrengthSessionRow,
   StrengthSetRow,
   WeeklyLoadRow,
 } from "../src/lib/db/rows.ts";
@@ -52,8 +53,9 @@ const DATA: DashboardData = {
 
 function set(overrides: Partial<StrengthSetRow>): StrengthSetRow {
   return {
-    date: "2026-08-10",
-    block: "Program - blok 11",
+    weekStart: "2026-09-28",
+    session: 1,
+    block: "Program - blok 12",
     week: 1,
     sheetRow: 9,
     setNo: 1,
@@ -118,53 +120,78 @@ test("selectWeek honours a known ?week= and ignores unknown or future ones", () 
   assert.equal(selectWeek(DATA, "2026-09-21", "2026-W40")?.param, "2026-W39");
 });
 
-test("dayDetails: rest, ride only, counted strength, both, and plan-only strength", () => {
+function done(n: number, date: string, overrides: Partial<StrengthSessionRow> = {}): StrengthSessionRow {
+  return {
+    weekStart: "2026-09-28",
+    session: n,
+    block: "Program - blok 12",
+    week: 1,
+    activityId: `i${n}`,
+    date,
+    activityName: "Styrke",
+    movingTimeS: 4368,
+    tss: 44.1,
+    ...overrides,
+  };
+}
+
+test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed ride only, extra on Thu", () => {
   const w = weekView(
     {
       daily: [
-        day("2026-08-10", 80, 44.1),
-        day("2026-08-11"),
-        day("2026-08-12", 0, 23.9),
-        day("2026-08-13", 60, 0),
-        day("2026-08-14", 0, 0),
+        day("2026-09-28"),
+        day("2026-09-29", 0, 44.1),
+        day("2026-09-30", 60, 0),
+        day("2026-10-01"),
+        day("2026-10-02"),
       ],
       blocks: [],
       weeks: [],
     },
-    week(33, "2026-08-10"),
+    week(40, "2026-09-28"),
   );
   const detail = dayDetails(w, {
-    activities: [ride({}), ride({ id: "i2", startDateLocal: "2026-08-13T07:00:00", deviceName: null })],
+    activities: [ride({ id: "i9", startDateLocal: "2026-09-30T07:00:00", deviceName: null })],
+    sessions: [
+      done(1, "2026-09-29"),
+      done(4, "2026-10-01", { block: null, week: null, activityId: "x", movingTimeS: 2710, tss: 0 }),
+    ],
     sets: [
       set({ setNo: 2 }),
       set({ setNo: 1 }),
       set({ sheetRow: 12, name: "Dips", type: "BACK", bodyweight: true, loggedKg: 10, kg: 90, score: 264.6 }),
-      set({ date: "2026-08-12", sheetRow: 17, name: "Tempo bench", type: "BENCH", score: 90.7 }),
-      // Planned for the 14th, but that day carries no strength load: not shown.
-      set({ date: "2026-08-14", sheetRow: 9 }),
+      // Session 3 has kg pre-filled but no activity: it never shows.
+      set({ session: 3, sheetRow: 40, name: "Dødløft", loggedKg: 125 }),
     ],
   });
   const [mon, tue, wed, thu, fri] = detail;
 
-  assert.equal(mon.rides.length, 1);
-  assert.equal(mon.rides[0].startTime, "18:05");
-  assert.ok(mon.strength);
-  assert.equal(mon.strength.strengthTss, 44.1);
-  assert.deepEqual(mon.strength.sessions, [{ block: "Program - blok 11", week: 1 }]);
+  assert.equal(mon.rest, true);
+  assert.equal(mon.strength, null);
+
+  assert.ok(tue.strength);
+  assert.equal(tue.strength.strengthTss, 44.1);
+  const [s1] = tue.strength.sessions;
   assert.deepEqual(
-    mon.strength.exercises.map((e) => [e.name, e.sets, e.scorePerSet]),
+    [s1?.session, s1?.block, s1?.week, s1?.activityName, s1?.movingTimeS, s1?.tss],
+    [1, "Program - blok 12", 1, "Styrke", 4368, 44.1],
+  );
+  assert.deepEqual(
+    s1?.exercises.map((e) => [e.name, e.sets, e.scorePerSet]),
     [
       ["Squat", 2, 336.8],
       ["Dips", 1, 264.6],
     ],
   );
-  assert.equal(mon.rest, false);
+  assert.equal(tue.rest, false);
 
-  assert.equal(tue.rest, true);
-  assert.equal(wed.rides.length, 0);
-  assert.equal(wed.strength?.exercises[0]?.name, "Tempo bench");
-  assert.equal(thu.strength, null);
-  assert.equal(thu.rides[0]?.device, null);
+  assert.equal(wed.strength, null); // no strength until intervals logs it
+  assert.equal(wed.rides[0]?.device, null);
+  assert.equal(wed.rest, false);
+
+  const extra = thu.strength?.sessions[0];
+  assert.deepEqual([extra?.block, extra?.tss, extra?.exercises.length], [null, 0, 0]);
+  assert.equal(thu.rest, false);
   assert.equal(fri.rest, true);
 });
 
@@ -194,7 +221,8 @@ test("parseActivityRow and parseStrengthSetRow map and validate", () => {
     },
   );
   const raw = {
-    date: "2026-08-10",
+    week_start: "2026-09-28",
+    session: 1,
     sheet_id: "s",
     block: "Program - blok 11",
     week: 1,
@@ -211,6 +239,8 @@ test("parseActivityRow and parseStrengthSetRow map and validate", () => {
     score: 336.8,
   };
   assert.equal(parseStrengthSetRow(raw).prescribed, "RPE 7 - 8");
+  assert.equal(parseStrengthSetRow(raw).session, 1);
+  assert.throws(() => parseStrengthSetRow({ ...raw, week_start: "2026-9-28" }), RowError);
   assert.throws(() => parseStrengthSetRow({ ...raw, bodyweight: "no" }), RowError);
   assert.throws(() => parseActivityRow({ id: "i1", start_date_local: "yesterday" }), RowError);
 });

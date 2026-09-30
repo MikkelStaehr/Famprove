@@ -5,9 +5,15 @@
  */
 import { freshness, zoneDisplay } from "./dashboard-view.ts";
 import type { Freshness, Hero } from "./dashboard-view.ts";
-import { addDays } from "./dates.ts";
+import { addDays, isoWeekNumber } from "./dates.ts";
 import type { TodayPlanData } from "./db/queries.ts";
-import type { DailyLoadRow, IsoDate, PlanItem, PrescribedSetRow } from "./db/rows.ts";
+import type {
+  DailyLoadRow,
+  IsoDate,
+  PlanItem,
+  PrescribedSetRow,
+  StrengthSessionRow,
+} from "./db/rows.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
 
@@ -40,7 +46,7 @@ export function resolveToday(
 
 export type Reference = { readonly kg: number; readonly bodyweight: boolean };
 
-/** One sheet row of today's session (all its sets share these values). */
+/** One sheet row of the next session (all its sets share these values). */
 export type ExerciseView = {
   readonly key: string; // stable per sheet row, for the local "done" state
   readonly name: string;
@@ -52,10 +58,39 @@ export type ExerciseView = {
   readonly reference: Reference | null; // last week's logged kg for the same sheet row
 };
 
+/** The next session to do: session k + 1 of this ISO week. It has no date until it's done. */
 export type StrengthSession = {
+  readonly session: number; // n
+  readonly of: number; // N, sessions the sheet prescribes this ISO week
   readonly block: string;
   readonly week: number;
   readonly exercises: readonly ExerciseView[]; // sheet order
+};
+
+/** A strength activity logged this ISO week (the n-th is session n). */
+export type DoneSession = {
+  readonly session: number;
+  readonly extra: boolean; // beyond the sheet's sessions: "not in the program", 0 TSS
+  readonly date: IsoDate;
+  readonly isToday: boolean;
+  readonly activityName: string | null;
+  readonly movingTimeS: number | null;
+};
+
+/**
+ * This ISO week's strength, per the rule "the n-th strength activity of the week is session
+ * n": k = activities so far, N = sessions the sheet prescribes. Nothing comes from weekdays.
+ *   next        k < N: `next` is session k + 1
+ *   all_done    k >= N > 0
+ *   no_program  N = 0
+ */
+export type StrengthWeek = {
+  readonly state: "next" | "all_done" | "no_program";
+  readonly isoWeek: number;
+  readonly planned: number; // N
+  readonly done: readonly DoneSession[]; // k, in session order
+  readonly next: StrengthSession | null; // set only in state "next"
+  readonly nextWeekStart: IsoDate; // the Monday next week's session 1 shows from
 };
 
 export type RideView = {
@@ -67,15 +102,11 @@ export type RideView = {
   readonly problem: string | null;
 };
 
-export type NextSessionItem =
-  | { readonly kind: "strength"; readonly block: string; readonly week: number }
-  | { readonly kind: "ride"; readonly name: string };
-
-/** The first date after today (within the lookahead) with something planned, and all of it. */
+/** The first date after today (within the lookahead) with a planned ride, and its rides. */
 export type NextDay = {
   readonly date: IsoDate;
   readonly isTomorrow: boolean;
-  readonly sessions: readonly NextSessionItem[]; // ride(s) first, then strength
+  readonly rides: readonly string[]; // planned ride names
 };
 
 export type TodayHeader = {
@@ -85,13 +116,18 @@ export type TodayHeader = {
   readonly freshness: Freshness;
 };
 
-/** The day's plan. The form line (TodayHeader) is built and loaded separately. */
+/**
+ * The day's plan. The form line (TodayHeader) is built and loaded separately.
+ * kind: "strength" when a session is left this week (state "next"), "ride" when a ride is
+ * planned today, "both", or "rest" (no ride today and no session left: the Rest card shows).
+ */
 export type TodayPlan = {
   readonly date: IsoDate;
   readonly kind: "strength" | "ride" | "both" | "rest";
-  readonly strength: readonly StrengthSession[];
+  readonly strength: StrengthWeek;
+  readonly doneToday: boolean; // a strength activity was logged today
   readonly rides: readonly RideView[];
-  readonly next: NextDay | null; // null when nothing is planned within the lookahead
+  readonly next: NextDay | null; // next planned ride; null when none within the lookahead
 };
 
 function rowKey(s: { readonly block: string; readonly sheetRow: number }): string {
@@ -109,22 +145,15 @@ function references(previous: readonly PrescribedSetRow[]): Map<string, Referenc
   return refs;
 }
 
-export function strengthSessions(data: TodayPlanData): StrengthSession[] {
-  const refs = references(data.previousWeek);
-  const sessions = new Map<string, { block: string; week: number; rows: Map<string, ExerciseView> }>();
-  const ordered = data.sets.toSorted(
+function exercisesOf(sets: readonly PrescribedSetRow[], refs: Map<string, Reference>): ExerciseView[] {
+  const rows = new Map<string, ExerciseView>();
+  const ordered = sets.toSorted(
     (a, b) => a.block.localeCompare(b.block) || a.sheetRow - b.sheetRow || a.setNo - b.setNo,
   );
   for (const s of ordered) {
-    const sessionKey = `${s.block}#${s.week}`;
-    let session = sessions.get(sessionKey);
-    if (session === undefined) {
-      session = { block: s.block, week: s.week, rows: new Map() };
-      sessions.set(sessionKey, session);
-    }
     const key = rowKey(s);
-    if (!session.rows.has(key)) {
-      session.rows.set(key, {
+    if (!rows.has(key)) {
+      rows.set(key, {
         key,
         name: s.name,
         type: s.type,
@@ -136,27 +165,59 @@ export function strengthSessions(data: TodayPlanData): StrengthSession[] {
       });
     }
   }
-  return [...sessions.values()].map(({ block, week, rows }) => ({
-    block,
-    week,
-    exercises: [...rows.values()],
-  }));
+  return [...rows.values()];
+}
+
+type DoneRow = StrengthSessionRow & { readonly date: IsoDate };
+
+/** This ISO week's strength (see StrengthWeek). Rows of other weeks are ignored. */
+export function strengthWeek(data: TodayPlanData, today: IsoDate): StrengthWeek {
+  const week = data.sessions.filter((r) => r.weekStart === data.weekStart);
+  const planned = week.filter((r) => r.block !== null);
+  const done: DoneSession[] = week
+    .filter((r): r is DoneRow => r.date !== null)
+    .toSorted((a, b) => a.session - b.session)
+    .map((r) => ({
+      session: r.session,
+      extra: r.block === null,
+      date: r.date,
+      isToday: r.date === today,
+      activityName: r.activityName,
+      movingTimeS: r.movingTimeS,
+    }));
+  const base = {
+    isoWeek: isoWeekNumber(data.weekStart),
+    planned: planned.length,
+    done,
+    nextWeekStart: addDays(data.weekStart, 7),
+  };
+  if (planned.length === 0) return { ...base, state: "no_program", next: null };
+  const slot = planned.find((r) => r.session === done.length + 1);
+  if (slot === undefined || slot.block === null || slot.week === null) {
+    return { ...base, state: "all_done", next: null };
+  }
+  return {
+    ...base,
+    state: "next",
+    next: {
+      session: slot.session,
+      of: planned.length,
+      block: slot.block,
+      week: slot.week,
+      exercises: exercisesOf(
+        data.sets.filter((s) => s.weekStart === data.weekStart && s.session === slot.session),
+        references(data.previousWeek),
+      ),
+    },
+  };
 }
 
 function nextDay(data: TodayPlanData, today: IsoDate): NextDay | null {
-  const dates = [
-    ...(data.nextStrength === null ? [] : [data.nextStrength.date]),
-    ...data.upcomingRides.map((r) => r.date),
-  ].filter((d) => d > today);
+  const dates = data.upcomingRides.map((r) => r.date).filter((d) => d > today);
   if (dates.length === 0) return null;
   const date = dates.reduce((a, b) => (b < a ? b : a));
-  const sessions: NextSessionItem[] = data.upcomingRides
-    .filter((r) => r.date === date)
-    .map((r) => ({ kind: "ride", name: r.name }));
-  if (data.nextStrength !== null && data.nextStrength.date === date) {
-    sessions.push({ kind: "strength", block: data.nextStrength.block, week: data.nextStrength.week });
-  }
-  return { date, isTomorrow: date === addDays(today, 1), sessions };
+  const rides = data.upcomingRides.filter((r) => r.date === date).map((r) => r.name);
+  return { date, isTomorrow: date === addDays(today, 1), rides };
 }
 
 /** The form line from the latest daily_load row (null when there is none). */
@@ -172,7 +233,7 @@ export function todayHeader(latest: DailyLoadRow | null, now: Date): TodayHeader
 }
 
 export function buildTodayPlan(data: TodayPlanData, today: IsoDate): TodayPlan {
-  const strength = strengthSessions(data);
+  const strength = strengthWeek(data, today);
   const rides: RideView[] = data.rides.map((r) => ({
     name: r.name,
     notes: r.notes,
@@ -181,13 +242,8 @@ export function buildTodayPlan(data: TodayPlanData, today: IsoDate): TodayPlan {
     steps: r.steps,
     problem: r.problem,
   }));
-  const kind =
-    strength.length > 0 && rides.length > 0
-      ? "both"
-      : strength.length > 0
-        ? "strength"
-        : rides.length > 0
-          ? "ride"
-          : "rest";
-  return { date: today, kind, strength, rides, next: nextDay(data, today) };
+  const left = strength.state === "next";
+  const kind = left && rides.length > 0 ? "both" : left ? "strength" : rides.length > 0 ? "ride" : "rest";
+  const doneToday = strength.done.some((d) => d.isToday);
+  return { date: today, kind, strength, doneToday, rides, next: nextDay(data, today) };
 }

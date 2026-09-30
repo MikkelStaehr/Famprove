@@ -4,7 +4,7 @@ import { connection } from "next/server";
 
 import { readSupabaseEnv } from "./env.ts";
 import { createClient, selectAll, selectFirst } from "./postgrest.ts";
-import { addDays } from "../dates.ts";
+import { addDays, isoWeekStart } from "../dates.ts";
 import {
   ACTIVITIES_SELECT,
   BLOCKS_SELECT,
@@ -17,8 +17,10 @@ import {
   PRESCRIBED_SETS_SELECT,
   parseBlockRow,
   parseDailyLoadRow,
+  parseStrengthSessionRow,
   parseStrengthSetRow,
   parseWeeklyLoadRow,
+  STRENGTH_SESSIONS_SELECT,
   STRENGTH_SETS_SELECT,
   WEEKLY_LOAD_SELECT,
 } from "./rows.ts";
@@ -28,6 +30,7 @@ import type {
   IsoDate,
   PlannedTargetRow,
   PrescribedSetRow,
+  StrengthSessionRow,
   WeekDetailData,
 } from "./rows.ts";
 
@@ -62,8 +65,9 @@ export async function loadDashboardData(): Promise<DashboardData> {
 }
 
 /**
- * Rides and strength sets dated inside [start, end] (a weekly_load row's week, never raw
- * user input). Reads only. Throws EnvError / PostgrestError / RowError like loadDashboardData.
+ * Rides and strength sessions done inside [start, end] (a weekly_load row's ISO week, never
+ * raw user input), plus that week's prescribed sets for the sessions' exercises. Reads only.
+ * Throws EnvError / PostgrestError / RowError like loadDashboardData.
  */
 export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<WeekDetailData> {
   await connection();
@@ -71,7 +75,7 @@ export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<Week
     throw new RangeError("loadWeekDetail: invalid week range");
   }
   const db = client();
-  const [activities, sets] = await Promise.all([
+  const [activities, sessions, sets] = await Promise.all([
     selectAll(
       db,
       ACTIVITIES_SELECT.table,
@@ -86,15 +90,24 @@ export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<Week
     ),
     selectAll(
       db,
+      STRENGTH_SESSIONS_SELECT.table,
+      { ...STRENGTH_SESSIONS_SELECT, filters: [["date", `gte.${start}`], ["date", `lte.${end}`]] },
+      parseStrengthSessionRow,
+    ),
+    selectAll(
+      db,
       STRENGTH_SETS_SELECT.table,
-      { ...STRENGTH_SETS_SELECT, filters: [["date", `gte.${start}`], ["date", `lte.${end}`]] },
+      {
+        ...STRENGTH_SETS_SELECT,
+        filters: [["week_start", `gte.${isoWeekStart(start)}`], ["week_start", `lte.${end}`]],
+      },
       parseStrengthSetRow,
     ),
   ]);
-  return { activities, sets };
+  return { activities, sessions, sets };
 }
 
-/** Days ahead the rest state looks for the next session. */
+/** Days ahead the rest state looks for the next planned ride. */
 export const NEXT_SESSION_DAYS = 28;
 
 /** The form line: the latest daily_load row on or before `today` (null when none). */
@@ -111,28 +124,40 @@ export async function loadTodayForm(today: IsoDate): Promise<DailyLoadRow | null
 
 /** Everything the Today screen's plan reads for one local date (form is loaded separately). */
 export type TodayPlanData = {
-  readonly sets: readonly PrescribedSetRow[]; // today's prescription, all sets
+  readonly weekStart: IsoDate; // Monday of today's ISO week
+  readonly sessions: readonly StrengthSessionRow[]; // this ISO week: planned, done and extra
+  readonly sets: readonly PrescribedSetRow[]; // this ISO week's prescription, every session
   readonly previousWeek: readonly PrescribedSetRow[]; // same tabs, week - 1 (references)
   readonly rides: readonly PlannedTargetRow[]; // planned rides today
-  readonly nextStrength: PrescribedSetRow | null; // first prescribed set in (today, today + 28]
   readonly upcomingRides: readonly PlannedTargetRow[]; // planned rides in (today, today + 28]
 };
 
 /**
- * Today's prescription, last week's sets of the same tabs, planned rides and what comes
- * next. `today` is a local date chosen by the server (never raw user input); it is
- * validated again here. Reads only; throws EnvError / PostgrestError / RowError.
+ * This ISO week's strength sessions and prescription (the view picks session k + 1), last
+ * week's sets of the same tabs, planned rides and the next ones. `today` is a local date
+ * chosen by the server (never raw user input); it is validated again here. Reads only;
+ * throws EnvError / PostgrestError / RowError.
  */
 export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
   await connection();
   if (!ISO_DATE.test(today)) throw new RangeError("loadTodayPlan: invalid date");
   const db = client();
   const horizon = addDays(today, NEXT_SESSION_DAYS);
-  const [sets, rides, nextStrength, upcomingRides] = await Promise.all([
+  const weekStart = isoWeekStart(today);
+  const [sessions, sets, rides, upcomingRides] = await Promise.all([
+    selectAll(
+      db,
+      STRENGTH_SESSIONS_SELECT.table,
+      {
+        ...STRENGTH_SESSIONS_SELECT,
+        filters: [["week_start", `eq.${weekStart}`]],
+      },
+      parseStrengthSessionRow,
+    ),
     selectAll(
       db,
       PRESCRIBED_SETS_SELECT.table,
-      { ...PRESCRIBED_SETS_SELECT, filters: [["date", `eq.${today}`]] },
+      { ...PRESCRIBED_SETS_SELECT, filters: [["week_start", `eq.${weekStart}`]] },
       parsePrescribedSetRow,
     ),
     selectAll(
@@ -140,15 +165,6 @@ export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
       PLANNED_TARGETS_SELECT.table,
       { ...PLANNED_TARGETS_SELECT, filters: [["date", `eq.${today}`]] },
       parsePlannedTargetRow,
-    ),
-    selectFirst(
-      db,
-      PRESCRIBED_SETS_SELECT.table,
-      {
-        ...PRESCRIBED_SETS_SELECT,
-        filters: [["date", `gt.${today}`], ["date", `lte.${horizon}`]],
-      },
-      parsePrescribedSetRow,
     ),
     selectAll(
       db,
@@ -161,7 +177,7 @@ export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
     ),
   ]);
   // Last week's sets of the same tab(s): one query per (tab, week - 1). Tab names come from
-  // today's rows (server data) and go through URLSearchParams as eq. values.
+  // this week's rows (server data) and go through URLSearchParams as eq. values.
   const previousKeys = new Map<string, { block: string; week: number }>();
   for (const s of sets) {
     if (s.week > 1) {
@@ -178,5 +194,5 @@ export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
       ),
     ),
   );
-  return { sets, previousWeek: previous.flat(), rides, nextStrength, upcomingRides };
+  return { weekStart, sessions, sets, previousWeek: previous.flat(), rides, upcomingRides };
 }

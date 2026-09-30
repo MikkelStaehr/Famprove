@@ -1,4 +1,11 @@
-import type { DayDetail, ExerciseDetail, RideDetail, StrengthDetail, WeekView } from "@/lib/dashboard-view";
+import type {
+  DayDetail,
+  ExerciseDetail,
+  RideDetail,
+  SessionDetail,
+  StrengthDetail,
+  WeekView,
+} from "@/lib/dashboard-view";
 import {
   formatDay,
   formatDevice,
@@ -10,6 +17,7 @@ import {
   formatWatts,
 } from "@/lib/format";
 
+import { ActivityWords, hasActivityWords } from "./MovingTime";
 import { SkeletonBar } from "./Skeleton";
 
 /**
@@ -191,21 +199,50 @@ function Metric({ term, value }: { readonly term: string; readonly value: string
   );
 }
 
+/**
+ * One section per strength activity of the day (spec today.md §8), by session number. A matched
+ * activity names its sheet session and lists the exercises; an extra one is "not in the program".
+ */
 function Strength({ strength }: { readonly strength: StrengthDetail }) {
+  const anyExercises = strength.sessions.some((s) => s.exercises.length > 0);
+  return (
+    <div className="flex flex-col gap-4">
+      {strength.sessions.map((s) => (
+        <StrengthSession key={s.key} session={s} />
+      ))}
+      {anyExercises && (
+        <p className="text-12 text-text-muted">
+          Score/set is the raw score of one set, before the strength factor that turns it into TSS.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function StrengthSession({ session: s }: { readonly session: SessionDetail }) {
+  const title =
+    s.block === null
+      ? "Strength · not in the program"
+      : `Session ${s.session} · ${s.block}${s.week === null ? "" : ` · week ${s.week}`}`;
   return (
     <div className="flex flex-col gap-1">
-      <SectionHeading title="Strength" tss={strength.strengthTss} />
-      <p className="text-12 text-text-muted">
-        {strength.sessions.map((s) => `${s.block} · week ${s.week}`).join("; ")}
+      <h3 className="text-16 font-semibold">{title}</h3>
+      <p className="text-14 text-text-muted">
+        {hasActivityWords(s.activityName, s.movingTimeS) && (
+          <>
+            <ActivityWords name={s.activityName} movingTimeS={s.movingTimeS} />
+            {" · "}
+          </>
+        )}
+        <span className="tabular-nums">{formatLoad(s.tss)} TSS</span>
       </p>
-      <ol className="flex flex-col">
-        {strength.exercises.map((exercise) => (
-          <Exercise key={exercise.key} exercise={exercise} />
-        ))}
-      </ol>
-      <p className="text-12 text-text-muted">
-        Score/set is the raw score of one set, before the strength factor that turns it into TSS.
-      </p>
+      {s.exercises.length > 0 && (
+        <ol aria-label="Exercises" className="flex flex-col">
+          {s.exercises.map((exercise) => (
+            <Exercise key={exercise.key} exercise={exercise} />
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

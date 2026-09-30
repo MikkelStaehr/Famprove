@@ -87,7 +87,8 @@ export type ActivityRow = {
 
 /** public.strength_sets, for the week detail. score is the raw per-set score (before K). */
 export type StrengthSetRow = {
-  readonly date: IsoDate;
+  readonly weekStart: IsoDate; // Monday of the ISO week
+  readonly session: number; // 1..N within the ISO week
   readonly block: string;
   readonly week: number;
   readonly sheetRow: number;
@@ -103,10 +104,28 @@ export type StrengthSetRow = {
   readonly score: number;
 };
 
+/**
+ * public.strength_sessions (derived by Python): one row per (ISO week, session number).
+ * date is null until a strength activity is logged (the n-th activity of the week is
+ * session n); block/week are null for an extra activity beyond the program (tss 0).
+ */
+export type StrengthSessionRow = {
+  readonly weekStart: IsoDate;
+  readonly session: number;
+  readonly block: string | null;
+  readonly week: number | null;
+  readonly activityId: string | null;
+  readonly date: IsoDate | null;
+  readonly activityName: string | null;
+  readonly movingTimeS: number | null;
+  readonly tss: number; // strength TSS on `date` (0 when undone or extra)
+};
+
 /** The selected week's sessions, as returned by queries.loadWeekDetail. */
 export type WeekDetailData = {
   readonly activities: readonly ActivityRow[]; // ascending by start
-  readonly sets: readonly StrengthSetRow[]; // ascending by date, then sheet order
+  readonly sessions: readonly StrengthSessionRow[]; // done in the week, by week and number
+  readonly sets: readonly StrengthSetRow[]; // the ISO week's prescription, by session, sheet order
 };
 
 export const ACTIVITIES_SELECT = {
@@ -119,8 +138,14 @@ export const ACTIVITIES_SELECT = {
 export const STRENGTH_SETS_SELECT = {
   table: "strength_sets",
   columns:
-    "date,sheet_id,block,week,sheet_row,set_no,type,name,reps,logged_kg,kg,bodyweight,rpe,prescribed,score",
-  order: "date,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
+    "week_start,session,sheet_id,block,week,sheet_row,set_no,type,name,reps,logged_kg,kg,bodyweight,rpe,prescribed,score",
+  order: "week_start,session,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
+} as const;
+
+export const STRENGTH_SESSIONS_SELECT = {
+  table: "strength_sessions",
+  columns: "week_start,session,block,week,activity_id,date,activity_name,moving_time_s,tss",
+  order: "week_start,session", // the primary key
 } as const;
 
 export class RowError extends Error {}
@@ -269,7 +294,8 @@ export function parseActivityRow(raw: unknown): ActivityRow {
 export function parseStrengthSetRow(raw: unknown): StrengthSetRow {
   const f = new Fields(STRENGTH_SETS_SELECT.table, raw);
   return {
-    date: f.date("date"),
+    weekStart: f.date("week_start"),
+    session: f.number("session"),
     block: f.string("block"),
     week: f.number("week"),
     sheetRow: f.number("sheet_row"),
@@ -286,11 +312,27 @@ export function parseStrengthSetRow(raw: unknown): StrengthSetRow {
   };
 }
 
+export function parseStrengthSessionRow(raw: unknown): StrengthSessionRow {
+  const f = new Fields(STRENGTH_SESSIONS_SELECT.table, raw);
+  return {
+    weekStart: f.date("week_start"),
+    session: f.number("session"),
+    block: f.stringOrNull("block"),
+    week: f.numberOrNull("week"),
+    activityId: f.stringOrNull("activity_id"),
+    date: f.dateOrNull("date"),
+    activityName: f.stringOrNull("activity_name"),
+    movingTimeS: f.numberOrNull("moving_time_s"),
+    tss: f.number("tss"),
+  };
+}
+
 // --- Today screen ------------------------------------------------------------------------
 
 /** One prescribed set of the coach's sheet (plan + what was logged), for the Today screen. */
 export type PrescribedSetRow = {
-  readonly date: IsoDate;
+  readonly weekStart: IsoDate; // Monday of the ISO week
+  readonly session: number; // 1..N within the ISO week; never a weekday
   readonly block: string;
   readonly week: number;
   readonly sheetRow: number;
@@ -307,14 +349,15 @@ export type PrescribedSetRow = {
 export const PRESCRIBED_SETS_SELECT = {
   table: "strength_sets",
   columns:
-    "date,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight",
-  order: "date,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
+    "week_start,session,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight",
+  order: "week_start,session,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
 } as const;
 
 export function parsePrescribedSetRow(raw: unknown): PrescribedSetRow {
   const f = new Fields(PRESCRIBED_SETS_SELECT.table, raw);
   return {
-    date: f.date("date"),
+    weekStart: f.date("week_start"),
+    session: f.number("session"),
     block: f.string("block"),
     week: f.number("week"),
     sheetRow: f.number("sheet_row"),

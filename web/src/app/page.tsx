@@ -95,22 +95,21 @@ export default async function TodayPage() {
   );
 }
 
-/** Ride card(s) first (short, so a strength list can't push them out of sight), then strength. */
+/**
+ * Ride card(s) first (short, so a strength list can't push them out of sight), then this ISO
+ * week's strength (every state of spec §3a, including "no program"), then the Rest card when no
+ * ride is planned today and no strength session is left.
+ */
 function DayCards({ plan }: { readonly plan: TodayPlan }) {
   return (
     <>
       {plan.rides.map((ride, i) => (
         <RideCard key={`ride-${i}`} id={`ride-${i + 1}`} ride={ride} />
       ))}
-      {plan.strength.map((session, i) => (
-        <StrengthCard
-          key={`${session.block}#${session.week}`}
-          id={i === 0 ? "strength" : `strength-${i + 1}`}
-          date={plan.date}
-          session={session}
-        />
-      ))}
-      {plan.kind === "rest" && <RestCard next={plan.next} lookaheadDays={NEXT_SESSION_DAYS} />}
+      <StrengthCard id="strength" date={plan.date} strength={plan.strength} />
+      {plan.kind === "rest" && (
+        <RestCard next={plan.next} lookaheadDays={NEXT_SESSION_DAYS} doneToday={plan.doneToday} />
+      )}
     </>
   );
 }
