@@ -46,6 +46,15 @@ def mid(txt):
     nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", str(txt))]
     return sum(nums)/len(nums) if nums else None
 
+_NUMBER_TEXT = re.compile(r"^\s*-?\d+(?:[.,]\d+)?\s*$")
+
+def text_number(cell: object) -> object:
+    """Et tal skrevet som tekst ('137.5', '137,5', '140') -> float; alt andet uændret.
+    Arket kan have KG-kolonnen formateret som tekst, så indtastet kg kommer som str."""
+    if isinstance(cell, str) and _NUMBER_TEXT.match(cell):
+        return float(cell.strip().replace(",", "."))
+    return cell
+
 def cell_text(cell: object) -> str | None:
     """En celle som i arket: tekst uændret, tal uden overflødige decimaler (3.0 -> '3')."""
     if cell is None or cell == "": return None
@@ -90,6 +99,7 @@ def parse_tab(ws, tab, bodyweight):
         for w,date in enumerate(week_dates):
             base = 4 + w*8          # SETS-kolonne for uge w
             nsets, reps, load, kg = r[base], r[base+1], r[base+2], r[base+3]
+            kg = text_number(kg)
             sets_text, reps_text = cell_text(nsets), cell_text(reps)
             if nsets in (None,0,"") or reps in (None,"") : continue
             nsets, reps = int(mid(nsets)), mid(reps)

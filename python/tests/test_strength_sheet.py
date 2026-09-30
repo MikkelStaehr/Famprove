@@ -8,8 +8,14 @@ from datetime import date
 
 import pytest
 
-from conftest import BLOK_11, BLOK_12, SYNTHETIC_BODYWEIGHT
-from training_load.sources.strength_sheet import ParsedSet, cell_text, parse_all, prescribed_text
+from conftest import BLOK_11, BLOK_11_SECTIONS, BLOK_12, SYNTHETIC_BODYWEIGHT, build_workbook
+from training_load.sources.strength_sheet import (
+    ParsedSet,
+    cell_text,
+    parse_all,
+    prescribed_text,
+    text_number,
+)
 
 
 @pytest.fixture
@@ -151,3 +157,35 @@ def test_sets_and_reps_cells_are_passed_through_as_written(parsed: list[ParsedSe
 )
 def test_cell_text_shows_numbers_without_trailing_zeros(cell: object, text: str | None) -> None:
     assert cell_text(cell) == text
+
+
+def test_text_number_reads_numbers_typed_as_text() -> None:
+    assert text_number("137.5") == 137.5
+    assert text_number("137,5") == 137.5
+    assert text_number(" 140 ") == 140.0
+    assert text_number(125) == 125  # numbers pass through
+    for keep in ("BW", "137.5 kg", "", None, "RPE 7"):
+        assert text_number(keep) == keep
+
+
+def test_kg_typed_as_text_parses_like_numbers() -> None:
+    """The sheet's WEIGHT column can be formatted as text: "120", "70,0" and "10.0" must give
+    the same sets (and scores) as the numbers 120, 70 and 10."""
+    (dates_1, rows_1), (dates_2, rows_2) = BLOK_11_SECTIONS
+    squat, dips, *rest_1 = rows_1
+    tempo, *rest_2 = rows_2
+    as_text = [
+        (
+            dates_1,
+            [
+                (squat[0], squat[1], [("3", "5", "RPE 7 - 8", "120"), *squat[2][1:]]),
+                (dips[0], dips[1], [(3, "8 - 12", "RPE 7", "10.0"), *dips[2][1:]]),
+                *rest_1,
+            ],
+        ),
+        (dates_2, [(tempo[0], tempo[1], [(3, 6, "RPE 6", "70,0"), *tempo[2][1:]]), *rest_2]),
+    ]
+    typed = parse_all(build_workbook(as_text), SYNTHETIC_BODYWEIGHT)
+    numeric = parse_all(build_workbook(), SYNTHETIC_BODYWEIGHT)
+    assert typed == numeric
+    assert first(typed, BLOK_11, "Squat", 1)["logged_kg"] == 120.0
