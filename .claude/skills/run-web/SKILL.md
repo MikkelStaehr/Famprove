@@ -32,7 +32,8 @@ contain personal training data: write them to the session scratchpad or `%TEMP%`
 ```
 
 `shoot.mjs` options: `--out <png>` (required) · `--path /load?week=2026-W33` (default `/`) ·
-`--width 390` · `--open` (open every `<details>`) · `--dark` · `--zoom200` (root font 200 %) ·
+`--width 390` · `--open` (open every `<details>`) · `--dark` · `--reduce-motion` (emulates
+`prefers-reduced-motion: reduce`) · `--zoom200` (root font 200 %) ·
 `--base http://localhost:3100`. It prints one JSON line (height, horizontal overflow, console
 errors) and exits 1 on overflow, console errors or a page that never got ready. Then **Read the
 PNG** — a screenshot you haven't looked at proves nothing.

@@ -25,8 +25,9 @@ Form zone
     from Joe Friel and are for absolute TSB" (forum.intervals.icu/t/3623). The same numbers
     apply to % of fitness when that display option is on; percent form is 0 when CTL is 0.
     The user's intervals.icu shows absolute TSB (icu_form_as_percent = false), so FORM_BASIS
-    is ABSOLUTE_TSB. This table is the ONLY place the thresholds live
-    (web/src/lib/dashboard-view.ts only maps keys to display text/tone).
+    is ABSOLUTE_TSB. This table owns the thresholds and the classification. The web never
+    classifies a TSB: web/src/lib/zone-scale.ts repeats the numbers only to draw the zone
+    bar, and web/tests/zone-scale.test.ts fails if the two drift.
 """
 
 from collections.abc import Sequence

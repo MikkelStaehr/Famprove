@@ -1,6 +1,6 @@
 // Exact-width, real-time screenshot of the web app through Edge's DevTools protocol (CDP).
 // node .claude/skills/run-web/shoot.mjs --out <file.png> [--path /load] [--width 390]
-//   [--open] [--dark] [--zoom200] [--base http://localhost:3100]
+//   [--open] [--dark] [--reduce-motion] [--zoom200] [--base http://localhost:3100]
 // Prints one JSON line; exits 1 on horizontal overflow, console errors or a page that never got ready.
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -16,6 +16,7 @@ const { values: opt } = parseArgs({
     base: { type: "string", default: process.env.BASE_URL ?? "http://localhost:3100" },
     open: { type: "boolean", default: false },
     dark: { type: "boolean", default: false },
+    "reduce-motion": { type: "boolean", default: false },
     zoom200: { type: "boolean", default: false },
   },
 });
@@ -76,9 +77,11 @@ try {
   const metrics = (height) =>
     send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 600 });
   await metrics(844);
-  if (opt.dark) {
-    await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "dark" }] });
-  }
+  const media = [
+    ...(opt.dark ? [{ name: "prefers-color-scheme", value: "dark" }] : []),
+    ...(opt["reduce-motion"] ? [{ name: "prefers-reduced-motion", value: "reduce" }] : []),
+  ];
+  if (media.length > 0) await send("Emulation.setEmulatedMedia", { features: media });
   await send("Page.navigate", { url: new URL(opt.path, opt.base).href });
 
   // Real time, no --virtual-time-budget: React hydrates on an animation frame virtual time never fires.
