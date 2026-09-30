@@ -7,16 +7,25 @@ Personal training-load app for one user. It combines cycling (intervals.icu) and
 - Backend/DB: Supabase (Postgres + RLS) · Python collectors/compute (uv)
 - Hosting: Vercel (frontend) · GitHub Actions (scheduled Python jobs)
 - Package manager: pnpm (frontend) · uv (Python)
+- Tests: pytest (Python) · `node --test` (web, Node 24 type stripping)
 
 ## Commands
 All Python commands run from `python/` (they read the repo-root `.env.local`).
-- run: `uv run collect-intervals [--since 2026-01-01]` · `uv run collect-strength` · `uv run compute` (in that order)
+- run: `uv run collect-intervals [--since 2026-01-01]` · `uv run collect-strength` · `uv run compute` · `uv run collect-plan` (in that order)
 - test: `uv run pytest` (offline, synthetic fixtures) · `uv run pytest -m live` (hits intervals.icu, read-only)
 - lint: `uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy`
 - db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
 - web (from `web/`, reads `web/.env.local`): `pnpm dev` · `pnpm build && pnpm start` · checks: `pnpm lint && pnpm typecheck && pnpm test`
+- **Run & screenshot:** use the `run-web` skill (`.claude/skills/run-web/`). Never invent a new screenshot method.
 
 CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain/load.py`.
+
+## Environment
+- Ports: **3000 = the user's dev server, 3100 = agents.** Agents never touch 3000.
+- Stop every server you started before the session ends.
+- Run Python with `PYTHONIOENCODING=utf-8` (not set machine-wide yet; the Windows console chokes on "−" and "æ"). Write commit messages via a file (`git commit -F`), not inline quoting.
+- Windows with Git Bash and PowerShell. uv, pnpm and the Supabase CLI are per-user installs; if a shell can't find them, restart VS Code.
+- CI secrets: the daily job needs all 8 `.env.example` variables as **repository** secrets on `MikkelStaehr/Famprove` (Settings → Secrets and variables → Actions).
 
 ## Conventions
 - Strict types. No `any` / untyped dict without a comment.
@@ -30,6 +39,14 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - `STRENGTH_K` and `BODYWEIGHT` are env-configured tunables, never hardcoded.
 - Collectors are idempotent: re-running a day overwrites, never duplicates.
 - Single user. No auth UI, no multi-tenancy. RLS on every table.
+
+## Orientation
+- `docs/ARCHITECTURE.md` is a one-page map of folders, data flow and commands. Agents read it **instead of scanning the repo**. Update it when structure changes.
+
+## Design
+- `DESIGN.md` predates the Part A/B split. Its general sections are the guardrails. **No direction has been chosen yet**: the current look is a placeholder, not the product's identity. Run `design-lead` Mode 0 before the next visible L task.
+- No UI component library yet; Tailwind themed from DESIGN.md tokens. Mode 0 may propose shadcn/ui.
+- Screen specs live in `design/specs/`, template and pattern packs in `design/`.
 
 ## Milestone 1 brief (done 2026-09-28)
 Goal: one weekly key figure — total TSS across cycling and strength — plus daily CTL (42 d), ATL (7 d), TSB = CTL − ATL, with strength-block markers. No UI in M1; M2 is a Next.js dashboard reading `daily_load` (+ weekly view).
@@ -71,19 +88,35 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 - No auth UI, no settings page. pnpm, TypeScript strict, Tailwind; the simplest chart library that meets `DESIGN.md`.
 - Routes: `/` = Today (what to do in the gym or on the bike today; spec `design/specs/today.md`), `/load` = the load dashboard (unchanged), a small nav between them.
 
-## Development team (user-level subagents in ~/.claude/agents/)
-| When | Agent |
-|---|---|
-| New feature or unclear requirement | `tech-lead` first |
-| New project, new module, schema change | `architect` |
-| Before any screen the user sees: spec; after it's built: review (owns `DESIGN.md`) | `design-lead` |
-| Build or polish a screen/component from design-lead's spec (follows `DESIGN.md`) | `ui` |
-| Feature finished, before merge | `reviewer` |
-| Bug, failing test, wrong output | `debugger` |
-| Before first deploy; after auth/DB-access/API/secret changes | `security` |
+## How we work: size every task first
+Before starting, the main session states the **size (S/M/L), the steps and the time budget** to the user. The user can change it.
+If a budget is exceeded, **stop and ask**. Never keep running.
+`∥` means the steps run in parallel.
 
-Default flow: tech-lead → (architect if structural) → implement → reviewer → security if it touches auth or data.
-Visible work: design-lead (spec) → ui (build) → design-lead (review) → ui (polish) → reviewer. Specs live in `design/specs/`, pattern packs in `design/patterns/`.
+| Size | When | Steps | Budget (agent time) |
+|---|---|---|---|
+| **S** | Text, colour, layout in an existing component; no new data | Main session (or `ui`) + one 390px screenshot. `reviewer` only if the diff is > ~50 lines | 10 min |
+| **M** | New component or view on data that already exists | Data check ∥ `design-lead` spec-lite → build → `reviewer` ∥ `security` (security only if data/access changed) | 30 min |
+| **L** | New data + new screen, or a new module | `tech-lead` one-pager → data check + **one** migration → `design-lead` spec ∥ data layer → `ui` build → `design-lead` review (Must only) → `ui` polish → `tester` ∥ `reviewer` ∥ `security` | 60 min |
+| **Project start** | New repo | `tech-lead` + `architect` → `design-lead` Mode 0 → write `docs/ARCHITECTURE.md` | 45 min |
+
+**Data check** (M and L): list every value the screen shows and mark it *exists / missing*. All missing data goes into **one** migration before any UI is built.
+
+**Research first, ask after.** Before asking the user a technical question, research it and bring numbers.
+
+## Status to the user
+- Before each step: what, which agent, and an estimated time.
+- Agents over ~10 min: give a short status when they return. Run long agents in the background where possible.
+
+## Definition of done
+- **S:** it works, the screenshot looks right, lint and typecheck pass.
+- **M:** plus tests for new logic, and `reviewer` has approved.
+- **L:** plus `tester` PASS on every acceptance criterion, no open **Must** from `design-lead`, and `security` approved if relevant.
+
+## Development team (user-level subagents in ~/.claude/agents/)
+`tech-lead` · `architect` · `design-lead` · `ui` · `tester` · `reviewer` · `security` · `debugger`.
+Agents are called only as listed in the size table, plus `debugger` when the cause of a failure is unclear.
+**Install new agents before starting the session.** Agents added mid-session aren't loaded until the next one.
 
 ## Non-goals
 - No premature scaling. Optimize when a measurement says so.
