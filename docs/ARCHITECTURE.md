@@ -8,21 +8,22 @@ Supabase service key is **server-side only** · every table has RLS with no anon
 ## Data flow
 ```
 GitHub Actions daily.yml (≈05:00 Copenhagen; also "Run workflow")
-  collect-intervals  intervals.icu API (last 14 d)      → activities
-  collect-strength   Google Drive xlsx export (read)    → strength_sets
-  compute            activities + strength_sets         → daily_load, blocks   (+ SQL view weekly_load)
+  collect-intervals  intervals.icu API (last 14 d)      → activities (rides), strength_activities (WeightTraining)
+  collect-strength   Google Drive xlsx export (read)    → strength_sets (ISO week + session 1..N, no dates)
+  compute            activities + strength_sets + strength_activities
+                                                        → strength_sessions, daily_load, blocks (+ view weekly_load)
   collect-plan       planned_sessions (hand-filled) + FTP from intervals.icu → planned_targets
 
 Next.js (web/), server components only
-  /       Today   ← daily_load (form line), strength_sets (today + last week), planned_targets
-  /load   Load    ← daily_load, blocks, weekly_load; week details ← activities, strength_sets
+  /       Today   ← daily_load (form line), strength_sessions + strength_sets (this ISO week, last week), planned_targets
+  /load   Load    ← daily_load, blocks, weekly_load; week details ← activities, strength_sessions, strength_sets
 ```
 
 ## Folders
 | Path | What lives there |
 |---|---|
 | `python/src/training_load/sources/` | Adapters that read the outside world: `intervals.py`, `google_drive.py`, `strength_sheet.py` (the coach-sheet parser and strength formula; formula lines never change) |
-| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (filled weeks, blocks), `cycling.py`, `daily.py`, `plan.py` (watt targets), `dates.py` |
+| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `dates.py` |
 | `python/src/training_load/db/` | The only code that talks to Supabase (PostgREST over `requests`), one module per table |
 | `python/src/training_load/cli/` | The four console scripts, one per step of the daily job |
 | `python/src/training_load/*.py` | `config.py` (env, fail-fast), `http.py` (retrying HTTP seam), `narrow.py` (JSON → typed fields) |
@@ -37,7 +38,9 @@ Next.js (web/), server components only
 | `.claude/skills/run-web/` | The only way to run and screenshot the web app (port 3100) |
 
 ## Tables
-`activities` (rides) · `strength_sets` (every prescribed set: plan + logged kg + cells as written) ·
+`activities` (rides) · `strength_activities` (WeightTraining from intervals.icu) ·
+`strength_sets` (every prescribed set: plan + logged kg + cells as written; ISO week + session number) ·
+`strength_sessions` (derived: per ISO week and session number, the activity that did it, its date, TSS) ·
 `daily_load` (one row per day since 2026-01-01: TSS, CTL, ATL, TSB, ramp, zone, `computed_at`) ·
 `blocks` (strength blocks + deload) · `weekly_load` (view) · `planned_sessions` (you fill) ·
 `planned_targets` (derived watts).
@@ -50,6 +53,6 @@ Next.js (web/), server components only
 - CI: `test.yml` on every push (Python + web checks, no secrets); `daily.yml` needs the 8 repository secrets.
 
 ## Where to change what
-Decay variant → `domain/load.py` `DECAY` · form-zone bands → `domain/form.py` · strength formula →
+Strength session rule → `domain/sessions.py` · Decay variant → `domain/load.py` `DECAY` · form-zone bands → `domain/form.py` · strength formula →
 don't (it's the coach's, in `sources/strength_sheet.py`) · `STRENGTH_K` / `BODYWEIGHT` → env ·
 tokens and layout rules → `DESIGN.md` · zone labels shown in the UI → `web/src/lib/dashboard-view.ts`.

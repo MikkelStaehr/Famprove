@@ -89,13 +89,13 @@ Defined once in `web/src/app/globals.css` (CSS variables, switched by `prefers-c
 - Title "This week · week N" for the latest week, "Week N" otherwise; the "Back to this week" link sits in the card action.
 - Switcher: previous / next are real links (44 × 44, `aria-label` names the target week), absent at the ends (an empty 44px box keeps the label centred). They use `scroll={false}` so switching keeps the scroll position and keyboard focus. Label: date range + ISO week (`2026-W33`).
 - Switching weeks re-renders only the day list: a `<Suspense>` keyed by the week shows its skeleton; hero and chart never flash. Detail errors show an ErrorState inside the card.
-- Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days are a plain row reading "Rest". Column heads are visual only; each row speaks "cycling N TSS, …".
+- Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days (no ride and no strength activity) are a plain row reading "Rest". Strength sits on its matched activity's date; planned-but-undone sessions are not shown (spec `design/specs/today.md` §8). Column heads are visual only; each row speaks "cycling N TSS, …".
 - Row grid: day + three 64px TSS columns when the list is ≥ 20rem wide (Tailwind `@xs` container query, so it tracks text size); narrower, e.g. at 200% text, the day moves above the numbers instead of scrolling sideways.
 - Missing values show "–", spoken as "not recorded". A blank kg on a weighted exercise reads "no kg logged", never "0 kg". Score/set is labelled as the raw score before the strength factor.
 
 ### Today (`/`, added by design-lead; full spec `design/specs/today.md`)
 - **Use:** a companion screen, read at arm's length (≈ 60–80 cm) in the gym or from the handlebar. The session is the hero. Form (TSB) is one header line, not a key figure.
-- **Data:** read-only and server-side. It uses the latest `daily_load` row for the form line, today's strength plan from the sheet data, and `planned_sessions` for rides. Python computes every number, including target watts. "Today" is the Europe/Copenhagen date at request time.
+- **Data:** read-only and server-side. It uses the latest `daily_load` row for the form line, the next undone strength session of the ISO week (session k + 1 of N; the n-th strength activity of the week is session n, and undone sessions have no date), and `planned_sessions` for rides. Python computes every number, including target watts. "Today" is the Europe/Copenhagen date at request time.
 - **Glance sizes** (existing tokens, no new sizes):
   - text-28 bold tabular: anything read mid-set or mid-interval, i.e. sets × reps, prescribed load, target watts.
   - text-20: exercise names, the last-week reference, step labels and durations.
@@ -117,7 +117,7 @@ Defined once in `web/src/app/globals.css` (CSS variables, switched by `prefers-c
   - Left column: label and duration.
   - Right column: watts in text-28, unit included ("238 W": a smaller capital W reads as "w"), % FTP below it in muted text.
   - Repeat groups get a "Repeat N times" header, with their steps indented 16px behind a 2px `--chart-mark` rule.
-- **Order:** ride card(s), then the strength card, then (only when neither) the rest card.
+- **Order:** ride card(s), then the strength card, then the rest card (only when no ride today and no strength session left this week). Rest wording never depends on strength dates.
 - **Freshness:**
   - The same "updated" line as `/load`. The stale sentence names the consequence: "Form and the strength plan may be out of date."
   - A failed plan read is an ErrorState, never a rest day.

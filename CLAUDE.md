@@ -64,9 +64,9 @@ Deliverables:
 - Tests for the parser and the CTL/ATL math, with fixtures.
 
 Decisions (agreed with the user):
-- Sheet is plan + log: coach prescribes sets/reps/RPE, the user logs kg on the day. Dates come from `sources/strength_sheet.py` (ex-`strength_collector.py`).
-- Block = tab name; start = first week date; end = last filled week; deload = last filled week of each tab. Derived from the sheet — no hand-kept list.
-- Cycling = intervals.icu types `Ride` and `VirtualRide` only. Everything else (incl. Garmin-synced `WeightTraining`) is excluded.
+- Sheet is plan + log: coach prescribes sets/reps/RPE, the user logs kg on the day. The sheet defines sessions 1..N per ISO week (Mon–Sun), **never weekdays**. A session's date comes from intervals.icu: the n-th strength activity (`WeightTraining`, incl. manual ones) of the ISO week is session n, and its strength TSS lands on that activity's date. Planned sessions not yet done have no date and add nothing; an activity beyond N is an extra with 0 TSS ("not in the program"). Blok 11 predates the Garmin log: its sessions count once matching manual activities exist in intervals.icu (decided 2026-09-30).
+- Block = tab name; start = first week's ISO Monday; end = last filled week; deload = last filled week of each tab. Derived from the sheet — no hand-kept list.
+- Cycling = intervals.icu types `Ride` and `VirtualRide` only. `WeightTraining` only dates strength sessions (its own load is never used); everything else is excluded.
 - Cycling TSS = intervals.icu's own load value as-is; rides without power use its HR-based load (never skipped).
 - Backfill from 2026-01-01 with CTL = ATL = 0 on that date. Strength only from the current workbook (blok 11 onward).
 - CTL/ATL use intervals.icu's exponential form: `x_t = x_{t-1}·w + load_t·(1 − w)`, `w = e^(−1/τ)`, τ = 42 / 7. TSB = CTL − ATL (same day). 1/τ (TrainingPeaks) stays available as `Decay.INVERSE_TAU`.
