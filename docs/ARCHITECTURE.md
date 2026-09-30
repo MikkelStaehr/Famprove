@@ -31,9 +31,9 @@ Next.js (web/), server components only
 | `python/tests/` | pytest with synthetic fixtures (`conftest.py` builds a fake workbook and an in-memory PostgREST) and an anonymised real-data slice (`fixtures/blok12_slice.json`: refresh it when a new block starts) |
 | `supabase/migrations/` | Schema, RLS, grants; applied with `supabase db push` |
 | `web/src/lib/db/` | Server-only data layer (`server-only`): `queries.ts` entry points, `postgrest.ts` client, `rows.ts` typed parsers, `dev-fixture.ts` (DEV_FIXTURE, dev only) |
-| `web/src/lib/*.ts` | Pure view models and formatting: `dashboard-view.ts` (/load), `today-view.ts` (/), `zone-scale.ts` (zone-bar drawing scale + sr sentence), `format.ts` (locale da-DK), `dates.ts` |
+| `web/src/lib/*.ts` | Pure view models and formatting: `dashboard-view.ts` (/load), `today-view.ts` (/), `zone-scale.ts` (zone-bar drawing scale, zone swatches and range texts, sr sentence, /load zone reading), `format.ts` (locale da-DK), `dates.ts` |
 | `web/src/app/` | Routes: `page.tsx` (Today), `load/page.tsx`, `layout.tsx` (nav + tick provider) |
-| `web/src/components/` | UI pieces; client components only where needed: `ZoneBar` (form on both screens), `TrendChart`, `ScreenNav`, `TickProvider`, `ExerciseChecklist` (NÆSTE slab) |
+| `web/src/components/` | UI pieces; client components only where needed: `ZoneBar` (form on both screens), `TrendChart` + `ChartSeries` (legend swatches), `LoadExplainer` ("Hvad betyder det?"), `ScreenNav`, `TickProvider`, `ExerciseChecklist` (NÆSTE slab) |
 | `web/tests/` | `node --test` on the pure modules |
 | `DESIGN.md`, `design/` | Visual contract (design-lead), screen specs, pattern packs |
 | `.claude/skills/run-web/` | The only way to run and screenshot the web app (port 3100) |

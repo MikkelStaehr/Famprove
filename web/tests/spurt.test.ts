@@ -185,14 +185,14 @@ test("zone-bar sr sentence per fixture (today.md §5a)", () => {
   assert.equal(zoneSentence(4, "grey_zone"), "Form plus 4 TSS per dag: gråzone, som går fra minus 10 til 5.");
   assert.equal(
     zoneSentence(-45, "high_risk"),
-    "Form minus 45 TSS per dag: høj risiko, under minus 30. Uden for skalaen, som går fra minus 40 til 30.",
+    "Form minus 45 TSS per dag: høj risiko, minus 30 og lavere. Uden for skalaen, som går fra minus 40 til 30.",
   );
   assert.equal(
     zoneSentence(34, "transition"),
-    "Form plus 34 TSS per dag: overgang, over 20. Uden for skalaen, som går fra minus 40 til 30.",
+    "Form plus 34 TSS per dag: overgang, 20 og højere. Uden for skalaen, som går fra minus 40 til 30.",
   );
   assert.equal(zoneSentence(11, "fresh"), "Form plus 11 TSS per dag: frisk, som går fra 5 til 20.");
-  assert.equal(zoneSentence(24, "transition"), "Form plus 24 TSS per dag: overgang, over 20.");
+  assert.equal(zoneSentence(24, "transition"), "Form plus 24 TSS per dag: overgang, 20 og højere.");
   assert.equal(
     zoneSentence(4, "grey_zone", formatDayLong("2026-09-27")),
     "Form plus 4 TSS per dag: gråzone, som går fra minus 10 til 5. Tallet er fra søndag 27. september.",

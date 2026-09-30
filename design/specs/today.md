@@ -168,11 +168,11 @@ Every "Prøv igen" is an in-app navigation (`next/link`, `prefetch={false}`), so
 **ZoneBar sr sentence** (one `sr-only` sentence; numbers written out as words for sign, digits for size):
 | Case | Sentence |
 |---|---|
-| Høj risiko | `Form minus 34 TSS per dag: høj risiko, under minus 30.` |
+| Høj risiko | `Form minus 34 TSS per dag: høj risiko, minus 30 og lavere.` |
 | Optimal | `Form minus 12 TSS per dag: optimal, som går fra minus 30 til minus 10.` |
 | Gråzone | `Form plus 4 TSS per dag: gråzone, som går fra minus 10 til 5.` (0 reads `Form 0 TSS per dag: …`) |
 | Frisk | `Form plus 11 TSS per dag: frisk, som går fra 5 til 20.` |
-| Overgang | `Form plus 24 TSS per dag: overgang, over 20.` |
+| Overgang | `Form plus 24 TSS per dag: overgang, 20 og højere.` |
 | No zone | `Form plus 4 TSS per dag. Zone ikke beregnet.` |
 | Out of range | the zone sentence + ` Uden for skalaen, som går fra minus 40 til 30.` |
 | Not today | any of the above + ` Tallet er fra søndag 27. september.` |

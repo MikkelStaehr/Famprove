@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDay, formatDayLong, formatSigned } from "@/lib/format";
 import type { TodayHeader } from "@/lib/today-view";
-import { BANDS, isZoneKey, pinned, position, THRESHOLDS, type ZoneKey, zoneSentence } from "@/lib/zone-scale";
+import { BANDS, isZoneKey, pinned, position, THRESHOLDS, type ZoneKey, ZONE_FILL, zoneSentence } from "@/lib/zone-scale";
 
 /**
  * DESIGN.md Part B › Zone bar: form (TSB) on the −40 … +30 scale. The active band comes from
@@ -12,14 +12,6 @@ import { BANDS, isZoneKey, pinned, position, THRESHOLDS, type ZoneKey, zoneSente
  */
 
 export type ZoneBarSize = "compact" | "hero";
-
-const ZONE_FILL: Readonly<Record<ZoneKey, string>> = {
-  high_risk: "bg-zone-risk",
-  optimal: "bg-zone-optimal",
-  grey_zone: "bg-zone-grey",
-  fresh: "bg-zone-fresh",
-  transition: "bg-zone-transition",
-};
 
 // slot = flag height + 6px notch, so nothing shifts between loading, no-TSB and loaded.
 const SIZE = {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { BANDS, pinned, position, THRESHOLDS, zoneReading, zoneSentence } from "../src/lib/zone-scale.ts";
+import { BANDS, pinned, position, THRESHOLDS, ZONE_RANGE, zoneReading, zoneSentence } from "../src/lib/zone-scale.ts";
 
 const FORM_PY = readFileSync(
   new URL("../../python/src/training_load/domain/form.py", import.meta.url),
@@ -53,14 +53,14 @@ test("off-scale values pin the marker to the end but keep their own number", () 
 
 test("zoneSentence reads the zone from form_zone and writes the sign out", () => {
   assert.equal(zoneSentence(4, "grey_zone"), "Form plus 4 TSS per dag: gråzone, som går fra minus 10 til 5.");
-  assert.equal(zoneSentence(-34, "high_risk"), "Form minus 34 TSS per dag: høj risiko, under minus 30.");
+  assert.equal(zoneSentence(-34, "high_risk"), "Form minus 34 TSS per dag: høj risiko, minus 30 og lavere.");
   assert.equal(zoneSentence(0.2, "grey_zone"), "Form 0 TSS per dag: gråzone, som går fra minus 10 til 5.");
   assert.equal(zoneSentence(4, null), "Form plus 4 TSS per dag. Zone ikke beregnet.");
   // The zone comes from Python, even when it disagrees with the drawing thresholds.
   assert.equal(zoneSentence(24, "fresh"), "Form plus 24 TSS per dag: frisk, som går fra 5 til 20.");
   assert.equal(
     zoneSentence(-46, "high_risk", "søndag 27. september"),
-    "Form minus 46 TSS per dag: høj risiko, under minus 30. Uden for skalaen, som går fra minus 40 til 30. Tallet er fra søndag 27. september.",
+    "Form minus 46 TSS per dag: høj risiko, minus 30 og lavere. Uden for skalaen, som går fra minus 40 til 30. Tallet er fra søndag 27. september.",
   );
 });
 
@@ -76,4 +76,19 @@ test("zoneReading gives load.md §8a's sentence per form_zone, from the key only
   for (const [zone, sentence] of cases) assert.equal(zoneReading(zone), sentence, String(zone));
   // An unknown key is not a zone: the same "can't interpret" sentence, never a guess.
   assert.equal(zoneReading("peaking"), zoneReading(null));
+});
+
+test("zone range texts follow THRESHOLDS and form.py's inclusivity", () => {
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(ZONE_RANGE).map(([k, r]) => [k, r.visible])),
+    {
+      high_risk: "\u221230 og lavere",
+      optimal: "over \u221230 til og med \u221210",
+      grey_zone: "over \u221210 til under 5",
+      fresh: "5 til under 20",
+      transition: "20 og højere",
+    },
+  );
+  assert.equal(ZONE_RANGE.optimal.spoken, "over minus 30 til og med minus 10");
+  assert.deepEqual(THRESHOLDS, [-30, -10, 5, 20]);
 });

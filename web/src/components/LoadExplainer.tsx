@@ -1,4 +1,5 @@
-import type { ZoneKey } from "@/lib/zone-scale";
+import { FORM_ZONE_DISPLAY } from "@/lib/dashboard-view";
+import { ZONE_FILL, ZONE_RANGE, type ZoneKey } from "@/lib/zone-scale";
 
 import { LineSample, SERIES, type SeriesKey } from "./ChartSeries";
 
@@ -16,58 +17,24 @@ const LINE_TEXT: Readonly<Record<SeriesKey, string>> = {
 const METHOD_NOTE =
   "Belastning er TSS pr. dag fra cykling og styrke tilsammen. Fitness og træthed er vægtede gennemsnit: de nyeste dage tæller mest, og ældre dage fylder gradvist mindre uden at forsvinde helt. Tidskonstanterne er 42 og 7 dage, samme formel som intervals.icu.";
 
-type ZoneItem = {
-  readonly key: ZoneKey;
-  readonly name: string;
-  readonly swatch: string; // Tailwind bg-* utility for the --zone-* token
-  readonly range: string; // visible, U+2212 minus
-  readonly spoken: string; // sr-only twin, "minus" written out
-  readonly text: string;
-};
-
-/** Scale order, low to high. Boundaries as form.py: −30 and −10 belong low, 5 and 20 high. */
-const ZONES: readonly ZoneItem[] = [
-  {
-    key: "high_risk",
-    name: "Høj risiko",
-    swatch: "bg-zone-risk",
-    range: "−30 og lavere",
-    spoken: "minus 30 og lavere",
-    text: "Træthed langt over fitness. Risiko for overbelastning og sygdom, så læg lette dage ind.",
-  },
-  {
-    key: "optimal",
-    name: "Optimal",
-    swatch: "bg-zone-optimal",
-    range: "over −30 til og med −10",
-    spoken: "over minus 30 til og med minus 10",
-    text: "Træt nok til at bygge fitness uden at køre dig selv ned. Her skal en god træningsblok ligge.",
-  },
-  {
-    key: "grey_zone",
-    name: "Gråzone",
-    swatch: "bg-zone-grey",
-    range: "over −10 til under 5",
-    spoken: "over minus 10 til under 5",
-    text: "Hverken træt nok til at bygge fitness eller frisk nok til at præstere.",
-  },
-  {
-    key: "fresh",
-    name: "Frisk",
-    swatch: "bg-zone-fresh",
-    range: "5 til under 20",
-    spoken: "5 til under 20",
-    text: "Udhvilet og klar til at præstere, fx til løb eller test. Fitness bygges ikke op.",
-  },
-  {
-    key: "transition",
-    name: "Overgang",
-    swatch: "bg-zone-transition",
-    range: "20 og højere",
-    spoken: "20 og højere",
-    text: "Så frisk, at fitness falder. Fint i en pause mellem sæsoner, ellers er det tid til at træne mere.",
-  },
+/** What each zone means for training (spec load.md §8b); names, swatches and ranges come from their owners. */
+const ZONE_TEXT: readonly (readonly [ZoneKey, string])[] = [
+  ["high_risk", "Træthed langt over fitness. Risiko for overbelastning og sygdom, så læg lette dage ind."],
+  ["optimal", "Træt nok til at bygge fitness uden at køre dig selv ned. Her skal en god træningsblok ligge."],
+  ["grey_zone", "Hverken træt nok til at bygge fitness eller frisk nok til at præstere."],
+  ["fresh", "Udhvilet og klar til at præstere, fx til løb eller test. Fitness bygges ikke op."],
+  ["transition", "Så frisk, at fitness falder. Fint i en pause mellem sæsoner, ellers er det tid til at træne mere."],
 ];
+
+/** Scale order, low to high. */
+const ZONES = ZONE_TEXT.map(([key, text]) => ({
+  key,
+  name: FORM_ZONE_DISPLAY[key]?.label ?? key,
+  swatch: ZONE_FILL[key],
+  range: ZONE_RANGE[key].visible,
+  spoken: ZONE_RANGE[key].spoken,
+  text,
+}));
 
 export function LoadExplainer() {
   return (

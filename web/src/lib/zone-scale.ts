@@ -54,6 +54,39 @@ export const BANDS: readonly Band[] = LOWERS.map(([key, lower], i) => {
 /** The threshold numbers printed under the bar: −30, −10, 5, 20. */
 export const THRESHOLDS: readonly number[] = BANDS.flatMap((b) => (b.lower === null ? [] : [b.lower]));
 
+/** Tailwind fill utility per zone (the --zone-* tokens), shared by ZoneBar and the /load explainer. */
+export const ZONE_FILL: Readonly<Record<ZoneKey, string>> = {
+  high_risk: "bg-zone-risk",
+  optimal: "bg-zone-optimal",
+  grey_zone: "bg-zone-grey",
+  fresh: "bg-zone-fresh",
+  transition: "bg-zone-transition",
+};
+
+/**
+ * Each zone's range in words, built from THRESHOLDS so it can't drift from form.py (the sync
+ * test guards THRESHOLDS). Inclusivity as form.py: −30 and −10 belong to the lower zone, 5 and
+ * 20 to the higher. `visible` uses U+2212; `spoken` writes "minus" out for screen readers.
+ */
+export const ZONE_RANGE: Readonly<Record<ZoneKey, { readonly visible: string; readonly spoken: string }>> =
+  (() => {
+    const [risk, optimal, fresh, transition] = THRESHOLDS as readonly [number, number, number, number];
+    const words = (sign: (n: number) => string) => ({
+      high_risk: `${sign(risk)} og lavere`,
+      optimal: `over ${sign(risk)} til og med ${sign(optimal)}`,
+      grey_zone: `over ${sign(optimal)} til under ${sign(fresh)}`,
+      fresh: `${sign(fresh)} til under ${sign(transition)}`,
+      transition: `${sign(transition)} og højere`,
+    });
+    const visible = words((n) => (n < 0 ? `\u2212${-n}` : `${n}`));
+    const spoken = words((n) => (n < 0 ? `minus ${-n}` : `${n}`));
+    const keys = Object.keys(visible) as ZoneKey[];
+    return Object.fromEntries(keys.map((k) => [k, { visible: visible[k], spoken: spoken[k] }])) as Record<
+      ZoneKey,
+      { readonly visible: string; readonly spoken: string }
+    >;
+  })();
+
 /** A TSB number written out for screen readers: 4 -> "plus 4", −12 -> "minus 12", 0 -> "0". */
 function spokenSigned(value: number): string {
   const rounded = Math.round(value);
@@ -64,11 +97,11 @@ function spokenSigned(value: number): string {
 
 /** Each band's name and range as spoken (design/specs/today.md §5a, ZoneBar sr sentence). */
 const SPOKEN_BAND: Readonly<Record<ZoneKey, string>> = {
-  high_risk: "høj risiko, under minus 30",
+  high_risk: "høj risiko, minus 30 og lavere",
   optimal: "optimal, som går fra minus 30 til minus 10",
   grey_zone: "gråzone, som går fra minus 10 til 5",
   fresh: "frisk, som går fra 5 til 20",
-  transition: "overgang, over 20",
+  transition: "overgang, 20 og højere",
 };
 
 export function isZoneKey(key: string | null): key is ZoneKey {
