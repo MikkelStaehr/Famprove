@@ -2,7 +2,7 @@
 
 Owner: design-lead · 2026-09-28, session numbering 2026-09-30 (§3a, §8), **Spurt applied 2026-09-30** (the former DESIGN.md "Overrides" are folded in here) · for `ui`. Contract: `DESIGN.md` Part A (guardrails) and Part B (Spurt: tokens, type, NÆSTE slab, segmented progress, ZoneBar). `/load` has its own spec-lite: `design/specs/load.md`.
 
-**Language:** all UI copy is Danish (§5a). Never translate exercise names, sheet cells, block tab names, activity/ride names, step labels from `planned_sessions`, Python `problem` strings, or TSS / W / FTP / CTL / ATL / TSB. Formats: dates `ons. 30. sep.`, times `kl. 05.03`, decimal comma (`62,5 kg`), U+2212 minus, en-dash ranges without spaces (`225–250 W`). `<html lang="da">`.
+**Language:** all UI copy is Danish (§5a). Never translate exercise names, sheet cells, block tab names, activity/ride names, step labels from `planned_sessions`, Python `problem` strings, or TSS / W / FTP / CTL / ATL / TSB. Formats: dates `ons. 30. sep.` (weekday abbreviations as Intl `da-DK` writes them, which match Retskrivningsordbogen: `man. tirs. ons. tors. fre. lør. søn.`; no override), times `kl. 05.03`, decimal comma (`62,5 kg`), U+2212 minus, en-dash ranges without spaces (`225–250 W`). `<html lang="da">`.
 
 ## 1. Question and primary action
 - **Question:** "What am I doing in this session, and how hard?"
@@ -67,7 +67,7 @@ Ride card(s) planned for today, then the Strength card (always; with N = 0 it sh
 ### Rest card (`Card id="rest"`)
 Depends on rides and strength *activities* only, never strength dates.
 - **Title:** "Hviledag", or "Færdig for i dag" when a strength activity was logged today (`text-32` display). Body `text-20`: "Intet planlagt i dag." / "Ikke mere planlagt i dag."
-- "Næste tur" (`text-14` 700 uppercase muted), date `text-20` 700 ("I morgen · tor. 1. okt." or "søn. 4. okt."), name `text-16`.
+- "Næste tur" (`text-14` 700 uppercase muted), date `text-20` 700 ("I morgen · tors. 1. okt." or "søn. 4. okt."), name `text-16`.
 - None within 28 days: `EmptyState` per §5a.
 
 ## 3a. Strength sessions per ISO week
@@ -75,7 +75,7 @@ Rule: the sheet defines sessions 1..N per ISO week (Mon–Sun). The n-th strengt
 
 **Done list** (only when k ≥ 1; `<ul aria-label="Udført i denne uge">`, `text-16`, gap 4px, 1px `--border` divider below). Each line starts with a **20px `--slab` circle with a `--slab-mark` ✓** (same language as a ticked check: done = slab; no `--positive` on Today), in start-time order:
 - `Session 1 udført i dag · Styrke 1:12:48` (activity name as logged, moving time h:mm:ss)
-- `Session 1 udført tir. 29. sep. · Styrke 1:12:48`
+- `Session 1 udført tirs. 29. sep. · Styrke 1:12:48`
 - n > N: `Ekstra session udført i dag · Styrke 0:45:10 · ikke i programmet`
 - Null/blank name or null moving time: drop it and its space; both missing drops the whole "· name time" segment. Never a placeholder.
 
@@ -137,7 +137,7 @@ Every "Prøv igen" is an in-app navigation (`next/link`, `prefetch={false}`), so
 | `describeDataError` | `Serveren mangler sine databaseindstillinger.` · `Læsning af {table} fra databasen mislykkedes.` · `Databasen returnerede data i et uventet format.` |
 | Retry | `Prøv igen` |
 | Strength | `Styrke` · `0 af 11 udført` · `Alle 11 udført` · `Session 2 af 3 i denne uge` · `… · uge 1` · `Næste` |
-| Done list | `Udført i denne uge` (aria) · `Session 1 udført i dag` · `Session 1 udført tir. 29. sep.` · `Ekstra session udført i dag` · `ikke i programmet` |
+| Done list | `Udført i denne uge` (aria) · `Session 1 udført i dag` · `Session 1 udført tirs. 29. sep.` · `Ekstra session udført i dag` · `ikke i programmet` |
 | Week-1 note | `Uge 1 i blokken: ingen kg fra sidste uge at sammenligne med endnu.` |
 | Reference | `Sidste uge 100 kg` · `kropsvægt` · `kropsvægt + 10 kg` · `Intet logget sidste uge` |
 | Counts | `10 - 15 reps` · `2 sæt` · `1 sæt` |
@@ -145,7 +145,7 @@ Every "Prøv igen" is an in-app navigation (`next/link`, `prefetch={false}`), so
 | States (c)/(d) | see §3a table |
 | Ride | `Cykel` · `I alt 1:15 t` · `Mål ud fra FTP 250 W` · `Trin` (aria) · `Gentag 4 gange` / `Gentag 1 gang` · `Tur uden navn` |
 | Ride gaps | `Ingen FTP fra intervals.icu, så målene står kun i % FTP.` · `Kunne ikke læse trinene, så der vises ingen mål. Ret dem i planned_sessions ({problem}).` · `Der er ikke indtastet trin for denne tur.` |
-| Rest | `Hviledag` · `Færdig for i dag` · `Intet planlagt i dag.` · `Ikke mere planlagt i dag.` · `Næste tur` · `I morgen · tor. 1. okt.` · `Ingen tur planlagt de næste 28 dage. Ture kommer fra planned_sessions.` |
+| Rest | `Hviledag` · `Færdig for i dag` · `Intet planlagt i dag.` · `Ikke mere planlagt i dag.` · `Næste tur` · `I morgen · tors. 1. okt.` · `Ingen tur planlagt de næste 28 dage. Ture kommer fra planned_sessions.` |
 | Row sr name | `Squat, 1 sæt af 3 reps ved RPE 5, sidste uge 100 kg` (+ `, næste`); `8 til 12 reps`, `RPE 6 til 7` |
 
 **ZoneBar sr sentence** (one `sr-only` sentence; numbers written out as words for sign, digits for size):
@@ -186,7 +186,7 @@ Every "Prøv igen" is an in-app navigation (`next/link`, `prefetch={false}`), so
 18. At 200% text on 390px: no horizontal scroll; the prescription wraps in its column; the zone-bar label line wraps.
 19. Both themes: text ≥ 4.5:1; check ring, repeat rule and zone marker ≥ 3:1.
 20. With `prefers-reduced-motion: reduce`, ticking changes state with no transition and no press scale.
-21. Wed 30 Sept 2026 (week 40, N = 3, Styrke Tue 29 Sept, no ride): "Session 1 udført tir. 29. sep. · Styrke 1:12:48" (slab circle with ✓), then "Session 2 af 3 i denne uge" and session 2's exercises; no Rest card.
+21. Wed 30 Sept 2026 (week 40, N = 3, Styrke Tue 29 Sept, no ride): "Session 1 udført tirs. 29. sep. · Styrke 1:12:48" (slab circle with ✓), then "Session 2 af 3 i denne uge" and session 2's exercises; no Rest card.
 22. A strength activity logged today shows "Session n udført i dag · {name} {h:mm:ss}" above the next session or the all-done text.
 23. k ≥ N > 0: "Alle N sessioner er udført i denne uge." + "Næste uges session 1 vises her fra man. {date}.", no list, no progress. N = 0: "Intet styrkeprogram i denne uge." Beyond N: "Ekstra session udført … · ikke i programmet".
 24. `/load` week table per §8.

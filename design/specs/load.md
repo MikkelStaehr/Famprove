@@ -37,7 +37,7 @@ Owner: design-lead · 2026-09-30 · for `ui`. Contract: `DESIGN.md` Part A + Par
 | Tooltip | `ons. 30. sep.` · `Fitness (CTL) 45` · `Træthed (ATL) 41` · `Form (TSB) +4` · `Program - blok 12 (offseason)` (as written) + ` · deload` in a deload week |
 | Chart empty | `Trenden vises, når der er mindst to dages træningsbelastning.` |
 | Chart error | title `Grafen kan ikke vises`, `Grafen kunne ikke tegnes. Tallene ovenfor er ikke berørt.` + `Prøv igen` |
-| Chart sr text | `Daglig fitness (CTL), træthed (ATL) og form (TSB) i TSS/dag fra tor. 1. jan. til ons. 30. sep.` · `Den ons. 30. sep.: fitness 45, træthed 41, form +4.` · `Fitness ændrede sig med +3 over de sidste 7 dage.` · `Styrkeblok 12: fra 14. sep., igangværende, deload-uge fra 5. okt.` · `Ingen styrkeblokke i perioden.` |
+| Chart sr text | `Daglig fitness (CTL), træthed (ATL) og form (TSB) i TSS/dag fra tors. 1. jan. til ons. 30. sep.` · `Den ons. 30. sep.: fitness 45, træthed 41, form +4.` · `Fitness ændrede sig med +3 over de sidste 7 dage.` · `Styrkeblok 12: fra 14. sep., igangværende, deload-uge fra 5. okt.` · `Ingen styrkeblokke i perioden.` |
 | Chart sr table (if a table is used) | caption `Fitness, træthed og form pr. dag`; columns `Dato` · `Fitness (CTL)` · `Træthed (ATL)` · `Form (TSB)` · `Styrkeblok` |
 
 **Hero sr sentence** (one `sr-only` sentence, the same component and wording as Today §5a):

@@ -163,7 +163,7 @@ Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the
 | `--on-slab-muted` | `#bdbdbd` | `#3d4a0f` | secondary text on slab: 10.0 / 8.3:1 |
 | `--slab-mark` | `#d4ff3a` | `#121212` | ✓ in a ticked check, the check ring on the NÆSTE row, the NÆSTE tag fill: 16.2:1 against `--slab` |
 | `--focus` | `#121212` | `#d4ff3a` | 3px outline, 3px offset: 16.1 / 15.3:1 on bg/surface |
-| `--positive` / `--warning` / `--negative` | `#18743a` / `#8a4f00` / `#b42318` | `#4ade9a` / `#f5c451` / `#ff7b7b` | status text (fitness delta, stale line, errors), always with words or an icon. Light ≥ 5.0:1 on bg; dark ≥ 6.4:1 on bg, surface and block fill |
+| `--positive` / `--warning` / `--negative` | `#18743a` / `#8a4f00` / `#b42318` | `#4ade9a` / `#f5c451` / `#ff7b7b` | status text (stale line, errors), always with words or an icon. The `/load` fitness delta stays `--text` (neutral): a falling CTL in a deload week is planned, so red/green would judge what the data can't; the arrow + words carry direction. Light ≥ 5.0:1 on bg; dark ≥ 6.4:1 on bg, surface and block fill |
 | `--series-ctl` | `#121212` solid 2.5px | `#eef1f5` solid 2.5px | fitness: the line the question is about, so it gets the ink |
 | `--series-atl` | `#595959` dashed 2px (6 4) | `#9ba6b4` dashed 2px | fatigue. 6.0 / 6.5:1 on block fill |
 | `--series-tsb` | `#1f5bd0` dotted 2px (round caps) | `#7aa7ff` dotted 2px | form, the chart's only hue. 5.2 / 6.7:1 on block fill |
