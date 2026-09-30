@@ -20,6 +20,7 @@ from conftest import (
 from training_load.cli import collect_strength, compute
 from training_load.config import GoogleSettings
 from training_load.db.activities import upsert_activities
+from training_load.db.strength_activities import upsert_strength_activities
 from training_load.domain.load import ctl_atl
 from training_load.sources.google_drive import GOOGLE_SHEET_MIME, XLSX_MIME
 from training_load.sources.intervals import parse_activities
@@ -53,6 +54,9 @@ def test_collect_strength_exports_parses_and_replaces(
         written = collect_strength.run(GOOGLE, bodyweight=SYNTHETIC_BODYWEIGHT, send=send, db=db)
     assert written == 55
     assert len(db.tables["strength_sets"]) == 55
+    tempo = next(r for r in db.tables["strength_sets"] if r["name"] == "Tempo bench")
+    assert (tempo["week_start"], tempo["session"]) == ("2026-02-02", 2)
+    assert "date" not in tempo
     assert send.calls[1].url.endswith(f"/files/{SYNTHETIC_SHEET_ID}{path_suffix}")
 
 
@@ -68,8 +72,13 @@ def test_compute_rebuilds_daily_load_and_blocks(
     rides = [
         raw_ride("i1", "2026-01-01T18:00:00", load=100),
         raw_ride("i2", "2026-02-05T07:00:00", load=60),
+        # Week of 2026-02-02: sessions 1 and 2 are done on Tue and Thu, whatever the sheet says.
+        raw_ride("g1", "2026-02-03T19:00:00", load=19, kind="WeightTraining"),
+        raw_ride("g2", "2026-02-05T19:00:00", load=17, kind="WeightTraining"),
     ]
-    upsert_activities(db, parse_activities(rides).cycling)
+    parsed = parse_activities(rides)
+    upsert_activities(db, parsed.cycling)
+    upsert_strength_activities(db, parsed.strength)
     db.tables["daily_load"] = [{"date": "2025-12-31"}]  # stale row outside the range
 
     run_at = datetime(2026, 3, 15, 3, 0, tzinfo=UTC)
@@ -84,6 +93,11 @@ def test_compute_rebuilds_daily_load_and_blocks(
     jan1_ctl, jan8_ctl = rows["2026-01-01"]["ctl"], rows["2026-01-08"]["ctl"]
     assert isinstance(jan1_ctl, float) and isinstance(jan8_ctl, float)
     assert rows["2026-01-08"]["ctl_ramp_7d"] == pytest.approx(jan8_ctl - jan1_ctl)
+    assert rows["2026-02-02"]["strength_tss"] == 0.0  # the sheet's DAY 1 date: no activity
+    assert rows["2026-02-03"]["strength_tss"] == pytest.approx(
+        (3 * 336.8 + 3 * 264.6 + 2 * 72.0 + 3 * 86.4) * 0.02
+    )
+    assert rows["2026-02-03"]["cycling_tss"] == 0.0  # WeightTraining load never counts as cycling
     feb5 = rows["2026-02-05"]
     assert feb5["cycling_tss"] == 60.0
     assert feb5["strength_tss"] == pytest.approx((3 * 90.7 + 3 * 307.2) * 0.02)
@@ -92,6 +106,18 @@ def test_compute_rebuilds_daily_load_and_blocks(
         (BLOK_11, "2026-02-02"),
         (BLOK_12, None),  # week 2 has kg but starts after today
     }
+    assert (summary.sessions_done, summary.extra_sessions) == (2, 0)
+    first_week = {
+        r["session"]: r["date"]
+        for r in db.tables["strength_sessions"]
+        if r["week_start"] == "2026-02-02"
+    }
+    assert first_week == {1: "2026-02-03", 2: "2026-02-05"}
+
+    before = {t: sorted(map(str, db.tables[t])) for t in ("daily_load", "strength_sessions")}
+    compute.run(db, strength_k=0.02, today=FIXED_TODAY, computed_at=run_at)
+    after = {t: sorted(map(str, db.tables[t])) for t in ("daily_load", "strength_sessions")}
+    assert before == after  # idempotent
 
 
 def ok_set(**overrides: object) -> ParsedSet:
@@ -100,6 +126,7 @@ def ok_set(**overrides: object) -> ParsedSet:
         "block": BLOK_11,
         "row": 9,
         "week": 1,
+        "section": 1,
         "type": "SQUAT",
         "name": "Squat",
         "set": 1,

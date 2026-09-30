@@ -15,6 +15,7 @@ from typing import Final
 from urllib.parse import quote
 
 from training_load.domain.cycling import CyclingActivity, is_cycling
+from training_load.domain.sessions import StrengthActivity, is_strength
 from training_load.http import HttpSend, request
 from training_load.narrow import (
     json_objects,
@@ -36,11 +37,13 @@ type RawActivity = Mapping[str, object]
 @dataclass(frozen=True, slots=True)
 class ParsedActivities:
     cycling: list[CyclingActivity]
+    strength: list[StrengthActivity]
+    """WeightTraining activities: they date the sheet's strength sessions."""
     stub_ids: list[str]
     """Strava-sourced stubs (source == "STRAVA", no type/load): skipped, logged as a warning,
     and never mirror-deleted."""
     excluded_types: Counter[str]
-    """Non-cycling activities by type (WeightTraining, Run, ...), for the run log."""
+    """Activities that are neither cycling nor strength, by type (Run, Walk, ...), for the log."""
     missing_load_ids: list[str]
     """Cycling activities with icu_training_load null: kept (load counts as 0), logged."""
 
@@ -87,15 +90,16 @@ def fetch_activities(
 
 
 def parse_activities(raw: Sequence[RawActivity]) -> ParsedActivities:
-    """Split raw activities into cycling / stubs / excluded, mapping fields:
+    """Split raw activities into cycling / strength / stubs / excluded, mapping fields:
 
     id, start_date_local ("YYYY-MM-DDTHH:MM:SS", naive), type, name, icu_training_load,
     icu_weighted_avg_watts, icu_intensity (percent, stored as-is), icu_ftp, moving_time,
     elapsed_time, power_load, hr_load, device_name.
-    A stub is an object with no "type" (typically source == "STRAVA").
+    A stub is an object with no "type" (typically source == "STRAVA"). Strength activities
+    keep id, start_date_local, type, name, moving/elapsed time, icu_training_load, device_name.
     """
     parsed = ParsedActivities(
-        cycling=[], stub_ids=[], excluded_types=Counter(), missing_load_ids=[]
+        cycling=[], strength=[], stub_ids=[], excluded_types=Counter(), missing_load_ids=[]
     )
     for obj in raw:
         activity_type = obj.get("type")
@@ -104,6 +108,20 @@ def parse_activities(raw: Sequence[RawActivity]) -> ParsedActivities:
             continue
         if not isinstance(activity_type, str):
             raise ValueError("intervals.icu activity: field 'type' must be a string")
+        if is_strength(activity_type):
+            parsed.strength.append(
+                StrengthActivity(
+                    id=req_str(obj, "id"),
+                    start_date_local=req_naive_datetime(obj, "start_date_local"),
+                    type=activity_type,
+                    name=opt_str(obj, "name"),
+                    moving_time_s=opt_int(obj, "moving_time"),
+                    elapsed_time_s=opt_int(obj, "elapsed_time"),
+                    training_load=opt_int(obj, "icu_training_load"),
+                    device_name=opt_str(obj, "device_name"),
+                )
+            )
+            continue
         if not is_cycling(activity_type):
             parsed.excluded_types[activity_type] += 1
             continue

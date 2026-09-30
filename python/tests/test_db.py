@@ -6,11 +6,19 @@ from datetime import UTC, date, datetime
 import pytest
 
 from conftest import Call, FakeResponse, FakeSend, InMemoryPostgrest
-from training_load.db import activities, blocks, daily_load, strength_sets
+from training_load.db import (
+    activities,
+    blocks,
+    daily_load,
+    strength_activities,
+    strength_sessions,
+    strength_sets,
+)
 from training_load.db.client import EmptyFilterError, Postgrest, auth_headers
 from training_load.db.strength_sets import EmptyReplaceError
 from training_load.domain.cycling import CyclingActivity
 from training_load.domain.daily import build_daily_load
+from training_load.domain.sessions import StrengthActivity, StrengthSession
 from training_load.domain.strength import Block, StrengthSet
 
 MakeSet = Callable[..., StrengthSet]
@@ -130,3 +138,29 @@ def test_from_row_rejects_mistyped_column(make_set: MakeSet) -> None:
     row["bodyweight"] = "yes"
     with pytest.raises(ValueError, match="bodyweight"):
         strength_sets.from_row(row)
+
+
+def test_strength_activity_round_trip_and_window_delete(db: InMemoryPostgrest) -> None:
+    lift = StrengthActivity(
+        "i9", datetime(2026, 9, 29, 10, 35), "WeightTraining", "Styrke", 4368, 4400, 22, "fenix 6"
+    )
+    assert strength_activities.from_row(dict(strength_activities.to_row(lift))) == lift
+    strength_activities.upsert_strength_activities(db, [lift, lift])
+    assert strength_activities.all_strength_activities(db) == [lift]
+    assert strength_activities.ids_between(db, date(2026, 9, 29), date(2026, 9, 29)) == {"i9"}
+    strength_activities.delete_ids(db, {"i9"})
+    assert db.tables["strength_activities"] == []
+    assert db.tables["activities"] == []  # never touches the rides table
+
+
+def test_sync_strength_sessions_upserts_and_prunes(db: InMemoryPostgrest) -> None:
+    week = date(2026, 9, 28)
+    done = StrengthSession(
+        week, 1, "s", "Program - blok 12", 1, "i1", date(2026, 9, 29), "Styrke", 4368, 50.0
+    )
+    planned = StrengthSession(week, 2, "s", "Program - blok 12", 1, None, None, None, None, 0.0)
+    strength_sessions.sync_strength_sessions(db, [done, planned])
+    # The activity is deleted upstream: session 1 loses its date, session 2 disappears.
+    undone = StrengthSession(week, 1, "s", "Program - blok 12", 1, None, None, None, None, 0.0)
+    strength_sessions.sync_strength_sessions(db, [undone])
+    assert db.tables["strength_sessions"] == [dict(strength_sessions.to_row(undone))]

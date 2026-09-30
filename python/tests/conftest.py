@@ -120,7 +120,7 @@ def _write_tab(
             ws.append(row)
 
 
-def build_workbook() -> bytes:
+def build_workbook(blok_11_sections: Sequence[Section] = BLOK_11_SECTIONS) -> bytes:
     wb = openpyxl.Workbook()
     overview = wb.active
     assert overview is not None
@@ -129,7 +129,7 @@ def build_workbook() -> bytes:
     _write_tab(
         wb.create_sheet(BLOK_11),
         {"SQUAT": 150.0, "BENCH": 100.0, "DEADLIFT": 180.0},
-        BLOK_11_SECTIONS,
+        blok_11_sections,
         n_weeks=3,
     )
     _write_tab(wb.create_sheet(BLOK_12), {"SQUAT": 160.0}, BLOK_12_SECTIONS, n_weeks=2)
@@ -150,7 +150,8 @@ _DEFAULT_SET = StrengthSet(
     sheet_row=10,
     week=1,
     set_no=1,
-    date=date(2026, 2, 2),
+    week_start=date(2026, 2, 2),
+    session=1,
     type="SQUAT",
     name="Squat",
     reps=5.0,
@@ -270,6 +271,8 @@ class FakeSend:
 PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "activities": ("id",),
     "strength_sets": ("sheet_id", "block", "sheet_row", "week", "set_no"),
+    "strength_activities": ("id",),
+    "strength_sessions": ("week_start", "session"),
     "blocks": ("sheet_id", "name"),
     "daily_load": ("date",),
     "planned_sessions": ("date", "name"),

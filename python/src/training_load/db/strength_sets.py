@@ -29,7 +29,8 @@ class StrengthSetRow(TypedDict):
     sheet_row: int
     week: int
     set_no: int
-    date: str  # ISO date
+    week_start: str  # ISO date, a Monday
+    session: int
     type: str
     name: str
     reps: float
@@ -53,7 +54,8 @@ def to_row(s: StrengthSet) -> StrengthSetRow:
         sheet_row=s.sheet_row,
         week=s.week,
         set_no=s.set_no,
-        date=s.date.isoformat(),
+        week_start=s.week_start.isoformat(),
+        session=s.session,
         type=s.type,
         name=s.name,
         reps=s.reps,
@@ -76,7 +78,8 @@ def from_row(row: JsonRow) -> StrengthSet:
         sheet_row=req_int(row, "sheet_row"),
         week=req_int(row, "week"),
         set_no=req_int(row, "set_no"),
-        date=req_date(row, "date"),
+        week_start=req_date(row, "week_start"),
+        session=req_int(row, "session"),
         type=req_str(row, "type"),
         name=req_str(row, "name"),
         reps=req_float(row, "reps"),

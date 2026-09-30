@@ -76,13 +76,14 @@ def upsert_activities(db: Postgrest, activities: Sequence[CyclingActivity]) -> N
         db.upsert(TABLE, [to_row(a) for a in activities], on_conflict="id")
 
 
-def ids_between(db: Postgrest, first_day: date, last_day: date) -> set[str]:
-    """Ids with first_day <= start_date_local.date() <= last_day.
+def ids_between(db: Postgrest, first_day: date, last_day: date, *, table: str = TABLE) -> set[str]:
+    """Ids with first_day <= start_date_local.date() <= last_day, in ``table`` (activities or
+    strength_activities: same id and start_date_local columns).
 
     Filters: start_date_local=gte.{first_day}T00:00:00 and lt.{last_day + 1}T00:00:00.
     """
     rows = db.select(
-        TABLE,
+        table,
         columns="id",
         order="id",
         filters=[
@@ -93,14 +94,14 @@ def ids_between(db: Postgrest, first_day: date, last_day: date) -> set[str]:
     return {req_str(row, "id") for row in rows}
 
 
-def delete_ids(db: Postgrest, ids: Collection[str]) -> None:
+def delete_ids(db: Postgrest, ids: Collection[str], *, table: str = TABLE) -> None:
     """DELETE id=in.(...) in chunks (ids are URL-safe, e.g. i55751783). No-op when empty."""
     ordered = sorted(ids)
     for bad in (i for i in ordered if not _SAFE_ID.match(i)):
         raise ValueError(f"refusing to delete by unexpected activity id {bad!r}")
     for start in range(0, len(ordered), DELETE_CHUNK):
         chunk = ordered[start : start + DELETE_CHUNK]
-        db.delete(TABLE, [("id", f"in.({','.join(chunk)})")])
+        db.delete(table, [("id", f"in.({','.join(chunk)})")])
 
 
 def all_activities(db: Postgrest) -> list[CyclingActivity]:

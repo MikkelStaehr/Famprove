@@ -2,7 +2,7 @@
 
 import base64
 import logging
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -56,8 +56,16 @@ def test_parse_splits_cycling_stubs_and_excluded_types() -> None:
         ]
     )
     assert [a.id for a in parsed.cycling] == ["i1", "i2"]
+    assert [a.id for a in parsed.strength] == ["i3"]
     assert parsed.stub_ids == ["12345678"]
-    assert parsed.excluded_types == {"WeightTraining": 1, "Run": 1}
+    assert parsed.excluded_types == {"Run": 1}
+
+
+def test_parse_maps_strength_activity_fields() -> None:
+    lift = raw_ride("i3", "2026-09-29T10:35:00", load=22, kind="WeightTraining")
+    [activity] = parse_activities([lift]).strength
+    assert (activity.name, activity.moving_time_s, activity.training_load) == ("Zwift", 3600, 22)
+    assert activity.start_date_local == datetime(2026, 9, 29, 10, 35)
 
 
 def test_parse_keeps_ride_with_null_load_and_reports_it() -> None:
@@ -93,6 +101,10 @@ def test_run_upserts_and_mirrors_deletions_only_inside_window(
         {"id": "i_gone", "start_date_local": "2026-03-05T07:00:00"},  # deleted upstream
         {"id": "12345678", "start_date_local": "2026-03-10T07:00:00"},  # stub id: never deleted
     ]
+    db.tables["strength_activities"] = [
+        {"id": "i_lift_old", "start_date_local": "2026-02-01T07:00:00"},  # outside window: kept
+        {"id": "i_lift_gone", "start_date_local": "2026-03-06T19:00:00"},  # deleted upstream
+    ]
     send = FakeSend(
         FakeResponse(
             body=[
@@ -107,8 +119,9 @@ def test_run_upserts_and_mirrors_deletions_only_inside_window(
 
     assert send.calls[0].params == [("oldest", "2026-02-28"), ("newest", "2026-03-16")]
     assert {r["id"] for r in db.tables["activities"]} == {"i_old", "12345678", "i_new"}
-    assert (summary.fetched, summary.upserted, summary.deleted) == (3, 1, 1)
-    assert (summary.stubs_skipped, summary.excluded) == (1, 1)
+    assert {r["id"] for r in db.tables["strength_activities"]} == {"i_lift_old", "i_gym"}
+    assert (summary.fetched, summary.upserted, summary.strength_upserted) == (3, 1, 1)
+    assert (summary.deleted, summary.stubs_skipped, summary.excluded) == (2, 1, 0)
     assert "1 Strava-sourced activities skipped" in caplog.text
     assert "12345678" not in caplog.text  # counts only: the Actions logs are public
 

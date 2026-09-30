@@ -6,7 +6,8 @@ from datetime import date, datetime
 from typing import Final
 
 CYCLING_TYPES: Final = frozenset({"Ride", "VirtualRide"})
-"""Agreed decision: everything else (incl. Garmin-synced WeightTraining) is excluded."""
+"""Agreed decision: only these reach cycling TSS. WeightTraining dates strength sessions
+(domain.sessions); every other type is excluded."""
 
 
 @dataclass(frozen=True, slots=True)

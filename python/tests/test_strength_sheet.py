@@ -35,6 +35,12 @@ def test_dates_come_from_each_day_sections_date_row(parsed: list[ParsedSet]) -> 
     assert first(parsed, BLOK_11, "Tempo bench", 1)["date"] == date(2026, 2, 5)
 
 
+def test_section_is_the_day_section_index_in_the_tab(parsed: list[ParsedSet]) -> None:
+    assert first(parsed, BLOK_11, "Squat", 1)["section"] == 1
+    assert first(parsed, BLOK_11, "Leg extension", 2)["section"] == 2
+    assert first(parsed, BLOK_12, "Squat", 2)["section"] == 1  # counted per tab
+
+
 def test_header_micro_and_day_rows_are_skipped(parsed: list[ParsedSet]) -> None:
     assert not {p["type"] for p in parsed} & {"TYPE", "DAY", "MICRO 1"}
 

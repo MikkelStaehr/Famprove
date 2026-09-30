@@ -1,4 +1,5 @@
-"""`compute`: rebuild public.daily_load (2026-01-01 .. today) and public.blocks from the DB.
+"""`compute`: rebuild public.strength_sessions, public.daily_load (2026-01-01 .. today) and
+public.blocks from the DB.
 
 Runs only after both collectors succeeded (sequential, fail-fast CI steps).
 """
@@ -14,12 +15,15 @@ from training_load.db.activities import all_activities
 from training_load.db.blocks import sync_blocks
 from training_load.db.client import Postgrest
 from training_load.db.daily_load import sync_daily_load
+from training_load.db.strength_activities import all_strength_activities
+from training_load.db.strength_sessions import sync_strength_sessions
 from training_load.db.strength_sets import all_sets
 from training_load.domain.cycling import daily_cycling_tss
 from training_load.domain.daily import build_daily_load
 from training_load.domain.dates import SERIES_START, today_local
 from training_load.domain.load import DECAY
-from training_load.domain.strength import counted_sets, daily_strength_tss, derive_blocks
+from training_load.domain.sessions import daily_strength_tss, match_sessions
+from training_load.domain.strength import derive_blocks
 from training_load.http import requests_send
 
 log = logging.getLogger(__name__)
@@ -30,22 +34,28 @@ class ComputeSummary:
     days: int
     activities: int
     strength_sets: int
-    counted_sets: int
+    strength_activities: int
+    sessions_done: int  # planned sessions matched to an activity
+    extra_sessions: int  # activities beyond the planned sessions (0 TSS)
     ignored_outside_range: int  # loads dated before SERIES_START or after today
     blocks: int
 
 
 def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime) -> ComputeSummary:
-    """1. all_activities + all_sets (paginated)
-    2. daily_cycling_tss(activities); daily_strength_tss(sets, today, strength_k)
-    3. build_daily_load(start=SERIES_START, end=today) with load.DECAY
-    4. sync_daily_load(start=SERIES_START, end=today, computed_at=run start, UTC)
-    5. sync_blocks(derive_blocks(sets, today))
+    """1. all_activities + all_sets + all_strength_activities (paginated)
+    2. match_sessions(sets, strength activities, strength_k) -> sync_strength_sessions
+    3. daily_cycling_tss(activities); daily_strength_tss(sessions) (on the activity dates)
+    4. build_daily_load(start=SERIES_START, end=today) with load.DECAY
+    5. sync_daily_load(start=SERIES_START, end=today, computed_at=run start, UTC)
+    6. sync_blocks(derive_blocks(sets, today))
     """
     activities = all_activities(db)
     sets = all_sets(db)
+    lifts = all_strength_activities(db)
+    sessions = match_sessions(sets, lifts, strength_k)
+    sync_strength_sessions(db, sessions)
     cycling = daily_cycling_tss(activities)
-    strength = daily_strength_tss(sets, today, strength_k)
+    strength = daily_strength_tss(sessions)
     ignored = sum(1 for d in (*cycling, *strength) if not SERIES_START <= d <= today)
 
     days = build_daily_load(cycling, strength, start=SERIES_START, end=today, decay=DECAY)
@@ -61,7 +71,9 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         days=len(days),
         activities=len(activities),
         strength_sets=len(sets),
-        counted_sets=len(counted_sets(sets, today)),
+        strength_activities=len(lifts),
+        sessions_done=sum(1 for s in sessions if s.block is not None and s.activity_id is not None),
+        extra_sessions=sum(1 for s in sessions if s.block is None),
         ignored_outside_range=ignored,
         blocks=len(blocks),
     )

@@ -1,4 +1,5 @@
-"""`collect-intervals [--since YYYY-MM-DD]`: mirror intervals.icu rides into public.activities.
+"""`collect-intervals [--since YYYY-MM-DD]`: mirror intervals.icu rides into public.activities
+and strength activities (WeightTraining) into public.strength_activities.
 
 Default window: today - 14 days .. today (Europe/Copenhagen). Backfill: --since 2026-01-01.
 """
@@ -18,6 +19,7 @@ from training_load.config import (
     load_dotenv_file,
     mask_in_ci,
 )
+from training_load.db import strength_activities
 from training_load.db.activities import delete_ids, ids_between, upsert_activities
 from training_load.db.client import Postgrest
 from training_load.domain.dates import today_local
@@ -33,6 +35,7 @@ log = logging.getLogger(__name__)
 class IntervalsRunSummary:
     fetched: int
     upserted: int
+    strength_upserted: int
     deleted: int
     stubs_skipped: int
     excluded: int
@@ -63,9 +66,9 @@ def run(
           both edges of the delete window, whatever day boundary the API applies.
     2. parse_activities; log a WARNING with the count (never the ids) of Strava stubs and of
        rides with a null load.
-    3. upsert the cycling activities.
-    4. Mirror deletions, window [since, today] only:
-       stale = ids_between(db, since, today) - cycling ids - stub ids; delete_ids(stale).
+    3. upsert the cycling activities and the strength activities (separate tables).
+    4. Mirror deletions per table, window [since, today] only:
+       stale = ids_between(db, since, today) - that table's ids - stub ids; delete_ids(stale).
     """
     raw = fetch_activities(
         send,
@@ -86,14 +89,20 @@ def run(
         log.warning("%d rides have no training load; counted as 0", len(parsed.missing_load_ids))
 
     upsert_activities(db, parsed.cycling)
-    keep = {a.id for a in parsed.cycling} | set(parsed.stub_ids)
-    stale = ids_between(db, since, today) - keep
+    strength_activities.upsert_strength_activities(db, parsed.strength)
+    stubs = set(parsed.stub_ids)
+    stale = ids_between(db, since, today) - {a.id for a in parsed.cycling} - stubs
     delete_ids(db, stale)
+    stale_strength = (
+        strength_activities.ids_between(db, since, today) - {a.id for a in parsed.strength} - stubs
+    )
+    strength_activities.delete_ids(db, stale_strength)
 
     return IntervalsRunSummary(
         fetched=len(raw),
         upserted=len(parsed.cycling),
-        deleted=len(stale),
+        strength_upserted=len(parsed.strength),
+        deleted=len(stale) + len(stale_strength),
         stubs_skipped=len(parsed.stub_ids),
         excluded=sum(parsed.excluded_types.values()),
         missing_load=len(parsed.missing_load_ids),

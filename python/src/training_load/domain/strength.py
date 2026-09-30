@@ -1,16 +1,23 @@
-"""Strength rules on top of the parsed sets: filled weeks, counted sets, STRENGTH_K, blocks.
+"""Strength rules on top of the parsed sets: session numbers, filled weeks, blocks.
 
 The per-set ``score`` itself is NOT computed here; it comes from the original
-strength_collector formula in ``sources.strength_sheet`` and is stored as-is.
+strength_collector formula in ``sources.strength_sheet`` and is stored as-is. Which sets
+count toward strength TSS is decided in ``domain.sessions`` (a session counts once a
+strength activity is matched to it).
 
-Definitions (a "week" is a 1-based week index inside one tab of one sheet):
+Sessions: the coach's sheet defines sessions 1..N per ISO week (Mon-Sun), never weekdays.
+  week start      Monday of the ISO week of the tab's week (earliest sheet date of that
+                  week in the tab; only its ISO week is used, never its weekday).
+  session         the day sections (date rows) of the tab that prescribe at least one set
+                  that week, numbered 1..N in sheet order. If two tabs prescribe sets in the
+                  same ISO week, they are numbered in block-number order.
+
+Blocks (a "week" is a 1-based week index inside one tab of one sheet):
   filled week     at least one set in that week with type != ABS_TYPE, not bodyweight,
                   and logged_kg > 0.
-  counted set     a set in a filled week whose date <= today. Only these count toward TSS.
-  week start      the earliest set date in that week (a week spans several session dates).
   block           one per (sheet_id, tab) that has at least one set (filled weeks here must
                   also have started: week start <= today):
-    start_date    earliest set date in the tab (first week with any prescribed set)
+    start_date    earliest week start in the tab (first week with any prescribed set)
     end_date      week start of the last filled week + 6 days; None if no week is filled
     finished      a block of the same sheet with a higher block_no has a filled week, OR the
                   tab's last prescribed week (highest week index) is itself filled
@@ -41,7 +48,8 @@ class StrengthSet:
     sheet_row: int
     week: int
     set_no: int
-    date: date
+    week_start: date  # Monday of the ISO week
+    session: int  # 1..N within the ISO week
     type: str
     name: str
     reps: float
@@ -80,6 +88,53 @@ def has_block_number(tab: str) -> bool:
     return _BLOCK_NO.match(tab.strip()) is not None
 
 
+def iso_week_start(day: date) -> date:
+    """Monday of ``day``'s ISO week."""
+    return day - timedelta(days=day.weekday())
+
+
+type SectionKey = tuple[str, int, int]
+"""(block tab name, week index, section index) of one sheet section in one week."""
+
+
+@dataclass(frozen=True, slots=True)
+class SessionSlot:
+    week_start: date
+    session: int
+
+
+def number_sessions(sections: Iterable[tuple[SectionKey, date]]) -> dict[SectionKey, SessionSlot]:
+    """Number the sections that prescribe sets, per ISO week (see module docstring).
+
+    ``sections`` holds one (section key, sheet date) pair per prescribed set (duplicates
+    are fine). Every tab must have a block number (``has_block_number``).
+    """
+    week_dates: dict[tuple[str, int], date] = {}
+    keys: set[SectionKey] = set()
+    for key, day in sections:
+        keys.add(key)
+        week = key[:2]
+        if week not in week_dates or day < week_dates[week]:
+            week_dates[week] = day
+    by_week: dict[date, list[SectionKey]] = {}
+    for key in keys:
+        by_week.setdefault(iso_week_start(week_dates[key[:2]]), []).append(key)
+    slots: dict[SectionKey, SessionSlot] = {}
+    for week_start, week_keys in by_week.items():
+        ordered = sorted(week_keys, key=lambda k: (block_number(k[0]), k[0], k[2]))
+        for n, key in enumerate(ordered, start=1):
+            slots[key] = SessionSlot(week_start=week_start, session=n)
+    return slots
+
+
+def shared_weeks(slots: dict[SectionKey, SessionSlot]) -> list[date]:
+    """ISO weeks whose sessions come from more than one tab (logged as a warning)."""
+    tabs: dict[date, set[str]] = {}
+    for key, slot in slots.items():
+        tabs.setdefault(slot.week_start, set()).add(key[0])
+    return sorted(week for week, names in tabs.items() if len(names) > 1)
+
+
 def _week_key(s: StrengthSet) -> WeekKey:
     return (s.sheet_id, s.block, s.week)
 
@@ -92,30 +147,13 @@ def filled_weeks(sets: Iterable[StrengthSet]) -> frozenset[WeekKey]:
 
 
 def week_starts(sets: Iterable[StrengthSet]) -> dict[WeekKey, date]:
-    """Earliest set date per week key."""
+    """ISO week start per week key (the earliest, should a tab week span two ISO weeks)."""
     starts: dict[WeekKey, date] = {}
     for s in sets:
         key = _week_key(s)
-        if key not in starts or s.date < starts[key]:
-            starts[key] = s.date
+        if key not in starts or s.week_start < starts[key]:
+            starts[key] = s.week_start
     return starts
-
-
-def counted_sets(sets: Sequence[StrengthSet], today: date) -> list[StrengthSet]:
-    """Sets in filled weeks with date <= today."""
-    filled = filled_weeks(sets)
-    return [s for s in sets if _week_key(s) in filled and s.date <= today]
-
-
-def daily_strength_tss(sets: Sequence[StrengthSet], today: date, k: float) -> dict[date, float]:
-    """Per date: sum(score) over counted_sets(sets, today), times ``k`` (STRENGTH_K).
-
-    Not rounded; rounding is a display concern.
-    """
-    raw: dict[date, float] = {}
-    for s in counted_sets(sets, today):
-        raw[s.date] = raw.get(s.date, 0.0) + s.score
-    return {day: score * k for day, score in raw.items()}
 
 
 def derive_blocks(sets: Sequence[StrengthSet], today: date) -> list[Block]:
@@ -158,7 +196,7 @@ def derive_blocks(sets: Sequence[StrengthSet], today: date) -> list[Block]:
                 sheet_id=sheet_id,
                 name=name,
                 block_no=block_no,
-                start_date=min(s.date for s in tab_sets),
+                start_date=min(s.week_start for s in tab_sets),
                 end_date=last_filled_start + timedelta(days=6) if last_filled_start else None,
                 deload_start=last_filled_start if finished else None,
             )

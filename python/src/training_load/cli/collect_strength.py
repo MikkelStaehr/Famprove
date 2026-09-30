@@ -15,7 +15,14 @@ from training_load.config import (
 )
 from training_load.db.client import Postgrest
 from training_load.db.strength_sets import replace_for_sheet
-from training_load.domain.strength import StrengthSet, has_block_number
+from training_load.domain.strength import (
+    SectionKey,
+    SessionSlot,
+    StrengthSet,
+    has_block_number,
+    number_sessions,
+    shared_weeks,
+)
 from training_load.http import HttpSend, requests_send
 from training_load.sources.google_drive import access_token, download_workbook
 from training_load.sources.strength_sheet import ParsedSet, parse_all
@@ -23,8 +30,13 @@ from training_load.sources.strength_sheet import ParsedSet, parse_all
 log = logging.getLogger(__name__)
 
 
-def to_domain(parsed: ParsedSet, sheet_id: str) -> StrengthSet:
-    """Map a parser dict to StrengthSet: row -> sheet_row, set -> set_no, add sheet_id.
+def section_key(parsed: ParsedSet) -> SectionKey:
+    return (parsed["block"], parsed["week"], parsed["section"])
+
+
+def to_domain(parsed: ParsedSet, sheet_id: str, slot: SessionSlot) -> StrengthSet:
+    """Map a parser dict to StrengthSet: row -> sheet_row, set -> set_no, add sheet_id and
+    the session slot (ISO week start + session number); the sheet's date is not kept.
 
     Raises ValueError naming the tab/row/week when a number is missing or not finite (e.g.
     reps "AMRAP" on an ABS row): this runs before anything is deleted from the database.
@@ -51,7 +63,8 @@ def to_domain(parsed: ParsedSet, sheet_id: str) -> StrengthSet:
         sheet_row=parsed["row"],
         week=parsed["week"],
         set_no=parsed["set"],
-        date=parsed["date"],
+        week_start=slot.week_start,
+        session=slot.session,
         type=parsed["type"],
         name=parsed["name"],
         reps=parsed["reps"],
@@ -68,17 +81,22 @@ def to_domain(parsed: ParsedSet, sheet_id: str) -> StrengthSet:
 
 def run(google: GoogleSettings, *, bodyweight: float, send: HttpSend, db: Postgrest) -> int:
     """1. access_token + download_workbook(file_id=google.sheet_id) -> xlsx bytes
-    2. parse_all(xlsx, bodyweight) -> to_domain each
-    3. replace_for_sheet(db, google.sheet_id, sets)  (refuses 0 rows)
+    2. parse_all(xlsx, bodyweight), minus tabs without a block number
+    3. number_sessions per ISO week -> to_domain each
+    4. replace_for_sheet(db, google.sheet_id, sets)  (refuses 0 rows)
     Returns the number of sets written; logs the per-tab counts.
     """
     token = access_token(google.service_account_info)
     xlsx = download_workbook(send, token=token, file_id=google.sheet_id)
-    sets = [to_domain(p, google.sheet_id) for p in parse_all(xlsx, bodyweight)]
-    unnumbered = sorted({s.block for s in sets if not has_block_number(s.block)})
+    parsed = parse_all(xlsx, bodyweight)
+    unnumbered = sorted({p["block"] for p in parsed if not has_block_number(p["block"])})
     if unnumbered:
         log.warning("skipping tabs without a block number: %s", ", ".join(unnumbered))
-        sets = [s for s in sets if s.block not in unnumbered]
+        parsed = [p for p in parsed if p["block"] not in unnumbered]
+    slots = number_sessions((section_key(p), p["date"]) for p in parsed)
+    if shared := shared_weeks(slots):
+        log.warning("%d weeks have sessions from more than one tab", len(shared))
+    sets = [to_domain(p, google.sheet_id, slots[section_key(p)]) for p in parsed]
     replace_for_sheet(db, google.sheet_id, sets)
     for tab, count in sorted(Counter(s.block for s in sets).items()):
         log.info("%s: %d sets", tab, count)

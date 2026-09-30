@@ -14,6 +14,7 @@ class ParsedSet(TypedDict):
     block: str
     row: int              # 1-baseret række i fanen
     week: int             # 1-baseret uge i fanen
+    section: int          # 1-baseret dag-sektion (dato-række) i fanen; kun rækkefølge, aldrig ugedag
     type: str
     name: str
     set: int
@@ -74,10 +75,12 @@ def parse_tab(ws, tab, bodyweight):
                 e1rm[c] = float(r[i+5])
     sets = []
     week_dates = None
+    section = 0
     for ri, r in enumerate(rows, start=1):
         if r and isinstance(r[1],dt.datetime) and "WEEK 1" in [str(x) for x in r]:
             # dato-række: dato står 2 kolonner efter 'WEEK n'
             week_dates = [r[i+2] for i,c in enumerate(r) if isinstance(c,str) and c.startswith("WEEK")]
+            section += 1
             continue
         if not week_dates or not r or not r[2]: continue
         typ, name = str(r[1] or "").strip(), str(r[2]).strip()
@@ -104,7 +107,7 @@ def parse_tab(ws, tab, bodyweight):
                 factor = 1.0 if typ.startswith(LEG_TYPES) else 0.6
                 score = reps * kg * (rpe/10)**2 * factor
             for s in range(nsets):
-                sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, type=typ, name=name, set=s+1,
+                sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
                                       prescribed=prescribed_text(load),
                                       sets_text=sets_text, reps_text=reps_text))
