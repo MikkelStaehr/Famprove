@@ -10,7 +10,7 @@ import { tickKey, useTicks } from "./TickProvider";
  * Today's sheet rows as tick rows (DESIGN.md › Today › Tick rows, Part B › NÆSTE slab). Each row
  * is a <label> wrapping a native, controlled checkbox, so the whole row is the target and Space
  * toggles it. Visible text is exactly as written in the sheet; the accessible name is one
- * sr-only sentence ("Squat, 1 sæt af 3 reps ved RPE 5, sidste uge 100 kg") and the visual copy
+ * sr-only sentence ("Squat, 1 sæt af 3 reps ved RPE 5, 140 kg, sidste uge 137,5 kg") and the visual copy
  * is aria-hidden.
  */
 
@@ -122,6 +122,8 @@ function ExerciseRow({ exercise: e, week, showName, runDone, next, done, onToggl
   // undefined: week 1 has no reference line; null: nothing logged last week (never "0 kg").
   const lastWeek =
     week < 2 ? undefined : e.reference === null ? null : formatSetLoad(e.reference.kg, e.reference.bodyweight);
+  // This week's kg as written in the sheet (spec today.md §3b); none -> no item at all, never "0 kg".
+  const kg = e.kg === null ? null : formatSetLoad(e.kg, e.bodyweight);
   const nameShown = showName || next;
   // Grid rows: [name], prescription (with the check beside it), [last week].
   const line = nameShown ? "row-start-2" : "row-start-1";
@@ -140,7 +142,7 @@ function ExerciseRow({ exercise: e, week, showName, runDone, next, done, onToggl
         onChange={(event) => onToggle(event.currentTarget.checked)}
       />
       <span className="sr-only">
-        {spokenExercise(e, lastWeek)}
+        {spokenExercise(e, lastWeek, kg)}
         {next && ", næste"}
       </span>
       {nameShown && (
@@ -172,6 +174,11 @@ function ExerciseRow({ exercise: e, week, showName, runDone, next, done, onToggl
           <span>
             <KeepRanges text={e.prescribed} />
           </span>
+        )}
+        {/* A no-break space keeps "140 kg" together; at 200% text the item may still break
+            (even inside "kropsvægt") rather than push the page sideways. */}
+        {kg !== null && (
+          <span className="min-w-0 [overflow-wrap:anywhere]">{kg.replace(/ kg$/, " kg")}</span>
         )}
       </span>
       {lastWeek !== undefined && (

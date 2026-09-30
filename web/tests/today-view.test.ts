@@ -33,7 +33,7 @@ function set(overrides: Partial<PrescribedSetRow>): PrescribedSetRow {
     setsText: "1",
     repsText: "3",
     prescribed: "RPE 5.5",
-    loggedKg: 0,
+    loggedKg: null, // missing kg is null (never 0) since the no-silent-defaults change
     bodyweight: false,
     ...overrides,
   };
@@ -160,7 +160,7 @@ test("next session: exercises in sheet order, one per row, with last week's kg a
       sessions: [session(1), session(2)],
       sets: [
         set({ session: 1, sheetRow: 27, setNo: 2, name: "Squat", setsText: "2", repsText: "5", prescribed: "-10%" }),
-        set({ session: 1, sheetRow: 25 }),
+        set({ session: 1, sheetRow: 25, loggedKg: 137.5 }),
         set({ session: 1, sheetRow: 27, setNo: 1, name: "Squat", setsText: "2", repsText: "5", prescribed: "-10%" }),
         set({ session: 1, sheetRow: 31, name: "Dips", type: "BACK", repsText: "8 - 12", bodyweight: true }),
       ],
@@ -174,11 +174,11 @@ test("next session: exercises in sheet order, one per row, with last week's kg a
   );
   assert.equal(view.strength.next?.session, 1);
   assert.deepEqual(
-    view.strength.next?.exercises.map((e) => [e.name, e.setsText, e.repsText, e.prescribed, e.reference]),
+    view.strength.next?.exercises.map((e) => [e.name, e.setsText, e.repsText, e.prescribed, e.kg, e.reference]),
     [
-      ["Squat", "1", "3", "RPE 5.5", { kg: 140, bodyweight: false }],
-      ["Squat", "2", "5", "-10%", null], // nothing logged last week
-      ["Dips", "1", "8 - 12", "RPE 5.5", { kg: 10, bodyweight: true }],
+      ["Squat", "1", "3", "RPE 5.5", 137.5, { kg: 140, bodyweight: false }],
+      ["Squat", "2", "5", "-10%", null, null], // no kg this week, nothing logged last week: never 0
+      ["Dips", "1", "8 - 12", "RPE 5.5", null, { kg: 10, bodyweight: true }],
     ],
   );
 });

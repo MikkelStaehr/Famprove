@@ -89,6 +89,23 @@ Rule: the sheet defines sessions 1..N per ISO week (Mon–Sun). The n-th strengt
 | (d) N = 0 | `text-20` 700 "Intet styrkeprogram i denne uge." + `text-16` "Trænerens ark har intet for uge 40 endnu. Det vises her, når det er tilføjet." | empty |
 | (e) k > N | Extra line(s) in the done list, then (c) or (d) | empty |
 
+## 3b. Kg on exercise rows (spec-lite, 2026-09-30)
+The sheet's kg is the user's own number (planned ahead or lifted). Show it as written, with no "mål" or target label.
+- **Where:** a **third item in the prescription line**, after the load: `1 × 3`  `RPE 5`  `140 kg`. Same `text-32` Barlow Condensed 700 tabular, `--text`. The kg is the number you load, so it gets prescription size, not reference size.
+- **Separator:** the line's existing 16px gap. No "·" glyph, because a wrapped line would start with a stray "·".
+- **Wrap:** the kg wraps as a unit. Use U+00A0 between the number and "kg" so they never split. At 390px (≈ 294px column), `3 × 20 - 30`  `RPE 7 - 8` fills line 1 and `22,5 kg` drops to line 2 at the left edge. Use no `whitespace-nowrap` on the whole item, so `kropsvægt + 10 kg` can still break at 200% text.
+- **Format:** use the same value→text function as the reference line: `140 kg`, `22,5 kg` (decimal comma, never a trailing `,0`), `kropsvægt`, `kropsvægt + 10 kg`. **Null means the item is not rendered**: no gap and no placeholder. `0 kg` never appears.
+- **Reference line:** unchanged ("Sidste uge 137,5 kg" / "Intet logget sidste uge"; none in week 1). This is the small reference.
+- **NÆSTE slab:** kg in `--on-slab`, like the rest of the slab. **Ticked row:** `--text-muted`, like the rest of the row. No accent colour on the kg.
+- **Accessible name:** `Squat, 1 sæt af 3 reps ved RPE 5, 140 kg, sidste uge 137,5 kg` (+ `, næste`). Bodyweight rows read `, kropsvægt + 10 kg`. With no kg, the `, 140 kg` segment is left out. This replaces the §3 / §5a example.
+- **Fold (§4):** each row whose kg wraps grows about 40px. Re-measure AC 13.
+
+Acceptance (for `tester`):
+26. A row with kg shows it in the prescription line at a computed 32px Condensed 700 (`140 kg`, `22,5 kg`, `kropsvægt + 10 kg`). A row without kg shows no kg item, no empty gap and no "0 kg".
+27. At 390px, `1 × 3  RPE 5  140 kg` sits on one line. `3 × 20 - 30  RPE 7 - 8  22,5 kg` puts `22,5 kg` on line 2, with "22,5" and "kg" on the same line. At 200% text there is no horizontal scroll.
+28. On the NÆSTE row the kg uses `--on-slab` (≥ 4.5:1 in both themes). On a ticked row it uses `--text-muted`.
+29. The checkbox's accessible name is `Squat, 1 sæt af 3 reps ved RPE 5, 140 kg, sidste uge 137,5 kg`. With no kg it has no kg segment. The NÆSTE row still ends with `, næste`.
+
 ## 4. Above the fold at 390 × 844
 Header (Part B spacing): nav ends ≈ y 56, title 16px below ends ≈ 116, updated line ≈ 140, compact ZoneBar (≈ 96px) ends ≈ 248, **first card starts ≈ y 264** (was 191: +73px, tech-lead's ~77 confirmed).
 Strength card, week 1, k = 0: head + progress end ≈ 340, list starts ≈ 442. Rows: NÆSTE row ≈ 103px incl. its 8px margins, other first-of-run rows ≈ 79px, continuation rows ≈ 51px, +28px each with a reference line.

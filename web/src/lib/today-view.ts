@@ -58,6 +58,8 @@ export type ExerciseView = {
   readonly repsText: string | null;
   readonly prescribed: string | null;
   readonly bodyweight: boolean;
+  /** This week's kg from the sheet (the user's own number: planned ahead or lifted); null = none. */
+  readonly kg: number | null;
   readonly reference: Reference | null; // last week's logged kg for the same sheet row
 };
 
@@ -164,6 +166,7 @@ function exercisesOf(sets: readonly PrescribedSetRow[], refs: Map<string, Refere
         repsText: s.repsText,
         prescribed: s.prescribed,
         bodyweight: s.bodyweight,
+        kg: s.loggedKg,
         reference: refs.get(key) ?? null,
       });
     }

@@ -218,12 +218,17 @@ export type ExerciseWords = {
  * `lastWeek`: undefined in week 1 (no reference line), null when nothing was logged, else the
  * formatted load ("100 kg", "kropsvægt + 10 kg").
  */
-export function spokenExercise(e: ExerciseWords, lastWeek: string | null | undefined): string {
+export function spokenExercise(
+  e: ExerciseWords,
+  lastWeek: string | null | undefined,
+  kg: string | null = null,
+): string {
   const amount = spokenSetsReps(e.setsText, e.repsText);
   const load = e.prescribed === null ? null : spokenRange(e.prescribed);
   const what = amount !== null && load !== null ? `${amount} ved ${load}` : (amount ?? load);
   const parts = [e.name.trim()];
   if (what !== null) parts.push(what);
+  if (kg !== null) parts.push(kg);
   if (lastWeek === null) parts.push("intet logget sidste uge");
   else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);
   return parts.join(", ");
