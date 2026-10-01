@@ -259,43 +259,76 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
     setActive(weeks.find((w) => w.x0 <= x && x < w.x1) ?? null);
   };
 
-  const strip = (label: string, unit: string, top: number, value: (w: WeekBar) => number, vMax: number) => (
-    <div className="relative" style={{ height: STRIP }}>
-      <div className="absolute border-b border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, bottom: 0 }} />
-      <div className="absolute border-t border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: top }} />
-      <span className="absolute left-0 text-12 font-medium text-text-muted tabular-nums" style={{ top: top - 8 }}>
-        {vMax.toLocaleString("da-DK")}
-      </span>
-      <span className="absolute bottom-0 left-0 text-12 font-medium text-text-muted">0</span>
-      <p className="absolute top-0 text-14 font-semibold" style={{ left: Y_AXIS_WIDTH }}>
+  // 200 % text: tick labels keep TICK's fixed px size (the 12px exception, analyse.md §8).
+  const tickStyle = { fontSize: TICK.fontSize } as const;
+  const TOP = 8; // room for the max label inside the strip
+
+  const strip = (label: string, unit: string, value: (w: WeekBar) => number, vMax: number) => (
+    <div className="flex flex-col gap-1">
+      <p className="text-14 font-semibold" aria-hidden="true" style={{ marginLeft: Y_AXIS_WIDTH }}>
         {label} <span className="font-normal text-text-muted">{unit}</span>
       </p>
-      {weeks.map((w) => {
-        const left = xCss(axis, w.x0);
-        const width = `calc(${xCss(axis, w.x1)} - ${xCss(axis, w.x0)} - 1px)`;
-        const color = w.current ? "bg-slab" : w.zero ? "bg-chart-mark" : "bg-text-muted";
-        const h = w.zero ? "2px" : `calc((100% - ${top}px) * ${value(w) / vMax})`;
-        return <div key={w.x0} className={`absolute bottom-0 ${color}`} style={{ left, width, height: h }} />;
-      })}
+      <div className="relative" style={{ height: STRIP }} aria-hidden="true">
+        <div className="absolute border-b border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, bottom: 0 }} />
+        <div className="absolute border-t border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: TOP }} />
+        <span
+          className="absolute left-0 font-medium leading-none text-text-muted tabular-nums"
+          style={{ ...tickStyle, top: TOP - 6 }}
+        >
+          {vMax.toLocaleString("da-DK")}
+        </span>
+        <span className="absolute bottom-0 left-0 font-medium leading-none text-text-muted" style={tickStyle}>
+          0
+        </span>
+        {weeks.map((w) => {
+          const left = xCss(axis, w.x0);
+          const width = `calc(${xCss(axis, w.x1)} - ${xCss(axis, w.x0)} - 1px)`;
+          const color = w.current ? "bg-slab" : w.zero ? "bg-chart-mark" : "bg-text-muted";
+          const h = w.zero ? "2px" : `calc((100% - ${TOP}px) * ${value(w) / vMax})`;
+          const ring = w === active ? " outline outline-1 outline-text" : "";
+          return <div key={w.x0} className={`absolute bottom-0 ${color}${ring}`} style={{ left, width, height: h }} />;
+        })}
+      </div>
     </div>
   );
 
+  // Keyboard: ←/→ step through the weeks (starting at the current one), Esc closes the tooltip.
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      setActive(null);
+      return;
+    }
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    if (active === null) {
+      setActive(weeks.find((w) => w.current) ?? weeks[weeks.length - 1] ?? null);
+      return;
+    }
+    const i = weeks.indexOf(active) + (e.key === "ArrowLeft" ? -1 : 1);
+    setActive(weeks[Math.max(0, Math.min(weeks.length - 1, i))] ?? null);
+  };
+
   return (
     <div
-      className="relative flex flex-col gap-2 touch-pan-y"
-      aria-hidden="true"
+      className="relative flex touch-pan-y flex-col gap-2 rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus"
+      tabIndex={0}
+      role="group"
+      aria-label="Uger. Piletaster vælger en uge"
+      onKeyDown={onKey}
+      onBlur={() => setActive(null)}
       onPointerMove={pick}
       onPointerDown={pick}
       onPointerLeave={() => setActive(null)}
     >
-      {strip("Timer", "t", 26, (w) => w.hours, hMax)}
-      {strip("Belastning", "TSS", 26, (w) => w.load, lMax)}
-      <div className="relative h-[30px]">
+      {strip("Timer", "t", (w) => w.hours, hMax)}
+      {strip("Belastning", "TSS", (w) => w.load, lMax)}
+      <div className="relative h-[30px]" aria-hidden="true">
         {ticks.map((t, i) => (
           <span
             key={t.x}
-            className="absolute top-1 text-12 font-medium whitespace-nowrap text-text-muted tabular-nums"
+            className="absolute top-1 font-medium whitespace-nowrap text-text-muted tabular-nums"
             style={{
+              ...tickStyle,
               left: xCss(axis, t.x),
               transform: i === 0 ? undefined : axis.hi - t.x < 30 ? "translateX(-100%)" : "translateX(-50%)",
             }}
@@ -306,7 +339,7 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
       </div>
       <SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />
       {active !== null && (
-        <div className="pointer-events-none absolute top-6 left-10 z-10">
+        <div className="pointer-events-none absolute top-6 left-10 z-10" role="status">
           <TipBox lines={active.tip} />
         </div>
       )}

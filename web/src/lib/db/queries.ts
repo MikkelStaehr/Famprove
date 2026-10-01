@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isDataError } from "../data-error.ts";
+
 import { connection } from "next/server";
 
 import { devFixture, fewEfPoints, fixtureError, illustrativeBands, staleComputedAt } from "./dev-fixture.ts";
@@ -248,20 +250,25 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
   if (fixture === "error") throw fixtureError(RIDE_METRICS_SELECT.table);
   if (fixture === "empty") return { rides: [], weeks: [] };
   const db = client();
+  // A cycling_weeks failure stays inside its card (analyse.md §5d): carried as weeksError.
   const weeksRead = selectAll(db, CYCLING_WEEKS_SELECT.table, CYCLING_WEEKS_SELECT, parseCyclingWeekRow).catch(
     (error: unknown) => {
       console.error("analyse: loading cycling_weeks failed", error);
-      return null;
+      if (isDataError(error)) return error;
+      throw error;
     },
   );
   const rides = await selectAll(db, RIDE_METRICS_SELECT.table, RIDE_METRICS_SELECT, parseRideMetricsRow);
-  const weeks = await weeksRead;
+  const weeksResult = await weeksRead;
+  const weeks = weeksResult instanceof Error ? null : weeksResult;
+  const weeksError = weeksResult instanceof Error ? weeksResult : null;
   if (fixture === "stale") {
     const computedAt = staleComputedAt(new Date());
     return {
       rides: rides.map((r) => ({ ...r, computedAt })),
       weeks: weeks === null ? null : weeks.map((w) => ({ ...w, computedAt })),
+      weeksError,
     };
   }
-  return { rides: fixture === "ef-few" ? fewEfPoints(rides) : rides, weeks };
+  return { rides: fixture === "ef-few" ? fewEfPoints(rides) : rides, weeks, weeksError };
 }

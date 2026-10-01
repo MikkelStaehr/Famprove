@@ -5,6 +5,7 @@
  */
 import { addDays, isoWeekNumber, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
+import type { DataError } from "./data-error.ts";
 import type { CyclingAnalysisData, CyclingWeekRow, IsoDate, RideMetricsRow } from "./db/rows.ts";
 import { formatDate, formatDateRange, formatDay, formatDayLong, formatDuration, formatLoad, formatSigned, LOCALE } from "./format.ts";
 
@@ -37,6 +38,7 @@ function dateWithYear(date: IsoDate): string {
 
 /** h:mm t; under 1 h, "45 min" (spec §6). */
 export function formatHours(seconds: number): string {
+  if (seconds > 0 && seconds < 60) return "under 1 min"; // never "0 min" for a real ride
   const minutes = Math.round(seconds / 60);
   return minutes < 60 ? `${minutes} min` : `${formatDuration(seconds)} t`;
 }
@@ -44,7 +46,9 @@ export function formatHours(seconds: number): string {
 const KM = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const EF = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export const formatKm = (meters: number): string => `${KM.format(meters / 1000)} km`;
+/** 1 decimal; a real distance under 0,05 km reads "under 0,1 km", never "0,0 km". */
+export const formatKm = (meters: number): string =>
+  meters > 0 && meters < 50 ? "under 0,1 km" : `${KM.format(meters / 1000)} km`;
 export const formatEf = (ef: number): string => EF.format(ef);
 const rides = (n: number): string => (n === 1 ? "1 tur" : `${n} ture`);
 const join = (parts: readonly (string | null)[]): string => parts.filter((p) => p !== null).join(" · ");
@@ -165,6 +169,7 @@ export type AnalyseView =
       readonly noWattNote: string | null;
       readonly ef: LineChartView | { readonly kind: "few"; readonly text: string; readonly list: readonly string[] };
       readonly weeks: readonly WeekBar[] | null; // null: cycling_weeks couldn't be read
+      readonly weeksError: DataError | null; // why (the card's ErrorState)
       readonly weekMax: { readonly hours: number; readonly load: number };
       readonly excluded: { readonly summary: string; readonly items: readonly ExcludedItem[] } | null;
     };
@@ -460,6 +465,7 @@ export function buildAnalyseView(data: CyclingAnalysisData, now: Date, today: Is
       noWatt === 0 ? null : `${rides(noWatt)} uden watt er ikke med her, men tæller i timer og belastning.`,
     ef: efChart(plotted, today),
     weeks,
+    weeksError: data.weeksError ?? null,
     weekMax: {
       hours: Math.max(0, ...(weeks ?? []).map((w) => w.hours)),
       load: Math.max(0, ...(weeks ?? []).map((w) => w.load)),

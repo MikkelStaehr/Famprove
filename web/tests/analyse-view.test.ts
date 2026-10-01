@@ -9,6 +9,7 @@ import {
   exclusionFacts,
   exclusionText,
   formatHours,
+  formatKm,
   seams,
   weekBars,
 } from "../src/lib/analyse-view.ts";
@@ -88,6 +89,11 @@ test("exclusion copy and facts; an unknown code is never guessed", () => {
   assert.equal(exclusionFacts(ride("2026-01-01", { exclusion: "power_outlier", npW: 31, movingS: 5820 })), "NP 31 W · 1:37 t");
   assert.equal(exclusionFacts(ride("2026-01-01", { exclusion: "hr_outlier", avgHr: 212, movingS: null })), "puls 212");
   assert.equal(formatHours(2700), "45 min");
+  assert.equal(formatHours(20), "under 1 min");
+  assert.equal(formatHours(0), "0 min");
+  assert.equal(formatKm(30), "under 0,1 km");
+  assert.equal(formatKm(50), "0,1 km");
+  assert.equal(formatKm(0), "0,0 km");
 });
 
 test("EF too few: 0, 1 and n, newest first with the year outside the current one", () => {

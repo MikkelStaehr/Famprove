@@ -256,7 +256,12 @@ function Cards({ view }: { readonly view: Ready }) {
         {view.weeks === null ? (
           <ErrorState
             title="Kunne ikke hente ugerne"
-            what="Læsning af cycling_weeks fra databasen mislykkedes."
+            what={
+              view.weeksError === null
+                ? "Læsning af cycling_weeks fra databasen mislykkedes."
+                : describeDataError(view.weeksError)
+            }
+            detail={view.weeksError?.message}
             retry={{ href: "/analyse" }}
           />
         ) : (

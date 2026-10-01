@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { DataError } from "../data-error.ts";
+
 /**
  * Row types + runtime validation for the three read-only sources. PostgREST JSON is
  * `unknown` until a parser here has narrowed it (no `any`, no casts). Parsers throw
@@ -250,6 +252,8 @@ export type CyclingAnalysisData = {
   readonly rides: readonly RideMetricsRow[]; // ascending by date
   /** Ascending by weekStart; null when they couldn't be read (that card shows an error). */
   readonly weeks: readonly CyclingWeekRow[] | null;
+  /** Why weeks is null (set by loadCyclingAnalysis); absent/null when they were read. */
+  readonly weeksError?: DataError | null;
 };
 
 export const RIDE_METRICS_SELECT = {
