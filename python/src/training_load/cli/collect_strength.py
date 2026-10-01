@@ -28,6 +28,7 @@ from training_load.http import HttpSend, requests_send
 from training_load.sources.google_drive import access_token, download_workbook
 from training_load.sources.strength_sheet import (
     KG_NOT_A_NUMBER,
+    LSRPE_NOT_HALF,
     RPE_NOT_HALF,
     ParsedSet,
     parse_all,
@@ -56,7 +57,9 @@ def check_issues(issues: Counter[str], parsed: Sequence[ParsedSet]) -> None:
     for reason, count in sorted(issues.items()):
         log.warning("%d cells unreadable: %s", count, reason)
     row_weeks = len({(p["block"], p["row"], p["week"]) for p in parsed})
-    tried = row_weeks + total - issues[KG_NOT_A_NUMBER] - issues[RPE_NOT_HALF]
+    # These still yield sets (value None), so their row-weeks are already in ``parsed``.
+    yielded = issues[KG_NOT_A_NUMBER] + issues[RPE_NOT_HALF] + issues[LSRPE_NOT_HALF]
+    tried = row_weeks + total - yielded
     if total and total > MAX_ISSUE_SHARE * tried:
         raise TooManyIssuesError(
             f"{total} unreadable cells in {tried} row-weeks (limit {MAX_ISSUE_SHARE:.0%}); "
@@ -112,6 +115,8 @@ def to_domain(parsed: ParsedSet, sheet_id: str, slot: SessionSlot) -> StrengthSe
         sets_text=parsed["sets_text"],
         reps_text=parsed["reps_text"],
         e1rm=parsed["e1rm"],
+        raw=parsed["raw"],
+        logged_rpe=parsed["logged_rpe"],
     )
 
 

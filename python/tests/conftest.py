@@ -110,8 +110,10 @@ def _write_tab(
             date_row[6 + 8 * w] = datetime.combine(d, datetime.min.time())
         ws.append(date_row)
         # Full template width: the parser indexes every week's 8 columns, even when empty.
-        header: list[object] = [None, "TYPE", "NAME", None, "SETS", "REPS", "LOAD", "KG"]
-        ws.append([*header, *([None] * (width - 1 - len(header))), "NOTES"])
+        header: list[object] = [None, "TYPE", "NAME", None]
+        for _ in range(n_weeks):
+            header += ["SETS", "REPS", "LOAD", "WEIGHT", "LSRPE", "NOTES", "Mean Weight", None]
+        ws.append(header)
         ws.append([None, "MICRO 1", "Accumulation"])
         for typ, name, weeks in exercises:
             row: list[object] = [None, typ, name, None]
@@ -281,6 +283,8 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "planned_targets": ("date", "name"),
     "ride_metrics": ("activity_id",),
     "cycling_weeks": ("week_start",),
+    "strength_weeks": ("week_start", "lift"),
+    "strength_set_kg": ("sheet_id", "block", "sheet_row", "week", "set_no"),
 }
 
 

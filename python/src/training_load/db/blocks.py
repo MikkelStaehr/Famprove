@@ -5,6 +5,7 @@ from typing import Final, TypedDict
 
 from training_load.db.client import Postgrest
 from training_load.domain.strength import Block
+from training_load.domain.strength_analysis import Phase, phase_of
 from training_load.narrow import req_str
 
 TABLE: Final = "blocks"
@@ -17,6 +18,7 @@ class BlockRow(TypedDict):
     start_date: str  # ISO date
     end_date: str | None
     deload_start: str | None
+    phase: Phase  # domain.strength_analysis.PHASES
 
 
 def to_row(block: Block) -> BlockRow:
@@ -27,6 +29,7 @@ def to_row(block: Block) -> BlockRow:
         start_date=block.start_date.isoformat(),
         end_date=block.end_date.isoformat() if block.end_date else None,
         deload_start=block.deload_start.isoformat() if block.deload_start else None,
+        phase=phase_of(block.block_no),
     )
 
 

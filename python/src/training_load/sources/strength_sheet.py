@@ -7,7 +7,7 @@ Celler der ikke kan læses bliver aldrig stille til 0: de tælles i ``issues`` (
 og manglende/ulæselig kg gemmes som None. Selve score-formlen er uændret.
 STRENGTH_K (tidl. K) ganges på i domain.strength; BODYWEIGHT kommer fra env via parameteren.
 """
-import io, re, datetime as dt
+import io, math, re, datetime as dt
 from collections import Counter
 from typing import TypedDict
 import openpyxl
@@ -30,6 +30,8 @@ class ParsedSet(TypedDict):
     sets_text: str | None   # sets-cellen som skrevet (fx '2'), kun til visning
     reps_text: str | None   # reps-cellen som skrevet (fx '8 - 12'), kun til visning
     e1rm: float | None      # fanens 1RM for sættets løft (SQUAT/BENCH/DEADLIFT), ellers None
+    raw: dict[str, object]  # ugens celler som skrevet: sets, reps, load, weight, lsrpe, notes, mean_weight
+    logged_rpe: float | None  # LSRPE (loggede RPE), kun hele/halve 1-10; ellers None (talt)
     score: float          # rå score, før STRENGTH_K
 
 ABS_SET_SCORE = 10*20*(0.6**2)   # fast score pr. abs-sæt (10 reps @ 20 kg RPE 6)
@@ -99,6 +101,33 @@ SETS_REPS_NOT_A_NUMBER = "sets/reps not a number"
 WEEK_DATE_NOT_A_DATE = "week date not a date"
 ROW_WITHOUT_TYPE = "prescribed row without type"
 RPE_NOT_HALF = "RPE not a whole or half value"
+LSRPE_NOT_HALF = "logged RPE not a whole or half value"
+LSRPE_COLUMN_MISSING = "no LSRPE column in the header"
+RAW_KEYS = ("sets", "reps", "load", "weight", "lsrpe", "notes", "mean_weight")  # ugens 7 første kolonner
+
+
+def json_cell(cell: object) -> object:
+    """A cell as JSON: numbers and text as written, dates as ISO, anything else as text."""
+    if cell is None or isinstance(cell, (bool, int, str)):
+        return cell
+    if isinstance(cell, float):
+        return cell if math.isfinite(cell) else str(cell)
+    if isinstance(cell, (dt.datetime, dt.date)):
+        return cell.isoformat()
+    return str(cell)
+
+
+def logged_rpe(cell: object, issues: Counter[str]) -> float | None:
+    """LSRPE: a whole or half value 1-10 ("7", "7,5", 7.5). Blank is None; anything else is None
+    and counted (never guessed)."""
+    if cell is None or (isinstance(cell, str) and not cell.strip()):
+        return None
+    value = text_number(cell)
+    if (isinstance(value, bool) or not isinstance(value, (int, float))
+            or not 1 <= value <= 10 or value * 2 != round(value * 2)):
+        issues[LSRPE_NOT_HALF] += 1
+        return None
+    return float(value)
 
 E1RM_RANGE = (20.0, 400.0)   # kg; et 1RM udenfor er aldrig et rigtigt 1RM
 E1RM_OUT_OF_RANGE = "1RM out of range"
@@ -153,7 +182,11 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
     sets = []
     week_dates = None
     section = 0
+    lsrpe_ok = None   # afgøres af den første header-række (SETS i kolonne E): LSRPE 4 kolonner til højre
     for ri, r in enumerate(rows, start=1):
+        if lsrpe_ok is None and r and len(r) > 4 and str(r[4] or "").strip().upper() == "SETS":
+            lsrpe_ok = len(r) > 8 and str(r[8] or "").strip().upper() == "LSRPE"
+            if not lsrpe_ok: issues[LSRPE_COLUMN_MISSING] += 1
         if r and isinstance(r[1],dt.datetime) and "WEEK 1" in [str(x) for x in r]:
             # dato-række: dato står 2 kolonner efter 'WEEK n'
             week_dates = [r[i+2] for i,c in enumerate(r) if isinstance(c,str) and c.startswith("WEEK")]
@@ -170,6 +203,7 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
         for w,date in enumerate(week_dates):
             base = 4 + w*8          # SETS-kolonne for uge w
             nsets, reps, load, kg = r[base], r[base+1], r[base+2], r[base+3]
+            cells = [r[base+k] if base+k < len(r) else None for k in range(len(RAW_KEYS))]
             kg = text_number(kg)
             sets_text, reps_text = cell_text(nsets), cell_text(reps)
             if nsets in (None,0,"") or reps in (None,"") : continue
@@ -185,10 +219,12 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
             rpe_ok = rpe_readable(load)
             if not rpe_ok: issues[RPE_NOT_HALF] += 1   # tælles; cellens RPE bruges aldrig ("RPE ukendt")
             kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load) if rpe_ok else None, bodyweight, e1rm)
+            raw = {key: json_cell(cell) for key, cell in zip(RAW_KEYS, cells)}
+            lsrpe = logged_rpe(cells[4], issues) if lsrpe_ok else None
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
                                       prescribed=prescribed_text(load),
                                       sets_text=sets_text, reps_text=reps_text,
-                                      e1rm=e1rm.get(typ)))
+                                      e1rm=e1rm.get(typ), raw=raw, logged_rpe=lsrpe))
     return sets

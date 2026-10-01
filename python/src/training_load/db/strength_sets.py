@@ -7,6 +7,7 @@ from training_load.db.client import JsonRow, Postgrest
 from training_load.domain.strength import StrengthSet
 from training_load.narrow import (
     opt_float,
+    opt_object,
     opt_str,
     req_bool,
     req_date,
@@ -43,6 +44,8 @@ class StrengthSetRow(TypedDict):
     sets_text: str | None
     reps_text: str | None
     e1rm: float | None
+    logged_rpe: float | None
+    raw: JsonRow | None  # the week's cells as written
 
 
 COLUMNS: Final = ",".join(StrengthSetRow.__annotations__)
@@ -69,6 +72,8 @@ def to_row(s: StrengthSet) -> StrengthSetRow:
         sets_text=s.sets_text,
         reps_text=s.reps_text,
         e1rm=s.e1rm,
+        logged_rpe=s.logged_rpe,
+        raw=dict(s.raw) if s.raw is not None else None,
     )
 
 
@@ -94,6 +99,8 @@ def from_row(row: JsonRow) -> StrengthSet:
         sets_text=opt_str(row, "sets_text"),
         reps_text=opt_str(row, "reps_text"),
         e1rm=opt_float(row, "e1rm"),
+        logged_rpe=opt_float(row, "logged_rpe"),
+        raw=opt_object(row, "raw"),
     )
 
 

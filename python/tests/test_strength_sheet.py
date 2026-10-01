@@ -191,7 +191,12 @@ def test_kg_typed_as_text_parses_like_numbers() -> None:
     ]
     typed = parse_all(build_workbook(as_text), SYNTHETIC_BODYWEIGHT)
     numeric = parse_all(build_workbook(), SYNTHETIC_BODYWEIGHT)
-    assert typed == numeric
+
+    def parsed(sets: list[ParsedSet]) -> list[dict[str, object]]:
+        return [{k: v for k, v in p.items() if k != "raw"} for p in sets]  # raw keeps the text
+
+    assert parsed(typed) == parsed(numeric)
+    assert typed[0]["raw"]["weight"] == "120" and numeric[0]["raw"]["weight"] == 120
     assert first(typed, BLOK_11, "Squat", 1)["logged_kg"] == 120.0
 
 

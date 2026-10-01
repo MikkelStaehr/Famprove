@@ -62,7 +62,8 @@ def _legacy_score(s: StrengthSet, kg: float, e1rm: dict[str, float]) -> float:
     return float(result[2])
 
 
-def _rpe(prescribed: str | None) -> float | None:
+def prescribed_rpe(prescribed: str | None) -> float | None:
+    """The coach's RPE from the load cell ("RPE 6 - 7" -> 6.5); None for %, -x% or unreadable."""
     if prescribed is None or "RPE" not in prescribed or not rpe_readable(prescribed):
         return None
     return _legacy_mid(str(decimal_dots(prescribed)))
@@ -75,7 +76,7 @@ def _is_bodyweight(s: StrengthSet) -> bool:
 def _main_lift_kg(s: StrengthSet) -> tuple[float, str] | None:
     if s.type not in MAIN_LIFTS or "tempo" in s.name.lower() or s.e1rm is None:
         return None
-    rpe = _rpe(s.prescribed)
+    rpe = prescribed_rpe(s.prescribed)
     if rpe is not None:
         return s.e1rm / (1 + 0.0333 * (s.reps + 10 - rpe)), "rpe_e1rm"
     pct = _percent(s.prescribed)

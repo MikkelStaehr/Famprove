@@ -148,6 +148,8 @@ def ok_set(**overrides: object) -> ParsedSet:
         "sets_text": "1",
         "reps_text": "5",
         "e1rm": None,
+        "raw": {},
+        "logged_rpe": None,
     }
     return cast(ParsedSet, base | overrides)
 
@@ -257,3 +259,33 @@ def test_compute_counts_rides_not_fields_toward_the_raw_problem_share(
     assert summary.rides_analysed == 5
     bad = next(r for r in db.tables["ride_metrics"] if r["activity_id"] == "i5")
     assert (bad["distance_m"], bad["device_watts"], bad["eftp_ok"]) == (None, None, False)
+
+
+def test_compute_writes_strength_weeks_phase_and_kg_history_idempotently(
+    db: InMemoryPostgrest, workbook_bytes: bytes
+) -> None:
+    collect_strength.run(GOOGLE, bodyweight=SYNTHETIC_BODYWEIGHT, send=drive(workbook_bytes), db=db)
+    lifts = [raw_ride("g1", "2026-02-03T19:00:00", kind="WeightTraining")]  # week 1, session 1
+    upsert_strength_activities(db, parse_activities(lifts).strength)
+    run_at = datetime(2026, 3, 15, 3, 0, tzinfo=UTC)
+
+    summary = compute.run(db, strength_k=0.02, today=FIXED_TODAY, computed_at=run_at)
+
+    phases = {b["name"]: b["phase"] for b in db.tables["blocks"]}
+    assert phases == {BLOK_11: "in_season", BLOK_12: "off_season"}
+    weeks = db.tables["strength_weeks"]
+    assert len(weeks) == summary.strength_weeks and len(weeks) % 3 == 0
+    squat = {(w["week_start"], w["lift"]): w for w in weeks}[("2026-02-02", "SQUAT")]
+    assert squat["status"] == "lifted" and squat["sets_lifted"] == 3  # session 1 matched
+    assert squat["tonnage_kg"] == 3 * 5 * 120.0 and squat["e1rm_rpe_source"] == "prescribed"
+    kg = db.tables["strength_set_kg"]
+    assert len(kg) == summary.kg_states_changed == len(db.tables["strength_sets"])
+    lifted = [r for r in kg if r["name"] == "Squat" and r["week_start"] == "2026-02-02"]
+    assert {r["lifted_kg"] for r in lifted} == {120.0}
+    assert {r["planned_first_kg"] for r in lifted} == {None}  # first seen after it was done
+
+    before = sorted(map(str, kg))
+    again = compute.run(
+        db, strength_k=0.02, today=FIXED_TODAY, computed_at=datetime(2026, 3, 15, 15, tzinfo=UTC)
+    )
+    assert again.kg_states_changed == 0 and sorted(map(str, db.tables["strength_set_kg"])) == before
