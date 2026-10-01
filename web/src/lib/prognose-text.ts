@@ -4,7 +4,7 @@
  * functions (no React) so `node --test` can check the copy verbatim. Values are Python's, only
  * formatted (whole TSS, U+2212); no band arithmetic here.
  */
-import type { ChartPoint } from "./dashboard-view.ts";
+import { type ChartPoint, NO_RECENT_WEEKS } from "./dashboard-view.ts";
 import type { Band, IsoDate, ProjectedSession } from "./db/rows.ts";
 import { formatDate, formatDay, formatLoad, formatSigned } from "./format.ts";
 
@@ -35,7 +35,7 @@ export function rangeText(band: Band | null, format: (value: number) => string):
 /** Python's reasons for a session left out (tss null), in Danish. Unknown reasons get no text. */
 const SKIPPED_REASON: Readonly<Record<string, string>> = {
   "no day left this week": "ingen dag tilbage i ugen",
-  "no recent weeks to average": "endnu ingen hele uger at regne gennemsnit af",
+  [NO_RECENT_WEEKS]: "endnu ingen hele uger at regne gennemsnit af",
   "no kg for any set in the plan": "ingen kg i trænerens plan",
 };
 
@@ -51,7 +51,7 @@ export function strengthLine(s: ProjectedSession): string {
       s.recentWeeks === 1
         ? "den seneste uge"
         : s.recentWeeks === null
-          ? "de seneste uger"
+          ? "de seneste uger" // unreachable: rows.ts rejects an averaged recent session without it
           : `de seneste ${formatLoad(s.recentWeeks)} uger`;
     return `Styrke ≈ ${formatLoad(s.tss)} TSS${rangeText(s.tssBand, formatLoad)} · session ${s.session} · gennemsnit af ${weeks}${day}`;
   }

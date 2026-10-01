@@ -53,7 +53,7 @@ function bandSession(s: ProjectedSession): ProjectedSession {
  * DEV_FIXTURE=band: each `recent` row gets low < value < high, growing with its distance (in
  * rows) from the block's end. Dev only; it exists so the band can be drawn before real data has it.
  * CTL grows 0.6/row (~18 wide by the window's end): with the y axis spanning ~±130 a CTL is ~0.6px
- * at 390px, so the old 0.3/row stayed hidden under the 2.5px CTL line for most of the window.
+ * at 390px, and a band much thinner than that hides under the 2.5px CTL line.
  */
 export function illustrativeBands(rows: readonly DailyProjectionRow[]): DailyProjectionRow[] {
   let n = 0;

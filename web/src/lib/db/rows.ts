@@ -426,16 +426,19 @@ export function parseProjectionRow(raw: unknown): DailyProjectionRow {
       return { name: ride.string("name"), tss: ride.numberOrNull("tss"), reason: ride.optionalString("reason") };
     }),
     sessions: basis.array("strength").map((s, i) => {
-      const entry = new Fields(`${PROJECTION_SELECT.table}.basis.strength[${i}]`, s);
       const where = `${table}.basis.strength[${i}]`;
+      const entry = new Fields(where, s);
+      const method = strengthMethod(`${where}.method`, entry.string("method"));
+      const tss = entry.numberOrNull("tss");
       return {
         session: entry.number("session"),
-        tss: entry.numberOrNull("tss"),
+        tss,
         dayEstimated: entry.boolean("day_estimated"),
         reason: entry.optionalString("reason"),
-        method: strengthMethod(`${where}.method`, entry.string("method")),
+        method,
         tssBand: band(`${where}.tss_low/high`, entry.optionalNumber("tss_low"), entry.optionalNumber("tss_high")),
-        recentWeeks: entry.optionalNumber("recent_weeks"),
+        // Python writes recent_weeks with every averaged session; missing is a contract break.
+        recentWeeks: method === "recent" && tss !== null ? entry.number("recent_weeks") : entry.optionalNumber("recent_weeks"),
         unscored: entry.optionalNumber("unscored"),
       };
     }),
