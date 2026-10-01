@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 import openpyxl
 import pytest
 
-from training_load.domain.kg_history import KgState, kg_keys, next_kg_state
+from training_load.domain.kg_history import KgState, gone_states, kg_keys, next_kg_state
 from training_load.domain.strength import Block, StrengthSet
 from training_load.domain.strength_analysis import (
     E1RM_FACTOR,
@@ -268,11 +268,35 @@ def test_an_inserted_row_keeps_the_history_and_a_rename_never_overwrites(
     assert kg_keys([renamed])[set_key(renamed)] not in states
 
 
-def test_same_name_rows_in_a_session_are_told_apart_by_order(make_set: MakeSet) -> None:
+def test_a_top_set_and_a_backoff_never_swap_when_a_same_name_row_is_inserted(
+    make_set: MakeSet,
+) -> None:
     top_set = top(make_set, sheet_row=5)
     backoff = top(make_set, sheet_row=6, prescribed="-10%", logged_kg=126.0)
-    keys = kg_keys([backoff, top_set])
-    assert keys[set_key(top_set)][5] == 1 and keys[set_key(backoff)][5] == 2  # occurrence
+    before = kg_keys([top_set, backoff])
+    # The coach inserts another "Squat" row above both: rows shift, the keys don't.
+    extra = top(make_set, sheet_row=5, prescribed="RPE 7")
+    shifted = [replace(top_set, sheet_row=6), replace(backoff, sheet_row=7)]
+    after = kg_keys([extra, *shifted])
+    assert after[set_key(shifted[0])] == before[set_key(top_set)]
+    assert after[set_key(shifted[1])] == before[set_key(backoff)]
+    assert after[set_key(extra)] not in before.values()
+    twins = [top(make_set, sheet_row=8), top(make_set, sheet_row=9)]  # identical rows
+    twin_keys = kg_keys(twins)
+    assert [twin_keys[set_key(t)][6] for t in twins] == [1, 2]  # occurrence in sheet order
+
+
+def test_a_set_that_leaves_the_sheet_is_marked_gone_and_cleared_when_back(
+    make_set: MakeSet,
+) -> None:
+    s = top(make_set)
+    key = kg_keys([s])[set_key(s)]
+    stored = {key: next_kg_state(None, s, key, "planned", NOW)}
+    [gone] = gone_states(stored, set(), NOW + timedelta(days=1))
+    assert gone.gone_at == NOW + timedelta(days=1) and gone.planned_first_kg == 140.0
+    assert gone_states({key: gone}, set(), NOW + timedelta(days=2)) == []  # already gone
+    back = next_kg_state(gone, s, key, "planned", NOW + timedelta(days=3))
+    assert back.gone_at is None and back.planned_first_kg == 140.0
 
 
 def test_empty_kg_records_nothing(make_set: MakeSet) -> None:

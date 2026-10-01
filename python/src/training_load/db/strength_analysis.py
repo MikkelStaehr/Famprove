@@ -38,12 +38,12 @@ class KgStateRow(TypedDict):
     week: int
     session: int
     name: str
+    prescribed: str  # "" when the load cell is blank
     occurrence: int
     set_no: int
     sheet_row: int
     type: str
     reps_text: str | None
-    prescribed: str | None
     week_start: str
     planned_first_kg: float | None
     planned_first_at: str | None
@@ -53,10 +53,11 @@ class KgStateRow(TypedDict):
     lifted_first_at: str | None
     lifted_changed_at: str | None
     first_seen_at: str
+    gone_at: str | None
 
 
 KG_COLUMNS: Final = ",".join(KgStateRow.__annotations__)
-KG_ORDER: Final = "sheet_id,block,week,session,name,occurrence,set_no"  # the primary key
+KG_ORDER: Final = "sheet_id,block,week,session,name,prescribed,occurrence,set_no"  # the PK
 
 
 def week_row(w: StrengthWeek, computed_at: datetime) -> StrengthWeekRow:
@@ -97,19 +98,19 @@ def _at(value: datetime | None) -> str | None:
 
 
 def kg_row(k: KgState) -> KgStateRow:
-    sheet_id, block, week, session, name, occurrence, set_no = k.key
+    sheet_id, block, week, session, name, prescribed, occurrence, set_no = k.key
     return KgStateRow(
         sheet_id=sheet_id,
         block=block,
         week=week,
         session=session,
         name=name,
+        prescribed=prescribed,
         occurrence=occurrence,
         set_no=set_no,
         sheet_row=k.sheet_row,
         type=k.type,
         reps_text=k.reps_text,
-        prescribed=k.prescribed,
         week_start=k.week_start.isoformat(),
         planned_first_kg=k.planned_first_kg,
         planned_first_at=_at(k.planned_first_at),
@@ -119,6 +120,7 @@ def kg_row(k: KgState) -> KgStateRow:
         lifted_first_at=_at(k.lifted_first_at),
         lifted_changed_at=_at(k.lifted_changed_at),
         first_seen_at=k.first_seen_at.isoformat(),
+        gone_at=_at(k.gone_at),
     )
 
 
@@ -135,6 +137,7 @@ def kg_from_row(row: JsonRow) -> KgState:
         req_int(row, "week"),
         req_int(row, "session"),
         req_str(row, "name"),
+        req_str(row, "prescribed"),
         req_int(row, "occurrence"),
         req_int(row, "set_no"),
     )
@@ -143,7 +146,6 @@ def kg_from_row(row: JsonRow) -> KgState:
         sheet_row=req_int(row, "sheet_row"),
         type=req_str(row, "type"),
         reps_text=opt_str(row, "reps_text"),
-        prescribed=opt_str(row, "prescribed"),
         week_start=req_date(row, "week_start"),
         planned_first_kg=opt_float(row, "planned_first_kg"),
         planned_first_at=_opt_at(row, "planned_first_at"),
@@ -153,6 +155,7 @@ def kg_from_row(row: JsonRow) -> KgState:
         lifted_first_at=_opt_at(row, "lifted_first_at"),
         lifted_changed_at=_opt_at(row, "lifted_changed_at"),
         first_seen_at=datetime.fromisoformat(req_str(row, "first_seen_at")),
+        gone_at=_opt_at(row, "gone_at"),
     )
 
 

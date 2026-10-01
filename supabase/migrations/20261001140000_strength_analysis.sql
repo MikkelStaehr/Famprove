@@ -74,12 +74,12 @@ create table public.strength_set_kg (
   week               smallint         not null check (week > 0),
   session            smallint         not null check (session > 0),
   name               text             not null,
+  prescribed         text             not null,
   occurrence         smallint         not null check (occurrence > 0),
   set_no             smallint         not null check (set_no > 0),
   sheet_row          integer          not null check (sheet_row > 0),
   type               text             not null,
   reps_text          text,
-  prescribed         text,
   week_start         date             not null,
   planned_first_kg   double precision,
   planned_first_at   timestamptz,
@@ -89,7 +89,8 @@ create table public.strength_set_kg (
   lifted_first_at    timestamptz,
   lifted_changed_at  timestamptz,
   first_seen_at      timestamptz      not null,
-  primary key (sheet_id, block, week, session, name, occurrence, set_no),
+  gone_at            timestamptz,
+  primary key (sheet_id, block, week, session, name, prescribed, occurrence, set_no),
   check ((planned_first_kg is null) = (planned_first_at is null)),
   check ((planned_last_kg is null) = (planned_last_at is null)),
   check ((planned_first_kg is null) = (planned_last_kg is null)),
@@ -97,7 +98,9 @@ create table public.strength_set_kg (
 );
 
 comment on table public.strength_set_kg is
-  'Persistent kg history per set (domain.kg_history), updated by compute and never rebuilt. planned_first = first kg seen before the session was done (never overwritten); planned_last = last kg seen before it was done (frozen once done); lifted = kg while the session is done (follows corrections). Planned null = not observed, never "no adjustment". Keyed by what the set is (tab, week, session, exercise name, its occurrence among same-name rows in the session, set number), not by its sheet row: an inserted row keeps its history; a renamed or moved set gets a new row and the old one stays. Rows are never overwritten by another set or deleted.';
+  'Persistent kg history per set (domain.kg_history), updated by compute and never rebuilt. planned_first = first kg seen before the session was done (never overwritten); planned_last = last kg seen before it was done (frozen once done); lifted = kg while the session is done (follows corrections). Planned null = not observed, never "no adjustment". Keyed by what the set is (tab, week, session, exercise name, prescription, its occurrence among identical rows in the session, set number), not by its sheet row: an inserted row keeps its history, and a top set and a back-off of the same exercise never swap. A renamed, re-prescribed or moved set gets a new row; the old one stays with gone_at set (cleared if it comes back). Rows are never overwritten by another set or deleted.';
+comment on column public.strength_set_kg.prescribed is
+  'The coach''s load cell as written (empty text when blank); part of the key, so the prescription that went with the planned kg is kept.';
 
 alter table public.strength_set_kg enable row level security;
 revoke all on table public.strength_set_kg from anon, authenticated;

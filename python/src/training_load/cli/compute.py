@@ -33,7 +33,7 @@ from training_load.db.strength_sets import all_sets
 from training_load.domain.cycling import daily_cycling_tss
 from training_load.domain.daily import build_daily_load
 from training_load.domain.dates import ANALYSIS_START, SERIES_START, today_local
-from training_load.domain.kg_history import kg_keys, next_kg_state
+from training_load.domain.kg_history import gone_states, kg_keys, next_kg_state
 from training_load.domain.load import DECAY
 from training_load.domain.projection import MODEL_VERSION, PlannedRide, naive_projection, project
 from training_load.domain.ride_analysis import analyse_rides, weekly_totals
@@ -140,7 +140,11 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         after = next_kg_state(before, st, key, statuses[set_key(st)], computed_at)
         if after != before:
             changed.append(after)
+    gone = gone_states(previous, set(keys.values()), computed_at)
+    changed += gone
     upsert_kg_states(db, changed)
+    if gone:
+        log.info("%d strength_set_kg rows no longer in the sheet (gone_at set)", len(gone))
     if analysis.e1rm_out_of_bounds:
         log.warning("%d sets left out of e1RM (implausible value)", analysis.e1rm_out_of_bounds)
 
