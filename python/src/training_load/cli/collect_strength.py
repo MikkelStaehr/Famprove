@@ -106,6 +106,7 @@ def to_domain(parsed: ParsedSet, sheet_id: str, slot: SessionSlot) -> StrengthSe
         prescribed=parsed["prescribed"],
         sets_text=parsed["sets_text"],
         reps_text=parsed["reps_text"],
+        e1rm=parsed["e1rm"],
     )
 
 

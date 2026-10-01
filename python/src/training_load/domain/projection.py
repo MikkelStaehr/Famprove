@@ -4,12 +4,15 @@ Python owns the numbers; the web only draws them. Every future load is an ESTIMA
 with the user, 2026-09-30):
   cycling   a planned ride's TSS replaces that day (NP-style from its steps' %FTP); every other
             day gets the typical week: mean cycling TSS per weekday over the last TYPICAL_DAYS.
-  strength  each session still to do gets the mean TSS of the last SESSION_HISTORY done
-            sessions with the same number, on the user's typical weekday for that number (the
-            most common one over the last WEEKDAY_WEEKS ISO weeks; if none, spread evenly:
-            round(i * 7 / N)). A session whose day has passed this week moves to the next free
-            day from tomorrow. Weeks the sheet hasn't planned yet repeat the latest planned
-            week's session count ("the pattern continues").
+  strength  inside the block ("plan"): every session still to do is scored from the coach's
+            prescription with the unchanged score formula and planned kg (domain.planned_load),
+            times STRENGTH_K, assuming every planned session is done (decided 2026-10-01).
+            After the block ("recent"): the mean weekly strength TSS of the last RECENT_WEEKS
+            completed, non-deload weeks, split over the sessions, with their min-max as a band.
+            Sessions land on the user's typical weekday for that number (the most common one
+            over the last WEEKDAY_WEEKS ISO weeks; if none, spread evenly: round(i * 7 / N)). A
+            session whose day has passed this week moves to the next free day from tomorrow.
+            Weeks the sheet hasn't planned repeat the latest planned week's session count.
 The state going into tomorrow is today's CTL/ATL, decayed with load.DECAY. Nothing becomes a
 silent 0: an unreadable planned ride, a session number without done history and a session that
 no longer fits this week are all listed in the day's ``basis``.
@@ -25,13 +28,17 @@ from typing import Final
 from training_load.domain.daily import DailyLoad
 from training_load.domain.load import DECAY, Decay, LoadState, ctl_atl
 from training_load.domain.plan import PlanError, PlanItem, Repeat, parse_steps
+from training_load.domain.planned_load import planned_session_score
 from training_load.domain.sessions import StrengthSession
 from training_load.domain.strength import StrengthSet, iso_week_start
 
 HORIZON_DAYS: Final = 56
 TYPICAL_DAYS: Final = 28
-SESSION_HISTORY: Final = 3
+RECENT_WEEKS: Final = 4
 WEEKDAY_WEEKS: Final = 4
+NAIVE_DAYS: Final = 28
+MODEL_VERSION: Final = "plan-v1"
+"""Bump when the forecast method changes: forecast_log compares errors per version."""
 
 # basis is stored as jsonb and only ever read as JSON: a JSON object, by construction.
 type Basis = dict[str, object]
@@ -57,6 +64,11 @@ class ProjectedDay:
     atl: float
     tsb: float
     basis: Basis
+    strength_method: str = "plan"  # "plan" inside the block, "recent" after it
+    # The band (low, high) per metric: None inside the block, where the plan is used.
+    ctl_band: tuple[float, float] | None = None
+    atl_band: tuple[float, float] | None = None
+    tsb_band: tuple[float, float] | None = None
 
 
 def _flat_steps(items: Iterable[PlanItem]) -> Iterator[tuple[float, float]]:
@@ -112,14 +124,31 @@ def spread_weekday(session: int, count: int) -> int:
     return min(6, round((session - 1) * 7 / count))
 
 
-def session_estimate(sessions: Sequence[StrengthSession], session: int) -> float | None:
-    """Mean TSS of the last SESSION_HISTORY done planned sessions with this number, or None."""
-    done = sorted(
-        (s for s in sessions if s.session == session and s.date and s.block is not None),
-        key=lambda s: s.date or date.min,
-        reverse=True,
-    )[:SESSION_HISTORY]
-    return sum(s.tss for s in done) / len(done) if done else None
+@dataclass(frozen=True, slots=True)
+class RecentWeeks:
+    """Weekly strength TSS of the last RECENT_WEEKS completed, non-deload weeks."""
+
+    mean: float
+    low: float
+    high: float
+    weeks: int
+
+
+def recent_weeks(
+    sessions: Sequence[StrengthSession], today: date, deload_weeks: Iterable[date] = ()
+) -> RecentWeeks | None:
+    """Done planned sessions per ISO week before this week, deload weeks left out; None if none."""
+    this_week = iso_week_start(today)
+    skip = set(deload_weeks)
+    totals: dict[date, float] = {}
+    for s in sessions:
+        done = s.date is not None and s.block is not None
+        if done and s.week_start < this_week and s.week_start not in skip:
+            totals[s.week_start] = totals.get(s.week_start, 0.0) + s.tss
+    latest = [totals[w] for w in sorted(totals)[-RECENT_WEEKS:]]
+    if not latest:
+        return None
+    return RecentWeeks(sum(latest) / len(latest), min(latest), max(latest), len(latest))
 
 
 def planned_counts(sets: Sequence[StrengthSet]) -> dict[date, int]:
@@ -130,11 +159,51 @@ def planned_counts(sets: Sequence[StrengthSet]) -> dict[date, int]:
     return {week: len(numbers) for week, numbers in by_week.items()}
 
 
+def _session_load(
+    week: date,
+    n: int,
+    count: int,
+    counts: dict[date, int],
+    sets: Sequence[StrengthSet],
+    recent: RecentWeeks | None,
+    strength_k: float,
+) -> Basis:
+    """The strength TSS of session ``n`` in ``week``: from the plan, or the recent weeks."""
+    if week in counts:
+        session_sets = [s for s in sets if s.week_start == week and s.session == n]
+        planned = planned_session_score(session_sets, sets)
+        scored = planned.sets - planned.unscored
+        entry: Basis = {
+            "method": "plan",
+            "tss": planned.score * strength_k if scored else None,
+            "unscored": planned.unscored,
+            "kg_sources": planned.sources,
+        }
+        if not scored:
+            entry["reason"] = "no kg for any set in the plan"
+        return entry
+    if recent is None:
+        return {"method": "recent", "tss": None, "reason": "no recent weeks to average"}
+    return {
+        "method": "recent",
+        "tss": recent.mean / count,
+        "tss_low": recent.low / count,
+        "tss_high": recent.high / count,
+        "recent_weeks": recent.weeks,
+    }
+
+
 def _strength_plan(
-    sessions: Sequence[StrengthSession], sets: Sequence[StrengthSet], today: date, last: date
+    sessions: Sequence[StrengthSession],
+    sets: Sequence[StrengthSet],
+    today: date,
+    last: date,
+    strength_k: float,
+    deload_weeks: Iterable[date],
 ) -> dict[date, list[Basis]]:
     """Per future day: the strength sessions placed on it (see the module docstring)."""
     counts = planned_counts(sets)
+    recent = recent_weeks(sessions, today, deload_weeks)
     weekdays = learnt_weekdays(sessions, today)
     this_week = iso_week_start(today)
     done_this_week = sum(1 for s in sessions if s.week_start == this_week and s.date)
@@ -174,17 +243,14 @@ def _strength_plan(
                     continue
                 day, moved = free[0], True
             if tomorrow <= day <= last:
-                estimate = session_estimate(sessions, n)
                 entry: Basis = {
                     "session": n,
-                    "tss": estimate,
                     "weekday": "learnt" if learnt else "spread",
                     "moved": moved,
                     "day_estimated": moved or not learnt,
                     "planned_in_sheet": week in counts,
+                    **_session_load(week, n, latest_count, counts, sets, recent, strength_k),
                 }
-                if estimate is None:
-                    entry["reason"] = "no done session with this number to learn from"
                 placed.setdefault(day, []).append(entry)
         week += timedelta(weeks=1)
     return placed
@@ -197,17 +263,21 @@ def project(
     rides: Sequence[PlannedRide],
     *,
     today: date,
+    strength_k: float,
+    deload_weeks: Iterable[date] = (),
     decay: Decay = DECAY,
 ) -> list[ProjectedDay]:
     """HORIZON_DAYS projected days, tomorrow .. today + HORIZON_DAYS, seeded from today's row.
 
     ``days`` is the daily_load series just computed (its last row must be ``today``).
+    ``deload_weeks`` (ISO week starts) are left out of the "recent" average.
     """
     if not days or days[-1].date != today:
         raise ValueError("the projection starts from today's daily_load row")
     last = today + timedelta(days=HORIZON_DAYS)
     typical = typical_cycling(days, today)
-    strength = _strength_plan(sessions, sets, today, last)
+    counts = planned_counts(sets)
+    strength = _strength_plan(sessions, sets, today, last, strength_k, deload_weeks)
 
     rides_by_day: dict[date, list[Basis]] = {}
     for ride in rides:
@@ -226,6 +296,8 @@ def project(
     dates = [today + timedelta(days=i) for i in range(1, HORIZON_DAYS + 1)]
     cycling: list[float] = []
     lifting: list[float] = []
+    lifting_low: list[float] = []
+    lifting_high: list[float] = []
     bases: list[Basis] = []
     for d in dates:
         planned = rides_by_day.get(d, [])
@@ -238,17 +310,67 @@ def project(
         strength_load = sum(t for p in placed if isinstance(t := p["tss"], float))
         cycling.append(ride_load)
         lifting.append(strength_load)
+        lifting_low.append(
+            sum(t for p in placed if isinstance(t := p.get("tss_low", p["tss"]), float))
+        )
+        lifting_high.append(
+            sum(t for p in placed if isinstance(t := p.get("tss_high", p["tss"]), float))
+        )
         bases.append({"cycling": source, "rides": planned, "strength": placed})
 
-    seed = days[-1]
-    states = ctl_atl(
-        [c + s for c, s in zip(cycling, lifting, strict=True)],
-        decay=decay,
-        initial=LoadState(ctl=seed.ctl, atl=seed.atl, tsb=seed.tsb),
-    )
+    seed = LoadState(ctl=days[-1].ctl, atl=days[-1].atl, tsb=days[-1].tsb)
+
+    def run(strength_series: Sequence[float]) -> list[LoadState]:
+        loads = [c + s for c, s in zip(cycling, strength_series, strict=True)]
+        return ctl_atl(loads, decay=decay, initial=seed)
+
+    states, lows, highs = run(lifting), run(lifting_low), run(lifting_high)
+    result: list[ProjectedDay] = []
+    for i, d in enumerate(dates):
+        in_block = iso_week_start(d) in counts
+        st, lo, hi = states[i], lows[i], highs[i]
+        result.append(
+            ProjectedDay(
+                date=d,
+                cycling_tss=cycling[i],
+                strength_tss=lifting[i],
+                ctl=st.ctl,
+                atl=st.atl,
+                tsb=st.tsb,
+                basis=bases[i],
+                strength_method="plan" if in_block else "recent",
+                ctl_band=None if in_block else (min(lo.ctl, hi.ctl), max(lo.ctl, hi.ctl)),
+                atl_band=None if in_block else (min(lo.atl, hi.atl), max(lo.atl, hi.atl)),
+                tsb_band=None if in_block else (min(lo.tsb, hi.tsb), max(lo.tsb, hi.tsb)),
+            )
+        )
+    return result
+
+
+def naive_projection(
+    days: Sequence[DailyLoad], *, today: date, decay: Decay = DECAY
+) -> list[ProjectedDay]:
+    """The baseline to beat: "the next 8 weeks look like the last 4". Every future day gets the
+    mean cycling and strength TSS of the NAIVE_DAYS before today, run through the same decay."""
+    if not days or days[-1].date != today:
+        raise ValueError("the projection starts from today's daily_load row")
+    first = today - timedelta(days=NAIVE_DAYS)
+    window = [d for d in days if first <= d.date < today]
+    cycling = sum(d.cycling_tss for d in window) / len(window) if window else 0.0
+    strength = sum(d.strength_tss for d in window) / len(window) if window else 0.0
+    seed = LoadState(ctl=days[-1].ctl, atl=days[-1].atl, tsb=days[-1].tsb)
+    states = ctl_atl([cycling + strength] * HORIZON_DAYS, decay=decay, initial=seed)
+    basis: Basis = {"naive_days": len(window)}
     return [
         ProjectedDay(
-            date=d, cycling_tss=c, strength_tss=s, ctl=st.ctl, atl=st.atl, tsb=st.tsb, basis=b
+            date=today + timedelta(days=i + 1),
+            cycling_tss=cycling,
+            strength_tss=strength,
+            ctl=st.ctl,
+            atl=st.atl,
+            tsb=st.tsb,
+            basis=basis,
+            strength_method="recent",
         )
-        for d, c, s, st, b in zip(dates, cycling, lifting, states, bases, strict=True)
+        for i, st in enumerate(states)
     ]

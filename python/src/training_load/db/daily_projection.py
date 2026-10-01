@@ -18,7 +18,22 @@ class DailyProjectionRow(TypedDict):
     atl: float
     tsb: float
     basis: Basis
+    strength_method: str
+    ctl_low: float | None
+    ctl_high: float | None
+    atl_low: float | None
+    atl_high: float | None
+    tsb_low: float | None
+    tsb_high: float | None
     computed_at: str  # ISO timestamptz (UTC), the same on every row of one compute run
+
+
+def _low(band: tuple[float, float] | None) -> float | None:
+    return band[0] if band else None
+
+
+def _high(band: tuple[float, float] | None) -> float | None:
+    return band[1] if band else None
 
 
 def to_row(day: ProjectedDay, computed_at: datetime) -> DailyProjectionRow:
@@ -30,6 +45,13 @@ def to_row(day: ProjectedDay, computed_at: datetime) -> DailyProjectionRow:
         atl=day.atl,
         tsb=day.tsb,
         basis=day.basis,
+        strength_method=day.strength_method,
+        ctl_low=_low(day.ctl_band),
+        ctl_high=_high(day.ctl_band),
+        atl_low=_low(day.atl_band),
+        atl_high=_high(day.atl_band),
+        tsb_low=_low(day.tsb_band),
+        tsb_high=_high(day.tsb_band),
         computed_at=computed_at.isoformat(),
     )
 

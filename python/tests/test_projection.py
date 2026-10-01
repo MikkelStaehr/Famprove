@@ -64,7 +64,7 @@ def test_ride_tss_is_np_style() -> None:
 
 def test_no_load_is_pure_decay_seeded_from_today() -> None:
     days = history({date(2026, 6, 1): 400.0})  # load long before the typical-week window
-    [*_, last] = project(days, [], [], [], today=TODAY, decay=Decay.EXPONENTIAL)
+    [*_, last] = project(days, [], [], [], strength_k=0.1, today=TODAY, decay=Decay.EXPONENTIAL)
     seed = days[-1]
     assert last.date == TODAY + timedelta(days=HORIZON_DAYS)
     assert last.ctl == pytest.approx(seed.ctl * math.exp(-HORIZON_DAYS / 42), abs=1e-9)
@@ -77,7 +77,9 @@ def test_typical_week_and_a_planned_ride_that_replaces_it() -> None:
         PlannedRide(date(2026, 10, 8), "Zwift", [{"minutes": 60, "pct_ftp": 100}]),
         PlannedRide(date(2026, 10, 15), "Broken", [{"minutes": "x"}]),
     ]
-    days = project(history(thursdays), [], [], rides, today=TODAY, decay=Decay.EXPONENTIAL)
+    days = project(
+        history(thursdays), [], [], rides, strength_k=0.1, today=TODAY, decay=Decay.EXPONENTIAL
+    )
     by_day = {d.date: d for d in days}
     assert by_day[date(2026, 10, 1)].cycling_tss == pytest.approx(60.0)  # a typical Thursday
     assert by_day[date(2026, 10, 1)].basis["cycling"] == "typical_week"
@@ -108,22 +110,26 @@ def test_strength_sessions_are_placed_estimated_and_continue_the_pattern(make_se
         planned(WEEK_40, 2),
         planned(WEEK_40, 3),
     ]
-    days = project(history(), sessions, sets, [], today=TODAY, decay=Decay.EXPONENTIAL)
+    days = project(
+        history(), sessions, sets, [], strength_k=0.1, today=TODAY, decay=Decay.EXPONENTIAL
+    )
     by_day = {d.date: d for d in days}
     # Session 2 has no history: spread over 3 -> Wednesday (today) has passed -> moves to Thu.
     thu = entries(by_day[date(2026, 10, 1)], "strength")
     assert [(e["session"], e["day_estimated"], e["moved"]) for e in thu] == [(2, True, True)]
-    assert thu[0]["tss"] is None and "reason" in thu[0]
-    # Next week repeats the 3 sessions; session 1 lands on its learnt Tuesday with its mean TSS.
+    assert thu[0]["method"] == "plan" and thu[0]["tss"] == pytest.approx(10.0)  # score 100 x K
+    # Next week repeats the 3 sessions; session 1 lands on its learnt Tuesday. Week 41 isn't in
+    # this fixture's sheet and no week before this one is complete: honestly unknown, not 0.
     tue = by_day[date(2026, 10, 6)]
-    assert tue.strength_tss == pytest.approx(150.0)
-    assert entries(tue, "strength")[0]["day_estimated"] is False
+    [s1] = entries(tue, "strength")
+    assert s1["day_estimated"] is False and s1["method"] == "recent"
+    assert s1["tss"] is None and s1["reason"] == "no recent weeks to average"
     assert sum(1 for d in days if entries(d, "strength")) >= 3 * 7  # 8 weeks of sessions
 
 
 def test_projection_starts_from_today_only() -> None:
     with pytest.raises(ValueError, match="today"):
-        project(history(), [], [], [], today=TODAY + timedelta(days=1))
+        project(history(), [], [], [], strength_k=0.1, today=TODAY + timedelta(days=1))
 
 
 def test_every_strength_entry_has_the_same_keys_even_on_a_sunday(make_set: MakeSet) -> None:
@@ -132,7 +138,9 @@ def test_every_strength_entry_has_the_same_keys_even_on_a_sunday(make_set: MakeS
     sets = [make_set(week_start=WEEK_40, session=n, sheet_row=n) for n in (1, 2, 3)]
     sessions = [done(WEEK_40, 1, date(2026, 9, 29)), planned(WEEK_40, 2), planned(WEEK_40, 3)]
     days = build_daily_load({}, {}, start=date(2026, 1, 1), end=sunday, decay=Decay.EXPONENTIAL)
-    projected = project(days, sessions, sets, [], today=sunday, decay=Decay.EXPONENTIAL)
+    projected = project(
+        days, sessions, sets, [], strength_k=0.1, today=sunday, decay=Decay.EXPONENTIAL
+    )
     all_entries = [e for d in projected for e in entries(d, "strength")]
     keys = {"session", "tss", "weekday", "moved", "day_estimated", "planned_in_sheet"}
     assert all(keys <= e.keys() for e in all_entries)

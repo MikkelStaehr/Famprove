@@ -99,6 +99,7 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 - "updated <time>" from the latest `daily_load` row; stale when older than 26 h.
 - Deploy on Vercel behind Vercel Authentication, scope "All Deployments" (tech-lead: free on Hobby, no auth code; Password Protection needs Pro + $20/mo). Root directory `web`.
 - No auth UI, no settings page. pnpm, TypeScript strict, Tailwind; the simplest chart library that meets `DESIGN.md`.
+- Prognose (decided 2026-10-01): cycling = the typical week of the last 28 days, planned rides replace their day. Strength = every remaining session of the current block scored from the coach's plan with the sheet formula (planned kg rules in `domain/planned_load.py`; 100 % completion; deload weeks as prescribed; a missed past session is dropped), on the learnt weekday per session number, else spread evenly. After the block: mean weekly TSS of the last 4 completed non-deload weeks, with their min-max as a band. Each run logs its prognose and a naive baseline (28-day mean held flat) in `forecast_log`; the last run of a day wins. Phase 2 (after 3-4 blocks): calibrate with explainable statistics only, measured as MAE of CTL/TSB at 7/28/56 days vs the baseline.
 - Routes: `/` = Today (what to do in the gym or on the bike today; spec `design/specs/today.md`), `/load` = the load dashboard (unchanged), a small nav between them.
 
 ## How we work: size every task first

@@ -16,6 +16,7 @@ from training_load.db.blocks import sync_blocks
 from training_load.db.client import Postgrest
 from training_load.db.daily_load import sync_daily_load
 from training_load.db.daily_projection import sync_projection
+from training_load.db.forecast_log import log_forecast
 from training_load.db.planned import all_sessions
 from training_load.db.strength_activities import all_strength_activities
 from training_load.db.strength_sessions import sync_strength_sessions
@@ -24,9 +25,9 @@ from training_load.domain.cycling import daily_cycling_tss
 from training_load.domain.daily import build_daily_load
 from training_load.domain.dates import SERIES_START, today_local
 from training_load.domain.load import DECAY
-from training_load.domain.projection import PlannedRide, project
+from training_load.domain.projection import MODEL_VERSION, PlannedRide, naive_projection, project
 from training_load.domain.sessions import daily_strength_tss, match_sessions
-from training_load.domain.strength import derive_blocks
+from training_load.domain.strength import derive_blocks, iso_week_start
 from training_load.http import requests_send
 
 log = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class ComputeSummary:
     ignored_outside_range: int  # loads dated before SERIES_START or after today
     blocks: int
     projected_days: int
+    logged_forecast_rows: int
     projection_notes: int  # unreadable planned rides / sessions without history or a day
 
 
@@ -53,8 +55,9 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     4. build_daily_load(start=SERIES_START, end=today) with load.DECAY
     5. sync_daily_load(start=SERIES_START, end=today, computed_at=run start, UTC)
     6. sync_blocks(derive_blocks(sets, today))
-    7. project the next 56 days (domain.projection) from today's state, the typical week,
-       planned_sessions and the strength sessions -> sync_projection
+    7. project the next 56 days (domain.projection) from today's state: the typical week and
+       planned_sessions for cycling, the coach's plan (then the recent weeks) for strength ->
+       sync_projection; log it with the naive baseline in forecast_log (made_on = today)
     """
     activities = all_activities(db)
     sets = all_sets(db)
@@ -71,8 +74,26 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     sync_blocks(db, blocks)
 
     rides = [PlannedRide(date=p.date, name=p.name, steps=p.steps) for p in all_sessions(db)]
-    projection = project(days, sessions, sets, rides, today=today, decay=DECAY)
+    deload_weeks = {iso_week_start(b.deload_start) for b in blocks if b.deload_start}
+    projection = project(
+        days,
+        sessions,
+        sets,
+        rides,
+        today=today,
+        strength_k=strength_k,
+        deload_weeks=deload_weeks,
+        decay=DECAY,
+    )
     sync_projection(db, projection, computed_at=computed_at)
+    logged = log_forecast(
+        db,
+        made_on=today,
+        model=projection,
+        naive=naive_projection(days, today=today, decay=DECAY),
+        params={"model_version": MODEL_VERSION, "strength_k": strength_k, "decay": DECAY.value},
+        computed_at=computed_at,
+    )
     notes = sum(
         1
         for p in projection
@@ -97,6 +118,7 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         ignored_outside_range=ignored,
         blocks=len(blocks),
         projected_days=len(projection),
+        logged_forecast_rows=logged,
         projection_notes=notes,
     )
 

@@ -13,7 +13,8 @@ GitHub Actions daily.yml (≈05:00 Copenhagen; also "Run workflow")
   collect-strength   Google Drive xlsx export (read)    → strength_sets (ISO week + session 1..N, no dates)
   compute            activities + strength_sets + strength_activities
                                                         → strength_sessions, daily_load, blocks (+ view weekly_load),
-                                                          daily_projection (the 56-day prognose; + planned_sessions)
+                                                          daily_projection (the 56-day prognose; + planned_sessions),
+                                                          forecast_log (that prognose + a naive baseline, per run day)
   collect-plan       planned_sessions (hand-filled) + FTP from intervals.icu → planned_targets
 
 Next.js (web/), server components only
@@ -25,7 +26,7 @@ Next.js (web/), server components only
 | Path | What lives there |
 |---|---|
 | `python/src/training_load/sources/` | Adapters that read the outside world: `intervals.py`, `google_drive.py`, `strength_sheet.py` (the coach-sheet parser and strength formula; formula lines never change) |
-| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: typical week, planned rides, strength estimates), `dates.py` |
+| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: cycling = typical week + planned rides; strength = the coach's plan to the block's end, then the recent weeks with a low-high band; `naive_projection` = the baseline), `planned_load.py` (planned kg per set and the plan score of a session), `dates.py` |
 | `python/src/training_load/db/` | The only code that talks to Supabase (PostgREST over `requests`), one module per table |
 | `python/src/training_load/cli/` | The five console scripts, one per step of the daily job (`check-config` first) |
 | `python/src/training_load/*.py` | `config.py` (env, fail-fast), `http.py` (retrying HTTP seam), `narrow.py` (JSON → typed fields) |
@@ -45,7 +46,8 @@ Next.js (web/), server components only
 `strength_sessions` (derived: per ISO week and session number, the activity that did it, its date, TSS) ·
 `daily_load` (one row per day since 2026-01-01: TSS, CTL, ATL, TSB, ramp, zone, `computed_at`) ·
 `blocks` (strength blocks + deload) · `weekly_load` (view) · `planned_sessions` (you fill) ·
-`planned_targets` (derived watts) · `daily_projection` (the prognose, next 56 days, rebuilt by `compute`; estimates only).
+`planned_targets` (derived watts) · `daily_projection` (the prognose, next 56 days, rebuilt by `compute`; estimates only) ·
+`forecast_log` (every run day's prognose and naive baseline, upserted per day, never pruned: for measuring forecast error later).
 
 ## Commands
 - Python, from `python/` (reads repo-root `.env.local`): `uv run check-config` · `uv run collect-intervals [--since 2026-01-01]`,

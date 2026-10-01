@@ -63,6 +63,7 @@ class StrengthSet:
     prescribed: str | None = None  # coach's load cell as text; display only
     sets_text: str | None = None  # coach's sets cell as written; display only
     reps_text: str | None = None  # coach's reps cell as written (e.g. "8 - 12"); display only
+    e1rm: float | None = None  # the tab's 1RM for this lift (main lifts only), for planned kg
 
 
 @dataclass(frozen=True, slots=True)

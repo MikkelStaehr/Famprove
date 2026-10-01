@@ -29,6 +29,7 @@ class ParsedSet(TypedDict):
     prescribed: str | None  # foreskrevet load-celle som tekst (fx 'RPE 7 - 8'), kun til visning
     sets_text: str | None   # sets-cellen som skrevet (fx '2'), kun til visning
     reps_text: str | None   # reps-cellen som skrevet (fx '8 - 12'), kun til visning
+    e1rm: float | None      # fanens 1RM for sættets løft (SQUAT/BENCH/DEADLIFT), ellers None
     score: float          # rå score, før STRENGTH_K
 
 ABS_SET_SCORE = 10*20*(0.6**2)   # fast score pr. abs-sæt (10 reps @ 20 kg RPE 6)
@@ -80,6 +81,22 @@ ROW_WITHOUT_TYPE = "prescribed row without type"
 
 E1RM_RANGE = (20.0, 400.0)   # kg; et 1RM udenfor er aldrig et rigtigt 1RM
 E1RM_OUT_OF_RANGE = "1RM out of range"
+
+def set_score(typ, name, reps, kg, load, bodyweight, e1rm):
+    """Score for ét sæt: formlen fra strength_collector.py, uændret (flyttet hertil så prognosen
+    kan genbruge den). kg = logget kg (0 hvis tom). Returnerer (kg brugt, rpe, score, kropsvægt?)."""
+    bw = any(b in name.lower() for b in BODYWEIGHT_EX)
+    if typ == "ABS":
+        score = ABS_SET_SCORE; rpe=None
+    else:
+        if bw: kg += bodyweight
+        main = typ in e1rm and "tempo" not in name.lower()   # tempo ≈ 20-25% lettere, brug foreskrevet RPE
+        rpe = rpe_from_pct(kg/e1rm[typ], reps) if (main and kg) else None
+        if rpe is None: rpe = mid(load) if isinstance(load,str) and "RPE" in str(load) else None
+        if rpe is None: rpe = 6.0     # ukendt (fx -10% uden kg endnu)
+        factor = 1.0 if typ.startswith(LEG_TYPES) else 0.6
+        score = reps * kg * (rpe/10)**2 * factor
+    return kg, rpe, score, bw
 
 def read_e1rm(rows, issues: Counter[str]) -> dict[str, float]:
     """1RM pr. løft fra fanens top (de første 15 rækker): løftets navn med tallet 5 kolonner til højre.
@@ -144,20 +161,11 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
             nsets, reps = int(mid(nsets)), mid(reps)
             kg = float(kg) if isinstance(kg,(int,float)) else 0.0
             logged = kg
-            bw = any(b in name.lower() for b in BODYWEIGHT_EX)
-            if typ == "ABS":
-                score = ABS_SET_SCORE; rpe=None
-            else:
-                if bw: kg += bodyweight
-                main = typ in e1rm and "tempo" not in name.lower()   # tempo ≈ 20-25% lettere, brug foreskrevet RPE
-                rpe = rpe_from_pct(kg/e1rm[typ], reps) if (main and kg) else None
-                if rpe is None: rpe = mid(load) if isinstance(load,str) and "RPE" in str(load) else None
-                if rpe is None: rpe = 6.0     # ukendt (fx -10% uden kg endnu)
-                factor = 1.0 if typ.startswith(LEG_TYPES) else 0.6
-                score = reps * kg * (rpe/10)**2 * factor
+            kg, rpe, score, bw = set_score(typ, name, reps, kg, load, bodyweight, e1rm)
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
                                       prescribed=prescribed_text(load),
-                                      sets_text=sets_text, reps_text=reps_text))
+                                      sets_text=sets_text, reps_text=reps_text,
+                                      e1rm=e1rm.get(typ)))
     return sets
