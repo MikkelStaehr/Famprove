@@ -11,7 +11,7 @@ Personal training-load app for one user. It combines cycling (intervals.icu) and
 
 ## Commands
 All Python commands run from `python/` (they read the repo-root `.env.local`).
-- run: `uv run collect-intervals [--since 2026-01-01]` · `uv run collect-strength` · `uv run compute` · `uv run collect-plan` (in that order)
+- run: `uv run collect-intervals [--since 2024-12-30]` · `uv run collect-strength` · `uv run compute` · `uv run collect-plan` (in that order)
 - test: `uv run pytest` (offline, synthetic fixtures) · `uv run pytest -m live` (hits intervals.icu, read-only)
 - lint: `uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy`
 - db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
@@ -84,7 +84,7 @@ Decisions (agreed with the user):
 - Block = tab name; start = first week's ISO Monday; end = last filled week; deload = last filled week of each tab. Derived from the sheet — no hand-kept list.
 - Cycling = intervals.icu types `Ride` and `VirtualRide` only. `WeightTraining` only dates strength sessions (its own load is never used); everything else is excluded.
 - Cycling TSS = intervals.icu's own load value as-is; rides without power use its HR-based load (never skipped).
-- Backfill from 2026-01-01 with CTL = ATL = 0 on that date. Strength only from the current workbook (blok 11 onward).
+- Backfill from 2026-01-01 with CTL = ATL = 0 on that date. Strength only from the current workbook (blok 11 onward). Rides are backfilled from 2024-12-30 (the ISO week of 2025-01-01) for the ride analysis only; `daily_load`/CTL still start 2026-01-01 (decided 2026-10-01: starting CTL in 2025 changes 2026 CTL by ≤ 1.5 and today's by 0.00).
 - CTL/ATL use intervals.icu's exponential form: `x_t = x_{t-1}·w + load_t·(1 − w)`, `w = e^(−1/τ)`, τ = 42 / 7. TSB = CTL − ATL (same day). 1/τ (TrainingPeaks) stays available as `Decay.INVERSE_TAU`.
 - Cycling-only CTL must match intervals.icu — enforced by a test.
 - Weekly figure = ISO week (Mon–Sun), as a SQL view over `daily_load`.
@@ -103,7 +103,8 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 - Deploy on Vercel behind Vercel Authentication, scope "All Deployments" (tech-lead: free on Hobby, no auth code; Password Protection needs Pro + $20/mo). Root directory `web`.
 - No auth UI, no settings page. pnpm, TypeScript strict, Tailwind; the simplest chart library that meets `DESIGN.md`.
 - Prognose (decided 2026-10-01): cycling = the typical week of the last 28 days, planned rides replace their day. Strength = every remaining session of the current block scored from the coach's plan with the sheet formula (planned kg rules in `domain/planned_load.py`; 100 % completion; deload weeks as prescribed; a missed past session is dropped), on the learnt weekday per session number, else spread evenly. After the block: mean weekly TSS of the last 4 completed non-deload weeks, with their min-max as a band. Each run logs its prognose and a naive baseline (28-day mean held flat) in `forecast_log`; the last run of a day wins. Phase 2 (after 3-4 blocks): calibrate with explainable statistics only, measured as MAE of CTL/TSB at 7/28/56 days vs the baseline.
-- Routes: `/` = Today (what to do in the gym or on the bike today; spec `design/specs/today.md`), `/load` = the load dashboard (unchanged), a small nav between them.
+- Routes: `/` = Today (what to do in the gym or on the bike today; spec `design/specs/today.md`), `/load` = the load dashboard (unchanged), `/analyse` = Analyse (Cykel now; spec `design/specs/analyse.md`), a small nav between them.
+- Analyse / Cykel (decided 2026-10-01): rides since 2024-12-30 (the ISO week of 2025-01-01) in `ride_metrics` + `cycling_weeks`, computed in `domain/ride_analysis.py`. Exclusions (too_short < 5 min or < 1 km, power_outlier, hr_outlier) are analytics-only and shown with a reason; weekly hours (moving time) and load count every ride. eFTP = intervals.icu's `icu_rolling_ftp` on each real-power ride; EF = NP / avg HR on endurance rides ≥ 30 min, 28-day median; lines break after > 21 days. The endurance intensity basis is one switch, `ENDURANCE`.
 
 ## How we work: size every task first
 Before starting, the main session states the **size (S/M/L), the steps and the time budget** to the user. The user can change it.

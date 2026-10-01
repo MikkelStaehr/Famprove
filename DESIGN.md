@@ -10,7 +10,7 @@ When Part B and a pattern pack conflict, Part B wins on look and the pack wins o
 ---
 
 ## Product profile
-- **Product type:** personal training companion. Two screens: **I dag** (what to do in today's session) and **Belastning** (fitness, fatigue and form over time).
+- **Product type:** personal training companion. Three screens: **I dag** (what to do in today's session), **Belastning** (fitness, fatigue and form over time) and **Analyse** (am I getting fitter: Cykel now, Styrke and Samlet later).
 - **Primary users & context:** one user. On the phone in the gym between sets — a quick glance at arm's length, one hand, sweaty fingers — and at home; at the desk to review load.
 - **Platform:** mobile web (home-screen bookmark), desktop browser for review. Next.js on Vercel.
 - **Locale:** da-DK. Danish UI copy ("I dag", "Belastning", "2 af 8 udført"). Dates `ons. 30. sep.`, times `kl. 09.31`, decimal comma. Exercise names and sheet cells are shown **exactly as written** in the coach's sheet (often English: "Lat pulldowns", "Bicep of choice").
@@ -53,7 +53,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - `StatusBadge` – text + semantic colour.
 - `EmptyState` – icon, one sentence, optional action.
 - `ErrorState` – what failed, when, retry.
-- `ScreenNav` – two-tab strip in the root layout; current tab = `aria-current="page"`, marked by weight **and** a bar or fill, never colour alone.
+- `ScreenNav` – tab strip (three links: I dag · Belastning · Analyse) in the root layout; current tab = `aria-current="page"`, marked by weight **and** a bar or fill, never colour alone.
 
 ## Interaction
 - Touch targets ≥ 44×44px. Tap, not hover, for anything essential.
@@ -83,9 +83,10 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - No decoration that serves neither the direction nor the hierarchy.
 
 ## Project rules
-- **Screens:** two routes linked by a two-tab `ScreenNav` ("I dag" · "Belastning"). All UI copy is Danish; the exact strings live in `design/specs/today.md` §5a and `design/specs/load.md` §4 and §6.
+- **Screens:** three routes linked by `ScreenNav` ("I dag" · "Belastning" · "Analyse"). All UI copy is Danish; the exact strings live in `design/specs/today.md` §5a, `design/specs/load.md` §4 and §6, and `design/specs/analyse.md` §6.
   - `/` **Today / I dag** answers "What am I doing in this session, and how hard?" (spec `design/specs/today.md`, rules in "Today" below).
   - `/load` **Training load / Belastning** answers "How loaded am I right now, and is fitness going up?". The bullets below, from "Key figure" to "Data", describe `/load`.
+  - `/analyse` **Analyse** answers "Am I getting fitter on the bike?" (section Cykel; spec `design/specs/analyse.md`). Follows the data-dashboard pack; the hero is the eFTP figure. `--slab` marks the latest eFTP point and the current week, and nothing else. Sections become tabs only when a second section exists.
 - **Pattern packs:**
   - `/load` follows [`design/patterns/data-dashboard.md`](design/patterns/data-dashboard.md). Conflict: the pack rounds kg to 1 decimal, but this app shows kg as logged (up to 2 decimals), because the user compares against their own sheet. DESIGN.md wins.
   - `/` Today is not a dashboard, so the pack's "key figure is the largest element" does not apply there: the session's prescription numbers are. Its data-honesty rules do apply: freshness, gaps never shown as zeros, whole watts.
