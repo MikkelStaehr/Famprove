@@ -4,7 +4,14 @@ import { isDataError } from "../data-error.ts";
 
 import { connection } from "next/server";
 
-import { devFixture, fewEfPoints, fixtureError, illustrativeBands, staleComputedAt } from "./dev-fixture.ts";
+import {
+  devFixture,
+  fewEfPoints,
+  fixtureError,
+  illustrativeBands,
+  illustrativeLogged,
+  staleComputedAt,
+} from "./dev-fixture.ts";
 import { readSupabaseEnv } from "./env.ts";
 import { createClient, selectAll, selectFirst } from "./postgrest.ts";
 import { addDays, isoWeekStart } from "../dates.ts";
@@ -27,6 +34,12 @@ import {
   parseStrengthSessionRow,
   PROJECTION_SELECT,
   RIDE_METRICS_SELECT,
+  SHEET_ONE_RM_SELECT,
+  STRENGTH_BLOCKS_SELECT,
+  STRENGTH_WEEKS_SELECT,
+  parseSheetOneRmRow,
+  parseStrengthBlockRow,
+  parseStrengthWeekRow,
   parseStrengthSetRow,
   parseWeeklyLoadRow,
   STRENGTH_SESSIONS_SELECT,
@@ -35,6 +48,7 @@ import {
 } from "./rows.ts";
 import type {
   CyclingAnalysisData,
+  StrengthAnalysisData,
   DashboardData,
   DailyLoadRow,
   IsoDate,
@@ -274,4 +288,27 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
     };
   }
   return { rides: fixture === "ef-few" ? fewEfPoints(rides) : rides, weeks, weeksError };
+}
+
+/**
+ * /analyse/styrke: every strength_weeks row (tiny, rebuilt whole by compute), the blocks with
+ * their phase, and the tab's 1RM values (main-lift sets with an e1rm). Reads only.
+ * Throws EnvError / PostgrestError / RowError; the page renders ErrorState.
+ */
+export async function loadStrengthAnalysis(): Promise<StrengthAnalysisData> {
+  await connection();
+  const fixture = devFixture();
+  if (fixture === "error") throw fixtureError(STRENGTH_WEEKS_SELECT.table);
+  if (fixture === "empty") return { weeks: [], blocks: [], sheetOneRm: [] };
+  const db = client();
+  const [weeks, blocks, sheetOneRm] = await Promise.all([
+    selectAll(db, STRENGTH_WEEKS_SELECT.table, STRENGTH_WEEKS_SELECT, parseStrengthWeekRow),
+    selectAll(db, STRENGTH_BLOCKS_SELECT.table, STRENGTH_BLOCKS_SELECT, parseStrengthBlockRow),
+    selectAll(db, SHEET_ONE_RM_SELECT.table, SHEET_ONE_RM_SELECT, parseSheetOneRmRow),
+  ]);
+  if (fixture === "stale") {
+    const computedAt = staleComputedAt(new Date());
+    return { weeks: weeks.map((w) => ({ ...w, computedAt })), blocks, sheetOneRm };
+  }
+  return { weeks: fixture === "lsrpe" ? illustrativeLogged(weeks) : weeks, blocks, sheetOneRm };
 }

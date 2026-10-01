@@ -9,15 +9,18 @@
  *          band can be screenshotted before 4 real weeks exist. Never a real estimate.
  *   ef-few real /analyse rows with ef_ok kept on the latest EF_FEW_POINTS only (analyse.md §8),
  *          so the "too few endurance rides" state can be screenshotted. Other screens: real rows.
+ *   lsrpe  real /analyse/styrke rows with the latest LSRPE_POINTS e1RM points per lift marked as
+ *          logged-RPE (full colour), so that state can be screenshotted before real LSRPE exists.
+ *          Illustrative only: the e1RM values are unchanged.
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
  */
 import { PostgrestError } from "./postgrest.ts";
-import type { DailyProjectionRow, ProjectedSession, RideMetricsRow } from "./rows.ts";
+import type { DailyProjectionRow, ProjectedSession, RideMetricsRow, StrengthWeekRow } from "./rows.ts";
 
-export type DevFixture = "empty" | "stale" | "error" | "band" | "ef-few";
-const FIXTURES: readonly DevFixture[] = ["empty", "stale", "error", "band", "ef-few"];
+export type DevFixture = "empty" | "stale" | "error" | "band" | "ef-few" | "lsrpe";
+const FIXTURES: readonly DevFixture[] = ["empty", "stale", "error", "band", "ef-few", "lsrpe"];
 
 /** Three days: well past the 26 h staleness limit. */
 export const STALE_AGE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -91,4 +94,20 @@ export function fewEfPoints(rides: readonly RideMetricsRow[]): RideMetricsRow[] 
   return rides.map((r) =>
     r.efOk && !keep.has(r.activityId) ? { ...r, efOk: false, efTrend: null, efGapBefore: false } : r,
   );
+}
+
+/** DEV_FIXTURE=lsrpe: e1RM points per lift shown as logged-RPE. */
+export const LSRPE_POINTS = 2;
+
+/**
+ * DEV_FIXTURE=lsrpe: weeks (ascending) with the latest LSRPE_POINTS e1RM points of each lift
+ * marked as logged-RPE. Dev only; the values stay Python's.
+ */
+export function illustrativeLogged(weeks: readonly StrengthWeekRow[]): StrengthWeekRow[] {
+  const keep = new Set<string>();
+  for (const lift of ["SQUAT", "BENCH", "DEADLIFT"] as const) {
+    const points = weeks.filter((w) => w.lift === lift && w.e1rmKg !== null);
+    for (const w of points.slice(-LSRPE_POINTS)) keep.add(`${w.weekStart}#${w.lift}`);
+  }
+  return weeks.map((w) => (keep.has(`${w.weekStart}#${w.lift}`) ? { ...w, e1rmRpeSource: "logged" } : w));
 }

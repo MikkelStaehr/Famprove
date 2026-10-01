@@ -269,6 +269,90 @@ export const CYCLING_WEEKS_SELECT = {
   order: "week_start", // the primary key
 } as const;
 
+/** Program phase of a strength block (Python: domain.strength_analysis.PHASES). */
+export type StrengthPhase = "in_season" | "off_season";
+const PHASES: readonly StrengthPhase[] = ["in_season", "off_season"];
+
+/** How a week's lifted kg counts: matched to an activity, or before the activity log (blok 11). */
+export type StrengthStatus = "lifted" | "pre_log";
+const STATUSES: readonly StrengthStatus[] = ["lifted", "pre_log"];
+
+/** Which RPE an e1RM used: the user's logged LSRPE (counts) or the coach's prescribed RPE. */
+export type RpeSource = "logged" | "prescribed";
+const RPE_SOURCES: readonly RpeSource[] = ["logged", "prescribed"];
+
+export type StrengthLift = "SQUAT" | "BENCH" | "DEADLIFT";
+const LIFTS: readonly StrengthLift[] = ["SQUAT", "BENCH", "DEADLIFT"];
+
+/**
+ * public.strength_weeks: one row per ISO week x lift, rebuilt by compute
+ * (domain.strength_analysis). Lifted kg only; every number is Python's.
+ */
+export type StrengthWeekRow = {
+  readonly weekStart: IsoDate;
+  readonly lift: StrengthLift;
+  readonly block: string | null; // null: a week between blocks
+  readonly blockNo: number | null;
+  readonly phase: StrengthPhase | null;
+  readonly status: StrengthStatus | null; // null: nothing lifted that week
+  readonly setsLifted: number;
+  readonly tonnageKg: number; // 0 = nothing lifted (a real 0)
+  readonly e1rmKg: number | null; // the week's best set; null when no qualifying set
+  readonly e1rmLoadKg: number | null;
+  readonly e1rmReps: number | null;
+  readonly e1rmRpe: number | null;
+  readonly e1rmRpeSource: RpeSource | null;
+  readonly isBlockBest: boolean;
+  readonly computedAt: string;
+};
+
+/** public.blocks with the phase, for /analyse/styrke. */
+export type StrengthBlockRow = {
+  readonly name: string;
+  readonly blockNo: number;
+  readonly startDate: IsoDate;
+  readonly endDate: IsoDate | null;
+  readonly deloadStart: IsoDate | null;
+  readonly phase: StrengthPhase | null; // null until compute has run on the phase migration
+};
+
+/** The tab's 1RM table value for a lift (an input, "1RM i arket (ikke testet)"), per set row. */
+export type SheetOneRmRow = {
+  readonly block: string;
+  readonly lift: StrengthLift;
+  readonly kg: number;
+};
+
+/** Everything /analyse/styrke reads, as returned by queries.loadStrengthAnalysis. */
+export type StrengthAnalysisData = {
+  readonly weeks: readonly StrengthWeekRow[]; // ascending by weekStart, then lift
+  readonly blocks: readonly StrengthBlockRow[]; // ascending by startDate
+  readonly sheetOneRm: readonly SheetOneRmRow[]; // one row per main-lift set; the view dedups
+};
+
+export const STRENGTH_WEEKS_SELECT = {
+  table: "strength_weeks",
+  columns:
+    "week_start,lift,block,block_no,phase,status,sets_lifted,tonnage_kg,e1rm_kg,e1rm_load_kg,e1rm_reps,e1rm_rpe,e1rm_rpe_source,is_block_best,computed_at",
+  order: "week_start,lift", // the primary key
+} as const;
+
+export const STRENGTH_BLOCKS_SELECT = {
+  table: "blocks",
+  columns: "name,block_no,start_date,end_date,deload_start,phase",
+  order: "start_date,sheet_id,name", // unique (includes the primary key)
+} as const;
+
+export const SHEET_ONE_RM_SELECT = {
+  table: "strength_sets",
+  columns: "block,type,e1rm",
+  order: "sheet_id,block,sheet_row,week,set_no", // the primary key
+  filters: [
+    ["e1rm", "not.is.null"],
+    ["type", "in.(SQUAT,BENCH,DEADLIFT)"],
+  ],
+} as const;
+
 export class RowError extends Error {}
 
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -433,6 +517,58 @@ export function parseCyclingWeekRow(raw: unknown): CyclingWeekRow {
     excluded: f.number("excluded"),
     computedAt: f.timestamp("computed_at"),
   };
+}
+
+function oneOf<T extends string>(table: string, column: string, value: string | null, allowed: readonly T[]): T | null {
+  if (value === null) return null;
+  const known = allowed.find((a) => a === value);
+  if (known === undefined) throw new RowError(`${table}.${column}: expected one of ${allowed.join(", ")}`);
+  return known;
+}
+
+export function parseStrengthWeekRow(raw: unknown): StrengthWeekRow {
+  const t = STRENGTH_WEEKS_SELECT.table;
+  const f = new Fields(t, raw);
+  const lift = oneOf(t, "lift", f.string("lift"), LIFTS);
+  if (lift === null) throw new RowError(`${t}.lift: expected a lift`);
+  return {
+    weekStart: f.date("week_start"),
+    lift,
+    block: f.stringOrNull("block"),
+    blockNo: f.numberOrNull("block_no"),
+    phase: oneOf(t, "phase", f.stringOrNull("phase"), PHASES),
+    status: oneOf(t, "status", f.stringOrNull("status"), STATUSES),
+    setsLifted: f.number("sets_lifted"),
+    tonnageKg: f.number("tonnage_kg"),
+    e1rmKg: f.numberOrNull("e1rm_kg"),
+    e1rmLoadKg: f.numberOrNull("e1rm_load_kg"),
+    e1rmReps: f.numberOrNull("e1rm_reps"),
+    e1rmRpe: f.numberOrNull("e1rm_rpe"),
+    e1rmRpeSource: oneOf(t, "e1rm_rpe_source", f.stringOrNull("e1rm_rpe_source"), RPE_SOURCES),
+    isBlockBest: f.boolean("is_block_best"),
+    computedAt: f.timestamp("computed_at"),
+  };
+}
+
+export function parseStrengthBlockRow(raw: unknown): StrengthBlockRow {
+  const t = STRENGTH_BLOCKS_SELECT.table;
+  const f = new Fields(t, raw);
+  return {
+    name: f.string("name"),
+    blockNo: f.number("block_no"),
+    startDate: f.date("start_date"),
+    endDate: f.dateOrNull("end_date"),
+    deloadStart: f.dateOrNull("deload_start"),
+    phase: oneOf(t, "phase", f.stringOrNull("phase"), PHASES),
+  };
+}
+
+export function parseSheetOneRmRow(raw: unknown): SheetOneRmRow {
+  const t = SHEET_ONE_RM_SELECT.table;
+  const f = new Fields(t, raw);
+  const lift = oneOf(t, "type", f.string("type"), LIFTS);
+  if (lift === null) throw new RowError(`${t}.type: expected a lift`);
+  return { block: f.string("block"), lift, kg: f.number("e1rm") };
 }
 
 export function parseBlockRow(raw: unknown): BlockRow {
