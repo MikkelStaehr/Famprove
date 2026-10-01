@@ -42,7 +42,7 @@ A three-row scoreboard, one row per lift in SBD order: three big tabular numbers
 **Shared:** one x domain per page, from the first `strength_weeks.week_start` to the current week's Sunday, with one 7-day slot per week. Points and bars sit in their week's slot (points at the slot centre). Both cards use the **WeekStrips construction and interaction** from `AnalyseCharts.tsx`: absolute divs placed with `xCss`, one focusable `role="group"` for the card, tap or pointer to pick a week, ←/→ to step, Esc to close, and a `TipBox`. Generalise `WeekStrips` to N strips and a configurable unit rather than copying it. The e1RM line may be an inline SVG inside the panel (`preserveAspectRatio="none"`, `vector-effect: non-scaling-stroke`). No motion, and no Recharts needed.
 
 **Block ruler** (both cards, an extension of `SeamOverlay` into `BlockOverlay`):
-- Each block from `blocks` gets a `--block-fill` span from `start_date` to `end_date` + 7 days (an ongoing block runs to the current week). The span runs behind every panel or strip in the card, as on `/load`.
+- Each block from `blocks` gets a `--block-fill` span from `start_date` to `end_date` inclusive (`end_date` is already the Sunday of the last filled week, as on `/load`; an ongoing block runs to the current week). The span runs behind every panel or strip in the card, as on `/load`.
 - Deload weeks (`deload_start` → `end_date`) get the `/load` deload hatch (reuse its pattern).
 - In an 18px strip on top, the label `Blok 11` (`text-12` 600) is centred over its span. It is omitted when the span is narrower than the label, using the same `@container` rule as `Ingen ture`.
 - Gap weeks between blocks have no fill and no label: they read as "between blocks", not as missing data.
@@ -57,7 +57,7 @@ A three-row scoreboard, one row per lift in SBD order: three big tabular numbers
   - The status `pre_log` changes nothing in the point: it is real lifted data (see the note).
 - **Line:** 1.5px `--text-muted`, linear through the points of **one block** in week order. It **breaks at every block boundary**, so it never crosses a gap or a phase change. Inside a block it bridges weeks without a point (no zero, no carry-forward mark).
 - **Block best:** a ring around the point (2px `--text`, 16px outer). Its value sits above it: `179,6` in `text-12` 600 tabular `--text`. Only block-bests are labelled, so the eye compares block to block within a phase.
-- **`1RM i arket (ikke testet)`:** one horizontal dashed line (1.5px `--text-muted`, 6 4) per block span at that block's sheet value. Its value `180` (`text-12` muted) sits at the right end of the span. It is a reference only: never connected to the points and never in a delta.
+- **`1RM i arket (ikke testet)`:** one horizontal dashed line (1.5px `--text-muted`, 6 4) per block span at that block's sheet value. Its value `180` (`text-12` muted, on a `--surface` halo so the hatch never runs through it) sits above the line at the right end of the span. A block-best label never crosses its span's dashed line: when the ring is below the line it goes under the ring. It is a reference only: never connected to the points and never in a delta.
 - **Notes under the x labels** (`text-14` muted, 60ch, 8px apart), each only when it applies:
   1. If any point is prescribed: `Lyse punkter er baseret på foreskrevet RPE. Log RPE på topsættet, så tæller punktet fuldt.`
   2. Always: `Blok 11 er i sæson, blok 12 uden for sæson. Den lodrette streg er faseskiftet: sammenlign blokke i samme fase.` This is built from `blocks`; with more blocks, list them as `Blok 11 er i sæson, blok 12–13 uden for sæson.`
@@ -96,7 +96,7 @@ No chart. While no row has `e1rm_rpe_source = 'logged'`, one line follows the to
 | Page empty | `Der er ingen styrkeuger endnu. Det daglige job læser arket omkring kl. 05.00.` |
 | Page error | title `Kunne ikke hente styrkedata`, `describeDataError`, `Prøv igen` → `/analyse/styrke` |
 | No e1RM anywhere | in place of the 5a panels: `Der er intet e1RM endnu. Det kommer, når et tungt sæt med RPE er løftet.` |
-| Sheet 1RM read fails | the reference lines and their legend item are omitted, and a note is added: `1RM i arket kunne ikke hentes.` |
+| Sheet 1RM read fails | page error (the data layer reads `strength_weeks`, `blocks` and `strength_sets` together; accepted at review 2026-10-01: honest, not graceful). |
 | Chart error | as `/analyse` (`Grafen kan ikke vises` …) |
 | Missing value | `–`, spoken `ikke registreret` |
 
