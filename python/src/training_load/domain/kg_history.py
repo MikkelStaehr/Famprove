@@ -13,6 +13,9 @@ Rules (one call per set per compute run; the result is stored, never rebuilt or 
   sheet_row but keeps the key, so the history continues; the prescription is part of the key,
   so a top set and a back-off of the same exercise never swap. A renamed, re-prescribed or moved
   set gets a new key; the old row stays with gone_at set (cleared if it comes back).
+- Accepted limit (tested 2026-10-01): an IDENTICAL row (same name and prescription) inserted
+  above the original in the same session takes the original's occurrence, so the history
+  continues on the new row; ranking by sheet order can't tell the two apart.
 """
 
 from collections.abc import Iterable, Mapping
