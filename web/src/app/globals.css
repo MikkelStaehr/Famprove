@@ -25,6 +25,7 @@
   --series-tsb: #1f5bd0;
   --block-fill: #efeee9;
   --chart-mark: #807e78;
+  --prognose-band: rgb(18 18 18 / 0.16); /* CTL band after the block (load.md §10a) */
   --chart-height: 224px; /* 240px from 640px, below (load.md §9a fold fix) */
 
   --zone-risk: #f0b9aa;
@@ -60,6 +61,7 @@
     --series-tsb: #7aa7ff;
     --block-fill: #1c222b;
     --chart-mark: #737d8a;
+    --prognose-band: rgb(238 241 245 / 0.18);
 
     --zone-risk: #542f32;
     --zone-optimal: #1e4c3b;

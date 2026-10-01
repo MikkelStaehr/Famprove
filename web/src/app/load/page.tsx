@@ -15,6 +15,7 @@ import {
   dayDetails,
   type DashboardView,
   type DayDetail,
+  strengthUnknownFrom,
   type WeekNav,
 } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
@@ -28,6 +29,7 @@ import {
   stopAfter,
   TSS_PER_DAY,
 } from "@/lib/format";
+import { prognoseSentence } from "@/lib/prognose-text";
 import { resolveToday } from "@/lib/today-view";
 import { zoneReading } from "@/lib/zone-scale";
 
@@ -257,14 +259,6 @@ function LoadError({ error, at }: { readonly error: DataError; readonly at: Date
   );
 }
 
-/** "+8" -> "plus 8", "−8" -> "minus 8" (load.md §9d: the sign in words). */
-function spokenSigned(value: number): string {
-  const signed = formatSigned(value);
-  if (signed.startsWith("+")) return `plus ${signed.slice(1)}`;
-  if (signed.startsWith("−")) return `minus ${signed.slice(1)}`;
-  return signed;
-}
-
 /** Text alternative for the chart: today's values, the 7-day fitness change and the blocks. */
 function chartSummary({ hero, chart, blocks }: ReadyView): string {
   const end = chart.findLast((p) => p.kind === "projected");
@@ -275,7 +269,7 @@ function chartSummary({ hero, chart, blocks }: ReadyView): string {
   ];
   if (end !== undefined) {
     parts.push(
-      `Prognose, anslået ud fra en typisk uge: den ${formatDay(end.date)} cirka fitness ${formatLoad(end.ctl)}, træthed ${formatLoad(end.atl)}, form ${spokenSigned(end.tsb)}.`,
+      prognoseSentence(end, strengthUnknownFrom(chart) !== null),
     );
   }
   if (hero.ctlRamp7d !== null) {

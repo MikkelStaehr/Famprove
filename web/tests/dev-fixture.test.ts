@@ -6,7 +6,7 @@ import { PostgrestError } from "../src/lib/db/postgrest.ts";
 import { freshness } from "../src/lib/dashboard-view.ts";
 
 test("DEV_FIXTURE only switches under next dev, and only to known states", () => {
-  for (const state of ["empty", "stale", "error"] as const) {
+  for (const state of ["empty", "stale", "error", "band"] as const) {
     assert.equal(devFixture({ DEV_FIXTURE: state }, "development"), state);
     assert.equal(devFixture({ DEV_FIXTURE: state }, "production"), null);
     assert.equal(devFixture({ DEV_FIXTURE: state }, "test"), null);
@@ -21,7 +21,7 @@ test("DEV_FIXTURE only switches under next dev, and only to known states", () =>
   } finally {
     console.warn = warn;
   }
-  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale or error"]);
+  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error or band"]);
   assert.equal(devFixture({}, "development"), null);
 });
 

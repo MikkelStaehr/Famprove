@@ -11,6 +11,7 @@
 import { addDays } from "./dates.ts";
 import type {
   ActivityRow,
+  Band,
   BlockRow,
   DailyLoadRow,
   DailyProjectionRow,
@@ -53,7 +54,19 @@ export type ChartPoint = {
     readonly strengthTss: number;
     readonly rides: DailyProjectionRow["rides"];
     readonly sessions: DailyProjectionRow["sessions"];
+    readonly strengthMethod: DailyProjectionRow["strengthMethod"];
   } | null;
+  /**
+   * Projected days only: Python's low-high per series, as stored (load.md §10). A band is null
+   * when it is missing or flat (low and high round to the same whole TSS): nothing to draw or say.
+   */
+  readonly bands: ChartBands | null;
+};
+
+export type ChartBands = {
+  readonly ctl: Band | null;
+  readonly atl: Band | null;
+  readonly tsb: Band | null;
 };
 
 /** The chart window: this many days back and forward from the latest actual day (spec load.md §9a). */
@@ -348,6 +361,36 @@ export function dayDetails(week: WeekView, detail: WeekDetailData): DayDetail[] 
 }
 
 /**
+ * The band as stored, or null when it is missing or flat at whole-TSS display precision
+ * (load.md §10b). Never widened, smoothed or derived: the same object comes back.
+ */
+export function visibleBand(band: Band | null): Band | null {
+  if (band === null) return null;
+  return Math.round(band.low) === Math.round(band.high) ? null : band;
+}
+
+/** The CTL band fill for one chart point: [ctl_low, ctl_high] unchanged, or null (load.md §10a). */
+export function ctlBandArea(point: ChartPoint): readonly [number, number] | null {
+  const band = point.bands?.ctl ?? null;
+  return band === null ? null : [band.low, band.high];
+}
+
+/** Python's reason when no complete recent week exists to average (load.md §10b). */
+export const NO_RECENT_WEEKS = "no recent weeks to average";
+
+/**
+ * load.md §10b: when strength after the block is unknown (a `recent` session that couldn't be
+ * averaged), the first prognose date with strength_method `recent`; else null.
+ */
+export function strengthUnknownFrom(points: readonly ChartPoint[]): IsoDate | null {
+  const unknown = points.some(
+    (p) => p.estimate?.sessions.some((s) => s.method === "recent" && s.reason === NO_RECENT_WEEKS) ?? false,
+  );
+  if (!unknown) return null;
+  return points.find((p) => p.estimate?.strengthMethod === "recent")?.date ?? null;
+}
+
+/**
  * The chart's points: the last CHART_WINDOW_DAYS actual days, then the prognose strictly after
  * the latest actual day (older projection rows are from a stale run and are never drawn).
  */
@@ -356,7 +399,7 @@ export function chartPoints(data: DashboardData, lastActual: IsoDate): ChartPoin
   const to = addDays(lastActual, CHART_WINDOW_DAYS);
   const actual: ChartPoint[] = data.daily
     .filter((d) => d.date >= from)
-    .map((d) => ({ date: d.date, ctl: d.ctl, atl: d.atl, tsb: d.tsb, kind: "actual", estimate: null }));
+    .map((d) => ({ date: d.date, ctl: d.ctl, atl: d.atl, tsb: d.tsb, kind: "actual", estimate: null, bands: null }));
   const projected: ChartPoint[] = (data.projection ?? [])
     .filter((p) => p.date > lastActual && p.date <= to)
     .map((p) => ({
@@ -371,7 +414,9 @@ export function chartPoints(data: DashboardData, lastActual: IsoDate): ChartPoin
         strengthTss: p.strengthTss,
         rides: p.rides,
         sessions: p.sessions,
+        strengthMethod: p.strengthMethod,
       },
+      bands: { ctl: visibleBand(p.ctlBand), atl: visibleBand(p.atlBand), tsb: visibleBand(p.tsbBand) },
     }));
   return [...actual, ...projected];
 }

@@ -2,7 +2,7 @@ import "server-only";
 
 import { connection } from "next/server";
 
-import { devFixture, fixtureError, staleComputedAt } from "./dev-fixture.ts";
+import { devFixture, fixtureError, illustrativeBands, staleComputedAt } from "./dev-fixture.ts";
 import { readSupabaseEnv } from "./env.ts";
 import { createClient, selectAll, selectFirst } from "./postgrest.ts";
 import { addDays, isoWeekStart } from "../dates.ts";
@@ -75,7 +75,8 @@ export async function loadDashboardData(): Promise<DashboardData> {
     selectAll(db, BLOCKS_SELECT.table, BLOCKS_SELECT, parseBlockRow),
     selectAll(db, WEEKLY_LOAD_SELECT.table, WEEKLY_LOAD_SELECT, parseWeeklyLoadRow),
   ]);
-  const projection = await projectionRead;
+  const read = await projectionRead;
+  const projection = fixture === "band" && read !== null ? illustrativeBands(read) : read;
   if (fixture === "stale") {
     const computedAt = staleComputedAt(new Date());
     return { daily: daily.map((d) => ({ ...d, computedAt })), blocks, weeks, projection };

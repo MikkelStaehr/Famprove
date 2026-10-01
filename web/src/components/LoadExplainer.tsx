@@ -1,11 +1,8 @@
 import { FORM_ZONE_DISPLAY } from "@/lib/dashboard-view";
+import { BAND_LABEL, BAND_TEXT, PROGNOSE_TEXT } from "@/lib/prognose-text";
 import { ZONE_FILL, ZONE_RANGE, type ZoneKey } from "@/lib/zone-scale";
 
-import { LineSample, PROGNOSE_LABEL, PrognoseSwatch, SERIES, type SeriesKey } from "./ChartSeries";
-
-/** load.md §9b: the 4th term, after Form. */
-const PROGNOSE_TEXT =
-  "Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer: cykling som dit gennemsnit for hver ugedag de sidste 28 dage (en planlagt tur erstatter dagen), styrke som dine seneste tre gange af hver session. Det er et skøn, ikke en plan.";
+import { BandSwatch, LineSample, PROGNOSE_LABEL, PrognoseSwatch, SERIES, type SeriesKey } from "./ChartSeries";
 
 /**
  * "Hvad betyder det?" (design/specs/load.md §8b): a native <details> in the chart card, under
@@ -78,6 +75,13 @@ export function LoadExplainer() {
                 {PROGNOSE_LABEL}
               </dt>
               <dd className="mt-1 text-16 text-text">{PROGNOSE_TEXT}</dd>
+            </div>
+            <div>
+              <dt className="flex items-center gap-2 text-16 font-bold">
+                <BandSwatch />
+                {BAND_LABEL}
+              </dt>
+              <dd className="mt-1 text-16 text-text">{BAND_TEXT}</dd>
             </div>
           </dl>
           <p className="text-14 text-text-muted">{METHOD_NOTE}</p>

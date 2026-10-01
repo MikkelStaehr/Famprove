@@ -3,9 +3,10 @@
 import { catchError, type ErrorInfo } from "next/error";
 import { type ReactNode, useSyncExternalStore } from "react";
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ReferenceArea,
   ReferenceDot,
   ReferenceLine,
@@ -14,8 +15,16 @@ import {
   YAxis,
 } from "recharts";
 
-import { type BlockSpan, CHART_WINDOW_DAYS, type ChartPoint, type DashboardView } from "@/lib/dashboard-view";
+import {
+  type BlockSpan,
+  CHART_WINDOW_DAYS,
+  type ChartPoint,
+  ctlBandArea,
+  type DashboardView,
+  strengthUnknownFrom,
+} from "@/lib/dashboard-view";
 import { formatDate, formatDay, LOCALE, TSS_PER_DAY } from "@/lib/format";
+import { prognoseStatus, rangeText, strengthLine, strengthUnknownNote } from "@/lib/prognose-text";
 
 import { LineSample, SERIES } from "./ChartSeries";
 import { EmptyState } from "./EmptyState";
@@ -24,7 +33,8 @@ import { WarningLine } from "./WarningLine";
 
 /**
  * CTL / ATL / TSB per day, centred on the latest measured day ("i dag"), with the prognose to
- * its right (load.md §9), strength blocks shaded and deload weeks hatched.
+ * its right (load.md §9) with the CTL band after the block (§10), strength blocks shaded and
+ * deload weeks hatched.
  * Plots Python's values as-is; the only arithmetic here is date -> x position.
  * The text alternative is rendered by the (server) page next to this component.
  */
@@ -56,7 +66,8 @@ const MARGIN_RIGHT = 16;
 const X_AXIS_HEIGHT = 30;
 const BLOCK_LABEL_ROOM = 18;
 
-type Row = ChartPoint & { readonly x: number };
+// ctlBand: [ctl_low, ctl_high] as stored, or null; a plain field so Recharts reads it as a range.
+type Row = ChartPoint & { readonly x: number; readonly ctlBand: readonly [number, number] | null };
 
 /** Calendar date -> whole days since the epoch (UTC, so no time-zone shift). */
 function dayNumber(date: string): number {
@@ -118,6 +129,7 @@ export function TrendChart(props: TrendChartProps) {
     return <EmptyState message="Trenden vises, når der er mindst to dages træningsbelastning." />;
   }
   const hasPrognose = props.points.some((p) => p.kind === "projected");
+  const unknownFrom = hasPrognose ? strengthUnknownFrom(props.points) : null;
   return (
     <div className="flex flex-col gap-2">
       <Legend />
@@ -144,6 +156,7 @@ export function TrendChart(props: TrendChartProps) {
           Ingen prognose endnu. Den beregnes af det daglige job omkring kl. 05.00.
         </p>
       )}
+      {unknownFrom !== null && <p className="max-w-[60ch] text-14 text-text-muted">{strengthUnknownNote(unknownFrom)}</p>}
     </div>
   );
 }
@@ -157,7 +170,7 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
     return <div className="h-(--chart-height) w-full rounded-control bg-track motion-safe:animate-pulse" />;
   }
 
-  const rows: Row[] = points.map((p) => ({ ...p, x: dayNumber(p.date) }));
+  const rows: Row[] = points.map((p) => ({ ...p, x: dayNumber(p.date), ctlBand: ctlBandArea(p) }));
   const byDay = new Map(rows.map((r) => [r.x, r]));
   // Spec §9b/§9e: the rule sits on today; after a missed run the region starts left of it.
   const today = dayNumber(todayDate);
@@ -207,7 +220,7 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
         )}
       </div>
       <div className="relative min-h-0 flex-1">
-        <LineChart
+        <ComposedChart
           responsive
           style={{ width: "100%", height: "100%" }}
           data={rows}
@@ -276,6 +289,19 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
               <ChartTooltip active={active} x={label} byDay={byDay} blocks={blocks} />
             )}
           />
+          {/* load.md §10a: CTL only, [ctl_low, ctl_high] as stored; above the region, below the lines. */}
+          <Area
+            dataKey="ctlBand"
+            type="linear"
+            stroke="none"
+            fill="var(--prognose-band)"
+            fillOpacity={1}
+            dot={false}
+            activeDot={false}
+            legendType="none"
+            tooltipType="none"
+            isAnimationActive={false}
+          />
           {SERIES.map((s) => (
             <Line
               key={s.key}
@@ -304,7 +330,7 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
                 ifOverflow="visible"
               />
             ))}
-        </LineChart>
+        </ComposedChart>
       </div>
     </div>
   );
@@ -371,6 +397,7 @@ function ChartTooltip({ active, x, byDay, blocks }: ChartTooltipProps) {
   );
 }
 
+/** Values; on prognose days with "≈" and, where Python stored a non-flat band, its range (§10c). */
 function SeriesValues({ row, approx }: { readonly row: Row; readonly approx: boolean }) {
   return (
     <dl className="grid grid-cols-[auto_auto] items-center gap-x-3 tabular-nums">
@@ -380,8 +407,10 @@ function SeriesValues({ row, approx }: { readonly row: Row; readonly approx: boo
             <LineSample series={s} />
             {s.label}
           </dt>
-          <dd className="text-right font-semibold whitespace-nowrap">
-            {approx ? `≈ ${s.format(row[s.key])}` : s.format(row[s.key])}
+          <dd className="text-right font-semibold">
+            {/* each part stays whole; the range wraps under the value when space runs out (§10c) */}
+            <span className="whitespace-nowrap">{approx ? `≈ ${s.format(row[s.key])}` : s.format(row[s.key])}</span>
+            {approx && <Range text={rangeText(row.bands?.[s.key] ?? null, s.format)} />}
           </dd>
         </div>
       ))}
@@ -389,27 +418,31 @@ function SeriesValues({ row, approx }: { readonly row: Row; readonly approx: boo
   );
 }
 
-/** load.md §9c: a future day is an estimate; say so, and say what it was built from. */
+function Range({ text }: { readonly text: string }) {
+  if (text === "") return null;
+  return (
+    <>
+      {" "}
+      <span className="whitespace-nowrap">{text.trim()}</span>
+    </>
+  );
+}
+
+/** load.md §9c/§10c: a future day is an estimate; say so, and say what it was built from. */
 function PrognoseTooltip({ row }: { readonly row: Row }) {
   const estimate = row.estimate;
-  const dayEstimated = estimate?.sessions.some((s) => s.dayEstimated) ?? false;
   const cycling = estimate === null ? null : cyclingLine(row.date, estimate);
   return (
     <div className="flex max-w-72 flex-col gap-1 rounded-control border border-border bg-surface px-3 py-2 text-14 text-text shadow-card">
       <p className="font-semibold">{formatDay(row.date)}</p>
-      <p className="text-14 font-semibold text-text-muted">{dayEstimated ? "Prognose · dag anslået" : "Prognose"}</p>
+      <p className="text-14 font-semibold text-text-muted">{prognoseStatus(estimate)}</p>
       <SeriesValues row={row} approx />
       {estimate !== null && (cycling !== null || estimate.sessions.length > 0) && (
         <ul className="flex flex-col text-14 text-text-muted tabular-nums">
           {cycling !== null && <li>{cycling}</li>}
           {estimate.sessions.map((s, i) => (
             <li key={i}>{/* index: two sessions can share a number on one day */}
-              {s.tss === null
-                ? `Styrke · session ${s.session} · ikke talt med (${
-                    s.reason === "no day left this week" ? "ingen dag tilbage i ugen" : "ikke lavet før"
-                  })`
-                : `Styrke ≈ ${Math.round(s.tss)} TSS · session ${s.session}`}
-              {s.dayEstimated && s.tss !== null && " · dag anslået"}
+              {strengthLine(s)}
             </li>
           ))}
         </ul>

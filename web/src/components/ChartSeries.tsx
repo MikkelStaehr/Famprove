@@ -51,3 +51,13 @@ export function PrognoseSwatch() {
     </svg>
   );
 }
+
+/** The CTL band's swatch (load.md §10a): --prognose-band over --track 60%, 1px --chart-mark ring, 24×12. */
+export function BandSwatch() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
+      <rect x="0.5" y="0.5" width="23" height="11" fill="var(--track)" fillOpacity={0.6} />
+      <rect x="0.5" y="0.5" width="23" height="11" fill="var(--prognose-band)" stroke="var(--chart-mark)" />
+    </svg>
+  );
+}
