@@ -6,8 +6,16 @@ name: daily
 # re-enable under Actions → daily if that happens.
 
 on:
+  # 05:00, 12:00 and 20:00 Copenhagen all year (user, 2026-10-01: planned kg must be seen before
+  # same-day sessions). Cron is UTC, so both offsets are scheduled and the gate job keeps the
+  # three whose Copenhagen hour (scheduled UTC hour + today's offset) is 05, 12 or 20.
   schedule:
-    - cron: "0 3 * * *" # 05:00 Copenhagen in summer (CEST), 04:00 in winter (CET)
+    - cron: "0 3 * * *" # 05 CEST
+    - cron: "0 4 * * *" # 05 CET
+    - cron: "0 10 * * *" # 12 CEST
+    - cron: "0 11 * * *" # 12 CET
+    - cron: "0 18 * * *" # 20 CEST
+    - cron: "0 19 * * *" # 20 CET
   workflow_dispatch:
     inputs:
       since:
@@ -23,7 +31,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.hour.outputs.run }}
+    steps:
+      - id: hour
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        # The scheduled hour, not the clock: a delayed run still maps to its slot.
+        run: |
+          if [ -z "$SCHEDULE" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          utc_hour=$(echo "$SCHEDULE" | awk '{print $2}')
+          offset=$(TZ=Europe/Copenhagen date +%z | cut -c2-3)
+          local_hour=$(( (10#$utc_hour + 10#$offset) % 24 ))
+          case "$local_hour" in 5|12|20) run=true ;; *) run=false ;; esac
+          echo "UTC $utc_hour + $offset h = $local_hour Copenhagen: run=$run"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   collect-and-compute:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
