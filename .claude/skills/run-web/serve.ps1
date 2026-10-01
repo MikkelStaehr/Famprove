@@ -7,7 +7,7 @@
 param(
   [ValidateSet('dev', 'prod')][string]$Mode = 'dev',
   [string]$DevToday = '',
-  [ValidateSet('', 'empty', 'stale', 'error', 'band')][string]$DevFixture = '',
+  [ValidateSet('', 'empty', 'stale', 'error', 'band', 'ef-few')][string]$DevFixture = '',
   [Parameter(Mandatory = $true)][string]$Cmd
 )
 $ErrorActionPreference = 'Stop'
