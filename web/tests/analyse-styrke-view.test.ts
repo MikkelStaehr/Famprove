@@ -280,3 +280,13 @@ test("freshness is the latest computed_at; older than 26 h is stale", () => {
   const old = weeks().map((r) => ({ ...r, computedAt: "2026-09-28T03:00:00Z" }));
   assert.equal(ready(data(old)).freshness.kind, "stale");
 });
+
+test("a block published ahead in another phase draws no phase rule and joins no phase sentence", () => {
+  const ahead: StrengthBlockRow = {
+    name: "Program - blok 13", blockNo: 13, startDate: "2026-10-19", endDate: null, deloadStart: null, phase: "in_season",
+  };
+  const v = ready({ ...data(), blocks: [...BLOCKS, ahead] });
+  assert.deepEqual(v.phaseRules, [dayNumber("2026-09-21") - 0.5]); // blok 12 only; blok 13 is after hi
+  assert.ok(v.phaseRules.every((x) => x < v.hi));
+  assert.ok(v.notes.every((n) => !n.includes("13")));
+});

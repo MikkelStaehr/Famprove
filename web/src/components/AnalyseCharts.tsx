@@ -47,7 +47,7 @@ function SeamOverlay({ axis, bottom }: { readonly axis: Axis; readonly bottom: n
           {[s.x0, s.x1].map((x) => (
             <div
               key={x}
-              className="absolute top-0 w-px"
+              className="absolute top-0 z-[1] w-px"
               style={{
                 left: xCss(axis, x),
                 bottom,
@@ -56,7 +56,7 @@ function SeamOverlay({ axis, bottom }: { readonly axis: Axis; readonly bottom: n
             />
           ))}
           <div
-            className="@container absolute top-0 flex h-[18px] items-center justify-center overflow-hidden"
+            className="@container absolute top-0 z-[1] flex h-[18px] items-center justify-center overflow-hidden"
             style={{ left: xCss(axis, s.x0), width: `calc(${xCss(axis, s.x1)} - ${xCss(axis, s.x0)})` }}
           >
             {/* Omitted (not clipped) when the run is narrower than the label. */}
@@ -565,7 +565,7 @@ function E1rmPlot({
               {p.best && (
                 <>
                   <span
-                    className="absolute size-4 -translate-1/2 rounded-full border-2 border-text"
+                    className="absolute size-[16px] -translate-1/2 rounded-full border-2 border-text"
                     style={{ left: xCss(axis, p.x), top: top(p.y) }}
                   />
                   <span
@@ -577,7 +577,7 @@ function E1rmPlot({
                 </>
               )}
               <span
-                className={`absolute -translate-1/2 rounded-full ${p.logged ? "size-2.5 bg-text" : "size-[7px] bg-chart-mark"}`}
+                className={`absolute -translate-1/2 rounded-full ${p.logged ? "size-[10px] bg-text" : "size-[7px] bg-chart-mark"}`}
                 style={{ left: xCss(axis, p.x), top: top(p.y) }}
               />
             </div>

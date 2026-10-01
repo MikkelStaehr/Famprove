@@ -130,14 +130,15 @@ function Cards({ view }: { readonly view: Ready }) {
               </figcaption>
             </>
           )}
-          <div className="flex flex-col gap-2">
-            {view.notes.map((n) => (
-              <p key={n} className="max-w-[60ch] text-14 text-text-muted">
-                {n}
-              </p>
-            ))}
-          </div>
         </figure>
+        {/* After the figure: a figcaption must be its first or last child. */}
+        <div className="mt-2 flex flex-col gap-2">
+          {view.notes.map((n) => (
+            <p key={n} className="max-w-[60ch] text-14 text-text-muted">
+              {n}
+            </p>
+          ))}
+        </div>
       </Card>
 
       <Card id="tonnage" variant="calm" level={3} title="Tonnage pr. uge">

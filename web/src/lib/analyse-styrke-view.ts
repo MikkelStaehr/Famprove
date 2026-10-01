@@ -469,13 +469,18 @@ export function buildStyrkeView(data: StrengthAnalysisData, now: Date, today: Is
   const ticksWide = monthTicks(lo, hi, today);
   const ticksNarrow = ticksWide.length > 6 ? ticksWide.filter((_, i) => i % 2 === 0) : ticksWide;
   const spans = blockSpans(blocks, lo, hi);
-  const changes = phaseChanges(blocks).filter((c) => dayNumber(c.block.startDate) - 0.5 > lo);
+  // Only blocks that have started: a tab the coach published ahead must not draw past the plot.
+  const started = blocks.filter((b) => b.startDate <= today);
+  const changes = phaseChanges(started).filter((c) => {
+    const x = dayNumber(c.block.startDate) - 0.5;
+    return x > lo && x < hi;
+  });
   const warnings: string[] = [];
   const allPanels = LIFTS.map((l) => panel(l, weeks, blocks, spans, data.sheetOneRm, warnings));
   const panels = allPanels.every((p) => p.empty !== null) ? null : allPanels;
   const anyPrescribed = weeks.some((w) => w.e1rmKg !== null && w.e1rmRpeSource !== "logged");
   const anyLogged = weeks.some((w) => w.e1rmRpeSource === "logged");
-  const phases = phaseSentence(blocks);
+  const phases = phaseSentence(started);
   const preLog = [...new Set(weeks.filter((w) => w.status === "pre_log" && w.blockNo !== null).map((w) => w.blockNo ?? 0))];
   const notes = [
     ...(panels !== null && anyPrescribed ? [NOTE_PRESCRIBED] : []),
