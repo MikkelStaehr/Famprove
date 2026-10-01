@@ -1,14 +1,17 @@
-"""`compute`: rebuild public.strength_sessions, public.daily_load (2026-01-01 .. today) and
-public.blocks from the DB.
+"""`compute`: rebuild public.strength_sessions, public.daily_load (2026-01-01 .. today),
+public.blocks, the prognose and the ride analysis (ride_metrics, cycling_weeks from 2024-12-30)
+from the DB.
 
 Runs only after both collectors succeeded (sequential, fail-fast CI steps).
 """
 
 import logging
 import os
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import Final
 
 from training_load.config import ConfigError, compute_config, load_dotenv_file
 from training_load.db.activities import all_activities
@@ -18,19 +21,30 @@ from training_load.db.daily_load import sync_daily_load
 from training_load.db.daily_projection import sync_projection
 from training_load.db.forecast_log import log_forecast
 from training_load.db.planned import all_sessions
+from training_load.db.ride_metrics import sync_ride_metrics
 from training_load.db.strength_activities import all_strength_activities
 from training_load.db.strength_sessions import sync_strength_sessions
 from training_load.db.strength_sets import all_sets
 from training_load.domain.cycling import daily_cycling_tss
 from training_load.domain.daily import build_daily_load
-from training_load.domain.dates import SERIES_START, today_local
+from training_load.domain.dates import ANALYSIS_START, SERIES_START, today_local
 from training_load.domain.load import DECAY
 from training_load.domain.projection import MODEL_VERSION, PlannedRide, naive_projection, project
+from training_load.domain.ride_analysis import analyse_rides, weekly_totals
 from training_load.domain.sessions import daily_strength_tss, match_sessions
 from training_load.domain.strength import derive_blocks, iso_week_start
 from training_load.http import requests_send
+from training_load.sources.intervals import ride_facts
 
 log = logging.getLogger(__name__)
+
+MAX_RIDE_PROBLEM_SHARE: Final = 0.2
+"""compute fails (after writing everything) when more rides than this lack raw or have an
+unreadable raw field: the backfill is missing or intervals.icu changed its format."""
+
+
+class RideDataError(RuntimeError):
+    """Too many rides could not be analysed; the counts are in the message (no values)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,12 +55,17 @@ class ComputeSummary:
     strength_activities: int
     sessions_done: int  # planned sessions matched to an activity
     extra_sessions: int  # activities beyond the planned sessions (0 TSS)
-    ignored_outside_range: int  # loads dated before SERIES_START or after today
+    ignored_outside_range: (
+        int  # loads after today, or before their series (cycling: ANALYSIS_START)
+    )
     blocks: int
     projected_days: int
     logged_forecast_rows: int
     projection_notes: int  # unreadable planned rides / sessions without history or a day
     unscored_planned_sets: int  # planned sets without a kg rule (left out, never 0)
+    rides_analysed: int  # rides since ANALYSIS_START in ride_metrics
+    rides_excluded: dict[str, int]  # per exclusion reason (left out of the trends, still shown)
+    cycling_weeks: int
 
 
 def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime) -> ComputeSummary:
@@ -59,6 +78,8 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     7. project the next 56 days (domain.projection) from today's state: the typical week and
        planned_sessions for cycling, the coach's plan (then the recent weeks) for strength ->
        sync_projection; log it with the naive baseline in forecast_log (made_on = today)
+    8. the ride analysis: every ride since ANALYSIS_START -> ride_metrics + cycling_weeks;
+       raises RideDataError afterwards when too many rides lack raw or have unreadable fields
     """
     activities = all_activities(db)
     sets = all_sets(db)
@@ -67,7 +88,10 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     sync_strength_sessions(db, sessions)
     cycling = daily_cycling_tss(activities)
     strength = daily_strength_tss(sessions)
-    ignored = sum(1 for d in (*cycling, *strength) if not SERIES_START <= d <= today)
+    # Cycling before SERIES_START is stored for the ride analysis only (not an ignored load).
+    ignored = sum(1 for d in cycling if not ANALYSIS_START <= d <= today) + sum(
+        1 for d in strength if not SERIES_START <= d <= today
+    )
 
     days = build_daily_load(cycling, strength, start=SERIES_START, end=today, decay=DECAY)
     sync_daily_load(db, days, start=SERIES_START, end=today, computed_at=computed_at)
@@ -115,8 +139,47 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
 
     if ignored:
         log.warning(
-            "%d daily loads fall outside %s..%s and were ignored", ignored, SERIES_START, today
+            "%d daily loads fall outside their series (cycling from %s, strength from %s, "
+            "to %s) and were ignored",
+            ignored,
+            ANALYSIS_START,
+            SERIES_START,
+            today,
         )
+
+    unreadable: Counter[str] = Counter()
+    facts = []
+    unreadable_rides = 0  # rides with at least one unreadable raw field
+    for a in activities:
+        if ANALYSIS_START <= a.start_date_local.date() <= today:
+            fields_before = unreadable.total()
+            facts.append(ride_facts(a, unreadable))
+            unreadable_rides += unreadable.total() > fields_before
+    metrics = analyse_rides(facts)
+    weeks = weekly_totals(metrics, first=ANALYSIS_START, last=today)
+    sync_ride_metrics(db, metrics, weeks, computed_at=computed_at)
+    excluded = Counter(m.exclusion for m in metrics if m.exclusion is not None)
+    no_moving = sum(1 for f in facts if f.moving_s is None)
+    no_load = sum(1 for f in facts if f.load is None)
+    if excluded:
+        log.info("rides left out of the trends: %s", dict(sorted(excluded.items())))
+    if no_moving:
+        log.warning("%d rides have no moving time (they add 0 h to cycling_weeks)", no_moving)
+    if no_load:
+        log.warning(
+            "%d rides have no load (they add 0 to cycling_weeks, as in daily_load)", no_load
+        )
+    if unreadable:
+        log.warning(
+            "unreadable raw ride fields (set to null): %s", dict(sorted(unreadable.items()))
+        )
+    problems = excluded["no_raw"] + unreadable_rides  # a ride without raw has no fields to read
+    if facts and problems > MAX_RIDE_PROBLEM_SHARE * len(facts):
+        raise RideDataError(
+            f"{excluded['no_raw']} of {len(facts)} rides have no raw and {unreadable_rides} have "
+            f"unreadable raw fields: run collect-intervals --since {ANALYSIS_START} (backfill)"
+        )
+
     return ComputeSummary(
         days=len(days),
         activities=len(activities),
@@ -130,6 +193,9 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         logged_forecast_rows=logged,
         projection_notes=notes,
         unscored_planned_sets=unscored,
+        rides_analysed=len(metrics),
+        rides_excluded=dict(sorted(excluded.items())),
+        cycling_weeks=len(weeks),
     )
 
 

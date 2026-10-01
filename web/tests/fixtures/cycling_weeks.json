@@ -1,0 +1,58 @@
+[
+  {
+    "week_start": "2026-04-06",
+    "rides": 3,
+    "moving_s": 10842,
+    "load": 175,
+    "excluded": 1,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "week_start": "2026-04-13",
+    "rides": 3,
+    "moving_s": 16200,
+    "load": 162,
+    "excluded": 2,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "week_start": "2026-04-20",
+    "rides": 2,
+    "moving_s": 10800,
+    "load": 160,
+    "excluded": 1,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "week_start": "2026-04-27",
+    "rides": 0,
+    "moving_s": 0,
+    "load": 0,
+    "excluded": 0,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "week_start": "2026-05-04",
+    "rides": 0,
+    "moving_s": 0,
+    "load": 0,
+    "excluded": 0,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "week_start": "2026-05-11",
+    "rides": 0,
+    "moving_s": 0,
+    "load": 0,
+    "excluded": 0,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "week_start": "2026-05-18",
+    "rides": 1,
+    "moving_s": 5400,
+    "load": 80,
+    "excluded": 0,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  }
+]

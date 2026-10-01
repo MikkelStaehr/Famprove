@@ -59,6 +59,25 @@ def req_int(obj: Mapping[str, object], key: str) -> int:
     return value
 
 
+def opt_bool(obj: Mapping[str, object], key: str) -> bool | None:
+    value = obj.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise ValueError(f"field {key!r} must be a boolean or null")
+    return value
+
+
+def opt_object(obj: Mapping[str, object], key: str) -> dict[str, object] | None:
+    """A JSON object (e.g. a jsonb column) or null."""
+    value = obj.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"field {key!r} must be an object or null")
+    return value
+
+
 def req_bool(obj: Mapping[str, object], key: str) -> bool:
     value = _get(obj, key)
     if not isinstance(value, bool):

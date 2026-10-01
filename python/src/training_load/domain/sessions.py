@@ -6,8 +6,8 @@ local date. A planned session without an activity has no date and adds nothing; 
 beyond the planned sessions is an extra with 0 TSS ("not in the program").
 """
 
-from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Final
 
@@ -29,6 +29,8 @@ class StrengthActivity:
     elapsed_time_s: int | None
     training_load: int | None  # intervals.icu's own value; display only
     device_name: str | None
+    raw: Mapping[str, object] | None = field(default=None, compare=False)
+    """The intervals.icu object as delivered; None for rows stored before raw was kept."""
 
 
 @dataclass(frozen=True, slots=True)

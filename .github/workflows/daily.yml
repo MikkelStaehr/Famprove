@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       since:
-        description: "collect-intervals --since YYYY-MM-DD (empty = last 14 days; 2026-01-01 = full backfill)"
+        description: "collect-intervals --since YYYY-MM-DD (empty = last 14 days; 2024-12-30 = full backfill)"
         required: false
         default: ""
 

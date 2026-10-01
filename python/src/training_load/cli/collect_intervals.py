@@ -1,7 +1,8 @@
 """`collect-intervals [--since YYYY-MM-DD]`: mirror intervals.icu rides into public.activities
 and strength activities (WeightTraining) into public.strength_activities.
 
-Default window: today - 14 days .. today (Europe/Copenhagen). Backfill: --since 2026-01-01.
+Default window: today - 14 days .. today (Europe/Copenhagen). Backfill: --since 2024-12-30
+(the ride analysis starts there, the ISO week of 2025-01-01; daily_load from 2026-01-01).
 """
 
 import argparse

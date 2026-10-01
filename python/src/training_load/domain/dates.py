@@ -7,6 +7,10 @@ from zoneinfo import ZoneInfo
 LOCAL_TZ: Final = ZoneInfo("Europe/Copenhagen")
 SERIES_START: Final = date(2026, 1, 1)
 """First day of daily_load; CTL = ATL = 0 going into this day."""
+ANALYSIS_START: Final = date(2024, 12, 30)
+"""First day of the ride analysis (ride_metrics, cycling_weeks): the Monday of 2025-01-01's ISO
+week, so the first week is whole. More trend points than SERIES_START. collect-intervals is
+backfilled from here; daily_load ignores the earlier rides."""
 
 
 def today_local(now: datetime | None = None) -> date:

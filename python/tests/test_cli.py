@@ -1,5 +1,6 @@
 """collect-strength and compute end to end: fake Drive over FakeSend, in-memory PostgREST."""
 
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import cast
 
@@ -177,3 +178,82 @@ def test_tabs_without_block_number_are_skipped(
     )
     assert collect_strength.run(GOOGLE, bodyweight=80.0, send=drive(workbook_bytes), db=db) == 1
     assert {r["block"] for r in db.tables["strength_sets"]} == {BLOK_11}
+
+
+def analysed_ride(activity_id: str, start: str, **extra: object) -> dict[str, object]:
+    return {
+        **raw_ride(activity_id, start, kind="Ride"),
+        "average_heartrate": 150,
+        "distance": 40_000.0,
+        "device_watts": True,
+        "icu_rolling_ftp": 200,
+        **extra,
+    }
+
+
+def test_compute_analyses_rides_since_2025_without_touching_daily_load(
+    db: InMemoryPostgrest, workbook_bytes: bytes
+) -> None:
+    collect_strength.run(GOOGLE, bodyweight=SYNTHETIC_BODYWEIGHT, send=drive(workbook_bytes), db=db)
+    rides = [
+        analysed_ride("i1", "2025-06-01T09:00:00"),  # analysis only: before SERIES_START
+        analysed_ride("i2", "2026-01-01T18:00:00", icu_training_load=100),
+        analysed_ride("i3", "2026-03-01T10:00:00", moving_time=60),  # too short
+    ]
+    upsert_activities(db, parse_activities(rides).cycling)
+    run_at = datetime(2026, 3, 15, 3, 0, tzinfo=UTC)
+
+    summary = compute.run(db, strength_k=0.02, today=FIXED_TODAY, computed_at=run_at)
+
+    load = {str(r["date"]): r for r in db.tables["daily_load"]}
+    assert min(load) == "2026-01-01" and load["2026-01-01"]["ctl"] == pytest.approx(
+        ctl_atl([100.0])[0].ctl
+    )  # the 2025 ride does not seed CTL
+    assert summary.ignored_outside_range == 0
+    metrics = {r["activity_id"]: r for r in db.tables["ride_metrics"]}
+    assert set(metrics) == {"i1", "i2", "i3"} and summary.rides_analysed == 3
+    assert metrics["i3"]["exclusion"] == "too_short"
+    assert metrics["i1"]["eftp_ok"] and metrics["i1"]["rolling_ftp_w"] == 200
+    assert summary.rides_excluded == {"too_short": 1}
+    weeks = sorted(str(r["week_start"]) for r in db.tables["cycling_weeks"])
+    assert weeks[0] == "2024-12-30" and weeks[-1] == "2026-03-09"  # every week, 0s included
+    assert len(weeks) == summary.cycling_weeks == 63
+
+    db.tables["activities"] = [a for a in db.tables["activities"] if a["id"] != "i3"]
+    before = sorted(map(str, db.tables["cycling_weeks"]))
+    later = datetime(2026, 3, 15, 4, 0, tzinfo=UTC)
+    compute.run(db, strength_k=0.02, today=FIXED_TODAY, computed_at=later)
+    assert {r["activity_id"] for r in db.tables["ride_metrics"]} == {"i1", "i2"}
+    assert {r["computed_at"] for r in db.tables["ride_metrics"]} == {later.isoformat()}
+    assert len(db.tables["cycling_weeks"]) == len(before)  # rebuilt, never duplicated
+
+
+def test_compute_fails_loudly_when_rides_have_no_raw(
+    db: InMemoryPostgrest, workbook_bytes: bytes
+) -> None:
+    collect_strength.run(GOOGLE, bodyweight=SYNTHETIC_BODYWEIGHT, send=drive(workbook_bytes), db=db)
+    [ride] = parse_activities([raw_ride("i1", "2026-03-01T10:00:00", kind="Ride")]).cycling
+    upsert_activities(db, [replace(ride, raw=None)])  # stored before raw was kept
+
+    with pytest.raises(compute.RideDataError, match="1 of 1 rides have no raw"):
+        compute.run(
+            db, strength_k=0.02, today=FIXED_TODAY, computed_at=datetime(2026, 3, 15, tzinfo=UTC)
+        )
+    assert db.tables["daily_load"] and db.tables["ride_metrics"]  # written before failing
+
+
+def test_compute_counts_rides_not_fields_toward_the_raw_problem_share(
+    db: InMemoryPostgrest, workbook_bytes: bytes
+) -> None:
+    collect_strength.run(GOOGLE, bodyweight=SYNTHETIC_BODYWEIGHT, send=drive(workbook_bytes), db=db)
+    rides = [analysed_ride(f"i{n}", f"2026-03-0{n}T10:00:00") for n in range(1, 5)]
+    # One ride of five with two unreadable fields: 1 ride (20 %), not 2 problems (40 %).
+    rides.append(analysed_ride("i5", "2026-03-05T10:00:00", distance="40", device_watts="yes"))
+    upsert_activities(db, parse_activities(rides).cycling)
+
+    summary = compute.run(
+        db, strength_k=0.02, today=FIXED_TODAY, computed_at=datetime(2026, 3, 15, tzinfo=UTC)
+    )
+    assert summary.rides_analysed == 5
+    bad = next(r for r in db.tables["ride_metrics"] if r["activity_id"] == "i5")
+    assert (bad["distance_m"], bad["device_watts"], bad["eftp_ok"]) == (None, None, False)

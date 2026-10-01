@@ -8,17 +8,19 @@ is always complete, which mirrored deletions depend on.
 
 import base64
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Final
 from urllib.parse import quote
 
 from training_load.domain.cycling import CyclingActivity, is_cycling
+from training_load.domain.ride_analysis import RideFacts
 from training_load.domain.sessions import StrengthActivity, is_strength
 from training_load.http import HttpSend, request
 from training_load.narrow import (
     json_objects,
+    opt_bool,
     opt_float,
     opt_int,
     opt_str,
@@ -94,7 +96,7 @@ def parse_activities(raw: Sequence[RawActivity]) -> ParsedActivities:
 
     id, start_date_local ("YYYY-MM-DDTHH:MM:SS", naive), type, name, icu_training_load,
     icu_weighted_avg_watts, icu_intensity (percent, stored as-is), icu_ftp, moving_time,
-    elapsed_time, power_load, hr_load, device_name.
+    elapsed_time, power_load, hr_load, device_name; the whole object is kept as ``raw``.
     A stub is an object with no "type" (typically source == "STRAVA"). Strength activities
     keep id, start_date_local, type, name, moving/elapsed time, icu_training_load, device_name.
     """
@@ -119,6 +121,7 @@ def parse_activities(raw: Sequence[RawActivity]) -> ParsedActivities:
                     elapsed_time_s=opt_int(obj, "elapsed_time"),
                     training_load=opt_int(obj, "icu_training_load"),
                     device_name=opt_str(obj, "device_name"),
+                    raw=obj,
                 )
             )
             continue
@@ -139,11 +142,44 @@ def parse_activities(raw: Sequence[RawActivity]) -> ParsedActivities:
             power_load=opt_int(obj, "power_load"),
             hr_load=opt_int(obj, "hr_load"),
             device_name=opt_str(obj, "device_name"),
+            raw=obj,
         )
         if activity.training_load is None:
             parsed.missing_load_ids.append(activity.id)
         parsed.cycling.append(activity)
     return parsed
+
+
+def ride_facts(activity: CyclingActivity, unreadable: Counter[str]) -> RideFacts:
+    """The typed columns plus the raw-only fields the ride analysis needs (average_heartrate,
+    distance, device_watts, icu_rolling_ftp). A raw value of the wrong type becomes None and is
+    counted in ``unreadable`` by field name; compute logs the counts and fails above a share."""
+    raw = activity.raw
+
+    def read[T](key: str, narrow: Callable[[Mapping[str, object], str], T | None]) -> T | None:
+        if raw is None:
+            return None
+        try:
+            return narrow(raw, key)
+        except ValueError:
+            unreadable[key] += 1
+            return None
+
+    return RideFacts(
+        activity_id=activity.id,
+        day=activity.start_date_local.date(),
+        type=activity.type,
+        has_raw=raw is not None,
+        moving_s=activity.moving_time_s,
+        distance_m=read("distance", opt_float),
+        load=activity.training_load,
+        np_w=activity.weighted_avg_watts,
+        avg_hr=read("average_heartrate", opt_int),
+        device_watts=read("device_watts", opt_bool),
+        ftp_w=activity.ftp,
+        if_set=None if activity.intensity_pct is None else activity.intensity_pct / 100,
+        rolling_ftp_w=read("icu_rolling_ftp", opt_int),
+    )
 
 
 def fetch_wellness(

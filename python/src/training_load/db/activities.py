@@ -7,7 +7,14 @@ from typing import Final, TypedDict
 
 from training_load.db.client import JsonRow, Postgrest
 from training_load.domain.cycling import CyclingActivity
-from training_load.narrow import opt_float, opt_int, opt_str, req_naive_datetime, req_str
+from training_load.narrow import (
+    opt_float,
+    opt_int,
+    opt_object,
+    opt_str,
+    req_naive_datetime,
+    req_str,
+)
 
 TABLE: Final = "activities"
 
@@ -26,6 +33,7 @@ class ActivityRow(TypedDict):
     power_load: int | None
     hr_load: int | None
     device_name: str | None
+    raw: JsonRow | None  # the intervals.icu object as delivered
 
 
 COLUMNS: Final = ",".join(ActivityRow.__annotations__)
@@ -48,6 +56,7 @@ def to_row(activity: CyclingActivity) -> ActivityRow:
         power_load=activity.power_load,
         hr_load=activity.hr_load,
         device_name=activity.device_name,
+        raw=dict(activity.raw) if activity.raw is not None else None,
     )
 
 
@@ -67,6 +76,7 @@ def from_row(row: JsonRow) -> CyclingActivity:
         power_load=opt_int(row, "power_load"),
         hr_load=opt_int(row, "hr_load"),
         device_name=opt_str(row, "device_name"),
+        raw=opt_object(row, "raw"),
     )
 
 

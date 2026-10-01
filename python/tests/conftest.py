@@ -279,6 +279,8 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "forecast_log": ("made_on", "target_date", "method"),
     "planned_sessions": ("date", "name"),
     "planned_targets": ("date", "name"),
+    "ride_metrics": ("activity_id",),
+    "cycling_weeks": ("week_start",),
 }
 
 

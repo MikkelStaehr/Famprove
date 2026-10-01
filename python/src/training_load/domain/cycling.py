@@ -1,7 +1,7 @@
 """Cycling activity model, the cycling-type filter and daily cycling TSS."""
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Final
 
@@ -25,6 +25,8 @@ class CyclingActivity:
     power_load: int | None
     hr_load: int | None
     device_name: str | None = None  # intervals.icu device_name; display only
+    raw: Mapping[str, object] | None = field(default=None, compare=False)
+    """The intervals.icu object as delivered; None for rows stored before raw was kept."""
 
 
 def is_cycling(activity_type: str | None) -> bool:
