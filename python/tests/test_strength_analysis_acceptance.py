@@ -80,7 +80,7 @@ def kg_row_violations(r: JsonRow) -> list[str]:
         "week": cast(int, r["week"]) > 0,
         "set_no": cast(int, r["set_no"]) > 0,
         "session": cast(int, r["session"]) > 0,
-        "resets": cast(int, r["resets"]) >= 0,
+        "occurrence": cast(int, r["occurrence"]) > 0,
         "not_null": all(r[k] is not None for k in ("type", "name", "week_start", "first_seen_at")),
         "first~at": (r["planned_first_kg"] is None) == (r["planned_first_at"] is None),
         "last~at": (r["planned_last_kg"] is None) == (r["planned_last_at"] is None),

@@ -227,4 +227,5 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
                                       prescribed=prescribed_text(load),
                                       sets_text=sets_text, reps_text=reps_text,
                                       e1rm=e1rm.get(typ), raw=raw, logged_rpe=lsrpe))
+    if lsrpe_ok is None and sets: issues[LSRPE_COLUMN_MISSING] += 1   # ingen header-række: LSRPE ulæst
     return sets

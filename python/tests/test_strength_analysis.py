@@ -6,9 +6,10 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
+import openpyxl
 import pytest
 
-from training_load.domain.kg_history import KgState, next_kg_state
+from training_load.domain.kg_history import KgState, kg_keys, next_kg_state
 from training_load.domain.strength import Block, StrengthSet
 from training_load.domain.strength_analysis import (
     E1RM_FACTOR,
@@ -21,7 +22,12 @@ from training_load.domain.strength_analysis import (
     set_key,
     strength_weeks,
 )
-from training_load.sources.strength_sheet import LSRPE_NOT_HALF, logged_rpe
+from training_load.sources.strength_sheet import (
+    LSRPE_COLUMN_MISSING,
+    LSRPE_NOT_HALF,
+    logged_rpe,
+    parse_tab,
+)
 
 MakeSet = Callable[..., StrengthSet]
 B11, B12 = "Program - blok 11", "Program - blok 12 (offseason)"
@@ -197,9 +203,9 @@ def run(
     states: list[KgState] = []
     prev = None
     for i, (kg, status) in enumerate(steps):
-        prev = next_kg_state(
-            prev, top(make_set, logged_kg=kg, **changes), status, NOW + timedelta(hours=i)
-        )
+        s = top(make_set, logged_kg=kg, **changes)
+        key = kg_keys([s])[set_key(s)]
+        prev = next_kg_state(prev, s, key, status, NOW + timedelta(hours=i))
         states.append(prev)
     return states
 
@@ -240,12 +246,33 @@ def test_unmatched_after_done_clears_lifted_and_keeps_the_plan_frozen(make_set: 
     assert replanned.planned_last_kg == 140.0  # frozen at the first completion
 
 
-def test_a_changed_fingerprint_starts_the_row_over(make_set: MakeSet) -> None:
-    before = next_kg_state(None, top(make_set), "planned", NOW)
-    moved = top(make_set, name="Dødløft", type="DEADLIFT", logged_kg=170.0)  # same sheet row
-    after = next_kg_state(before, moved, "planned", NOW + timedelta(days=1))
-    assert after.resets == 1 and after.planned_first_kg == 170.0 and after.name == "Dødløft"
-    assert after.first_seen_at == NOW + timedelta(days=1)
+def test_an_inserted_row_keeps_the_history_and_a_rename_never_overwrites(
+    make_set: MakeSet,
+) -> None:
+    week = [top(make_set, sheet_row=10), top(make_set, sheet_row=12, name="Bænk", type="BENCH")]
+    keys = kg_keys(week)
+    states = {
+        keys[set_key(x)]: next_kg_state(None, x, keys[set_key(x)], "planned", NOW) for x in week
+    }
+    # The coach inserts an accessory row above: both sets move down one row.
+    moved = [replace(x, sheet_row=x.sheet_row + 1) for x in week]
+    later = NOW + timedelta(days=1)
+    moved_keys = kg_keys(moved)
+    assert set(moved_keys.values()) == set(keys.values())  # same keys: the history continues
+    for x in moved:
+        k = moved_keys[set_key(x)]
+        after = next_kg_state(states[k], x, k, "lifted", later)
+        assert after.planned_first_kg == 140.0 and after.lifted_kg == 140.0
+        assert after.sheet_row == x.sheet_row and after.first_seen_at == NOW
+    renamed = replace(week[0], name="Pause squat")  # same row, another exercise: a new key
+    assert kg_keys([renamed])[set_key(renamed)] not in states
+
+
+def test_same_name_rows_in_a_session_are_told_apart_by_order(make_set: MakeSet) -> None:
+    top_set = top(make_set, sheet_row=5)
+    backoff = top(make_set, sheet_row=6, prescribed="-10%", logged_kg=126.0)
+    keys = kg_keys([backoff, top_set])
+    assert keys[set_key(top_set)][5] == 1 and keys[set_key(backoff)][5] == 2  # occurrence
 
 
 def test_empty_kg_records_nothing(make_set: MakeSet) -> None:
@@ -254,3 +281,25 @@ def test_empty_kg_records_nothing(make_set: MakeSet) -> None:
         planned.planned_first_kg is None and done.lifted_kg is None and done.lifted_first_at is None
     )
     assert replace(done) == done
+
+
+def test_a_tab_without_any_header_row_counts_the_missing_lsrpe_column() -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    date_row: list[object] = [
+        None,
+        datetime(2026, 8, 10),
+        None,
+        None,
+        "WEEK 1",
+        None,
+        datetime(2026, 8, 10),
+    ]
+    ws.append(date_row)
+    ws.append(
+        [None, "SQUAT", "Squat", None, 1, 5, "RPE 6", 140, 7]
+    )  # an LSRPE-like cell, no header
+    issues: Counter[str] = Counter()
+    [parsed] = parse_tab(ws, "Program - blok 12", 80.0, issues)
+    assert parsed["logged_rpe"] is None and issues[LSRPE_COLUMN_MISSING] == 1

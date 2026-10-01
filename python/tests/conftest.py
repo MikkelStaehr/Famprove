@@ -284,7 +284,7 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "ride_metrics": ("activity_id",),
     "cycling_weeks": ("week_start",),
     "strength_weeks": ("week_start", "lift"),
-    "strength_set_kg": ("sheet_id", "block", "sheet_row", "week", "set_no"),
+    "strength_set_kg": ("sheet_id", "block", "week", "session", "name", "occurrence", "set_no"),
 }
 
 

@@ -33,7 +33,7 @@ from training_load.db.strength_sets import all_sets
 from training_load.domain.cycling import daily_cycling_tss
 from training_load.domain.daily import build_daily_load
 from training_load.domain.dates import ANALYSIS_START, SERIES_START, today_local
-from training_load.domain.kg_history import next_kg_state
+from training_load.domain.kg_history import kg_keys, next_kg_state
 from training_load.domain.load import DECAY
 from training_load.domain.projection import MODEL_VERSION, PlannedRide, naive_projection, project
 from training_load.domain.ride_analysis import analyse_rides, weekly_totals
@@ -82,7 +82,6 @@ class ComputeSummary:
     strength_weeks: int
     e1rm_out_of_bounds: int  # candidate sets with an implausible e1RM (left out)
     kg_states_changed: int  # strength_set_kg rows written this run
-    kg_resets: int  # sets whose fingerprint changed (the coach moved a row)
 
 
 def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime) -> ComputeSummary:
@@ -133,19 +132,17 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     analysis = strength_weeks(sets, statuses, blocks, today=today)
     sync_strength_weeks(db, analysis.weeks, computed_at=computed_at)
     previous = all_kg_states(db)
+    keys = kg_keys(sets)
     changed = []
-    resets = 0
     for st in sets:
-        before = previous.get(set_key(st))
-        after = next_kg_state(before, st, statuses[set_key(st)], computed_at)
+        key = keys[set_key(st)]
+        before = previous.get(key)
+        after = next_kg_state(before, st, key, statuses[set_key(st)], computed_at)
         if after != before:
             changed.append(after)
-            resets += before is not None and after.resets > before.resets
     upsert_kg_states(db, changed)
     if analysis.e1rm_out_of_bounds:
         log.warning("%d sets left out of e1RM (implausible value)", analysis.e1rm_out_of_bounds)
-    if resets:
-        log.warning("%d strength_set_kg rows reset: the sheet row now holds another set", resets)
 
     rides = [PlannedRide(date=p.date, name=p.name, steps=p.steps) for p in all_sessions(db)]
     deload_weeks = {iso_week_start(b.deload_start) for b in blocks if b.deload_start}
@@ -248,7 +245,6 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         strength_weeks=len(analysis.weeks),
         e1rm_out_of_bounds=analysis.e1rm_out_of_bounds,
         kg_states_changed=len(changed),
-        kg_resets=resets,
     )
 
 

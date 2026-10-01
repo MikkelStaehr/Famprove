@@ -71,15 +71,16 @@ grant select, insert, update, delete on table public.strength_weeks to service_r
 create table public.strength_set_kg (
   sheet_id           text             not null,
   block              text             not null,
-  sheet_row          integer          not null check (sheet_row > 0),
   week               smallint         not null check (week > 0),
-  set_no             smallint         not null check (set_no > 0),
-  type               text             not null,
+  session            smallint         not null check (session > 0),
   name               text             not null,
+  occurrence         smallint         not null check (occurrence > 0),
+  set_no             smallint         not null check (set_no > 0),
+  sheet_row          integer          not null check (sheet_row > 0),
+  type               text             not null,
   reps_text          text,
   prescribed         text,
   week_start         date             not null,
-  session            smallint         not null check (session > 0),
   planned_first_kg   double precision,
   planned_first_at   timestamptz,
   planned_last_kg    double precision,
@@ -87,9 +88,8 @@ create table public.strength_set_kg (
   lifted_kg          double precision,
   lifted_first_at    timestamptz,
   lifted_changed_at  timestamptz,
-  resets             integer          not null default 0 check (resets >= 0),
   first_seen_at      timestamptz      not null,
-  primary key (sheet_id, block, sheet_row, week, set_no),
+  primary key (sheet_id, block, week, session, name, occurrence, set_no),
   check ((planned_first_kg is null) = (planned_first_at is null)),
   check ((planned_last_kg is null) = (planned_last_at is null)),
   check ((planned_first_kg is null) = (planned_last_kg is null)),
@@ -97,7 +97,7 @@ create table public.strength_set_kg (
 );
 
 comment on table public.strength_set_kg is
-  'Persistent kg history per set (domain.kg_history), updated by compute and never rebuilt. planned_first = first kg seen before the session was done (never overwritten); planned_last = last kg seen before it was done (frozen once done); lifted = kg while the session is done (follows corrections). Planned null = not observed, never "no adjustment". A changed fingerprint (type, name, reps_text, prescribed) resets the row (resets + 1).';
+  'Persistent kg history per set (domain.kg_history), updated by compute and never rebuilt. planned_first = first kg seen before the session was done (never overwritten); planned_last = last kg seen before it was done (frozen once done); lifted = kg while the session is done (follows corrections). Planned null = not observed, never "no adjustment". Keyed by what the set is (tab, week, session, exercise name, its occurrence among same-name rows in the session, set number), not by its sheet row: an inserted row keeps its history; a renamed or moved set gets a new row and the old one stays. Rows are never overwritten by another set or deleted.';
 
 alter table public.strength_set_kg enable row level security;
 revoke all on table public.strength_set_kg from anon, authenticated;

@@ -6,8 +6,8 @@ from datetime import datetime
 from typing import Final, Literal, TypedDict
 
 from training_load.db.client import JsonRow, Postgrest
-from training_load.domain.kg_history import KgState
-from training_load.domain.strength_analysis import Phase, RpeSource, SetKey, StrengthWeek
+from training_load.domain.kg_history import KgKey, KgState
+from training_load.domain.strength_analysis import Phase, RpeSource, StrengthWeek
 from training_load.narrow import opt_float, opt_str, req_date, req_int, req_str
 
 WEEKS_TABLE: Final = "strength_weeks"
@@ -35,15 +35,16 @@ class StrengthWeekRow(TypedDict):
 class KgStateRow(TypedDict):
     sheet_id: str
     block: str
-    sheet_row: int
     week: int
-    set_no: int
-    type: str
+    session: int
     name: str
+    occurrence: int
+    set_no: int
+    sheet_row: int
+    type: str
     reps_text: str | None
     prescribed: str | None
     week_start: str
-    session: int
     planned_first_kg: float | None
     planned_first_at: str | None
     planned_last_kg: float | None
@@ -51,12 +52,11 @@ class KgStateRow(TypedDict):
     lifted_kg: float | None
     lifted_first_at: str | None
     lifted_changed_at: str | None
-    resets: int
     first_seen_at: str
 
 
 KG_COLUMNS: Final = ",".join(KgStateRow.__annotations__)
-KG_ORDER: Final = "sheet_id,block,sheet_row,week,set_no"  # the primary key
+KG_ORDER: Final = "sheet_id,block,week,session,name,occurrence,set_no"  # the primary key
 
 
 def week_row(w: StrengthWeek, computed_at: datetime) -> StrengthWeekRow:
@@ -97,19 +97,20 @@ def _at(value: datetime | None) -> str | None:
 
 
 def kg_row(k: KgState) -> KgStateRow:
-    sheet_id, block, sheet_row, week, set_no = k.key
+    sheet_id, block, week, session, name, occurrence, set_no = k.key
     return KgStateRow(
         sheet_id=sheet_id,
         block=block,
-        sheet_row=sheet_row,
         week=week,
+        session=session,
+        name=name,
+        occurrence=occurrence,
         set_no=set_no,
+        sheet_row=k.sheet_row,
         type=k.type,
-        name=k.name,
         reps_text=k.reps_text,
         prescribed=k.prescribed,
         week_start=k.week_start.isoformat(),
-        session=k.session,
         planned_first_kg=k.planned_first_kg,
         planned_first_at=_at(k.planned_first_at),
         planned_last_kg=k.planned_last_kg,
@@ -117,7 +118,6 @@ def kg_row(k: KgState) -> KgStateRow:
         lifted_kg=k.lifted_kg,
         lifted_first_at=_at(k.lifted_first_at),
         lifted_changed_at=_at(k.lifted_changed_at),
-        resets=k.resets,
         first_seen_at=k.first_seen_at.isoformat(),
     )
 
@@ -129,21 +129,22 @@ def _opt_at(row: JsonRow, column: str) -> datetime | None:
 
 def kg_from_row(row: JsonRow) -> KgState:
     """Raises ValueError on a missing or mistyped column."""
-    key: SetKey = (
+    key: KgKey = (
         req_str(row, "sheet_id"),
         req_str(row, "block"),
-        req_int(row, "sheet_row"),
         req_int(row, "week"),
+        req_int(row, "session"),
+        req_str(row, "name"),
+        req_int(row, "occurrence"),
         req_int(row, "set_no"),
     )
     return KgState(
         key=key,
+        sheet_row=req_int(row, "sheet_row"),
         type=req_str(row, "type"),
-        name=req_str(row, "name"),
         reps_text=opt_str(row, "reps_text"),
         prescribed=opt_str(row, "prescribed"),
         week_start=req_date(row, "week_start"),
-        session=req_int(row, "session"),
         planned_first_kg=opt_float(row, "planned_first_kg"),
         planned_first_at=_opt_at(row, "planned_first_at"),
         planned_last_kg=opt_float(row, "planned_last_kg"),
@@ -151,12 +152,11 @@ def kg_from_row(row: JsonRow) -> KgState:
         lifted_kg=opt_float(row, "lifted_kg"),
         lifted_first_at=_opt_at(row, "lifted_first_at"),
         lifted_changed_at=_opt_at(row, "lifted_changed_at"),
-        resets=req_int(row, "resets"),
         first_seen_at=datetime.fromisoformat(req_str(row, "first_seen_at")),
     )
 
 
-def all_kg_states(db: Postgrest) -> dict[SetKey, KgState]:
+def all_kg_states(db: Postgrest) -> dict[KgKey, KgState]:
     """Every stored state, paginated, keyed by the set's primary key."""
     states = (kg_from_row(r) for r in db.select(KG_TABLE, columns=KG_COLUMNS, order=KG_ORDER))
     return {s.key: s for s in states}

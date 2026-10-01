@@ -25,6 +25,7 @@ from typing import Final, Literal
 
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.strength import Block, StrengthSet, block_number, iso_week_start
+from training_load.sources.strength_sheet import E1RM_RANGE
 
 type KgStatus = Literal["lifted", "pre_log", "planned"]
 type Phase = Literal["in_season", "off_season"]
@@ -48,7 +49,7 @@ PHASES_CONFIRMED_TO: Final = 12
 
 MAX_E1RM_REPS: Final = 8
 E1RM_FACTOR: Final = 0.0333
-E1RM_BOUNDS_KG: Final = (20.0, 400.0)
+E1RM_BOUNDS_KG: Final[tuple[float, float]] = E1RM_RANGE  # the parser's 1RM bound
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,10 +126,17 @@ def _candidate(s: StrengthSet) -> bool:
 
 
 def _block_of(week: date, blocks: Sequence[Block]) -> Block | None:
-    for b in blocks:
-        if b.start_date <= week <= (b.end_date or week):
-            return b
-    return None
+    """The latest block that started on or before ``week``. A block followed by a later one
+    ends at its last filled week (the weeks between blocks have none); the newest block keeps
+    the current week even before its first kg is entered."""
+    started = [b for b in blocks if b.start_date <= week]
+    if not started:
+        return None
+    block = max(started, key=lambda b: b.start_date)
+    followed = any(b.start_date > block.start_date for b in blocks)
+    if followed and block.end_date is not None and week > block.end_date:
+        return None
+    return block
 
 
 def strength_weeks(

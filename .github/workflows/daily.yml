@@ -26,10 +26,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: daily-load # strength_sets is replaced with delete + insert; never overlap two runs
-  cancel-in-progress: false
-
 jobs:
   gate:
     runs-on: ubuntu-latest
@@ -52,6 +48,10 @@ jobs:
   collect-and-compute:
     needs: gate
     if: needs.gate.outputs.run == 'true'
+    # On the job, not the workflow: a skipped slot never waits in (or replaces a run in) the group.
+    concurrency:
+      group: daily-load # strength_sets is replaced with delete + insert; never overlap two runs
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
