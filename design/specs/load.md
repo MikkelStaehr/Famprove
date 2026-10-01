@@ -152,7 +152,7 @@ Question: "Where am I today, and where does my usual training take fitness in th
 - **Prognose region:** from `lastActual` to the right edge, fill `--track` at **60% opacity**, drawn behind the lines. Series keep their full colour, width and dash (ATL dashed, TSB dotted, as Part B). **Do not** lower line opacity: ATL at 55% falls to 2.5:1. Line contrast on the fill: light ≥ 4.3:1, dark ≥ 5.1:1. The fill is supplementary. The meaning is carried by the label, the rule, the legend, the tooltip and the sr text.
 - **Region label** `Prognose · anslået`: `text-14` 600 `--text-muted` in the strip, start-anchored 6px right of the rule (≥ 6:1 on the fill). At 200% text it wraps to two lines (`Prognose ·` / `anslået`), and the strip grows with it. Never truncated. If `lastActual` < today (stale), the region begins left of the rule and the label stays right of the rule.
 - **Legend:** no prognose item (review 2026-09-30: as a legend item it wrapped to a 3rd line and broke the fold by ~14px). The region label is the key, placed right beside the fill. The swatch (24×12, `--track` 60% fill, 1px `--chart-mark` ring) appears only in the disclosure term below. The legend stays at 2 lines at 390px.
-- **Disclosure (§8b group 1):** add a 4th term after Form, with the legend swatch. Term `Prognose (anslået)`, text: `Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer: cykling som dit gennemsnit for hver ugedag de sidste 28 dage (en planlagt tur erstatter dagen), styrke som dine seneste tre gange af hver session. Det er et skøn, ikke en plan.`
+- **Disclosure (§8b group 1):** add a 4th term after Form, with the legend swatch. Term `Prognose (anslået)`, text (rewritten 2026-10-01, §10): `Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer. Cykling: dit gennemsnit for hver ugedag de sidste 28 dage (en planlagt tur erstatter dagen). Styrke: resten af blokken ud fra trænerens plan, og efter blokken dit gennemsnit pr. uge fra de seneste 4 hele uger uden deload. Det er et skøn, ikke en plan.` A 5th term (`Spænd efter blokken`) follows, see §10a.
 - No motion: the chart, the rule and the region never animate.
 
 ### 9c. Tooltip on a prognose day (same component; values tabular, U+2212)
@@ -163,13 +163,13 @@ Question: "Where am I today, and where does my usual training take fitness in th
 | Values | `Fitness (CTL) ≈ 46` · `Træthed (ATL) ≈ 44` · `Form (TSB) ≈ +2` |
 | Basis, cycling | `Cykel ≈ 62 TSS · typisk torsdag` · `Cykel 80 TSS · planlagt tur` · line omitted when 0/none |
 | Basis, cycling, planned ride unreadable (source falls back to typical) | `Cykel ≈ 62 TSS · typisk torsdag (planlagt tur kunne ikke læses)` |
-| Basis, strength | `Styrke ≈ 45 TSS · session 2` (+ ` · dag anslået` when that session's weekday is estimated) · omitted when none |
-| Basis, strength, `tss` null (counts as 0 in Python) | reason "no done session…": `Styrke · session 2 · ikke talt med (ikke lavet før)` · reason "no day left this week": `Styrke · session 2 · ikke talt med (ingen dag tilbage i ugen)` |
-Measured days keep the §4 tooltip, with no "≈". Today's tooltip is measured.
+| Basis, strength | Superseded by §10c (method, range and the three reasons). |
+
+Measured days keep the §4 tooltip, with no "≈". Today's tooltip is measured. Status, values and strength lines on prognose days: §10c.
 
 ### 9d. Screen-reader text (extends §4 "Chart sr text")
 - Range sentence: `Daglig fitness (CTL), træthed (ATL) og form (TSB) i TSS/dag fra ons. 5. aug. til ons. 30. sep., og en anslået prognose til ons. 25. nov.` (without projection: the text up to `30. sep.`).
-- Added after the today sentence: `Prognose, anslået ud fra en typisk uge: den ons. 25. nov. cirka fitness 48, træthed 40, form plus 8.`
+- Added after the today sentence: the prognose sentence in §10d (replaces `Prognose, anslået ud fra en typisk uge: …`).
 - No sr table (review 2026-09-30): the chart has none (§4 made it optional). The three sentences carry the chart's purpose (range, today, where the prognose ends). If a table is added later, it gets a `Type` column (`Målt` · `Prognose` · `Prognose, dag anslået`), and prognose cells get a `ca.` prefix.
 - At 200% text the SVG tick labels stay 12px. Browser zoom scales them with the plot, so that is accepted. Labels must not overlap at 100% text.
 
@@ -190,3 +190,57 @@ Measured days keep the §4 tooltip, with no "≈". Today's tooltip is measured.
 4. The tooltip on a future day follows §9c verbatim: date, `Prognose`, values with `≈`, then the cycling/strength basis lines. On a day whose `basis` flags an estimated placement the status reads `Prognose · dag anslået`. Measured days show no `≈`.
 5. Projection rows dated ≤ the latest `daily_load` date are never drawn. With no projection rows the chart ends at today and shows the §9e note. With `DEV_FIXTURE=empty|error` no prognose appears anywhere.
 6. The sr text includes the prognose sentence with "cirka" and "plus"/"minus" (no sr table required). At 200% text the region label wraps and never overlaps the `i dag` label or the lines' annotation strip.
+
+## 10. Prognose uncertainty band after the block (added 2026-10-01, M · task 1b)
+Question: "How sure is the prognose, and from where on is it a guess?" Data: `daily_projection` adds `ctl_low/ctl_high`, `atl_low/atl_high`, `tsb_low/tsb_high` (null inside the block) and `strength_method` (`plan` | `recent`); `basis.strength` entries gain `method`, `reason`, `tss_low/tss_high`, `recent_weeks`, `unscored`. The web selects these through `web/src/lib/db/*` and draws them as given: **no band arithmetic in the UI** (no widening, no smoothing, no deriving low/high). §9 stays as built except where it points here.
+
+### 10a. The band (chart, 390px first)
+- **One band, on CTL only.** It is the line the page's question is about. ATL sits close to CTL (two bands would overlap into one grey mass in a 224px plot), and the TSB/ATL ranges are in the tooltip and sr text instead.
+- **Fill:** area between `ctl_low` and `ctl_high`, new token `--prognose-band` (light `rgb(18 18 18 / .16)`, dark `rgb(238 241 245 / .18)`; DESIGN.md token table), no edge strokes. Drawn above the `--track` region fill, below the series lines and the "i dag" rule. Only rows with both values non-null get the band, so it starts by itself at the first `recent` day and widens as Python widens it.
+- **"Faded" = the band, not the lines.** The §9b rule holds: lines keep full colour, width and dash after the block. Measured on band over region: light ATL 4.1:1, TSB 3.5:1, CTL > 10:1; dark ATL 3.3:1, TSB 3.4:1, CTL 7:1 (all ≥ 3:1). The band is supplementary: the range is carried by the tooltip (§10c) and the sr text (§10d).
+- **Boundary plan → recent:** no extra rule or strip label. At 390px the block end is ~70px right of "i dag", and `Prognose · anslået` (~125px) already occupies that space; a third label would collide or add a strip line and break the fold. The band's start is the boundary; the tooltip status names it.
+- **Disclosure:** 5th term after `Prognose (anslået)`. Swatch: 24×12 `--prognose-band` over `--track` 60%, 1px `--chart-mark` ring. Term `Spænd efter blokken`, text: `Hvor fitness kan lande efter blokken, alt efter om dine styrkeuger bliver som den letteste eller den hårdeste af de seneste 4 hele uger. Jo længere frem, jo bredere.`
+- No motion (Area animation off; the chart never animates).
+
+### 10b. Flat or unknown band (the live case today)
+- `low = high` (rounded to whole TSS) on a row: nothing visible is drawn there (zero-height fill), and the tooltip omits the range.
+- **Strength unknown after the block** (any `basis.strength` entry with `method = 'recent'` and reason `no recent weeks to average`): note under the plot, 8px, `text-14` `--text-muted`, `max-width: 60ch`, same slot as the §9e note: `Styrke efter blokken (fra 26. okt.) er ikke med i prognosen endnu, fordi der ikke er nogen hele uger at regne et gennemsnit af. Den kommer med, når ugerne er gået.` The date is the first projection date with `strength_method = 'recent'`, format as the x ticks. The note sits below the x labels, so the §9f.1 fold is unaffected.
+
+### 10c. Tooltip on a prognose day (replaces §9c's strength rows; other §9c lines unchanged)
+| Line | Danish (exact; values tabular, U+2212) |
+|---|---|
+| Status, `strength_method = 'recent'` | `Prognose · efter blokken` (+ ` · dag anslået` per §9c). `plan` or null: §9c as is |
+| Values, range present and low ≠ high | `Fitness (CTL) ≈ 46 (44 til 49)` · `Træthed (ATL) ≈ 44 (41 til 47)` · `Form (TSB) ≈ −2 (−6 til +3)`. No range otherwise |
+| Strength, plan | `Styrke ≈ 45 TSS · session 2 · fra trænerens plan` (+ ` · dag anslået`) (+ ` · 2 sæt uden kg ikke talt med` when `unscored` > 0; 1: `1 sæt uden kg …`) |
+| Strength, recent | `Styrke ≈ 40 TSS (30 til 52) · session 2 · gennemsnit af de seneste 4 uger` (`recent_weeks` = 1: `… af den seneste uge`; range omitted when low = high) (+ ` · dag anslået`) |
+| `tss` null, `no day left this week` | `Styrke · session 2 · ikke talt med (ingen dag tilbage i ugen)` |
+| `tss` null, `no recent weeks to average` | `Styrke · session 2 · ikke talt med (endnu ingen hele uger at regne gennemsnit af)` |
+| `tss` null, `no kg for any set in the plan` | `Styrke · session 2 · ikke talt med (ingen kg i trænerens plan)` |
+| `tss` null, unknown or missing reason | `Styrke · session 2 · ikke talt med` (never a guessed reason; "ikke lavet før" is retired) |
+
+Lines wrap inside the tooltip (`max-w-72`); never truncated, also at 200% text.
+
+### 10d. Screen-reader text (replaces §9d's prognose sentence)
+- `Prognose, anslået ud fra trænerens plan og dine seneste uger: den ons. 25. nov. cirka fitness 48 (mellem 44 og 52), træthed 40, form plus 8.` The parenthesis uses the last row's `ctl_low/ctl_high` and is omitted when they are null or equal.
+- In the §10b case, add: `Styrke efter blokken er ikke med i prognosen endnu.`
+
+### 10e. States
+| State | Treatment |
+|---|---|
+| `DEV_FIXTURE=empty` / `error` | §5 page states. No projection, no band, no note. |
+| `DEV_FIXTURE=stale` / real stale | Band drawn from the rows as stored; nothing re-anchored. §9e region rule applies. |
+| No band rows (all low/high null: block covers the window, or rows from before task 1a) | No band, no ranges, no §10b note. Disclosure term stays (static text). |
+| Flat band, strength unknown (live today) | §10b: nothing drawn, note under the plot, tooltip reason per §10c. |
+| Flat band, real zero spread | Nothing drawn, no range, no note. |
+| `DEV_FIXTURE=band` (new, dev only) | Real rows; each `recent` projection row gets an illustrative spread (low < value < high, growing with distance) and its sessions a `recent` entry with `tss_low/tss_high`, `recent_weeks = 4`. Exists only so the band can be screenshotted before 4 real weeks have completed. Ignored in production like the other switches. |
+| Loading / projection read fails | §9e unchanged. |
+| Dark | Token dark value; contrasts per §10a. |
+| Reduced motion | Nothing animates (as §9b). |
+
+### 10f. Acceptance criteria (for `tester`)
+1. `DEV_TODAY=2026-10-01` on live data: no band is visible, the §10b note appears under the x labels with the first `recent` date, and the tooltip on a session day after the block reads `… ikke talt med (endnu ingen hele uger at regne gennemsnit af)`. The string `ikke lavet før` exists nowhere in `web/src`.
+2. `DEV_FIXTURE=band`, 390 × 844 and 1280, light and dark: a `--prognose-band` fill spans exactly `ctl_low`…`ctl_high` and only on rows where both are non-null; no band on ATL or TSB; all lines keep Part B colour, width, dash and full opacity; no new strip label; §9f.1 fold still holds.
+3. A `node --test` test feeds rows with known `*_low/*_high` to the chart's data mapping and asserts the plotted band equals them unchanged (no UI arithmetic), and that null or equal low/high yields no band and no tooltip range.
+4. Tooltips follow §10c verbatim for: a plan day (incl. `unscored` > 0), a recent day with a range (incl. negative TSB with U+2212 and `til`), `recent_weeks = 1`, each of the three reasons, and an unknown reason.
+5. The open disclosure shows the rewritten `Prognose (anslået)` text and the `Spænd efter blokken` term verbatim; the sr text matches §10d (range in "mellem … og …", and the extra sentence in the §10b case).
+6. At 200% text the tooltip lines and the §10b note wrap without clipping or overlap, in light and dark; nothing animates under `prefers-reduced-motion: reduce`.

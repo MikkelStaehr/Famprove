@@ -169,6 +169,7 @@ Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the
 | `--series-tsb` | `#1f5bd0` dotted 2px (round caps) | `#7aa7ff` dotted 2px | form, the chart's only hue. 5.2 / 6.7:1 on block fill |
 | `--block-fill` | `#efeee9` | `#1c222b` | strength-block shading behind the lines |
 | `--chart-mark` | `#807e78` | `#737d8a` | zero line, deload hatch, axis ticks: 3.5 / 3.8:1 on block fill |
+| `--prognose-band` | `rgb(18 18 18 / .16)` | `rgb(238 241 245 / .18)` | CTL uncertainty band after the strength block (load.md §10a). Supplementary: the range is in tooltip and sr text. Lines on it stay ≥ 3.3:1 (ATL dark, the lowest) |
 | `--zone-risk` | `#f0b9aa` | `#542f32` | band fills in the zone bar and the flag swatch. **Supplementary tints:** 1.2–2.1:1 against the page, so they never carry meaning alone. The zone name (text), the threshold numbers and the active band's 2px `--text` outline do. In dark they are Ro's zone colours (`#ff7b7b`, `#4ade9a`, `#a9b3c1`, `#5ab8ff`, `#f5c451`) at 30% over `--bg` |
 | `--zone-optimal` | `#c3e0b0` | `#1e4c3b` | as above |
 | `--zone-grey` | `#d3d0c8` | `#3a3f47` | as above |
