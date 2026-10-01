@@ -39,9 +39,10 @@ class Intensity(Enum):
     ROLLING_EFTP = "rolling_eftp"  # NP / intervals.icu's rolling eFTP on the day
 
 
-ENDURANCE: Final = Intensity.ROLLING_EFTP
-"""The user's choice (2026-10-01): their set FTP (250 W) is outdated. Measured on real data:
-0 rides since 2025 qualify on this basis (eFTP is a floor), 11 on SET_FTP. Pending the user."""
+ENDURANCE: Final = Intensity.SET_FTP
+"""The user's choice (2026-10-01): intervals.icu's IF. Measured on real data: 11 rides since 2025
+qualify on SET_FTP, 0 on ROLLING_EFTP (the rolling eFTP is a floor: few maximal efforts).
+Revisit after an FTP test; an HR-zone-based endurance filter may replace it later."""
 
 ENDURANCE_MAX_IF: Final = 0.75
 MIN_MOVING_S: Final = 5 * 60

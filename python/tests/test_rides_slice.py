@@ -49,6 +49,7 @@ def test_the_endurance_basis_decides_whether_ef_has_points(facts: list[RideFacts
     # of 30 min or more is below IF 0.75; on intervals.icu's IF (set FTP 250 W) 11 are.
     assert sum(m.ef_ok for m in analyse_rides(facts, basis=Intensity.ROLLING_EFTP)) == 0
     assert sum(m.ef_ok for m in analyse_rides(facts, basis=Intensity.SET_FTP)) == 11
+    assert sum(m.ef_ok for m in analyse_rides(facts)) == 11  # the default (ENDURANCE)
 
 
 def test_the_real_break_splits_the_eftp_line_and_a_year_ago_exists(
