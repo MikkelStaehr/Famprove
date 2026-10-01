@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -113,11 +114,27 @@ test("parseProjectionRow: basis entries may leave out reason (null), but a reaso
     ctl: 15.1,
     atl: 31.9,
     tsb: -16.8,
+    strength_method: "plan",
+    ctl_low: null,
+    ctl_high: null,
+    atl_low: null,
+    atl_high: null,
+    tsb_low: null,
+    tsb_high: null,
     basis: {
       cycling: "typical_week",
       rides: [{ name: "Zwift", tss: null, reason: "step 1: minutes must be a number" }],
       strength: [
-        { session: 1, tss: 152.9, weekday: "learnt", moved: false, day_estimated: false, planned_in_sheet: true },
+        {
+          session: 1,
+          tss: 152.9,
+          weekday: "learnt",
+          moved: false,
+          day_estimated: false,
+          planned_in_sheet: true,
+          method: "plan",
+          unscored: 0,
+        },
         // Python's real shape for a session with no day left this week (a Sunday run).
         {
           session: 2,
@@ -126,6 +143,7 @@ test("parseProjectionRow: basis entries may leave out reason (null), but a reaso
           moved: true,
           day_estimated: true,
           planned_in_sheet: true,
+          method: "plan",
           reason: "no day left this week",
         },
       ],
@@ -135,7 +153,31 @@ test("parseProjectionRow: basis entries may leave out reason (null), but a reaso
   assert.deepEqual(row.sessions.map((s) => s.reason), [null, "no day left this week"]);
   assert.equal(row.rides[0]?.reason, "step 1: minutes must be a number");
   assert.throws(
-    () => parseProjectionRow({ ...raw, basis: { ...raw.basis, strength: [{ session: 1, tss: 1, day_estimated: false, reason: 7 }] } }),
+    () => parseProjectionRow({ ...raw, basis: { ...raw.basis, strength: [{ session: 1, tss: 1, day_estimated: false, method: "plan", reason: 7 }] } }),
     RowError,
   );
+});
+
+// Contract (CLAUDE.md): the fixture is Python's own output, written by
+// python/tests/test_contract_projection.py from the real producer (domain.projection +
+// db.daily_projection.to_row) on synthetic data. Regenerate it there, never by hand.
+test("contract: every daily_projection row Python writes parses, edge cases included", () => {
+  const raw: unknown = JSON.parse(readFileSync(new URL("./fixtures/daily_projection.json", import.meta.url), "utf8"));
+  assert.ok(Array.isArray(raw) && raw.length > 0);
+  const rows = raw.map(parseProjectionRow);
+  const plan = rows.filter((r) => r.strengthMethod === "plan");
+  const recent = rows.filter((r) => r.strengthMethod === "recent");
+  assert.ok(plan.length > 0 && plan.every((r) => r.ctlBand === null && r.atlBand === null && r.tsbBand === null));
+  assert.ok(recent.length > 0 && recent.every((r) => r.ctlBand !== null && r.tsbBand !== null));
+  for (const r of recent) {
+    assert.ok(r.ctlBand !== null && r.ctlBand.low <= r.ctl && r.ctl <= r.ctlBand.high);
+  }
+  const sessions = rows.flatMap((r) => r.sessions);
+  assert.deepEqual(
+    [...new Set(sessions.flatMap((s) => (s.reason === null ? [] : [s.reason])))].sort(),
+    ["no day left this week", "no kg for any set in the plan", "no recent weeks to average"],
+  );
+  assert.ok(sessions.some((s) => s.method === "recent" && s.tssBand !== null && s.recentWeeks !== null));
+  assert.ok(sessions.some((s) => s.method === "plan" && s.unscored !== null && s.unscored > 0 && s.tss !== null));
+  assert.ok(rows.some((r) => r.rides.some((ride) => ride.tss === null && ride.reason !== null)));
 });

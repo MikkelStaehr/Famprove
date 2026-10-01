@@ -1,0 +1,372 @@
+[
+  {
+    "date": "2026-10-04",
+    "cycling_tss": 0.0,
+    "strength_tss": 10.0,
+    "ctl": 4.401268640002999,
+    "atl": 9.411887102831233,
+    "tsb": -5.010618462828234,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": [
+        {
+          "session": 1,
+          "weekday": "learnt",
+          "moved": true,
+          "day_estimated": true,
+          "planned_in_sheet": true,
+          "method": "plan",
+          "tss": 10.0,
+          "unscored": 0,
+          "kg_sources": {
+            "entered": 1
+          }
+        },
+        {
+          "session": 2,
+          "tss": null,
+          "weekday": "spread",
+          "moved": true,
+          "day_estimated": true,
+          "planned_in_sheet": true,
+          "method": "plan",
+          "reason": "no day left this week"
+        },
+        {
+          "session": 3,
+          "tss": null,
+          "weekday": "spread",
+          "moved": true,
+          "day_estimated": true,
+          "planned_in_sheet": true,
+          "method": "plan",
+          "reason": "no day left this week"
+        }
+      ]
+    },
+    "strength_method": "plan",
+    "ctl_low": null,
+    "ctl_high": null,
+    "atl_low": null,
+    "atl_high": null,
+    "tsb_low": null,
+    "tsb_high": null,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-05",
+    "cycling_tss": 0.0,
+    "strength_tss": 0,
+    "ctl": 4.297714212313354,
+    "atl": 8.15895692438816,
+    "tsb": -3.861242712074807,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": []
+    },
+    "strength_method": "plan",
+    "ctl_low": null,
+    "ctl_high": null,
+    "atl_low": null,
+    "atl_high": null,
+    "tsb_low": null,
+    "tsb_high": null,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-06",
+    "cycling_tss": 0.0,
+    "strength_tss": 10.0,
+    "ctl": 4.431879379124505,
+    "atl": 8.404040445263995,
+    "tsb": -3.97216106613949,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": [
+        {
+          "session": 1,
+          "weekday": "learnt",
+          "moved": false,
+          "day_estimated": false,
+          "planned_in_sheet": true,
+          "method": "plan",
+          "tss": 10.0,
+          "unscored": 1,
+          "kg_sources": {
+            "entered": 1
+          }
+        }
+      ]
+    },
+    "strength_method": "plan",
+    "ctl_low": null,
+    "ctl_high": null,
+    "atl_low": null,
+    "atl_high": null,
+    "tsb_low": null,
+    "tsb_high": null,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-07",
+    "cycling_tss": 0.0,
+    "strength_tss": 10.0,
+    "ctl": 4.562887865850569,
+    "atl": 8.616497933104217,
+    "tsb": -4.053610067253648,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": [
+        {
+          "session": 2,
+          "weekday": "spread",
+          "moved": false,
+          "day_estimated": true,
+          "planned_in_sheet": true,
+          "method": "plan",
+          "tss": 10.0,
+          "unscored": 0,
+          "kg_sources": {
+            "entered": 1
+          }
+        }
+      ]
+    },
+    "strength_method": "plan",
+    "ctl_low": null,
+    "ctl_high": null,
+    "atl_low": null,
+    "atl_high": null,
+    "tsb_low": null,
+    "tsb_high": null,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-08",
+    "cycling_tss": 60.0,
+    "strength_tss": 0,
+    "ctl": 5.867229611237564,
+    "atl": 15.456777646440269,
+    "tsb": -9.589548035202705,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [
+        {
+          "name": "Broken",
+          "tss": null,
+          "reason": "step 1: minutes must be a number"
+        }
+      ],
+      "strength": []
+    },
+    "strength_method": "plan",
+    "ctl_low": null,
+    "ctl_high": null,
+    "atl_low": null,
+    "atl_high": null,
+    "tsb_low": null,
+    "tsb_high": null,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-09",
+    "cycling_tss": 0.0,
+    "strength_tss": 0,
+    "ctl": 5.729183594461129,
+    "atl": 13.399138943051696,
+    "tsb": -7.669955348590567,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": []
+    },
+    "strength_method": "plan",
+    "ctl_low": null,
+    "ctl_high": null,
+    "atl_low": null,
+    "atl_high": null,
+    "tsb_low": null,
+    "tsb_high": null,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-10",
+    "cycling_tss": 0.0,
+    "strength_tss": 0,
+    "ctl": 5.594385567623821,
+    "atl": 11.615417425413522,
+    "tsb": -6.021031857789701,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": [
+        {
+          "session": 3,
+          "weekday": "spread",
+          "moved": false,
+          "day_estimated": true,
+          "planned_in_sheet": true,
+          "method": "plan",
+          "tss": null,
+          "unscored": 1,
+          "kg_sources": {},
+          "reason": "no kg for any set in the plan"
+        }
+      ]
+    },
+    "strength_method": "plan",
+    "ctl_low": null,
+    "ctl_high": null,
+    "atl_low": null,
+    "atl_high": null,
+    "tsb_low": null,
+    "tsb_high": null,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-11",
+    "cycling_tss": 0.0,
+    "strength_tss": 0,
+    "ctl": 5.4627591110006,
+    "atl": 10.069148662464135,
+    "tsb": -4.606389551463535,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": []
+    },
+    "strength_method": "plan",
+    "ctl_low": null,
+    "ctl_high": null,
+    "atl_low": null,
+    "atl_high": null,
+    "tsb_low": null,
+    "tsb_high": null,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-12",
+    "cycling_tss": 0.0,
+    "strength_tss": 0,
+    "ctl": 5.334229602893664,
+    "atl": 8.728722444789259,
+    "tsb": -3.3944928418955946,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": []
+    },
+    "strength_method": "recent",
+    "ctl_low": 5.334229602893664,
+    "ctl_high": 5.334229602893664,
+    "atl_low": 8.728722444789259,
+    "atl_high": 8.728722444789259,
+    "tsb_low": -3.3944928418955946,
+    "tsb_high": -3.3944928418955946,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-13",
+    "cycling_tss": 0.0,
+    "strength_tss": 16.666666666666668,
+    "ctl": 5.600862733123848,
+    "atl": 9.78543825127149,
+    "tsb": -4.184575518147642,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": [
+        {
+          "session": 1,
+          "weekday": "learnt",
+          "moved": false,
+          "day_estimated": false,
+          "planned_in_sheet": false,
+          "method": "recent",
+          "tss": 16.666666666666668,
+          "tss_low": 13.333333333333334,
+          "tss_high": 20.0,
+          "recent_weeks": 3
+        }
+      ]
+    },
+    "strength_method": "recent",
+    "ctl_low": 5.522435021964659,
+    "ctl_high": 5.679290444283037,
+    "atl_low": 9.341697917105428,
+    "atl_high": 10.229178585437552,
+    "tsb_low": -4.549888141154515,
+    "tsb_high": -3.8192628951407688,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-14",
+    "cycling_tss": 0.0,
+    "strength_tss": 16.666666666666668,
+    "ctl": 5.8612224355170826,
+    "atl": 10.701481830227626,
+    "tsb": -4.840259394710544,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": [
+        {
+          "session": 2,
+          "weekday": "spread",
+          "moved": false,
+          "day_estimated": true,
+          "planned_in_sheet": false,
+          "method": "recent",
+          "tss": 16.666666666666668,
+          "tss_low": 13.333333333333334,
+          "tss_high": 20.0,
+          "recent_weeks": 3
+        }
+      ]
+    },
+    "strength_method": "recent",
+    "ctl_low": 5.706212284962005,
+    "ctl_high": 6.01623258607216,
+    "atl_low": 9.873072807145245,
+    "atl_high": 11.529890853310008,
+    "tsb_low": -5.513658267237847,
+    "tsb_high": -4.16686052218324,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-12",
+    "cycling_tss": 0.0,
+    "strength_tss": 0,
+    "ctl": 5.32943072696175,
+    "atl": 8.653517238208902,
+    "tsb": -3.3240865112471525,
+    "basis": {
+      "cycling": "typical_week",
+      "rides": [],
+      "strength": [
+        {
+          "session": 1,
+          "weekday": "spread",
+          "moved": false,
+          "day_estimated": true,
+          "planned_in_sheet": false,
+          "method": "recent",
+          "tss": null,
+          "reason": "no recent weeks to average"
+        }
+      ]
+    },
+    "strength_method": "recent",
+    "ctl_low": 5.32943072696175,
+    "ctl_high": 5.32943072696175,
+    "atl_low": 8.653517238208902,
+    "atl_high": 8.653517238208902,
+    "tsb_low": -3.3240865112471525,
+    "tsb_high": -3.3240865112471525,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  }
+]

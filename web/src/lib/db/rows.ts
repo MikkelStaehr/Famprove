@@ -62,12 +62,22 @@ export type ProjectedRide = {
   readonly reason: string | null; // why tss is null (the steps couldn't be read)
 };
 
+/** A low-high range Python computed; the web draws it, never recomputes it. */
+export type Band = { readonly low: number; readonly high: number };
+
+/** How Python estimated strength: the coach's plan (inside the block) or the recent weeks. */
+export type StrengthMethod = "plan" | "recent";
+
 /** A strength session Python placed on a future day (an estimate). */
 export type ProjectedSession = {
   readonly session: number;
   readonly tss: number | null; // null: not counted; `reason` says why
   readonly dayEstimated: boolean; // the weekday was spread or moved, not learnt
   readonly reason: string | null; // e.g. "no day left this week"
+  readonly method: StrengthMethod;
+  readonly tssBand: Band | null; // recent sessions with data: the weekly min-max over N sessions
+  readonly recentWeeks: number | null; // recent sessions with data: weeks the mean is from
+  readonly unscored: number | null; // plan sessions: sets without a kg rule (left out); null if recent
 };
 
 /** public.daily_projection: the prognose (estimates only), rebuilt by compute. */
@@ -81,11 +91,17 @@ export type DailyProjectionRow = {
   readonly cyclingSource: "planned" | "typical_week";
   readonly rides: readonly ProjectedRide[];
   readonly sessions: readonly ProjectedSession[];
+  readonly strengthMethod: StrengthMethod;
+  // The uncertainty band after the strength block (low <= value <= high); null inside the block.
+  readonly ctlBand: Band | null;
+  readonly atlBand: Band | null;
+  readonly tsbBand: Band | null;
 };
 
 export const PROJECTION_SELECT = {
   table: "daily_projection",
-  columns: "date,cycling_tss,strength_tss,ctl,atl,tsb,basis",
+  columns:
+    "date,cycling_tss,strength_tss,ctl,atl,tsb,basis,strength_method,ctl_low,ctl_high,atl_low,atl_high,tsb_low,tsb_high",
   order: "date", // the primary key
 } as const;
 
@@ -236,6 +252,12 @@ class Fields {
     return this.get(column) === null ? null : this.number(column);
   }
 
+  /** For JSON objects whose writer leaves a key out when it doesn't apply (basis.tss_low). */
+  optionalNumber(column: string): number | null {
+    const value = this.get(column);
+    return value === undefined || value === null ? null : this.number(column);
+  }
+
   date(column: string): IsoDate {
     const value = this.string(column);
     return ISO_DATE.test(value) ? value : this.fail(column, "a YYYY-MM-DD date");
@@ -369,12 +391,27 @@ export function parseStrengthSessionRow(raw: unknown): StrengthSessionRow {
   };
 }
 
+function strengthMethod(where: string, value: string): StrengthMethod {
+  if (value !== "plan" && value !== "recent") throw new RowError(`${where}: unexpected value`);
+  return value;
+}
+
+/** Both ends or neither; low <= high (Python's contract). */
+function band(where: string, low: number | null, high: number | null): Band | null {
+  if (low === null && high === null) return null;
+  if (low === null || high === null || low > high) {
+    throw new RowError(`${where}: expected both low <= high or neither`);
+  }
+  return { low, high };
+}
+
 export function parseProjectionRow(raw: unknown): DailyProjectionRow {
-  const f = new Fields(PROJECTION_SELECT.table, raw);
-  const basis = new Fields(`${PROJECTION_SELECT.table}.basis`, f.unknown("basis"));
+  const table = PROJECTION_SELECT.table;
+  const f = new Fields(table, raw);
+  const basis = new Fields(`${table}.basis`, f.unknown("basis"));
   const source = basis.string("cycling");
   if (source !== "planned" && source !== "typical_week") {
-    throw new RowError(`${PROJECTION_SELECT.table}.basis.cycling: unexpected value`);
+    throw new RowError(`${table}.basis.cycling: unexpected value`);
   }
   return {
     date: f.date("date"),
@@ -390,13 +427,22 @@ export function parseProjectionRow(raw: unknown): DailyProjectionRow {
     }),
     sessions: basis.array("strength").map((s, i) => {
       const entry = new Fields(`${PROJECTION_SELECT.table}.basis.strength[${i}]`, s);
+      const where = `${table}.basis.strength[${i}]`;
       return {
         session: entry.number("session"),
         tss: entry.numberOrNull("tss"),
         dayEstimated: entry.boolean("day_estimated"),
         reason: entry.optionalString("reason"),
+        method: strengthMethod(`${where}.method`, entry.string("method")),
+        tssBand: band(`${where}.tss_low/high`, entry.optionalNumber("tss_low"), entry.optionalNumber("tss_high")),
+        recentWeeks: entry.optionalNumber("recent_weeks"),
+        unscored: entry.optionalNumber("unscored"),
       };
     }),
+    strengthMethod: strengthMethod(`${table}.strength_method`, f.string("strength_method")),
+    ctlBand: band(`${table}.ctl_low/high`, f.numberOrNull("ctl_low"), f.numberOrNull("ctl_high")),
+    atlBand: band(`${table}.atl_low/high`, f.numberOrNull("atl_low"), f.numberOrNull("atl_high")),
+    tsbBand: band(`${table}.tsb_low/high`, f.numberOrNull("tsb_low"), f.numberOrNull("tsb_high")),
   };
 }
 

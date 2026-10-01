@@ -242,6 +242,7 @@ def _strength_plan(
                             "moved": True,
                             "day_estimated": True,
                             "planned_in_sheet": week in counts,
+                            "method": "plan" if week in counts else "recent",
                             "reason": "no day left this week",
                         }
                     )

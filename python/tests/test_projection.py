@@ -142,7 +142,7 @@ def test_every_strength_entry_has_the_same_keys_even_on_a_sunday(make_set: MakeS
         days, sessions, sets, [], strength_k=0.1, today=sunday, decay=Decay.EXPONENTIAL
     )
     all_entries = [e for d in projected for e in entries(d, "strength")]
-    keys = {"session", "tss", "weekday", "moved", "day_estimated", "planned_in_sheet"}
+    keys = {"session", "tss", "weekday", "moved", "day_estimated", "planned_in_sheet", "method"}
     assert all(keys <= e.keys() for e in all_entries)
     no_day = [e for e in all_entries if e.get("reason") == "no day left this week"]
     assert [e["session"] for e in no_day] == [2, 3]

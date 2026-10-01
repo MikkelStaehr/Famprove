@@ -110,7 +110,22 @@ function projected(date: string, ctl: number): DailyProjectionRow {
     tsb: 0,
     cyclingSource: "typical_week",
     rides: [],
-    sessions: [{ session: 2, tss: null, dayEstimated: true, reason: "no done session with this number to learn from" }],
+    sessions: [
+      {
+        session: 2,
+        tss: null,
+        dayEstimated: true,
+        reason: "no recent weeks to average",
+        method: "recent",
+        tssBand: null,
+        recentWeeks: null,
+        unscored: null,
+      },
+    ],
+    strengthMethod: "recent",
+    ctlBand: { low: ctl, high: ctl },
+    atlBand: { low: ctl, high: ctl },
+    tsbBand: { low: 0, high: 0 },
   };
 }
 
