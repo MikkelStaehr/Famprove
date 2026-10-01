@@ -68,6 +68,18 @@ def decimal_dots(cell: object) -> object:
     gennemsnittet af 7 og 5 (= 6). Alt andet uændret. Bruges på load-cellen før set_score."""
     return _DECIMAL_COMMA.sub(r"\1.\2", cell) if isinstance(cell, str) else cell
 
+# Brugerens regel (2026-10-01): arkets RPE er kun hele eller halve tal (6, 6.5, 7), på skalaen 1-10.
+_RPE_NUMBER = re.compile(r"\d+(?:\.\d+)?")
+
+def rpe_readable(load: object) -> bool:
+    """En RPE-celle ('RPE 7', 'RPE 6.5 - 7', 'RPE 6,5') er læselig, når hvert tal er et helt eller
+    halvt tal i 1-10. Andet ('RPE 7,8', 'RPE 7.25', 'RPE') er ulæseligt: det tælles og bruges aldrig.
+    Celler uden 'RPE' (fx '-10%' eller 0.75) er ikke RPE-celler og altid læselige her."""
+    if not isinstance(load, str) or "RPE" not in load:
+        return True
+    nums = [float(x) for x in _RPE_NUMBER.findall(str(decimal_dots(load)))]
+    return bool(nums) and all((2 * n).is_integer() and 1 <= n <= 10 for n in nums)
+
 def cell_text(cell: object) -> str | None:
     """En celle som i arket: tekst uændret, tal uden overflødige decimaler (3.0 -> '3')."""
     if cell is None or cell == "": return None
@@ -86,6 +98,7 @@ KG_NOT_A_NUMBER = "kg not a number"
 SETS_REPS_NOT_A_NUMBER = "sets/reps not a number"
 WEEK_DATE_NOT_A_DATE = "week date not a date"
 ROW_WITHOUT_TYPE = "prescribed row without type"
+RPE_NOT_HALF = "RPE not a whole or half value"
 
 E1RM_RANGE = (20.0, 400.0)   # kg; et 1RM udenfor er aldrig et rigtigt 1RM
 E1RM_OUT_OF_RANGE = "1RM out of range"
@@ -169,7 +182,9 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
             nsets, reps = int(mid(nsets)), mid(reps)
             kg = float(kg) if isinstance(kg,(int,float)) else 0.0
             logged = kg
-            kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load), bodyweight, e1rm)
+            rpe_ok = rpe_readable(load)
+            if not rpe_ok: issues[RPE_NOT_HALF] += 1   # tælles; cellens RPE bruges aldrig ("RPE ukendt")
+            kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load) if rpe_ok else None, bodyweight, e1rm)
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),

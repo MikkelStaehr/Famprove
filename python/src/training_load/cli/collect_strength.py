@@ -26,7 +26,12 @@ from training_load.domain.strength import (
 )
 from training_load.http import HttpSend, requests_send
 from training_load.sources.google_drive import access_token, download_workbook
-from training_load.sources.strength_sheet import KG_NOT_A_NUMBER, ParsedSet, parse_all
+from training_load.sources.strength_sheet import (
+    KG_NOT_A_NUMBER,
+    RPE_NOT_HALF,
+    ParsedSet,
+    parse_all,
+)
 
 log = logging.getLogger(__name__)
 
@@ -44,14 +49,14 @@ def check_issues(issues: Counter[str], parsed: Sequence[ParsedSet]) -> None:
     """Log unreadable cells per reason (counts only: the Actions logs are public) and raise
     TooManyIssuesError when they exceed MAX_ISSUE_SHARE of the row-weeks tried.
 
-    Unreadable kg still yields sets (kg None), so those row-weeks are already in ``parsed``; the
-    other reasons are row-weeks (or rows) that yielded nothing.
+    Unreadable kg or RPE still yields sets (kg None / RPE unknown), so those row-weeks are already
+    in ``parsed``; the other reasons are row-weeks (or rows) that yielded nothing.
     """
     total = sum(issues.values())
     for reason, count in sorted(issues.items()):
         log.warning("%d cells unreadable: %s", count, reason)
     row_weeks = len({(p["block"], p["row"], p["week"]) for p in parsed})
-    tried = row_weeks + total - issues[KG_NOT_A_NUMBER]
+    tried = row_weeks + total - issues[KG_NOT_A_NUMBER] - issues[RPE_NOT_HALF]
     if total and total > MAX_ISSUE_SHARE * tried:
         raise TooManyIssuesError(
             f"{total} unreadable cells in {tried} row-weeks (limit {MAX_ISSUE_SHARE:.0%}); "

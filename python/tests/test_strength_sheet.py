@@ -4,17 +4,20 @@ Golden scores were cross-checked against the original strength_collector.py (git
 the same workbook: all 55 sets matched field by field.
 """
 
+from collections import Counter
 from datetime import date
 
 import pytest
 
 from conftest import BLOK_11, BLOK_11_SECTIONS, BLOK_12, SYNTHETIC_BODYWEIGHT, build_workbook
 from training_load.sources.strength_sheet import (
+    RPE_NOT_HALF,
     ParsedSet,
     cell_text,
     decimal_dots,
     parse_all,
     prescribed_text,
+    rpe_readable,
     text_number,
 )
 
@@ -199,21 +202,37 @@ def test_decimal_dots_turns_only_decimal_commas_into_dots() -> None:
         assert decimal_dots(keep) == keep
 
 
+def tempo_week_1(load: str, issues: Counter[str] | None = None) -> ParsedSet:
+    """The synthetic tempo row (RPE comes from its load cell) with ``load`` in week 1."""
+    first_section, (dates_2, rows_2) = BLOK_11_SECTIONS
+    tempo, *rest_2 = rows_2
+    weeks = [(3, 6, load, 70), *tempo[2][1:]]
+    workbook = build_workbook([first_section, (dates_2, [(tempo[0], tempo[1], weeks), *rest_2])])
+    return first(parse_all(workbook, SYNTHETIC_BODYWEIGHT, issues), BLOK_11, tempo[1], 1)
+
+
 def test_an_rpe_cell_with_a_comma_decimal_scores_like_a_dot() -> None:
     """A load cell "RPE 6,5" is RPE 6.5 (not the mean of 6 and 5); the cell stays as written."""
-    sections = BLOK_11_SECTIONS
-    (dates_2, rows_2) = sections[1]
-    tempo, *rest_2 = rows_2
-
-    def with_load(load: str) -> list[ParsedSet]:
-        weeks = [(3, 6, load, 70), *tempo[2][1:]]
-        return parse_all(
-            build_workbook([sections[0], (dates_2, [(tempo[0], tempo[1], weeks), *rest_2])]),
-            SYNTHETIC_BODYWEIGHT,
-        )
-
-    comma = first(with_load("RPE 6,5"), BLOK_11, tempo[1], 1)
-    dot = first(with_load("RPE 6.5"), BLOK_11, tempo[1], 1)
+    comma, dot = tempo_week_1("RPE 6,5"), tempo_week_1("RPE 6.5")
     assert comma["rpe"] == dot["rpe"] == 6.5
     assert comma["score"] == dot["score"]
     assert comma["prescribed"] == "RPE 6,5"
+
+
+def test_rpe_readable_takes_only_whole_or_half_values_from_1_to_10() -> None:
+    """The user's rule (2026-10-01): the coach's RPE is 6, 6.5, 7 ... never 7.8 or 7.25."""
+    for ok in ("RPE 7", "RPE 6.5", "RPE 6,5", "RPE 6 - 7", "RPE 6.5 - 7", "RPE 10"):
+        assert rpe_readable(ok), ok
+    for not_rpe in ("-10%", "75%", "", None, 0.75):
+        assert rpe_readable(not_rpe), not_rpe  # not an RPE cell
+    for bad in ("RPE 7,8", "RPE 7.25", "RPE 6 - 7,3", "RPE 11", "RPE 0", "RPE"):
+        assert not rpe_readable(bad), bad
+
+
+def test_an_rpe_that_is_not_whole_or_half_is_counted_and_never_used() -> None:
+    issues: Counter[str] = Counter()
+    bad = tempo_week_1("RPE 7,8", issues)
+    assert issues == Counter({RPE_NOT_HALF: 1})
+    assert bad["rpe"] == 6.0  # the formula's "RPE unknown", never 7.8 (or 7.5 from "7" and "8")
+    assert bad["prescribed"] == "RPE 7,8"  # the cell as written
+    assert bad["score"] == tempo_week_1("RPE")["score"]  # scored as a cell with no RPE number

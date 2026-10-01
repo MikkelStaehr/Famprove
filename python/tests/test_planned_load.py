@@ -109,3 +109,9 @@ def test_a_deload_week_scores_lower(make_set: MakeSet) -> None:
         for n in (1, 2)
     ]
     assert planned_session_score(deload, []).score < planned_session_score(normal, []).score
+
+
+def test_an_rpe_cell_that_is_not_whole_or_half_leaves_the_set_unscored(make_set: MakeSet) -> None:
+    squat = plan(make_set, type="SQUAT", name="Squat", reps=5.0, prescribed="RPE 7,8", e1rm=150.0)
+    result = planned_session_score([squat], [])
+    assert (result.score, result.unscored, result.sources) == (0.0, 1, {})

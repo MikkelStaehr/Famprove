@@ -11,6 +11,8 @@ reused unchanged) needs a planned kg per set. Rules, in order (decided with the 
   same_row      accessory: the latest kg logged on the same sheet row earlier in this block
   same_name     accessory: the latest kg logged for the same exercise name in any earlier week
   (none)        no kg found: the set is NOT scored and is counted as unscored, never 0
+An RPE cell that isn't whole or half values on 1-10 ("RPE 7,8") is never used: that set is
+unscored too (strength_sheet.rpe_readable, the user's rule of 2026-10-01).
 """
 
 import re
@@ -20,7 +22,13 @@ from dataclasses import dataclass
 from typing import Final
 
 from training_load.domain.strength import StrengthSet
-from training_load.sources.strength_sheet import BODYWEIGHT_EX, decimal_dots, mid, set_score
+from training_load.sources.strength_sheet import (
+    BODYWEIGHT_EX,
+    decimal_dots,
+    mid,
+    rpe_readable,
+    set_score,
+)
 
 MAIN_LIFTS: Final = frozenset({"SQUAT", "BENCH", "DEADLIFT"})
 _PERCENT: Final = re.compile(r"^\s*(-?\d+(?:[.,]\d+)?)\s*%\s*$")
@@ -55,7 +63,7 @@ def _legacy_score(s: StrengthSet, kg: float, e1rm: dict[str, float]) -> float:
 
 
 def _rpe(prescribed: str | None) -> float | None:
-    if prescribed is None or "RPE" not in prescribed:
+    if prescribed is None or "RPE" not in prescribed or not rpe_readable(prescribed):
         return None
     return _legacy_mid(str(decimal_dots(prescribed)))
 
@@ -127,6 +135,9 @@ def planned_session_score(
             sources[source] += 1
             if s.logged_kg is not None:
                 planned_kg[id(s)] = s.logged_kg
+            continue
+        if not rpe_readable(s.prescribed):  # e.g. "RPE 7,8": never used
+            unscored += 1
             continue
         pct = _percent(s.prescribed)
         if pct is not None and pct < 0:

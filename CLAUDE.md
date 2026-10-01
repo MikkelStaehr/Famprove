@@ -80,6 +80,7 @@ Deliverables:
 
 Decisions (agreed with the user):
 - Sheet is plan + log: coach prescribes sets/reps/RPE, the user logs kg on the day. The sheet defines sessions 1..N per ISO week (Mon–Sun), **never weekdays**. A session's date comes from intervals.icu: the n-th strength activity (`WeightTraining`, incl. manual ones) of the ISO week is session n, and its strength TSS lands on that activity's date. Planned sessions not yet done have no date and add nothing; an activity beyond N is an extra with 0 TSS ("not in the program"). Blok 11 predates the Garmin log: its sessions count once matching manual activities exist in intervals.icu (decided 2026-09-30).
+- RPE in the coach's sheet is only whole or half values, on 1–10 (6, 6.5, 7; decided 2026-10-01). An RPE cell with any other number (e.g. "7,8") is counted as unreadable and logged, never used: the parser scores the set as RPE unknown, and the forecast leaves a planned set unscored.
 - Block = tab name; start = first week's ISO Monday; end = last filled week; deload = last filled week of each tab. Derived from the sheet — no hand-kept list.
 - Cycling = intervals.icu types `Ride` and `VirtualRide` only. `WeightTraining` only dates strength sessions (its own load is never used); everything else is excluded.
 - Cycling TSS = intervals.icu's own load value as-is; rides without power use its HR-based load (never skipped).
