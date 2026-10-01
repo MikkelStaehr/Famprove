@@ -3,23 +3,17 @@
  * Every number is Python's (ride_metrics, cycling_weeks). Allowed here: sorting, filtering,
  * counting rows, date -> x position, choosing a y domain, and formatting. No deltas, no medians.
  */
-import { addDays, isoWeekNumber, isoWeekStart } from "./dates.ts";
+import { addDays, dayNumber, isoWeekNumber, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
 import type { DataError } from "./data-error.ts";
 import type { CyclingAnalysisData, CyclingWeekRow, IsoDate, RideMetricsRow } from "./db/rows.ts";
-import { formatDate, formatDateRange, formatDay, formatDayLong, formatDuration, formatLoad, formatSigned, LOCALE } from "./format.ts";
+import { formatDate, formatDateRange, formatDay, formatDayLong, formatDuration, formatLoad, formatSigned, formatWatts, LOCALE } from "./format.ts";
 
 /** The analysis window starts here (spec §4); weeks from 2024-12-30 are clipped to it. */
 export const AXIS_START: IsoDate = "2025-01-01";
 const SINCE = "1. jan. 2025";
-const DAY_MS = 86_400_000;
 const EF_MIN_POINTS = 5;
 const SEAM_MIN_WEEKS = 4;
-
-/** Calendar date -> whole days since the epoch (UTC, no time-zone shift). */
-export function dayNumber(date: IsoDate): number {
-  return Date.parse(`${date}T00:00:00Z`) / DAY_MS;
-}
 
 // --- formatting ----------------------------------------------------------------------------
 
@@ -96,7 +90,7 @@ export function exclusionFacts(r: RideMetricsRow): string {
   const km = r.distanceM === null ? null : formatKm(r.distanceM);
   switch (r.exclusion) {
     case "power_outlier":
-      return join([r.npW === null ? null : `NP ${formatLoad(r.npW)} W`, time]);
+      return join([r.npW === null ? null : `NP ${formatWatts(r.npW)}`, time]);
     case "hr_outlier":
       return join([r.avgHr === null ? null : `puls ${formatLoad(r.avgHr)}`, time]);
     default:
@@ -194,7 +188,7 @@ export function buildHero(rows: readonly RideMetricsRow[], currentYear: number):
   const w = formatLoad(latest.rollingFtpW);
   const compare = latest.eftpYearAgoW !== null && latest.eftpYearAgoDate !== null;
   const detail = compare
-    ? `Samme tid sidste år: ${formatLoad(latest.eftpYearAgoW ?? 0)} W (${dayText(latest.eftpYearAgoDate ?? "", currentYear)})`
+    ? `Samme tid sidste år: ${formatWatts(latest.eftpYearAgoW ?? 0)} (${dayText(latest.eftpYearAgoDate ?? "", currentYear)})`
     : null;
   let sr = `Estimeret FTP ${w} watt den ${formatDayLong(latest.date)}.`;
   if (compare && latest.eftpDeltaW !== null) {
@@ -270,12 +264,12 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
       excluded: false,
       tip: [
         dayText(r.date, year),
-        `eFTP ${formatLoad(r.rollingFtpW)} W`,
+        `eFTP ${formatWatts(r.rollingFtpW)}`,
         join([
           rideKind(r.type),
           r.movingS === null ? null : formatHours(r.movingS),
           r.distanceM === null ? null : formatKm(r.distanceM),
-          r.npW === null ? null : `NP ${formatLoad(r.npW)} W`,
+          r.npW === null ? null : `NP ${formatWatts(r.npW)}`,
         ]),
       ],
     });
@@ -337,7 +331,7 @@ function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView
         `EF ${formatEf(r.ef)}`,
         ...(r.efTrend === null ? [] : [`Trend ${formatEf(r.efTrend)}`]),
         join([
-          r.npW === null ? null : `NP ${formatLoad(r.npW)} W`,
+          r.npW === null ? null : `NP ${formatWatts(r.npW)}`,
           r.avgHr === null ? null : `puls ${formatLoad(r.avgHr)}`,
           r.movingS === null ? null : formatHours(r.movingS),
         ]),

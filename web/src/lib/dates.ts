@@ -6,6 +6,11 @@ import type { IsoDate } from "./db/rows.ts";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/** Calendar date -> whole days since the epoch (UTC, no time-zone shift); a chart x position. */
+export function dayNumber(date: IsoDate): number {
+  return Date.parse(`${date}T00:00:00Z`) / MS_PER_DAY;
+}
+
 /** `date` plus `days` calendar days, e.g. addDays("2026-10-04", 1) -> "2026-10-05". */
 export function addDays(date: IsoDate, days: number): IsoDate {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * MS_PER_DAY).toISOString().slice(0, 10);

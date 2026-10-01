@@ -23,6 +23,7 @@ import {
   type DashboardView,
   strengthUnknownFrom,
 } from "@/lib/dashboard-view";
+import { dayNumber } from "@/lib/dates";
 import { formatDate, formatDay, LOCALE, TSS_PER_DAY } from "@/lib/format";
 import { prognoseStatus, rangeText, strengthLine, strengthUnknownNote } from "@/lib/prognose-text";
 
@@ -68,11 +69,6 @@ const BLOCK_LABEL_ROOM = 18;
 
 // ctlBand: [ctl_low, ctl_high] as stored, or null; a plain field so Recharts reads it as a range.
 type Row = ChartPoint & { readonly x: number; readonly ctlBand: readonly [number, number] | null };
-
-/** Calendar date -> whole days since the epoch (UTC, so no time-zone shift). */
-function dayNumber(date: string): number {
-  return Date.parse(`${date}T00:00:00Z`) / DAY_MS;
-}
 
 /** "5. aug." (da-DK), no weekday. */
 function formatTick(day: number): string {
