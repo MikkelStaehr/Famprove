@@ -108,6 +108,7 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 Before starting, the main session states the **size (S/M/L), the steps and the time budget** to the user. The user can change it.
 If a budget is exceeded, **stop and ask**. Never keep running.
 **Budget check at every step boundary:** when a step ends, add up the time used so far and put it in the status line (`used 34/60 min`). If the next step won't fit in what's left, stop and ask before starting it, not after.
+**Migrations go live together with the code that writes them:** apply the migration → push the code → run the job. No scheduled or manual job runs in between.
 **Commit before `tester` ∥ `reviewer` ∥ `security`:** they check a committed tree (`git status` clean), never uncommitted work, and nobody edits files while they run. Fixes they trigger go in a new commit, and `tester` re-runs the affected criteria on it.
 `∥` means the steps run in parallel.
 
