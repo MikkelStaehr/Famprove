@@ -37,7 +37,7 @@ Stack gap 16px, card padding as Part B. Inside cards: legend 8px under the title
   - Each edge of the run (its first Monday, and the Monday after its last week) gets a 1px dashed (3 3) `--chart-mark` vertical rule, full plot height.
   - The label `Ingen ture` (`text-12` 500 `--text-muted`) is centred over the run in an 18px strip at the top of the plot. Omit the label, not the rules, when the run is narrower than the label.
   - No fill: on `/load`, fills already mean prognose, block and deload.
-  - In the live data, the seams are Jan–Feb 2025 and Oct 2025–Feb 2026. Seen down the page, the offseason reads as one honest pause, not three broken charts.
+  - In the live data, the only seam is Oct 2025–Feb 2026 (Jan–Feb 2025 has rides, so no run of ≥ 4 zero weeks; the rule wins over this sentence). Seen down the page, the offseason reads as one honest pause, not three broken charts.
 - **"You are here" (`--slab`):** the latest eFTP point and the current week's bars. Nothing else in these charts uses `--slab`.
 - No motion: `isAnimationActive={false}` everywhere, as on `/load`.
 - Reuse the `/load` building blocks: Recharts `ComposedChart`, the hydration skeleton, `catchError` → ErrorState, `LineSample`-style legend swatches, `TICK`, and the tooltip container (`rounded-control`, `max-w-72`). Extract shared pieces rather than copy them. No new chart library.
