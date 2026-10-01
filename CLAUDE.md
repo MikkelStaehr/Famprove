@@ -123,6 +123,8 @@ If a budget is exceeded, **stop and ask**. Never keep running.
 | **L** | New data + new screen, or a new module | `tech-lead` one-pager → data check + **one** migration → `design-lead` spec ∥ data layer → `ui` build → `design-lead` review (Must only) → `ui` polish → `tester` ∥ `reviewer` ∥ `security` | 60 min |
 | **Project start** | New repo | `tech-lead` + `architect` → `design-lead` Mode 0 → write `docs/ARCHITECTURE.md` | 45 min |
 
+**L slices:** plan the build steps against 40 of the 60 minutes; `design-lead` review, polish, `tester` and `reviewer` take about 20. A slice holds at most one new UI surface; split it otherwise.
+
 **Data check** (M and L): list every value the screen shows and mark it *exists / missing*. All missing data goes into **one** migration before any UI is built.
 
 **Research first, ask after.** Before asking the user a technical question, research it and bring numbers. Before calling a parameter or threshold wrong, run it on real data and report how many rows it selects. Before drawing a conclusion from a stored field, read how it is computed, so you don't measure your own input.
