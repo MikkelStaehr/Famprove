@@ -109,7 +109,7 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 ## How we work: size every task first
 Before starting, the main session states the **size (S/M/L), the steps and the time budget** to the user. The user can change it.
 If a budget is exceeded, **stop and ask**. Never keep running.
-**Budget check at every step boundary:** when a step ends, add up the time used so far and put it in the status line (`used 34/60 min`). If the next step won't fit in what's left, stop and ask before starting it, not after.
+**Budget check at every step boundary:** when a step ends, add up the time used so far and put it in the status line (`used 34/60 min`). Agent time is the **measured** duration from each agent's task notification, not the agent's own estimate. If the next step won't fit in what's left, stop and ask before starting it, not after.
 **Migrations go live together with the code that writes them:** apply the migration → push the code → run the job. No scheduled or manual job runs in between.
 **Commit before `tester` ∥ `reviewer` ∥ `security`:** they check a committed tree (`git status` clean), never uncommitted work, and nobody edits files while they run. Fixes they trigger go in a new commit, and `tester` re-runs the affected criteria on it.
 `∥` means the steps run in parallel.
@@ -143,7 +143,7 @@ After every L task, and whenever something went wrong, the main session writes a
 
 The user approves. Then:
 - **Project-specific rules** go into this repo's CLAUDE.md.
-- **Rules for every project** are only *proposed* here: exact wording, target file, and a `LESSONS.md` row. **This session never edits ProjectStart** (`C:\dev\project-start`: the team's agents, templates and skills). The user applies the proposal there in a separate session, pushes, and runs `install.sh`.
+- **Rules for every project** are only *proposed* here: exact wording, target file, and a `LESSONS.md` row. **This session never edits ProjectStart** (`C:\dev\waan\teams`, GitHub `MikkelStaehr/ProjectStart`: the team's agents, templates and skills). The user applies the proposal there in a separate session, pushes, and runs `install.sh`.
 
 A lesson that only lives in a chat is lost.
 
