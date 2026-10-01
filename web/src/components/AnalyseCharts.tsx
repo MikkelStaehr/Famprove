@@ -530,7 +530,7 @@ function E1rmPlot({
                 }}
               />
               <span
-                className="absolute -translate-x-full font-medium leading-none text-text-muted tabular-nums"
+                className="absolute -translate-x-full rounded-sm bg-surface px-0.5 font-medium leading-none text-text-muted tabular-nums"
                 style={{ ...tickStyle, left: xCss(axis, s.x1), top: `calc(${top(s.y)} - 14px)` }}
               >
                 {s.label}
@@ -570,7 +570,7 @@ function E1rmPlot({
                   />
                   <span
                     className="absolute -translate-x-1/2 font-semibold leading-none text-text tabular-nums"
-                    style={{ ...tickStyle, left: xCss(axis, p.x), top: `calc(${top(p.y)} - 22px)` }}
+                    style={{ ...tickStyle, left: xCss(axis, p.x), top: `calc(${top(p.y)} ${p.labelBelow ? "+ 10px" : "- 22px"})` }}
                   >
                     {p.label}
                   </span>

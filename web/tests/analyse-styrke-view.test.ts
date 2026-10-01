@@ -56,7 +56,7 @@ const B11 = { block: "Program - blok 11", blockNo: 11, phase: "in_season", statu
 const GAP = { block: null, blockNo: null, phase: null, status: null, setsLifted: 0, tonnageKg: 0 } as const;
 
 const BLOCKS: StrengthBlockRow[] = [
-  { name: "Program - blok 11", blockNo: 11, startDate: "2026-08-10", endDate: "2026-08-17", deloadStart: "2026-08-17", phase: "in_season" },
+  { name: "Program - blok 11", blockNo: 11, startDate: "2026-08-10", endDate: "2026-08-23", deloadStart: "2026-08-17", phase: "in_season" },
   { name: "Program - blok 12", blockNo: 12, startDate: "2026-09-21", endDate: null, deloadStart: null, phase: "off_season" },
 ];
 
@@ -175,6 +175,12 @@ test("e1RM panels: prescribed vs logged points, block bests labelled, a line per
     squat.points.map((p) => p.label),
     [null, "179,6", "174,1", null],
   );
+  // Block-best label under the ring only when the point is below its own block's sheet line.
+  assert.deepEqual(
+    squat.points.map((p) => p.labelBelow),
+    [false, false, true, true], // blok 11 has no sheet value; blok 12's 180 is above 174,1 and 172
+  );
+  assert.equal(bench.points[0].labelBelow, false); // 106,2 is above the sheet's 102,5
   // Two segments (blok 11, blok 12): the line breaks at the block boundary.
   assert.equal(squat.segments.length, 2);
   assert.ok(squat.points.every((p) => !p.logged));
@@ -205,13 +211,13 @@ test("kg domain rounds out to 5 kg with 2-3 ticks", () => {
   assert.ok(d.ticks.every((t) => t % 5 === 0));
 });
 
-test("block ruler: spans to end + 7 days, ongoing to the current week, deload hatch, phase rule", () => {
+test("block ruler: spans end on end_date (the last Sunday, inclusive), ongoing to the current week, deload hatch, phase rule", () => {
   const v = ready();
   const lo = dayNumber("2026-08-10") - 0.5;
   assert.equal(v.lo, lo);
   assert.equal(v.hi, dayNumber("2026-10-04") + 0.5);
   assert.deepEqual(blockSpans(BLOCKS, v.lo, v.hi), [
-    { x0: lo, x1: dayNumber("2026-08-24") - 0.5, label: "Blok 11", deloadX0: dayNumber("2026-08-17") - 0.5 },
+    { x0: lo, x1: dayNumber("2026-08-23") + 0.5, label: "Blok 11", deloadX0: dayNumber("2026-08-17") - 0.5 },
     { x0: dayNumber("2026-09-21") - 0.5, x1: v.hi, label: "Blok 12", deloadX0: null },
   ]);
   assert.deepEqual(v.phaseRules, [dayNumber("2026-09-21") - 0.5]);

@@ -102,6 +102,7 @@ export type E1rmPoint = {
   readonly logged: boolean;
   readonly best: boolean;
   readonly label: string | null; // "179,6" on block bests only
+  readonly labelBelow: boolean; // the point is below its block's sheet line: label under the ring
 };
 
 export type SheetLine = { readonly x0: number; readonly x1: number; readonly y: number; readonly label: string };
@@ -276,7 +277,8 @@ export function blockSpans(blocks: readonly StrengthBlockRow[], lo: number, hi: 
   return blocks
     .map((b) => {
       const x0 = Math.max(dayNumber(b.startDate) - 0.5, lo);
-      const x1 = b.endDate === null ? hi : Math.min(dayNumber(addDays(b.endDate, 7)) - 0.5, hi);
+      // end_date is the Sunday of the last week (inclusive, as /load); an ongoing block runs to the current week.
+      const x1 = b.endDate === null ? hi : Math.min(dayNumber(b.endDate) + 0.5, hi);
       const deloadX0 = b.deloadStart === null ? null : Math.max(dayNumber(b.deloadStart) - 0.5, x0);
       return { x0, x1, label: `Blok ${b.blockNo}`, deloadX0: deloadX0 !== null && deloadX0 < x1 ? deloadX0 : null };
     })
@@ -335,30 +337,37 @@ function panel(
   warnings: string[],
 ): E1rmPanel {
   const rows = weeks.filter((w) => w.lift === lift && w.e1rmKg !== null);
-  const points: E1rmPoint[] = rows.map((r) => ({
-    x: dayNumber(r.weekStart) + 3,
-    y: r.e1rmKg ?? 0,
-    logged: r.e1rmRpeSource === "logged",
-    best: r.isBlockBest,
-    label: r.isBlockBest && r.e1rmKg !== null ? formatE1rm(r.e1rmKg) : null,
-  }));
-  // One line per block: it breaks at every block boundary (and never joins points outside a block).
-  const segments: E1rmPoint[][] = [];
-  rows.forEach((r, i) => {
-    const prev = rows[i - 1];
-    if (i === 0 || r.blockNo === null || prev.blockNo !== r.blockNo) segments.push([points[i]]);
-    else segments[segments.length - 1].push(points[i]);
-  });
   const sheet: SheetLine[] = [];
   const sheetSr: string[] = [];
+  const sheetByBlock = new Map<number, number>();
   blocks.forEach((b) => {
     const span = spans.find((s) => s.label === `Blok ${b.blockNo}`);
     if (span === undefined) return;
     const { kg, warning } = sheetOneRm(sheetRows, b.name, lift);
     if (warning !== null) warnings.push(warning);
     if (kg === null) return;
+    sheetByBlock.set(b.blockNo, kg);
     sheet.push({ x0: span.x0, x1: span.x1, y: kg, label: formatKg(kg) });
     sheetSr.push(`${formatKg(kg)} kilo i ${blockLabel(b.blockNo)}`);
+  });
+  const points: E1rmPoint[] = rows.map((r) => {
+    const sheetKg = r.blockNo === null ? undefined : sheetByBlock.get(r.blockNo);
+    return {
+      x: dayNumber(r.weekStart) + 3,
+      y: r.e1rmKg ?? 0,
+      logged: r.e1rmRpeSource === "logged",
+      best: r.isBlockBest,
+      label: r.isBlockBest && r.e1rmKg !== null ? formatE1rm(r.e1rmKg) : null,
+      // Under the ring when the point sits below its block's sheet line (a comparison, no maths).
+      labelBelow: sheetKg !== undefined && r.e1rmKg !== null && r.e1rmKg < sheetKg,
+    };
+  });
+  // One line per block: it breaks at every block boundary (and never joins points outside a block).
+  const segments: E1rmPoint[][] = [];
+  rows.forEach((r, i) => {
+    const prev = rows[i - 1];
+    if (i === 0 || r.blockNo === null || prev.blockNo !== r.blockNo) segments.push([points[i]]);
+    else segments[segments.length - 1].push(points[i]);
   });
   const name = LIFT_NAME[lift];
   if (rows.length === 0) {
