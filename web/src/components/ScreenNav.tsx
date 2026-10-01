@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/", label: "I dag" },
   { href: "/load", label: "Belastning" },
+  { href: "/analyse", label: "Analyse" },
 ] as const;
 
 function isCurrent(pathname: string, href: string): boolean {
@@ -13,7 +14,7 @@ function isCurrent(pathname: string, href: string): boolean {
 }
 
 /**
- * DESIGN.md ScreenNav (Part B): a --track pill with two tabs, not sticky. The current tab has
+ * DESIGN.md ScreenNav (Part B): a --track pill with three tabs, not sticky. The current tab has
  * aria-current="page", a --text fill with --bg text and weight 700: fill and weight, never
  * colour alone (and deliberately not --slab).
  */
@@ -21,7 +22,7 @@ export function ScreenNav() {
   const pathname = usePathname();
   return (
     <nav aria-label="Hovedmenu">
-      <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-1 rounded-pill bg-track p-1">
+      <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-1 rounded-pill bg-track p-1">
         {TABS.map((tab) => {
           const current = isCurrent(pathname, tab.href);
           return (

@@ -22,7 +22,7 @@ GitHub Actions daily.yml (≈05:00 Copenhagen; also "Run workflow")
 Next.js (web/), server components only
   /       Today   ← daily_load (form line), strength_sessions + strength_sets (this ISO week, last week), planned_targets
   /load   Load    ← daily_load, blocks, weekly_load; week details ← activities, strength_sessions, strength_sets
-  /analyse Analyse (Cykel) ← ride_metrics, cycling_weeks   (UI: task d part B)
+  /analyse Analyse (Cykel) ← ride_metrics, cycling_weeks
 ```
 
 ## Folders
@@ -36,9 +36,9 @@ Next.js (web/), server components only
 | `python/tests/` | pytest with synthetic fixtures (`conftest.py` builds a fake workbook and an in-memory PostgREST) and an anonymised real-data slice (`fixtures/blok12_slice.json`: refresh it when a new block starts); `test_contract_*.py` write the web's JSON fixtures (`REGENERATE_CONTRACT=1`) |
 | `supabase/migrations/` | Schema, RLS, grants; applied with `supabase db push` |
 | `web/src/lib/db/` | Server-only data layer (`server-only`): `queries.ts` entry points, `postgrest.ts` client, `rows.ts` typed parsers, `dev-fixture.ts` (DEV_FIXTURE, dev only: empty, stale, error, band, ef-few) |
-| `web/src/lib/*.ts` | Pure view models and formatting: `dashboard-view.ts` (/load), `today-view.ts` (/), `zone-scale.ts` (zone-bar drawing scale, zone swatches and range texts, sr sentence, /load zone reading), `format.ts` (locale da-DK), `dates.ts` |
+| `web/src/lib/*.ts` | Pure view models and formatting: `dashboard-view.ts` (/load), `today-view.ts` (/), `zone-scale.ts` (zone-bar drawing scale, zone swatches and range texts, sr sentence, /load zone reading), `analyse-view.ts` (/analyse), `format.ts` (locale da-DK), `dates.ts` |
 | `web/src/app/` | Routes: `page.tsx` (Today), `load/page.tsx`, `layout.tsx` (nav + tick provider) |
-| `web/src/components/` | UI pieces; client components only where needed: `ZoneBar` (form on both screens), `TrendChart` + `ChartSeries` (legend swatches), `LoadExplainer` ("Hvad betyder det?"), `ScreenNav`, `TickProvider`, `ExerciseChecklist` (NÆSTE slab) |
+| `web/src/components/` | UI pieces; client components only where needed: `ZoneBar` (form on both screens), `TrendChart` + `ChartSeries` (legend swatches), `AnalyseCharts` (/analyse eFTP/EF charts, weekly strips, pause seams), `LoadExplainer` ("Hvad betyder det?"), `ScreenNav`, `TickProvider`, `ExerciseChecklist` (NÆSTE slab) |
 | `web/tests/` | `node --test` on the pure modules |
 | `DESIGN.md`, `design/` | Visual contract (design-lead), screen specs, pattern packs |
 | `.claude/skills/run-web/` | The only way to run and screenshot the web app (port 3100) |

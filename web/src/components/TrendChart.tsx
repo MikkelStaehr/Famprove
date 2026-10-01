@@ -57,7 +57,7 @@ const HATCH_ID = "deload-hatch";
 const LEGEND_HATCH_ID = "deload-hatch-legend";
 const DAY_MS = 86_400_000;
 const WINDOW_DAYS = CHART_WINDOW_DAYS;
-const TICK = { fill: "var(--text-muted)", fontSize: 12, fontWeight: 500 } as const;
+export const TICK = { fill: "var(--text-muted)", fontSize: 12, fontWeight: 500 } as const;
 const WEEKDAY_FORMAT = new Intl.DateTimeFormat(LOCALE, { weekday: "long", timeZone: "UTC" });
 
 /** Plot geometry shared by the SVG and the HTML strip/region/rule so they line up exactly. */
@@ -92,7 +92,7 @@ function xCss(fraction: number): string {
 const subscribeNothing = () => () => {};
 
 /** false on the server and during hydration, true afterwards (the chart measures the DOM). */
-function useHydrated(): boolean {
+export function useHydrated(): boolean {
   return useSyncExternalStore(
     subscribeNothing,
     () => true,
@@ -109,7 +109,7 @@ function subscribeWide(onChange: () => void): () => void {
 }
 
 /** true from 640px: 9 ticks every 14 days instead of 5 every 28 (load.md §9a). */
-function useWide(): boolean {
+export function useWide(): boolean {
   return useSyncExternalStore(
     subscribeWide,
     () => window.matchMedia(WIDE_QUERY).matches,
@@ -121,7 +121,7 @@ function ChartFailed({ what }: { readonly what: string }, { reset }: ErrorInfo) 
   return <ErrorState title="Grafen kan ikke vises" what={what} retry={{ onRetry: reset }} />;
 }
 
-const ChartBoundary = catchError(ChartFailed);
+export const ChartBoundary = catchError(ChartFailed);
 
 export function TrendChart(props: TrendChartProps) {
   const measured = props.points.filter((p) => p.kind === "actual").length;
