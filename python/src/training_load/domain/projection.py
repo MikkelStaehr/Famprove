@@ -23,7 +23,7 @@ from collections import Counter
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Final
+from typing import Final, Literal
 
 from training_load.domain.daily import DailyLoad
 from training_load.domain.load import DECAY, Decay, LoadState, ctl_atl
@@ -42,6 +42,7 @@ MODEL_VERSION: Final = "plan-v1"
 
 # basis is stored as jsonb and only ever read as JSON: a JSON object, by construction.
 type Basis = dict[str, object]
+type StrengthMethod = Literal["plan", "recent"]  # = daily_projection's check constraint
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +65,7 @@ class ProjectedDay:
     atl: float
     tsb: float
     basis: Basis
-    strength_method: str = "plan"  # "plan" inside the block, "recent" after it
+    strength_method: StrengthMethod = "plan"  # "plan" inside the block, "recent" after it
     # The band (low, high) per metric: None inside the block, where the plan is used.
     ctl_band: tuple[float, float] | None = None
     atl_band: tuple[float, float] | None = None
@@ -137,7 +138,11 @@ class RecentWeeks:
 def recent_weeks(
     sessions: Sequence[StrengthSession], today: date, deload_weeks: Iterable[date] = ()
 ) -> RecentWeeks | None:
-    """Done planned sessions per ISO week before this week, deload weeks left out; None if none."""
+    """Done planned sessions per ISO week before this week, deload weeks left out; None if none.
+
+    A week with no session done has no total, so it drops out instead of counting as 0 (the
+    forecast assumes 100 % completion), and "the last RECENT_WEEKS" can reach back past a break.
+    """
     this_week = iso_week_start(today)
     skip = set(deload_weeks)
     totals: dict[date, float] = {}
@@ -356,8 +361,10 @@ def naive_projection(
         raise ValueError("the projection starts from today's daily_load row")
     first = today - timedelta(days=NAIVE_DAYS)
     window = [d for d in days if first <= d.date < today]
-    cycling = sum(d.cycling_tss for d in window) / len(window) if window else 0.0
-    strength = sum(d.strength_tss for d in window) / len(window) if window else 0.0
+    if not window:  # the series' first day: no baseline (never a silent 0)
+        return []
+    cycling = sum(d.cycling_tss for d in window) / len(window)
+    strength = sum(d.strength_tss for d in window) / len(window)
     seed = LoadState(ctl=days[-1].ctl, atl=days[-1].atl, tsb=days[-1].tsb)
     states = ctl_atl([cycling + strength] * HORIZON_DAYS, decay=decay, initial=seed)
     basis: Basis = {"naive_days": len(window)}

@@ -12,6 +12,7 @@ from conftest import BLOK_11, BLOK_11_SECTIONS, BLOK_12, SYNTHETIC_BODYWEIGHT, b
 from training_load.sources.strength_sheet import (
     ParsedSet,
     cell_text,
+    decimal_dots,
     parse_all,
     prescribed_text,
     text_number,
@@ -189,3 +190,30 @@ def test_kg_typed_as_text_parses_like_numbers() -> None:
     numeric = parse_all(build_workbook(), SYNTHETIC_BODYWEIGHT)
     assert typed == numeric
     assert first(typed, BLOK_11, "Squat", 1)["logged_kg"] == 120.0
+
+
+def test_decimal_dots_turns_only_decimal_commas_into_dots() -> None:
+    assert decimal_dots("RPE 7,5") == "RPE 7.5"
+    assert decimal_dots("RPE 6,5 - 7,5") == "RPE 6.5 - 7.5"
+    for keep in ("RPE 7.5", "RPE 7 - 8", "110,115", "-10%", "", None, 0.75):
+        assert decimal_dots(keep) == keep
+
+
+def test_an_rpe_cell_with_a_comma_decimal_scores_like_a_dot() -> None:
+    """A load cell "RPE 6,5" is RPE 6.5 (not the mean of 6 and 5); the cell stays as written."""
+    sections = BLOK_11_SECTIONS
+    (dates_2, rows_2) = sections[1]
+    tempo, *rest_2 = rows_2
+
+    def with_load(load: str) -> list[ParsedSet]:
+        weeks = [(3, 6, load, 70), *tempo[2][1:]]
+        return parse_all(
+            build_workbook([sections[0], (dates_2, [(tempo[0], tempo[1], weeks), *rest_2])]),
+            SYNTHETIC_BODYWEIGHT,
+        )
+
+    comma = first(with_load("RPE 6,5"), BLOK_11, tempo[1], 1)
+    dot = first(with_load("RPE 6.5"), BLOK_11, tempo[1], 1)
+    assert comma["rpe"] == dot["rpe"] == 6.5
+    assert comma["score"] == dot["score"]
+    assert comma["prescribed"] == "RPE 6,5"

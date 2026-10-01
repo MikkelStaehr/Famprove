@@ -60,6 +60,14 @@ def text_number(cell: object) -> object:
         return float(cell.strip().replace(",", "."))
     return cell
 
+# Samme regel som text_number: decimalkomma kun med 1-2 decimaler ("110,115" er en liste).
+_DECIMAL_COMMA = re.compile(r"(\d),(\d{1,2})(?!\d)")
+
+def decimal_dots(cell: object) -> object:
+    """Decimalkomma i tekst -> punktum ('RPE 7,5' -> 'RPE 7.5'), så mid() læser 7.5 og ikke
+    gennemsnittet af 7 og 5 (= 6). Alt andet uændret. Bruges på load-cellen før set_score."""
+    return _DECIMAL_COMMA.sub(r"\1.\2", cell) if isinstance(cell, str) else cell
+
 def cell_text(cell: object) -> str | None:
     """En celle som i arket: tekst uændret, tal uden overflødige decimaler (3.0 -> '3')."""
     if cell is None or cell == "": return None
@@ -161,7 +169,7 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
             nsets, reps = int(mid(nsets)), mid(reps)
             kg = float(kg) if isinstance(kg,(int,float)) else 0.0
             logged = kg
-            kg, rpe, score, bw = set_score(typ, name, reps, kg, load, bodyweight, e1rm)
+            kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load), bodyweight, e1rm)
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),

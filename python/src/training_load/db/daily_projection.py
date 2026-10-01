@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Final, TypedDict
 
 from training_load.db.client import Postgrest
-from training_load.domain.projection import Basis, ProjectedDay
+from training_load.domain.projection import Basis, ProjectedDay, StrengthMethod
 
 TABLE: Final = "daily_projection"
 
@@ -18,7 +18,7 @@ class DailyProjectionRow(TypedDict):
     atl: float
     tsb: float
     basis: Basis
-    strength_method: str
+    strength_method: StrengthMethod
     ctl_low: float | None
     ctl_high: float | None
     atl_low: float | None
@@ -28,11 +28,11 @@ class DailyProjectionRow(TypedDict):
     computed_at: str  # ISO timestamptz (UTC), the same on every row of one compute run
 
 
-def _low(band: tuple[float, float] | None) -> float | None:
+def band_low(band: tuple[float, float] | None) -> float | None:
     return band[0] if band else None
 
 
-def _high(band: tuple[float, float] | None) -> float | None:
+def band_high(band: tuple[float, float] | None) -> float | None:
     return band[1] if band else None
 
 
@@ -46,12 +46,12 @@ def to_row(day: ProjectedDay, computed_at: datetime) -> DailyProjectionRow:
         tsb=day.tsb,
         basis=day.basis,
         strength_method=day.strength_method,
-        ctl_low=_low(day.ctl_band),
-        ctl_high=_high(day.ctl_band),
-        atl_low=_low(day.atl_band),
-        atl_high=_high(day.atl_band),
-        tsb_low=_low(day.tsb_band),
-        tsb_high=_high(day.tsb_band),
+        ctl_low=band_low(day.ctl_band),
+        ctl_high=band_high(day.ctl_band),
+        atl_low=band_low(day.atl_band),
+        atl_high=band_high(day.atl_band),
+        tsb_low=band_low(day.tsb_band),
+        tsb_high=band_high(day.tsb_band),
         computed_at=computed_at.isoformat(),
     )
 

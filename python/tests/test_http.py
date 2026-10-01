@@ -51,3 +51,17 @@ def test_does_not_retry_other_4xx_and_error_excludes_headers() -> None:
         call(send, [])
     assert len(send.calls) == 1
     assert "401" in str(exc.value) and "secret" not in str(exc.value)
+
+
+def test_an_error_body_keeps_only_code_and_message_never_the_failing_row() -> None:
+    body = {
+        "code": "23514",
+        "message": 'new row violates check constraint "e1rm_range"',
+        "details": "Failing row contains (2026-10-01, 412.5)",
+        "hint": None,
+    }
+    send = FakeSend(FakeResponse(400, body=body))
+    with pytest.raises(HttpError) as exc:
+        call(send, [])
+    assert "23514" in str(exc.value) and "check constraint" in str(exc.value)
+    assert "Failing row" not in str(exc.value) and "412.5" not in str(exc.value)

@@ -9,7 +9,7 @@ reused unchanged) needs a planned kg per set. Rules, in order (decided with the 
   pct_e1rm      main lift with a "75%" load cell: kg = e1RM x 75%
   backoff       a "-10%" row: 90% of the heaviest planned set of the same exercise that session
   same_row      accessory: the latest kg logged on the same sheet row earlier in this block
-  same_name     accessory: the latest kg logged for the same exercise name in an earlier block
+  same_name     accessory: the latest kg logged for the same exercise name in any earlier week
   (none)        no kg found: the set is NOT scored and is counted as unscored, never 0
 """
 
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from training_load.domain.strength import StrengthSet
-from training_load.sources.strength_sheet import BODYWEIGHT_EX, mid, set_score
+from training_load.sources.strength_sheet import BODYWEIGHT_EX, decimal_dots, mid, set_score
 
 MAIN_LIFTS: Final = frozenset({"SQUAT", "BENCH", "DEADLIFT"})
 _PERCENT: Final = re.compile(r"^\s*(-?\d+(?:[.,]\d+)?)\s*%\s*$")
@@ -48,7 +48,8 @@ def _legacy_mid(text: str) -> float | None:
 
 
 def _legacy_score(s: StrengthSet, kg: float, e1rm: dict[str, float]) -> float:
-    result: object = set_score(s.type, s.name, s.reps, kg, s.prescribed, 0.0, e1rm)  # type: ignore[no-untyped-call]  # untyped legacy module, see above
+    load = decimal_dots(s.prescribed)  # "RPE 7,5" is 7.5, as in the parser
+    result: object = set_score(s.type, s.name, s.reps, kg, load, 0.0, e1rm)  # type: ignore[no-untyped-call]  # untyped legacy module, see above
     assert isinstance(result, tuple)
     return float(result[2])
 
@@ -56,7 +57,7 @@ def _legacy_score(s: StrengthSet, kg: float, e1rm: dict[str, float]) -> float:
 def _rpe(prescribed: str | None) -> float | None:
     if prescribed is None or "RPE" not in prescribed:
         return None
-    return _legacy_mid(prescribed)
+    return _legacy_mid(str(decimal_dots(prescribed)))
 
 
 def _is_bodyweight(s: StrengthSet) -> bool:
@@ -75,19 +76,26 @@ def _main_lift_kg(s: StrengthSet) -> tuple[float, str] | None:
     return None
 
 
+def _logged(s: StrengthSet) -> float:
+    """The logged kg of a set already filtered to logged_kg > 0."""
+    if s.logged_kg is None:
+        raise ValueError("expected a set with logged kg")
+    return s.logged_kg
+
+
 def _accessory_kg(s: StrengthSet, history: Sequence[StrengthSet]) -> tuple[float, str] | None:
     logged = [h for h in history if h.logged_kg is not None and h.logged_kg > 0]
     same_row = [
         h for h in logged if h.block == s.block and h.sheet_row == s.sheet_row and h.week < s.week
     ]
     if same_row:
-        return max(same_row, key=lambda h: h.week).logged_kg or 0.0, "same_row"
+        return _logged(max(same_row, key=lambda h: h.week)), "same_row"
     name = s.name.strip().lower()
     same_name = [
         h for h in logged if h.name.strip().lower() == name and h.week_start < s.week_start
     ]
     if same_name:
-        return max(same_name, key=lambda h: h.week_start).logged_kg or 0.0, "same_name"
+        return _logged(max(same_name, key=lambda h: h.week_start)), "same_name"
     return None
 
 
@@ -138,8 +146,8 @@ def planned_session_score(
             for t in session_sets
             if id(t) in planned_kg and t.name.strip().lower() == s.name.strip().lower()
         ]
-        pct = _percent(s.prescribed) or 0.0
-        if not tops:
+        pct = _percent(s.prescribed)  # always "-x%" here: that's how backoffs were picked
+        if pct is None or not tops:
             unscored += 1
             continue
         total += _raw_score(s, max(tops) * (1 + pct))

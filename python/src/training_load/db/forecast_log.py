@@ -6,22 +6,23 @@ last run of a day wins, and never touches earlier days. Never rebuilt or pruned.
 
 from collections.abc import Sequence
 from datetime import date, datetime
-from typing import Final, TypedDict
+from typing import Final, Literal, TypedDict
 
 from training_load.db.client import Postgrest
-from training_load.db.daily_projection import _high, _low
-from training_load.domain.projection import ProjectedDay
+from training_load.db.daily_projection import band_high, band_low
+from training_load.domain.projection import ProjectedDay, StrengthMethod
 
 TABLE: Final = "forecast_log"
 
 # params is stored as jsonb and only read as JSON.
 type Params = dict[str, object]
+type LogMethod = Literal["model", "naive"]  # = forecast_log's check constraint
 
 
 class ForecastLogRow(TypedDict):
     made_on: str
     target_date: str
-    method: str  # "model" or "naive"
+    method: LogMethod
     cycling_tss: float
     strength_tss: float
     ctl: float
@@ -33,13 +34,18 @@ class ForecastLogRow(TypedDict):
     atl_high: float | None
     tsb_low: float | None
     tsb_high: float | None
-    strength_method: str | None
+    strength_method: StrengthMethod | None  # null on naive rows
     params: Params
     computed_at: str
 
 
 def to_row(
-    day: ProjectedDay, *, made_on: date, method: str, params: Params, computed_at: datetime
+    day: ProjectedDay,
+    *,
+    made_on: date,
+    method: LogMethod,
+    params: Params,
+    computed_at: datetime,
 ) -> ForecastLogRow:
     return ForecastLogRow(
         made_on=made_on.isoformat(),
@@ -50,12 +56,12 @@ def to_row(
         ctl=day.ctl,
         atl=day.atl,
         tsb=day.tsb,
-        ctl_low=_low(day.ctl_band),
-        ctl_high=_high(day.ctl_band),
-        atl_low=_low(day.atl_band),
-        atl_high=_high(day.atl_band),
-        tsb_low=_low(day.tsb_band),
-        tsb_high=_high(day.tsb_band),
+        ctl_low=band_low(day.ctl_band),
+        ctl_high=band_high(day.ctl_band),
+        atl_low=band_low(day.atl_band),
+        atl_high=band_high(day.atl_band),
+        tsb_low=band_low(day.tsb_band),
+        tsb_high=band_high(day.tsb_band),
         strength_method=day.strength_method if method == "model" else None,
         params=params,
         computed_at=computed_at.isoformat(),
@@ -74,9 +80,13 @@ def log_forecast(
     """Upsert this run's model and naive rows on (made_on, target_date, method). Returns rows."""
     if computed_at.tzinfo is None:
         raise ValueError("computed_at must be timezone-aware")
+    runs: tuple[tuple[LogMethod, Sequence[ProjectedDay]], ...] = (
+        ("model", model),
+        ("naive", naive),
+    )
     rows = [
         to_row(d, made_on=made_on, method=method, params=params, computed_at=computed_at)
-        for method, days in (("model", model), ("naive", naive))
+        for method, days in runs
         for d in days
     ]
     if rows:

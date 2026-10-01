@@ -46,6 +46,7 @@ class ComputeSummary:
     projected_days: int
     logged_forecast_rows: int
     projection_notes: int  # unreadable planned rides / sessions without history or a day
+    unscored_planned_sets: int  # planned sets without a kg rule (left out, never 0)
 
 
 def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime) -> ComputeSummary:
@@ -100,9 +101,17 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         for entry in (*_entries(p.basis, "rides"), *_entries(p.basis, "strength"))
         if "reason" in entry
     )
+    unscored = sum(
+        n
+        for p in projection
+        for e in _entries(p.basis, "strength")
+        if isinstance(n := e.get("unscored"), int)
+    )
+    # Counts only: the Actions logs are public. The details are in daily_projection.basis.
     if notes:
-        # Counts only: the Actions logs are public. The details are in daily_projection.basis.
         log.warning("%d projection entries are estimates without data (see basis)", notes)
+    if unscored:
+        log.warning("%d planned sets have no kg rule and are left out of the forecast", unscored)
 
     if ignored:
         log.warning(
@@ -120,6 +129,7 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         projected_days=len(projection),
         logged_forecast_rows=logged,
         projection_notes=notes,
+        unscored_planned_sets=unscored,
     )
 
 

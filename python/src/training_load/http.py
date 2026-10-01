@@ -6,6 +6,7 @@ no HTTP-mocking library is used.
 
 import time
 from collections.abc import Callable, Mapping, Sequence
+from json import dumps, loads
 from typing import Final, Protocol
 
 import requests
@@ -54,15 +55,31 @@ class HttpSend(Protocol):
     ) -> HttpResponse: ...
 
 
+# PostgREST's "details" and "hint" can echo the failing row ("Failing row contains (...)") and
+# these errors reach the public Actions logs: of a JSON body, only these keys are kept.
+SAFE_ERROR_KEYS: Final = ("code", "message", "error")
+
+
+def safe_body(body: str) -> str:
+    """An error body fit for a public log: a JSON object keeps SAFE_ERROR_KEYS only."""
+    try:
+        parsed: object = loads(body)
+    except ValueError:
+        return body[:500]
+    if isinstance(parsed, dict):
+        return dumps({k: parsed[k] for k in SAFE_ERROR_KEYS if k in parsed})[:500]
+    return body[:500]
+
+
 class HttpError(RuntimeError):
     """Non-2xx response after retries.
 
-    The message carries method, URL (no secrets are ever put in URLs), status and a truncated
-    body. It must never include request headers (they hold API keys and tokens).
+    The message carries method, URL (no secrets are ever put in URLs), status and the body
+    through safe_body. It must never include request headers (they hold API keys and tokens).
     """
 
     def __init__(self, method: str, url: str, status: int, body: str) -> None:
-        super().__init__(f"{method} {url} -> HTTP {status}: {body[:500]}")
+        super().__init__(f"{method} {url} -> HTTP {status}: {safe_body(body)}")
         self.status = status
 
 
