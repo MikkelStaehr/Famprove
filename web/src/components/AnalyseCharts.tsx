@@ -318,7 +318,10 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
       onBlur={() => setActive(null)}
       onPointerMove={pick}
       onPointerDown={pick}
-      onPointerLeave={() => setActive(null)}
+      // Touch fires pointerleave right after the tap: only a mouse leaving clears (blur does on touch).
+      onPointerLeave={(e) => {
+        if (e.pointerType === "mouse") setActive(null);
+      }}
     >
       {strip("Timer", "t", (w) => w.hours, hMax)}
       {strip("Belastning", "TSS", (w) => w.load, lMax)}

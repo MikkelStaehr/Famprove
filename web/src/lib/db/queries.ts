@@ -258,8 +258,11 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
       throw error;
     },
   );
-  const rides = await selectAll(db, RIDE_METRICS_SELECT.table, RIDE_METRICS_SELECT, parseRideMetricsRow);
-  const weeksResult = await weeksRead;
+  // Promise.all also awaits weeksRead when the rides read fails first (no unhandled rejection).
+  const [rides, weeksResult] = await Promise.all([
+    selectAll(db, RIDE_METRICS_SELECT.table, RIDE_METRICS_SELECT, parseRideMetricsRow),
+    weeksRead,
+  ]);
   const weeks = weeksResult instanceof Error ? null : weeksResult;
   const weeksError = weeksResult instanceof Error ? weeksResult : null;
   if (fixture === "stale") {
