@@ -38,7 +38,7 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - **Zero vs. missing per field.** Decide per field whether 0 is a valid value, and document it next to the field (schema comment or type). Missing is always `null`; 0 means a real zero only where the field allows it.
 - **Contract tests across language boundaries.** Data that crosses a language boundary (e.g. Python writes JSON, the web parses it) gets a contract test: the consumer's fixture is the producer's real output, including edge cases.
 - **External input is messy.** Numbers may arrive as text, with dot or comma decimals; junk rows exist. Parse defensively and test it.
-- **Real-data fixtures.** Features that read external data are also tested against a current slice of real data (anonymised: this repo is public). Refresh it when the source changes (new block, season, file).
+- **Real-data fixtures.** Features that read external data are also tested against a current slice of real data (anonymised: this repo is public). Refresh it when the source changes (new block, season, file). Samples keep dates only (no times of day) and never state the anonymisation applied (e.g. a date shift or scale factor). A privacy fix to an unpushed commit is squashed in before pushing, so the original never reaches history.
 - Store external source rows raw once (e.g. a `raw jsonb` column) so new views don't need new migrations.
 - Python owns all calculations. The frontend only reads `daily_load`.
 - The Google Sheet is read-only. Nothing in this repo may ever write to it.
@@ -104,7 +104,7 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 - No auth UI, no settings page. pnpm, TypeScript strict, Tailwind; the simplest chart library that meets `DESIGN.md`.
 - Prognose (decided 2026-10-01): cycling = the typical week of the last 28 days, planned rides replace their day. Strength = every remaining session of the current block scored from the coach's plan with the sheet formula (planned kg rules in `domain/planned_load.py`; 100 % completion; deload weeks as prescribed; a missed past session is dropped), on the learnt weekday per session number, else spread evenly. After the block: mean weekly TSS of the last 4 completed non-deload weeks, with their min-max as a band. Each run logs its prognose and a naive baseline (28-day mean held flat) in `forecast_log`; the last run of a day wins. Phase 2 (after 3-4 blocks): calibrate with explainable statistics only, measured as MAE of CTL/TSB at 7/28/56 days vs the baseline.
 - Routes: `/` = Today (what to do in the gym or on the bike today; spec `design/specs/today.md`), `/load` = the load dashboard (unchanged), `/analyse` = Analyse (Cykel now; spec `design/specs/analyse.md`), a small nav between them.
-- Analyse / Cykel (decided 2026-10-01): rides since 2024-12-30 (the ISO week of 2025-01-01) in `ride_metrics` + `cycling_weeks`, computed in `domain/ride_analysis.py`. Exclusions (too_short < 5 min or < 1 km, power_outlier, hr_outlier) are analytics-only and shown with a reason; weekly hours (moving time) and load count every ride. eFTP = intervals.icu's `icu_rolling_ftp` on each real-power ride; EF = NP / avg HR on endurance rides ≥ 30 min, 28-day median; lines break after > 21 days. The endurance intensity basis is one switch, `ENDURANCE`.
+- Analyse / Cykel (decided 2026-10-01): rides since 2024-12-30 (the ISO week of 2025-01-01) in `ride_metrics` + `cycling_weeks`, computed in `domain/ride_analysis.py`. Exclusions (too_short < 5 min or < 1 km, power_outlier, hr_outlier) are analytics-only and shown with a reason; weekly hours (moving time) and load count every ride. eFTP = intervals.icu's `icu_rolling_ftp` on each real-power ride; EF = NP / avg HR on endurance rides ≥ 30 min, 28-day median; lines break after > 21 days. The endurance intensity basis is one switch, `ENDURANCE` = intervals.icu's IF < 0.75 (11 rides since 2025; NP / rolling eFTP selects 0 because the rolling eFTP is a floor). Revisit after an FTP test; consider an HR-zone-based endurance filter later.
 
 ## How we work: size every task first
 Before starting, the main session states the **size (S/M/L), the steps and the time budget** to the user. The user can change it.
@@ -123,7 +123,7 @@ If a budget is exceeded, **stop and ask**. Never keep running.
 
 **Data check** (M and L): list every value the screen shows and mark it *exists / missing*. All missing data goes into **one** migration before any UI is built.
 
-**Research first, ask after.** Before asking the user a technical question, research it and bring numbers.
+**Research first, ask after.** Before asking the user a technical question, research it and bring numbers. Before calling a parameter or threshold wrong, run it on real data and report how many rows it selects.
 
 ## Status to the user
 - Before each step: what, which agent, and an estimated time.
