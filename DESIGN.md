@@ -10,7 +10,7 @@ When Part B and a pattern pack conflict, Part B wins on look and the pack wins o
 ---
 
 ## Product profile
-- **Product type:** personal training companion. Three screens: **I dag** (what to do in today's session), **Belastning** (fitness, fatigue and form over time) and **Analyse** (am I getting fitter: Cykel now, Styrke and Samlet later).
+- **Product type:** personal training companion. Three screens: **I dag** (what to do in today's session), **Belastning** (fitness, fatigue and form over time) and **Analyse** (am I getting fitter: Cykel and Styrke now, Samlet later).
 - **Primary users & context:** one user. On the phone in the gym between sets — a quick glance at arm's length, one hand, sweaty fingers — and at home; at the desk to review load.
 - **Platform:** mobile web (home-screen bookmark), desktop browser for review. Next.js on Vercel.
 - **Locale:** da-DK. Danish UI copy ("I dag", "Belastning", "2 af 8 udført"). Dates `ons. 30. sep.`, times `kl. 09.31`, decimal comma. Exercise names and sheet cells are shown **exactly as written** in the coach's sheet (often English: "Lat pulldowns", "Bicep of choice").
@@ -83,10 +83,13 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - No decoration that serves neither the direction nor the hierarchy.
 
 ## Project rules
-- **Screens:** three routes linked by `ScreenNav` ("I dag" · "Belastning" · "Analyse"). All UI copy is Danish; the exact strings live in `design/specs/today.md` §5a, `design/specs/load.md` §4 and §6, and `design/specs/analyse.md` §6.
+- **Screens:** three routes linked by `ScreenNav` ("I dag" · "Belastning" · "Analyse"). All UI copy is Danish; the exact strings live in `design/specs/today.md` §5a, `design/specs/load.md` §4 and §6, `design/specs/analyse.md` §6 and `design/specs/analyse-styrke.md` §4–6.
   - `/` **Today / I dag** answers "What am I doing in this session, and how hard?" (spec `design/specs/today.md`, rules in "Today" below).
   - `/load` **Training load / Belastning** answers "How loaded am I right now, and is fitness going up?". The bullets below, from "Key figure" to "Data", describe `/load`.
-  - `/analyse` **Analyse** answers "Am I getting fitter on the bike?" (section Cykel; spec `design/specs/analyse.md`). Follows the data-dashboard pack; the hero is the eFTP figure. `--slab` marks the latest eFTP point and the current week, and nothing else. Sections become tabs only when a second section exists.
+  - `/analyse` **Analyse** answers "Am I getting fitter?" in two sections, which are link tabs (`Cykel` · `Styrke`, `aria-current`, no tab roles, no Samlet placeholder) under the shared h1:
+    - `/analyse` **Cykel** ("on the bike?", spec `design/specs/analyse.md`): the hero is the eFTP figure, and `--slab` marks the latest eFTP point and the current week.
+    - `/analyse/styrke` **Styrke** ("in the three main lifts?", spec `design/specs/analyse-styrke.md`): the hero is the lift board, the block-best e1RM per lift. `--slab` marks only the current week's tonnage bars. e1RM provenance is ink for logged RPE and faded for prescribed RPE, and is always named in words. The sheet's 1RM is labelled `1RM i arket (ikke testet)` and is a reference only.
+    - Both follow the data-dashboard pack. Each section shows its own `UpdatedLine` under the tabs.
 - **Pattern packs:**
   - `/load` follows [`design/patterns/data-dashboard.md`](design/patterns/data-dashboard.md). Conflict: the pack rounds kg to 1 decimal, but this app shows kg as logged (up to 2 decimals), because the user compares against their own sheet. DESIGN.md wins.
   - `/` Today is not a dashboard, so the pack's "key figure is the largest element" does not apply there: the session's prescription numbers are. Its data-honesty rules do apply: freshness, gaps never shown as zeros, whole watts.
@@ -181,6 +184,7 @@ Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the
 
 - **Links** (e.g. "Tilbage til denne uge"): `--text`, weight 600, underline 1px offset 3px. Volt is never a link colour.
 - **Nav current tab:** `--text` fill with `--bg` text, weight 700 (fill + weight, not colour alone). It deliberately does not use `--slab`.
+- **Section tabs** (`/analyse`, `AnalyseTabs`): the section word is the tab. `text-32` Condensed italic uppercase; current 800 `--text` + 4px `--text` bar under the word; other 700 `--text-muted`. Never ScreenNav's pill track (two pill strips read as one menu), never `--slab`.
 
 ## Type
 **Decision (2026-09-30): Barlow + Barlow Condensed stay.** Chosen over Instrument Sans (one family with a width axis), Inter + Roboto Condensed, and Manrope + Sofia Sans Condensed. Those were rendered on Today at 390px, light and dark, against a brief for a calmer grotesk, and the user kept Barlow. Checked on the way: Barlow's default figures are proportional, but `tabular-nums` makes every digit the same width, so tabular figures work as specified below.

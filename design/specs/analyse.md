@@ -12,12 +12,11 @@ Data: `ride_metrics` and `cycling_weeks`, read server-side through `web/src/lib/
 ## 2. Route, nav, section heading
 - `/analyse`, document title `Analyse`. Skeleton: `app/analyse/loading.tsx`.
 - **ScreenNav gets a third link**, `Analyse` → `/analyse` (`I dag` · `Belastning` · `Analyse`). The look is unchanged. The grid becomes `repeat(auto-fit, minmax(min(100%, 6.5rem), 1fr))`, so all three fit on one row at 390px ("Belastning" ≈ 110px in a ≈ 116px column) and they stack at 200% text without horizontal scroll.
-- **Section heading:** `h2` "Cykel", `text-32` Barlow Condensed 800 italic, uppercase via CSS (the same "CYKEL" as Today's ride card), 16px under the updated line. **No tablist and no tab roles** while Cykel is the only section.
-  - *Later (Styrke task):* a section tab strip replaces the visible h2 in this same slot, and the panel keeps an `sr-only` h2. It must not reuse ScreenNav's pill look, because two pill strips stacked read as one menu. Nothing below the slot changes.
+- **Section heading (superseded by e2, 2026-10-01):** the visible h2 "Cykel" is replaced by the section tabs `Cykel` · `Styrke` (link tabs, no tab roles), specified in [`analyse-styrke.md`](analyse-styrke.md) §2. The panel keeps an `sr-only` h2 `Cykel`. The `UpdatedLine` moves under the tabs (8px). Nothing else on Cykel changes.
 
 ## 3. Layout (390px first; 1280 = the same single column, max 720px, Part B)
-1. Nav, h1 `Analyse` (`text-44` display, date not shown), `UpdatedLine` 4px under it.
-2. h2 `Cykel` (§2).
+1. Nav, h1 `Analyse` (`text-44` display, date not shown, from `app/analyse/layout.tsx`).
+2. Section tabs (§2, `analyse-styrke.md` §2), then `UpdatedLine` 8px under them.
 3. **Hero: eFTP key figure**, 12px under the h2, directly on `--bg` (no card, as the `/load` hero):
    - Label line (`flex-wrap`, space-between): `Estimeret FTP` (`text-14` 700 uppercase +0.04em) · `fra tirs. 15. sep.` (`text-14` 600 `--text`, as Today's "fra …" date).
    - 8px, then the value `184 W` in `text-56` Condensed 800 italic tabular, W the same size. **The largest text on the page.**
@@ -160,7 +159,7 @@ Picking the latest `eftp_ok` row is selection, not arithmetic; the delta is show
 
 ## 10. Acceptance criteria (design review + `tester`)
 1. **Nav:** three links in one row at 390px (100% text) with `Analyse` `aria-current="page"` on `/analyse`; at 200% text they stack with no horizontal scroll. `/` and `/load` are otherwise pixel-unchanged.
-2. **Heading:** h1 `Analyse`, h2 `Cykel`; there is no `role="tab"`/`tablist` and no Styrke/Samlet placeholder anywhere.
+2. **Heading:** h1 `Analyse`, then the section tabs with `Cykel` current and an `sr-only` h2 `Cykel` (since e2: `analyse-styrke.md` §10.1). There is no `role="tab"`/`tablist` and no Samlet placeholder anywhere.
 3. **Hero:** the eFTP value computes to 56px and is the largest text; the delta and detail come verbatim from `cycling_summary` (no arithmetic: a `node --test` on the view model passes `eftp_delta_w` through), and the honesty note is present.
 4. **Fold:** at 390 × 844, light and dark, the eFTP plot including its x labels ends at or above 844px.
 5. **eFTP line:** there is no segment across any point with `eftp_gap_before`, and none across Oct 2025–Feb 2026. The latest point is the 9px `--slab` dot.
