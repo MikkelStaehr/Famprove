@@ -1,3 +1,4 @@
+import { AnalyseTabs } from "@/components/AnalyseTabs";
 import { Card } from "@/components/Card";
 import { SkeletonBar as Bar } from "@/components/Skeleton";
 
@@ -7,12 +8,12 @@ const BLOCK = "w-full rounded-control bg-track motion-safe:animate-pulse";
 export default function Loading() {
   return (
     <>
-      <header className="flex flex-col">
-        <h1 className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">Analyse</h1>
-        <div aria-hidden="true" className="mt-1">
+      <div className="flex flex-col">
+        <AnalyseTabs current="cykel" />
+        <h2 className="sr-only">Cykel</h2>
+        <div aria-hidden="true" className="mt-2">
           <Bar className="w-1/3 text-14" />
         </div>
-        <h2 className="mt-4 font-display text-32 leading-none font-extrabold uppercase italic">Cykel</h2>
         <div className="mt-3">
           <p className="text-14 font-bold tracking-[0.04em] uppercase">Estimeret FTP</p>
           <div aria-hidden="true">
@@ -21,7 +22,7 @@ export default function Loading() {
             <Bar className="mt-1 w-2/3 text-14" />
           </div>
         </div>
-      </header>
+      </div>
       <p className="sr-only" role="status">
         Henter cykeldata…
       </p>

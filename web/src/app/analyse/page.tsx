@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { MarkChart, WeekStrips } from "@/components/AnalyseCharts";
+import { AnalyseTabs } from "@/components/AnalyseTabs";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -49,12 +50,11 @@ export default async function Page() {
   const state = await loadPageState();
   return (
     <>
-      <header className="flex flex-col">
-        <h1 className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">
-          Analyse
-        </h1>
+      <div className="flex flex-col">
+        <AnalyseTabs current="cykel" />
+        <h2 className="sr-only">Cykel</h2>
         {state.kind === "ready" && (
-          <div className="mt-1">
+          <div className="mt-2">
             <UpdatedLine
               freshness={state.freshness}
               staleNote="Jobbet skal køre dagligt omkring kl. 05.00."
@@ -62,11 +62,8 @@ export default async function Page() {
             />
           </div>
         )}
-        <h2 className="mt-4 font-display text-32 leading-none font-extrabold uppercase italic">
-          Cykel
-        </h2>
         {state.kind === "ready" && <Hero view={state} />}
-      </header>
+      </div>
       {state.kind === "error" && (
         <ErrorState
           title="Kunne ikke hente cykeldata"
