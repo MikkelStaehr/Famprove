@@ -7,14 +7,17 @@
  *   band   real rows, with an illustrative CTL/ATL/TSB spread on every `recent` prognose row and a
  *          `recent` entry (tss_low/tss_high, 4 weeks) for its sessions (load.md §10e), so the
  *          band can be screenshotted before 4 real weeks exist. Never a real estimate.
+ *   ef-few real /analyse rows with ef_ok kept on the latest EF_FEW_POINTS only (analyse.md §8),
+ *          so the "too few endurance rides" state can be screenshotted. Other screens: real rows.
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
  */
 import { PostgrestError } from "./postgrest.ts";
-import type { DailyProjectionRow, ProjectedSession } from "./rows.ts";
+import type { DailyProjectionRow, ProjectedSession, RideMetricsRow } from "./rows.ts";
 
-export type DevFixture = "empty" | "stale" | "error" | "band";
+export type DevFixture = "empty" | "stale" | "error" | "band" | "ef-few";
+const FIXTURES: readonly DevFixture[] = ["empty", "stale", "error", "band", "ef-few"];
 
 /** Three days: well past the 26 h staleness limit. */
 export const STALE_AGE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -25,8 +28,9 @@ export function devFixture(
 ): DevFixture | null {
   if (nodeEnv !== "development") return null;
   const value = env.DEV_FIXTURE;
-  if (value === "empty" || value === "stale" || value === "error" || value === "band") return value;
-  if (value) console.warn(`DEV_FIXTURE=${value} ignored: expected empty, stale, error or band`);
+  const known = FIXTURES.find((f) => f === value);
+  if (known !== undefined) return known;
+  if (value) console.warn(`DEV_FIXTURE=${value} ignored: expected ${FIXTURES.join(", ")}`);
   return null;
 }
 
@@ -68,4 +72,23 @@ export function illustrativeBands(rows: readonly DailyProjectionRow[]): DailyPro
       tsbBand: { low: row.tsb - 0.4 * n, high: row.tsb + 0.3 * n },
     };
   });
+}
+
+/** DEV_FIXTURE=ef-few: EF points kept on the latest rides only. */
+export const EF_FEW_POINTS = 3;
+
+/**
+ * DEV_FIXTURE=ef-few: rides (ascending by date) with ef_ok cleared on all but the latest
+ * EF_FEW_POINTS EF points (and their trend and line breaks with it). Dev only.
+ */
+export function fewEfPoints(rides: readonly RideMetricsRow[]): RideMetricsRow[] {
+  const keep = new Set(
+    rides
+      .filter((r) => r.efOk)
+      .slice(-EF_FEW_POINTS)
+      .map((r) => r.activityId),
+  );
+  return rides.map((r) =>
+    r.efOk && !keep.has(r.activityId) ? { ...r, efOk: false, efTrend: null, efGapBefore: false } : r,
+  );
 }

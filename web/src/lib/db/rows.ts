@@ -200,6 +200,71 @@ export const STRENGTH_SESSIONS_SELECT = {
   order: "week_start,session", // the primary key
 } as const;
 
+/** Why Python left a ride out of the trends (domain.ride_analysis.Exclusion). */
+export type RideExclusion = "no_raw" | "too_short" | "power_outlier" | "hr_outlier";
+const RIDE_EXCLUSIONS: readonly RideExclusion[] = ["no_raw", "too_short", "power_outlier", "hr_outlier"];
+
+/**
+ * public.ride_metrics: every ride since 2024-12-30, rebuilt by compute (domain.ride_analysis).
+ * Every number and flag is Python's; the web formats and draws, never recomputes.
+ */
+export type RideMetricsRow = {
+  readonly activityId: string;
+  readonly date: IsoDate; // local date of the ride
+  readonly type: string; // Ride | VirtualRide
+  readonly movingS: number | null;
+  readonly distanceM: number | null;
+  readonly load: number | null;
+  readonly npW: number | null;
+  readonly avgHr: number | null;
+  readonly deviceWatts: boolean | null; // true = a real power meter
+  readonly ftpW: number | null; // the FTP set in intervals.icu at the time
+  readonly ifSet: number | null; // intervals.icu IF (ratio) on ftpW
+  readonly rollingFtpW: number | null; // intervals.icu's eFTP that day
+  readonly ifEftp: number | null; // NP / rollingFtpW
+  readonly ef: number | null; // NP / average HR
+  readonly exclusion: RideExclusion | null; // null = in the trends
+  readonly eftpOk: boolean; // a point on the eFTP line
+  readonly eftpGapBefore: boolean; // the eFTP line breaks before this point
+  readonly efOk: boolean; // a point on the EF line
+  readonly efTrend: number | null; // 28-day median EF; null unless efOk
+  readonly efGapBefore: boolean; // the EF line breaks before this point
+  readonly eftpYearAgoDate: IsoDate | null; // the comparison point a year earlier (eFTP points)
+  readonly eftpYearAgoW: number | null;
+  readonly eftpDeltaW: number | null; // rollingFtpW - eftpYearAgoW
+  readonly computedAt: string; // ISO timestamptz (UTC)
+};
+
+/** public.cycling_weeks: one row per ISO week since 2024-12-30; rides = 0 is a real 0. */
+export type CyclingWeekRow = {
+  readonly weekStart: IsoDate;
+  readonly rides: number;
+  readonly movingS: number;
+  readonly load: number;
+  readonly excluded: number; // rides that week left out of the trends
+  readonly computedAt: string;
+};
+
+/** Everything /analyse reads, as returned by queries.loadCyclingAnalysis. */
+export type CyclingAnalysisData = {
+  readonly rides: readonly RideMetricsRow[]; // ascending by date
+  /** Ascending by weekStart; null when they couldn't be read (that card shows an error). */
+  readonly weeks: readonly CyclingWeekRow[] | null;
+};
+
+export const RIDE_METRICS_SELECT = {
+  table: "ride_metrics",
+  columns:
+    "activity_id,date,type,moving_s,distance_m,load,np_w,avg_hr,device_watts,ftp_w,if_set,rolling_ftp_w,if_eftp,ef,exclusion,eftp_ok,eftp_gap_before,ef_ok,ef_trend,ef_gap_before,eftp_year_ago_date,eftp_year_ago_w,eftp_delta_w,computed_at",
+  order: "date,activity_id", // unique (includes the primary key)
+} as const;
+
+export const CYCLING_WEEKS_SELECT = {
+  table: "cycling_weeks",
+  columns: "week_start,rides,moving_s,load,excluded,computed_at",
+  order: "week_start", // the primary key
+} as const;
+
 export class RowError extends Error {}
 
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -282,6 +347,10 @@ class Fields {
     return Number.isNaN(Date.parse(value)) ? this.fail(column, "a timestamp") : value;
   }
 
+  booleanOrNull(column: string): boolean | null {
+    return this.get(column) === null ? null : this.boolean(column);
+  }
+
   boolean(column: string): boolean {
     const value = this.get(column);
     return typeof value === "boolean" ? value : this.fail(column, "a boolean");
@@ -312,6 +381,53 @@ export function parseDailyLoadRow(raw: unknown): DailyLoadRow {
     ctlRamp7d: f.numberOrNull("ctl_ramp_7d"),
     formZone: f.stringOrNull("form_zone"),
     computedAt: f.timestampOrNull("computed_at"),
+  };
+}
+
+export function parseRideMetricsRow(raw: unknown): RideMetricsRow {
+  const f = new Fields(RIDE_METRICS_SELECT.table, raw);
+  const exclusion = f.stringOrNull("exclusion");
+  const known = RIDE_EXCLUSIONS.find((e) => e === exclusion);
+  if (exclusion !== null && known === undefined) {
+    throw new RowError(`${RIDE_METRICS_SELECT.table}.exclusion: expected one of ${RIDE_EXCLUSIONS.join(", ")}`);
+  }
+  return {
+    activityId: f.string("activity_id"),
+    date: f.date("date"),
+    type: f.string("type"),
+    movingS: f.numberOrNull("moving_s"),
+    distanceM: f.numberOrNull("distance_m"),
+    load: f.numberOrNull("load"),
+    npW: f.numberOrNull("np_w"),
+    avgHr: f.numberOrNull("avg_hr"),
+    deviceWatts: f.booleanOrNull("device_watts"),
+    ftpW: f.numberOrNull("ftp_w"),
+    ifSet: f.numberOrNull("if_set"),
+    rollingFtpW: f.numberOrNull("rolling_ftp_w"),
+    ifEftp: f.numberOrNull("if_eftp"),
+    ef: f.numberOrNull("ef"),
+    exclusion: known ?? null,
+    eftpOk: f.boolean("eftp_ok"),
+    eftpGapBefore: f.boolean("eftp_gap_before"),
+    efOk: f.boolean("ef_ok"),
+    efTrend: f.numberOrNull("ef_trend"),
+    efGapBefore: f.boolean("ef_gap_before"),
+    eftpYearAgoDate: f.dateOrNull("eftp_year_ago_date"),
+    eftpYearAgoW: f.numberOrNull("eftp_year_ago_w"),
+    eftpDeltaW: f.numberOrNull("eftp_delta_w"),
+    computedAt: f.timestamp("computed_at"),
+  };
+}
+
+export function parseCyclingWeekRow(raw: unknown): CyclingWeekRow {
+  const f = new Fields(CYCLING_WEEKS_SELECT.table, raw);
+  return {
+    weekStart: f.date("week_start"),
+    rides: f.number("rides"),
+    movingS: f.number("moving_s"),
+    load: f.number("load"),
+    excluded: f.number("excluded"),
+    computedAt: f.timestamp("computed_at"),
   };
 }
 

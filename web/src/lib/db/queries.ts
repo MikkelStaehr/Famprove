@@ -2,13 +2,14 @@ import "server-only";
 
 import { connection } from "next/server";
 
-import { devFixture, fixtureError, illustrativeBands, staleComputedAt } from "./dev-fixture.ts";
+import { devFixture, fewEfPoints, fixtureError, illustrativeBands, staleComputedAt } from "./dev-fixture.ts";
 import { readSupabaseEnv } from "./env.ts";
 import { createClient, selectAll, selectFirst } from "./postgrest.ts";
 import { addDays, isoWeekStart } from "../dates.ts";
 import {
   ACTIVITIES_SELECT,
   BLOCKS_SELECT,
+  CYCLING_WEEKS_SELECT,
   DAILY_LOAD_SELECT,
   ISO_DATE,
   parseActivityRow,
@@ -17,10 +18,13 @@ import {
   PLANNED_TARGETS_SELECT,
   PRESCRIBED_SETS_SELECT,
   parseBlockRow,
+  parseCyclingWeekRow,
   parseDailyLoadRow,
+  parseRideMetricsRow,
   parseProjectionRow,
   parseStrengthSessionRow,
   PROJECTION_SELECT,
+  RIDE_METRICS_SELECT,
   parseStrengthSetRow,
   parseWeeklyLoadRow,
   STRENGTH_SESSIONS_SELECT,
@@ -28,6 +32,7 @@ import {
   WEEKLY_LOAD_SELECT,
 } from "./rows.ts";
 import type {
+  CyclingAnalysisData,
   DashboardData,
   DailyLoadRow,
   IsoDate,
@@ -229,4 +234,34 @@ export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
     ),
   );
   return { weekStart, sessions, sets, previousWeek: previous.flat(), rides, upcomingRides };
+}
+
+/**
+ * /analyse (Cykel): every ride_metrics row and every cycling_weeks row (both tiny, both rebuilt
+ * whole by compute, so no filters). Reads only. The weeks are secondary: if they can't be read,
+ * the rides still render and that card shows its error (weeks = null).
+ * Throws EnvError / PostgrestError / RowError for the rides; the page renders ErrorState.
+ */
+export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
+  await connection();
+  const fixture = devFixture();
+  if (fixture === "error") throw fixtureError(RIDE_METRICS_SELECT.table);
+  if (fixture === "empty") return { rides: [], weeks: [] };
+  const db = client();
+  const weeksRead = selectAll(db, CYCLING_WEEKS_SELECT.table, CYCLING_WEEKS_SELECT, parseCyclingWeekRow).catch(
+    (error: unknown) => {
+      console.error("analyse: loading cycling_weeks failed", error);
+      return null;
+    },
+  );
+  const rides = await selectAll(db, RIDE_METRICS_SELECT.table, RIDE_METRICS_SELECT, parseRideMetricsRow);
+  const weeks = await weeksRead;
+  if (fixture === "stale") {
+    const computedAt = staleComputedAt(new Date());
+    return {
+      rides: rides.map((r) => ({ ...r, computedAt })),
+      weeks: weeks === null ? null : weeks.map((w) => ({ ...w, computedAt })),
+    };
+  }
+  return { rides: fixture === "ef-few" ? fewEfPoints(rides) : rides, weeks };
 }
