@@ -10,16 +10,14 @@ import type {
   IsoDate,
   StrengthAnalysisData,
   StrengthBlockRow,
-  StrengthLift,
   StrengthPhase,
   StrengthWeekRow,
 } from "./db/rows.ts";
 import { formatDate, formatDateRange, formatKg, LOCALE, stopAfter } from "./format.ts";
+import { LIFT_NAME, LIFTS, type StrengthLift } from "./lifts.ts";
 
 const dated = (date: IsoDate): string => `${formatDate(date)}${stopAfter(formatDate(date))}`;
 
-export const LIFTS: readonly StrengthLift[] = ["SQUAT", "BENCH", "DEADLIFT"];
-export const LIFT_NAME: Readonly<Record<StrengthLift, string>> = { SQUAT: "Squat", BENCH: "Bænkpres", DEADLIFT: "Dødløft" };
 const liftLower = (l: StrengthLift): string => LIFT_NAME[l].toLowerCase();
 export const PHASE_TEXT: Readonly<Record<StrengthPhase, string>> = { in_season: "i sæson", off_season: "uden for sæson" };
 

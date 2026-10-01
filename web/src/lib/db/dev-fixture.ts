@@ -16,6 +16,7 @@
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
  */
+import { LIFTS } from "../lifts.ts";
 import { PostgrestError } from "./postgrest.ts";
 import type { DailyProjectionRow, ProjectedSession, RideMetricsRow, StrengthWeekRow } from "./rows.ts";
 
@@ -105,7 +106,7 @@ export const LSRPE_POINTS = 2;
  */
 export function illustrativeLogged(weeks: readonly StrengthWeekRow[]): StrengthWeekRow[] {
   const keep = new Set<string>();
-  for (const lift of ["SQUAT", "BENCH", "DEADLIFT"] as const) {
+  for (const lift of LIFTS) {
     const points = weeks.filter((w) => w.lift === lift && w.e1rmKg !== null);
     for (const w of points.slice(-LSRPE_POINTS)) keep.add(`${w.weekStart}#${w.lift}`);
   }

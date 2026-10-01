@@ -6,6 +6,7 @@ import { ComposedChart, CartesianGrid, Line, Tooltip, XAxis, YAxis } from "recha
 import type { BlockSpan, E1rmPanel, StrengthWeek } from "@/lib/analyse-styrke-view";
 import { type AxisTick, formatEf, type LineChartView, type Mark, type Seam, type WeekBar } from "@/lib/analyse-view";
 import { formatLoad } from "@/lib/format";
+import { LIFT_NAME, LIFTS } from "@/lib/lifts";
 
 import { ChartBoundary, TICK, useHydrated, useWide } from "./TrendChart";
 
@@ -633,7 +634,7 @@ export function TonnageStrips(props: TonnageProps) {
   );
 }
 
-const LIFT_LABELS = ["Squat", "Bænkpres", "Dødløft"] as const;
+const LIFT_LABELS = LIFTS.map((l) => LIFT_NAME[l]);
 const TONNAGE_STRIP = 80;
 
 function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnageProps) {

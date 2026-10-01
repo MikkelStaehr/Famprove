@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { DataError } from "../data-error.ts";
+import { LIFTS, type StrengthLift } from "../lifts.ts";
 
 /**
  * Row types + runtime validation for the three read-only sources. PostgREST JSON is
@@ -281,8 +282,7 @@ const STATUSES: readonly StrengthStatus[] = ["lifted", "pre_log"];
 export type RpeSource = "logged" | "prescribed";
 const RPE_SOURCES: readonly RpeSource[] = ["logged", "prescribed"];
 
-export type StrengthLift = "SQUAT" | "BENCH" | "DEADLIFT";
-const LIFTS: readonly StrengthLift[] = ["SQUAT", "BENCH", "DEADLIFT"];
+export type { StrengthLift }; // defined once in lib/lifts.ts
 
 /**
  * public.strength_weeks: one row per ISO week x lift, rebuilt by compute
