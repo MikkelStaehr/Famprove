@@ -125,7 +125,7 @@ If a budget is exceeded, **stop and ask**. Never keep running.
 
 **Data check** (M and L): list every value the screen shows and mark it *exists / missing*. All missing data goes into **one** migration before any UI is built.
 
-**Research first, ask after.** Before asking the user a technical question, research it and bring numbers. Before calling a parameter or threshold wrong, run it on real data and report how many rows it selects.
+**Research first, ask after.** Before asking the user a technical question, research it and bring numbers. Before calling a parameter or threshold wrong, run it on real data and report how many rows it selects. Before drawing a conclusion from a stored field, read how it is computed, so you don't measure your own input.
 
 ## Status to the user
 - Before each step: what, which agent, and an estimated time.
