@@ -23,7 +23,7 @@ from training_load.config import (
 from training_load.db import strength_activities
 from training_load.db.activities import delete_ids, ids_between, upsert_activities
 from training_load.db.client import Postgrest
-from training_load.domain.dates import today_local
+from training_load.domain.dates import ANALYSIS_START, today_local
 from training_load.http import HttpSend, requests_send
 from training_load.sources.intervals import fetch_activities, parse_activities
 
@@ -44,7 +44,9 @@ class IntervalsRunSummary:
 
 
 def parse_since(argv: Sequence[str] | None, today: date) -> date:
-    """--since (ISO date), default today - DEFAULT_LOOKBACK_DAYS. Error if it is after today."""
+    """--since (ISO date), default today - DEFAULT_LOOKBACK_DAYS. Error if it is after today or
+    before ANALYSIS_START: nothing before it is used, and the window also bounds the mirrored
+    deletions (a since of 0001-01-01 would fetch and mirror all history)."""
     parser = argparse.ArgumentParser(
         prog="collect-intervals", description="Mirror intervals.icu rides into Supabase."
     )
@@ -57,6 +59,8 @@ def parse_since(argv: Sequence[str] | None, today: date) -> date:
     since: date = parser.parse_args(argv).since
     if since > today:
         parser.error(f"--since {since} is after today ({today})")
+    if since < ANALYSIS_START:
+        parser.error(f"--since {since} is before {ANALYSIS_START} (the earliest date used)")
     return since
 
 

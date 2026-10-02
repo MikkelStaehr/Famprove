@@ -88,6 +88,16 @@ def test_parse_since_default_is_14_days() -> None:
     assert parse_since(["--since", "2026-01-01"], TODAY) == date(2026, 1, 1)
 
 
+def test_parse_since_rejects_dates_before_the_analysis_start(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert parse_since(["--since", "2024-12-30"], TODAY) == date(2024, 12, 30)  # the full backfill
+    for early in ("2024-12-29", "0001-01-01"):
+        with pytest.raises(SystemExit):
+            parse_since(["--since", early], TODAY)
+    assert "is before 2024-12-30" in capsys.readouterr().err
+
+
 def test_parse_since_rejects_future_date() -> None:
     with pytest.raises(SystemExit):
         parse_since(["--since", "2026-03-16"], TODAY)
