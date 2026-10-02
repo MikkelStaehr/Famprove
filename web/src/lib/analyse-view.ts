@@ -313,6 +313,26 @@ export function efTooFew(points: readonly RideMetricsRow[], currentYear: number)
   return { kind: "few", text, list };
 }
 
+/**
+ * The EF trend is drawn only where at least EF_TREND_MIN_RIDES EF rides fall in its window (user,
+ * 2026-10-02). A display rule counted here on purpose, the one exception to "Python owns the
+ * numbers" (no migration): it only hides Python's ef_trend, never computes one. The window is
+ * domain.ride_analysis's: the EF_TREND_DAYS ending on the ride's date, both ends inclusive.
+ */
+export const EF_TREND_MIN_RIDES = 3;
+const EF_TREND_DAYS = 28;
+
+/** Python's EF trend for this ride, or null when fewer than EF_TREND_MIN_RIDES EF rides back it. */
+export function shownEfTrend(r: EfRow, points: readonly EfRow[]): number | null {
+  if (r.efTrend === null) return null;
+  const end = dayNumber(r.date);
+  const rides = points.filter((q) => {
+    const d = dayNumber(q.date);
+    return d <= end && d > end - EF_TREND_DAYS;
+  }).length;
+  return rides >= EF_TREND_MIN_RIDES ? r.efTrend : null;
+}
+
 function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView | EfFew {
   const year = yearOf(today);
   const points = rows.filter(isEfRow);
@@ -325,23 +345,24 @@ function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView
       marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year) });
       continue;
     }
-    if (!r.efOk || r.ef === null) continue;
-    if ((r.efGapBefore || r.efTrend === null) && open) {
+    if (!isEfRow(r)) continue;
+    const trend = shownEfTrend(r, points); // the dot is always drawn; the line only from 3 rides
+    if ((r.efGapBefore || trend === null) && open) {
       seg += 1;
       open = false;
     }
-    if (r.efTrend !== null) open = true;
+    if (trend !== null) open = true;
     marks.push({
       x: dayNumber(r.date),
       y: r.ef,
-      trend: r.efTrend,
+      trend,
       seg,
       latest: false,
       excluded: false,
       tip: [
         dayText(r.date, year),
         `EF ${formatEf(r.ef)}`,
-        ...(r.efTrend === null ? [] : [`Trend ${formatEf(r.efTrend)}`]),
+        ...(trend === null ? [] : [`Trend ${formatEf(trend)}`]),
         join([
           r.npW === null ? null : `NP ${formatWatts(r.npW)}`,
           r.avgHr === null ? null : `puls ${formatLoad(r.avgHr)}`,
@@ -350,16 +371,20 @@ function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView
       ],
     });
   }
-  const values = points.flatMap((p) => [p.ef, ...(p.efTrend === null ? [] : [p.efTrend])]);
+  const trends = points.flatMap((p) => {
+    const t = shownEfTrend(p, points);
+    return t === null ? [] : [{ date: p.date, value: t }];
+  });
+  const values = [...points.map((p) => p.ef), ...trends.map((t) => t.value)];
   const { domain, ticks } = niceTicks(Math.min(...values), Math.max(...values), 0.05);
   const first = points[0];
   const last = points[points.length - 1];
-  const lastTrend = points.findLast((p) => p.efTrend !== null);
+  const lastTrend = trends.at(-1);
   const sr =
     `EF på ${points.length} rolige ture fra ${dateWithYear(first.date)} til ${dateWithYear(last.date)}.` +
-    (lastTrend === undefined || lastTrend.efTrend === null
-      ? ` Seneste tur ${formatEf(last.ef)}.`
-      : ` Seneste trend ${formatEf(lastTrend.efTrend)} den ${dateWithYear(lastTrend.date)}, seneste tur ${formatEf(last.ef)}.`);
+    (lastTrend === undefined
+      ? ` Seneste tur ${formatEf(last.ef)}. Trenden vises først, når der er mindst ${EF_TREND_MIN_RIDES} ture inden for 28 dage.`
+      : ` Seneste trend ${formatEf(lastTrend.value)} den ${dateWithYear(lastTrend.date)}, seneste tur ${formatEf(last.ef)}.`);
   return { marks, segments: seg + 1, domain, ticks, sr };
 }
 

@@ -3,6 +3,8 @@ import { test } from "node:test";
 
 import {
   chartRows,
+  EF_TREND_MIN_RIDES,
+  shownEfTrend,
   marksAt,
   buildAnalyseView,
   buildHero,
@@ -187,21 +189,34 @@ test("two rides on one day keep two marks, and the tooltip lists both", () => {
   assert.deepEqual(chartRows({ ...chart, marks: chart.marks.slice(0, 1) }, "eftp")[0]?.s0, 1.2);
 });
 
-test("EF line breaks: a gap or a missing trend starts a new segment", () => {
-  const ef = (date: string, o: Partial<RideMetricsRow>) =>
+test("EF line breaks: a gap or a hidden trend starts a new segment; dots always stay", () => {
+  const ef = (date: string, o: Partial<RideMetricsRow> = {}) =>
     ride(date, { efOk: true, eftpOk: true, ef: 1.2, efTrend: 1.2, efGapBefore: false, ...o });
   const rides = [
-    ef("2026-05-01", { efGapBefore: true }),
-    ef("2026-05-05", {}),
-    ef("2026-05-10", { efTrend: null }), // no trend: the line breaks here
-    ef("2026-05-12", {}),
-    ef("2026-07-01", { efGapBefore: true }), // > 21 days: a new segment
-    ef("2026-07-03", {}),
+    ef("2026-05-01", { efGapBefore: true }), // n 1: dot, no trend
+    ef("2026-05-05"), // n 2: dot, no trend
+    ef("2026-05-08"), // n 3: the trend starts
+    ef("2026-05-12"), // n 4
+    ef("2026-05-14", { efTrend: null }), // Python's null trend still breaks the line
+    ef("2026-05-16"), // n 6: trend again, a new segment
+    ef("2026-07-01", { efGapBefore: true }), // n 1 after a gap: dot only
   ];
   const v = buildAnalyseView({ rides, weeks: [], weeksError: null }, new Date("2026-10-01T06:00:00Z"), "2026-10-01");
   assert.ok(v.kind === "ready" && "marks" in v.ef);
-  const segs = v.ef.marks.filter((m) => !m.excluded).map((m) => m.seg);
-  assert.deepEqual(segs, [0, 0, 1, 1, 2, 2]);
-  assert.equal(v.ef.segments, 3);
-  assert.equal(v.ef.marks[2]?.trend, null);
+  const marks = v.ef.marks.filter((m) => !m.excluded);
+  assert.equal(marks.length, 7); // every EF ride keeps its dot
+  assert.deepEqual(marks.map((m) => m.trend), [null, null, 1.2, 1.2, null, 1.2, null]);
+  assert.deepEqual(marks.map((m) => m.seg), [0, 0, 0, 0, 1, 1, 2]);
+  assert.ok(marks[0]?.tip.every((line) => !line.startsWith("Trend")));
+});
+
+test("the EF trend needs 3 EF rides in the 28 days ending on the ride (Python's window)", () => {
+  const ef = (date: string) => ride(date, { efOk: true, ef: 1.2, efTrend: 1.25 }) as Parameters<typeof shownEfTrend>[0];
+  const edge = [ef("2026-05-01"), ef("2026-05-10"), ef("2026-05-28")]; // 05-01 is day 28 back from 05-28
+  assert.equal(shownEfTrend(edge[2] as Parameters<typeof shownEfTrend>[0], edge), 1.25);
+  const outside = [ef("2026-04-30"), ef("2026-05-10"), ef("2026-05-28")]; // 29 days back: not counted
+  assert.equal(shownEfTrend(outside[2] as Parameters<typeof shownEfTrend>[0], outside), null);
+  const later = [...edge, ef("2026-06-30")];
+  assert.equal(shownEfTrend(later[0] as Parameters<typeof shownEfTrend>[0], later), null); // only rides up to its own day count
+  assert.equal(EF_TREND_MIN_RIDES, 3);
 });

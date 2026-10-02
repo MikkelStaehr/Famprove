@@ -30,7 +30,7 @@ type PageState =
 const HONESTY =
   "eFTP er et skøn fra intervals.icu ud fra dine hårdeste indsatser, ikke et testresultat. Uden maksimale indsatser ligger den ofte for lavt.";
 const EF_EXPLAINER =
-  "EF er normaliseret watt (NP) delt med gennemsnitspuls. Stiger den, træder du flere watt for samme puls. Kun rolige ture på mindst 30 min med både watt og puls.";
+  "EF er normaliseret watt (NP) delt med gennemsnitspuls. Stiger den, træder du flere watt for samme puls. Kun rolige ture på mindst 30 min med både watt og puls. Trendlinjen vises, hvor der er mindst 3 ture inden for 28 dage.";
 
 async function loadPageState(): Promise<PageState> {
   try {
