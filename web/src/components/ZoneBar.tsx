@@ -79,7 +79,9 @@ export function ZoneBar({ header, today, size }: ZoneBarProps) {
           {/* An invisible in-flow copy reserves the flag's real height (it wraps at 200 % text),
               so the notch and the bands below never sit under it. */}
           <span className={`invisible flex w-fit ${flagClass}`}>{flag}</span>
-          <span className={`absolute top-0 inline-flex ${flagClass}`} style={{ left: pct(x), transform: `translateX(-${pct(x)})` }}>
+          {/* w-max: an absolute box only gets the room right of its left edge; without it the flag
+              wrapped at 100 % whenever the marker sat right of the middle (TSB −3). */}
+          <span className={`absolute top-0 inline-flex w-max ${flagClass}`} style={{ left: pct(x), transform: `translateX(-${pct(x)})` }}>
             {flag}
           </span>
           <span
