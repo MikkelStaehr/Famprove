@@ -1,0 +1,3 @@
+# The gate runs on the GitHub runner's python3 (3.12): lint it for that version.
+extend = "../../python/pyproject.toml"
+target-version = "py312"

@@ -23,8 +23,10 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run ruff format --check src tests
-      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests ../.github/scripts
+      - run: uv run ruff check src tests ../.github/scripts
+      # The daily gate runs on the runner's own python3 (3.12), not uv's: compile it with that.
+      - run: python3 --version && python3 -m py_compile ../.github/scripts/gate.py
       - run: uv run mypy
       - run: uv run pytest
 

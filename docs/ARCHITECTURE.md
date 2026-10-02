@@ -7,7 +7,9 @@ Supabase service key is **server-side only** · every table has RLS with no anon
 
 ## Data flow
 ```
-GitHub Actions daily.yml (05:00, 12:00, 20:00 Copenhagen, DST-aware gate; also "Run workflow")
+GitHub Actions daily.yml at 05, 12, 20 Copenhagen: the droplet's workflow_dispatch (slot=05|12|20) first,
+  GitHub's schedule as backup; the gate (.github/scripts/gate.py) runs collect-and-compute once per slot.
+  A manual "Run workflow" without slot always runs.
   check-config       every job's env vars at once        → fails the run before anything is read
   collect-intervals  intervals.icu API (last 14 d)      → activities (rides), strength_activities (WeightTraining),
                                                           each with the API object as `raw`

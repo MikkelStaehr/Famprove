@@ -19,10 +19,18 @@ on:
     - cron: "37 11 * * *" # 12 CET
     - cron: "7 18 * * *" # 20 CEST
     - cron: "37 19 * * *" # 20 CET
+  # The primary trigger (user, 2026-10-02): the DigitalOcean droplet dispatches at 05, 12 and 20
+  # Copenhagen with slot=05|12|20 and ref main; the schedule above is the backup. The gate runs
+  # collect-and-compute once per slot, whichever comes first. A manual run without slot (e.g. a
+  # backfill with since) always runs.
   workflow_dispatch:
     inputs:
       since:
         description: "collect-intervals --since YYYY-MM-DD (empty = last 14 days; 2024-12-30 = full backfill)"
+        required: false
+        default: ""
+      slot:
+        description: "05, 12 or 20: a scheduled slot (the droplet's call; runs once per slot). Empty = a manual run that always runs."
         required: false
         default: ""
 
@@ -30,23 +38,30 @@ permissions:
   contents: read
 
 jobs:
+  # Once per slot: .github/scripts/gate.py (tests: python/tests/test_gate.py). It reads this
+  # workflow's other runs with the job's own token (actions: read); no secrets here.
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20 # it may wait up to 15 min for another run of the slot to finish
+    permissions:
+      actions: read
+      contents: read
     outputs:
-      run: ${{ steps.hour.outputs.run }}
+      run: ${{ steps.gate.outputs.run }}
     steps:
-      - id: hour
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - id: gate
         env:
+          EVENT: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
-        # The scheduled hour, not the clock: a delayed run still maps to its slot.
-        run: |
-          if [ -z "$SCHEDULE" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-          utc_hour=$(echo "$SCHEDULE" | awk '{print $2}')
-          offset=$(TZ=Europe/Copenhagen date +%z | cut -c2-3)
-          local_hour=$(( (10#$utc_hour + 10#$offset) % 24 ))
-          case "$local_hour" in 5|12|20) run=true ;; *) run=false ;; esac
-          echo "UTC $utc_hour + $offset h = $local_hour Copenhagen: run=$run"
-          echo "run=$run" >> "$GITHUB_OUTPUT"
+          SLOT: ${{ inputs.slot }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/gate.py
 
   collect-and-compute:
     needs: gate

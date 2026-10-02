@@ -34,7 +34,7 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tests"]
+pythonpath = ["tests", "../.github/scripts"]
 addopts = "-ra --import-mode=importlib -m 'not live'"
 markers = [
     "live: calls real external APIs with real credentials; run explicitly with `pytest -m live`",
@@ -45,7 +45,7 @@ markers = [
 python_version = "3.14"
 strict = true
 files = ["src", "tests"]
-mypy_path = ["src", "tests"]
+mypy_path = ["src", "tests", "../.github/scripts"]  # gate.py (the daily.yml gate)
 
 [[tool.mypy.overrides]]
 # google-auth may ship without inline types; only google.oauth2 / google.auth.transport are used.
