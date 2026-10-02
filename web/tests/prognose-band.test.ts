@@ -72,6 +72,7 @@ function row(date: string, bands: Partial<Pick<DailyProjectionRow, "ctlBand" | "
     atl: 44.1,
     tsb: -2.2,
     cyclingSource: "typical_week",
+    typicalRides: null,
     rides: [],
     sessions: [],
     strengthMethod: "recent",
@@ -277,4 +278,25 @@ test("§10e: DEV_FIXTURE=band spreads only 'recent' rows, low < value < high, gr
   assert.ok(first.ctlBand.high - first.ctl >= 0.2 && first.ctl - first.ctlBand.low >= 0.2);
   const view = buildDashboardView(data(banded), new Date(`${LAST}T12:00:00Z`));
   assert.ok(view.kind === "ready" && view.chart.some((p) => ctlBandArea(p) !== null));
+});
+
+test("the prognose names its cycling basis and the hero its strength estimate", async () => {
+  const { typicalRidesNote, STRENGTH_ESTIMATE_NOTE } = await import("../src/lib/prognose-text.ts");
+  const { typicalRidesOf } = await import("../src/lib/dashboard-view.ts");
+  assert.equal(typicalRidesNote(1), "Cyklingen i prognosen bygger på 1 tur de sidste 28 dage.");
+  assert.equal(typicalRidesNote(4), "Cyklingen i prognosen bygger på 4 ture de sidste 28 dage.");
+  assert.equal(typicalRidesNote(0), "Cyklingen i prognosen bygger på 0 ture de sidste 28 dage, så den regner kun med planlagte ture.");
+  assert.equal(STRENGTH_ESTIMATE_NOTE, "Styrke-TSS er et skøn (K ukalibreret).");
+  const raw: unknown = JSON.parse(readFileSync(new URL("./fixtures/daily_projection.json", import.meta.url), "utf8"));
+  assert.ok(Array.isArray(raw));
+  const rows = raw.map(parseProjectionRow);
+  assert.ok(rows.some((r) => r.cyclingSource === "typical_week" && r.typicalRides === 1)); // Python's contract
+  assert.ok(rows.every((r) => r.cyclingSource === "typical_week" || r.typicalRides === null));
+  assert.equal(typicalRidesOf(rows), 1);
+  assert.equal(typicalRidesOf(null), null);
+  assert.equal(typicalRidesOf(rows.map((r) => ({ ...r, typicalRides: null }))), null);
+  const first = raw.find((r: { basis: { cycling: string } }) => r.basis.cycling === "typical_week");
+  for (const bad of [2.5, -1]) {
+    assert.throws(() => parseProjectionRow({ ...first, basis: { ...first.basis, typical_rides: bad } }), /whole number/);
+  }
 });

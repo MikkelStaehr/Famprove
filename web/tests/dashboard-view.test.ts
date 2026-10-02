@@ -109,6 +109,7 @@ function projected(date: string, ctl: number): DailyProjectionRow {
     atl: ctl,
     tsb: 0,
     cyclingSource: "typical_week",
+    typicalRides: null,
     rides: [],
     sessions: [
       {

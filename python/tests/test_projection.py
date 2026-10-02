@@ -2,21 +2,24 @@
 
 import math
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 
+from training_load.domain.cycling import CyclingActivity
 from training_load.domain.daily import DailyLoad, build_daily_load
 from training_load.domain.load import Decay
 from training_load.domain.plan import parse_steps
 from training_load.domain.projection import (
     HORIZON_DAYS,
+    TYPICAL_DAYS,
     PlannedRide,
     ProjectedDay,
     learnt_weekdays,
     project,
     ride_tss,
     spread_weekday,
+    typical_ride_count,
 )
 from training_load.domain.sessions import StrengthSession
 from training_load.domain.strength import StrengthSet
@@ -147,3 +150,45 @@ def test_every_strength_entry_has_the_same_keys_even_on_a_sunday(make_set: MakeS
     no_day = [e for e in all_entries if e.get("reason") == "no day left this week"]
     assert [e["session"] for e in no_day] == [2, 3]
     assert all(e["day_estimated"] is True for e in no_day)
+
+
+def test_typical_ride_count_uses_the_typical_week_window() -> None:
+    today = date(2026, 10, 2)
+
+    def ride(day: date) -> CyclingActivity:
+        return CyclingActivity(
+            id="i1",
+            start_date_local=datetime.combine(day, datetime.min.time()),
+            type="Ride",
+            name=None,
+            training_load=60,
+            weighted_avg_watts=None,
+            intensity_pct=None,
+            ftp=None,
+            moving_time_s=3600,
+            elapsed_time_s=3600,
+            power_load=None,
+            hr_load=None,
+        )
+
+    rides = [
+        ride(today - timedelta(days=TYPICAL_DAYS + 1)),  # before the window
+        ride(today - timedelta(days=TYPICAL_DAYS)),  # its first day
+        ride(today - timedelta(days=12)),
+        ride(today),  # today is not in the window (its row is still empty at 05:00)
+    ]
+    assert typical_ride_count(rides, today) == 2
+
+
+def test_typical_rides_goes_into_typical_week_days_only() -> None:
+    today = date(2026, 10, 3)
+    history = build_daily_load(
+        {today - timedelta(days=3): 60.0}, {}, start=date(2026, 1, 1), end=today
+    )
+    planned = [PlannedRide(today + timedelta(days=2), "Z2", [{"minutes": 60, "pct_ftp": 65}])]
+    days = project(history, [], [], planned, strength_k=0.1, today=today, typical_rides=3)
+    by_source = {d.basis["cycling"]: d.basis for d in days}
+    assert by_source["typical_week"]["typical_rides"] == 3
+    assert "typical_rides" not in by_source["planned"]
+    without = project(history, [], [], planned, strength_k=0.1, today=today)
+    assert all("typical_rides" not in d.basis for d in without)

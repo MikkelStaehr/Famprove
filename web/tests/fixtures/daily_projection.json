@@ -43,7 +43,8 @@
           "method": "plan",
           "reason": "no day left this week"
         }
-      ]
+      ],
+      "typical_rides": 1
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -64,7 +65,8 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
-      "strength": []
+      "strength": [],
+      "typical_rides": 1
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -99,7 +101,8 @@
             "entered": 1
           }
         }
-      ]
+      ],
+      "typical_rides": 1
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -134,7 +137,8 @@
             "entered": 1
           }
         }
-      ]
+      ],
+      "typical_rides": 1
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -161,7 +165,8 @@
           "reason": "step 1: minutes must be a number"
         }
       ],
-      "strength": []
+      "strength": [],
+      "typical_rides": 1
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -182,7 +187,8 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
-      "strength": []
+      "strength": [],
+      "typical_rides": 1
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -216,7 +222,8 @@
           "kg_sources": {},
           "reason": "no kg for any set in the plan"
         }
-      ]
+      ],
+      "typical_rides": 1
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -237,7 +244,8 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
-      "strength": []
+      "strength": [],
+      "typical_rides": 1
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -258,7 +266,8 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
-      "strength": []
+      "strength": [],
+      "typical_rides": 1
     },
     "strength_method": "recent",
     "ctl_low": 5.334229602893664,
@@ -292,7 +301,8 @@
           "tss_high": 20.0,
           "recent_weeks": 3
         }
-      ]
+      ],
+      "typical_rides": 1
     },
     "strength_method": "recent",
     "ctl_low": 5.522435021964659,
@@ -326,7 +336,8 @@
           "tss_high": 20.0,
           "recent_weeks": 3
         }
-      ]
+      ],
+      "typical_rides": 1
     },
     "strength_method": "recent",
     "ctl_low": 5.706212284962005,
@@ -358,7 +369,8 @@
           "tss": null,
           "reason": "no recent weeks to average"
         }
-      ]
+      ],
+      "typical_rides": 1
     },
     "strength_method": "recent",
     "ctl_low": 5.32943072696175,

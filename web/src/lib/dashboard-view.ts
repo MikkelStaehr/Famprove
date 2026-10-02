@@ -109,6 +109,7 @@ export type DashboardView =
       readonly lastActual: IsoDate; // the latest daily_load date: the "i dag" rule
       /** ready: projected points exist; none: nothing after lastActual; error: couldn't be read. */
       readonly projection: "ready" | "none" | "error";
+      readonly typicalRides: number | null; // Python's rides behind the prognose's typical week
       readonly blocks: readonly BlockSpan[];
       readonly week: WeekNav | null; // null if weekly_load has no row for the latest date
     };
@@ -421,6 +422,11 @@ export function chartPoints(data: DashboardData, lastActual: IsoDate): ChartPoin
   return [...actual, ...projected];
 }
 
+/** Python's typical_rides, taken from the first typical-week prognose day (selection, no maths). */
+export function typicalRidesOf(projection: readonly DailyProjectionRow[] | null): number | null {
+  return projection?.find((p) => p.cyclingSource === "typical_week" && p.typicalRides !== null)?.typicalRides ?? null;
+}
+
 /** Composes the helpers above. "empty" when data.daily is empty. */
 export function buildDashboardView(
   data: DashboardData,
@@ -442,6 +448,7 @@ export function buildDashboardView(
           ? "ready"
           : "none",
     blocks: blockSpans(data.blocks, latest.date),
+    typicalRides: typicalRidesOf(data.projection),
     week: selectWeek(data, latest.date, week),
   };
 }

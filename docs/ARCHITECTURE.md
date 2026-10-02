@@ -67,7 +67,7 @@ Next.js (web/), server components only
   `collect-strength`, `compute`, `collect-plan` · `uv run pytest` · `uv run ruff check src tests && uv run mypy`
 - Web, from `web/` (reads `web/.env.local`): `pnpm dev` · `pnpm lint && pnpm typecheck && pnpm test` · `pnpm build`
 - Database, from the repo root: `supabase db push`
-- CI: `test.yml` on every push (Python + web checks, no secrets); `daily.yml` needs the 8 repository secrets.
+- CI: `test.yml` on every push (Python + web checks, no secrets); `daily.yml` needs 7 repository secrets and the repository variable `STRENGTH_K`.
 
 ## Where to change what
 Strength session rule → `domain/sessions.py` · ride-analysis thresholds and the EF intensity basis → `domain/ride_analysis.py` · program phases, competition-lift names and e1RM rules → `domain/strength_analysis.py` · Decay variant → `domain/load.py` `DECAY` · form-zone bands → `domain/form.py` + `web/src/lib/zone-scale.ts` (drawing only; `web/tests/zone-scale.test.ts` fails if they drift) · strength formula →

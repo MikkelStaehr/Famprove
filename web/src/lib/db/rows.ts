@@ -92,6 +92,7 @@ export type DailyProjectionRow = {
   readonly atl: number;
   readonly tsb: number;
   readonly cyclingSource: "planned" | "typical_week";
+  readonly typicalRides: number | null; // typical-week days: rides in the 28 days the week is built from
   readonly rides: readonly ProjectedRide[];
   readonly sessions: readonly ProjectedSession[];
   readonly strengthMethod: StrengthMethod;
@@ -661,6 +662,12 @@ function band(where: string, low: number | null, high: number | null): Band | nu
   return { low, high };
 }
 
+/** A count of rides: a whole number >= 0, or null when the writer left it out. */
+function rideCount(value: number | null, where: string): number | null {
+  if (value !== null && (!Number.isInteger(value) || value < 0)) throw new RowError(`${where}: expected a whole number >= 0`);
+  return value;
+}
+
 export function parseProjectionRow(raw: unknown): DailyProjectionRow {
   const table = PROJECTION_SELECT.table;
   const f = new Fields(table, raw);
@@ -677,6 +684,7 @@ export function parseProjectionRow(raw: unknown): DailyProjectionRow {
     atl: f.number("atl"),
     tsb: f.number("tsb"),
     cyclingSource: source,
+    typicalRides: rideCount(basis.optionalNumber("typical_rides"), `${table}.basis.typical_rides`),
     rides: basis.array("rides").map((r, i) => {
       const ride = new Fields(`${PROJECTION_SELECT.table}.basis.rides[${i}]`, r);
       return { name: ride.string("name"), tss: ride.numberOrNull("tss"), reason: ride.optionalString("reason") };

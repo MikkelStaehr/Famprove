@@ -95,7 +95,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           BODYWEIGHT: ${{ secrets.BODYWEIGHT }}
-          STRENGTH_K: ${{ secrets.STRENGTH_K }}
+          STRENGTH_K: ${{ vars.STRENGTH_K }} # a tunable, not a secret: Settings → Variables
         run: uv run --no-dev check-config
 
       - name: collect-intervals
@@ -120,7 +120,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          STRENGTH_K: ${{ secrets.STRENGTH_K }}
+          STRENGTH_K: ${{ vars.STRENGTH_K }} # a tunable, not a secret: Settings → Variables
         run: uv run --no-dev compute
 
       # Planned rides don't feed daily_load: last, so a plan problem never blocks compute.

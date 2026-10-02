@@ -26,7 +26,7 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - Stop every server you started before the session ends.
 - Run Python with `PYTHONIOENCODING=utf-8` (not set machine-wide yet; the Windows console chokes on "−" and "æ"). Write commit messages via a file (`git commit -F`), not inline quoting.
 - Windows with Git Bash and PowerShell. uv, pnpm and the Supabase CLI are per-user installs; if a shell can't find them, restart VS Code.
-- CI secrets: the daily job needs all 8 `.env.example` variables as **repository** secrets on `MikkelStaehr/Famprove` (Settings → Secrets and variables → Actions).
+- CI secrets: the daily job needs 7 `.env.example` variables as **repository** secrets on `MikkelStaehr/Famprove` (Settings → Secrets and variables → Actions → Secrets), and `STRENGTH_K` as a **repository variable** (→ Variables; `vars.STRENGTH_K`, a tunable, not a secret).
 
 ## Conventions
 - Strict types. No `any` / untyped dict without a comment.
@@ -90,7 +90,7 @@ Decisions (agreed with the user):
 - Weekly figure = ISO week (Mon–Sun), as a SQL view over `daily_load`.
 - Private: RLS on, no anon policies; Python and Next.js read server-side only; Vercel Authentication (All Deployments).
 - Daily run: last 14 days from intervals.icu + whole workbook; upsert on source id; mirror deletions inside that window; rebuild `daily_load` fully. Days bucketed by local date. Cron 05, 12 and 20 Europe/Copenhagen (DST-aware gate in daily.yml; 3× daily since 2026-10-01), at :07 (CEST) / :37 (CET), never :00 or :30: GitHub schedules are best-effort (first runs on :00 started 4–7 h late or not at all). Primary trigger since 2026-10-02: the user's DigitalOcean droplet calls workflow_dispatch (ref main, input slot=05|12|20) at 05, 12 and 20; GitHub's schedule is the backup. The gate (`.github/scripts/gate.py`, tests `python/tests/test_gate.py`) runs collect-and-compute once per slot: a slot is served by another run since its start − 30 min whose collect-and-compute succeeded; a queued or running one is waited for (≤ 15 min), so a run that fails lets the backup retry; unreadable runs or a timed-out wait fail open (a duplicate is harmless, a missed slot is not); a manual dispatch without slot always runs.
-- `BODYWEIGHT` / `STRENGTH_K` are current-value tunables; changing them recomputes all history. `GOOGLE_SERVICE_ACCOUNT_JSON` holds the JSON content.
+- `BODYWEIGHT` / `STRENGTH_K` are current-value tunables; changing them recomputes all history. `STRENGTH_K` = 0.035 since 2026-10-02: an anchor of ~60 TSS per heavy strength session (0.10 gave 153–197; intervals.icu's HR load was 19–22), not a calibration; /load says "Styrke-TSS er et skøn (K ukalibreret)". `GOOGLE_SERVICE_ACCOUNT_JSON` holds the JSON content.
 - Garmin later gets its own `daily_wellness` table keyed by date. No planned/future workouts in M1.
 - Layout: `python/` (uv project), `supabase/migrations/` (Supabase CLI), `web/` in M2.
 - Infra: Supabase project `iutgmfnqlmogfitezjnj`, GitHub repo `MikkelStaehr/Famprove` (public — nothing sensitive in git).

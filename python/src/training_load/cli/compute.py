@@ -35,7 +35,13 @@ from training_load.domain.daily import build_daily_load
 from training_load.domain.dates import ANALYSIS_START, SERIES_START, today_local
 from training_load.domain.kg_history import gone_states, kg_keys, next_kg_state
 from training_load.domain.load import DECAY
-from training_load.domain.projection import MODEL_VERSION, PlannedRide, naive_projection, project
+from training_load.domain.projection import (
+    MODEL_VERSION,
+    PlannedRide,
+    naive_projection,
+    project,
+    typical_ride_count,
+)
 from training_load.domain.ride_analysis import analyse_rides, weekly_totals
 from training_load.domain.sessions import daily_strength_tss, match_sessions
 from training_load.domain.strength import derive_blocks, iso_week_start
@@ -159,6 +165,7 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         strength_k=strength_k,
         deload_weeks=deload_weeks,
         decay=DECAY,
+        typical_rides=typical_ride_count(activities, today),
     )
     sync_projection(db, projection, computed_at=computed_at)
     logged = log_forecast(

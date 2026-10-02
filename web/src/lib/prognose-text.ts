@@ -59,6 +59,15 @@ export function strengthLine(s: ProjectedSession): string {
   return `Styrke ≈ ${formatLoad(s.tss)} TSS · session ${s.session} · fra trænerens plan${day}${unscored}`;
 }
 
+/** At the form hero (user, 2026-10-02): strength TSS rests on STRENGTH_K, an anchor, not a fit. */
+export const STRENGTH_ESTIMATE_NOTE = "Styrke-TSS er et skøn (K ukalibreret).";
+
+/** The data basis of the prognose's cycling (user, 2026-10-02): rides in the typical week's 28 days. */
+export function typicalRidesNote(rides: number): string {
+  if (rides === 0) return "Cyklingen i prognosen bygger på 0 ture de sidste 28 dage, så den regner kun med planlagte ture.";
+  return `Cyklingen i prognosen bygger på ${rides} ${rides === 1 ? "tur" : "ture"} de sidste 28 dage.`;
+}
+
 /** load.md §10b: the note under the plot, `from` = the first `recent` prognose date. */
 export function strengthUnknownNote(from: IsoDate): string {
   return `Styrke efter blokken (fra ${formatDate(from)}) er ikke med i prognosen endnu, fordi der ikke er nogen hele uger at regne et gennemsnit af. Den kommer med, når ugerne er gået.`;

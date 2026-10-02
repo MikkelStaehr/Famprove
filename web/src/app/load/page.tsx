@@ -29,7 +29,7 @@ import {
   stopAfter,
   TSS_PER_DAY,
 } from "@/lib/format";
-import { prognoseSentence } from "@/lib/prognose-text";
+import { prognoseSentence, STRENGTH_ESTIMATE_NOTE, typicalRidesNote } from "@/lib/prognose-text";
 import { resolveToday } from "@/lib/today-view";
 import { zoneReading } from "@/lib/zone-scale";
 
@@ -134,6 +134,8 @@ function Hero({ view }: { readonly view: ReadyView }) {
       <p className="mt-1 text-14 text-text-muted tabular-nums">
         Fitness (CTL) {formatLoad(hero.ctl)} − træthed (ATL) {formatLoad(hero.atl)}
       </p>
+      {/* User, 2026-10-02: STRENGTH_K = 0.035 is an anchor (~60 TSS per heavy session), not a calibration. */}
+      <p className="mt-1 text-14 text-text-muted">{STRENGTH_ESTIMATE_NOTE}</p>
     </div>
   );
 }
@@ -175,6 +177,9 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
           />
           <figcaption className="sr-only">{chartSummary(view)}</figcaption>
         </figure>
+        {view.projection === "ready" && view.typicalRides !== null && (
+          <p className="mt-2 max-w-[60ch] text-14 text-text-muted">{typicalRidesNote(view.typicalRides)}</p>
+        )}
       </Card>
 
       <Card

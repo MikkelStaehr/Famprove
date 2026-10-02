@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Final, Literal
 
+from training_load.domain.cycling import CyclingActivity
 from training_load.domain.daily import DailyLoad
 from training_load.domain.load import DECAY, Decay, LoadState, ctl_atl
 from training_load.domain.plan import PlanError, PlanItem, Repeat, parse_steps
@@ -93,15 +94,25 @@ def ride_tss(items: Sequence[PlanItem]) -> float:
     return minutes / 60 * intensity**2 * 100
 
 
+def in_typical_window(day: date, today: date) -> bool:
+    """The TYPICAL_DAYS before today; today is left out (its row is still empty when the daily
+    job runs at 05:00, so it would pull its weekday down). One owner for both uses below."""
+    return today - timedelta(days=TYPICAL_DAYS) <= day < today
+
+
 def typical_cycling(days: Sequence[DailyLoad], today: date) -> dict[int, float]:
-    """Mean cycling TSS per weekday (0 = Monday) over the TYPICAL_DAYS before today (today's
-    row is still empty when the daily job runs at 05:00, so it would pull its weekday down)."""
-    first = today - timedelta(days=TYPICAL_DAYS)
+    """Mean cycling TSS per weekday (0 = Monday) over the typical window (in_typical_window)."""
     by_weekday: dict[int, list[float]] = {w: [] for w in range(7)}
     for d in days:
-        if first <= d.date < today:
+        if in_typical_window(d.date, today):
             by_weekday[d.date.weekday()].append(d.cycling_tss)
     return {w: sum(v) / len(v) if v else 0.0 for w, v in by_weekday.items()}
+
+
+def typical_ride_count(rides: Iterable[CyclingActivity], today: date) -> int:
+    """Rides in the typical window (in_typical_window), for the prognose's "baseret på N ture"
+    (user, 2026-10-02). A ride without load counts here but adds 0 to the typical week."""
+    return sum(1 for r in rides if in_typical_window(r.start_date_local.date(), today))
 
 
 def learnt_weekdays(sessions: Sequence[StrengthSession], today: date) -> dict[int, int]:
@@ -272,11 +283,13 @@ def project(
     strength_k: float,
     deload_weeks: Iterable[date] = (),
     decay: Decay = DECAY,
+    typical_rides: int | None = None,
 ) -> list[ProjectedDay]:
     """HORIZON_DAYS projected days, tomorrow .. today + HORIZON_DAYS, seeded from today's row.
 
     ``days`` is the daily_load series just computed (its last row must be ``today``).
     ``deload_weeks`` (ISO week starts) are left out of the "recent" average.
+    ``typical_rides`` (typical_ride_count) goes into the basis of every typical-week day.
     """
     if not days or days[-1].date != today:
         raise ValueError("the projection starts from today's daily_load row")
@@ -322,7 +335,10 @@ def project(
         lifting_high.append(
             sum(t for p in placed if isinstance(t := p.get("tss_high", p["tss"]), float))
         )
-        bases.append({"cycling": source, "rides": planned, "strength": placed})
+        basis: Basis = {"cycling": source, "rides": planned, "strength": placed}
+        if source == "typical_week" and typical_rides is not None:
+            basis["typical_rides"] = typical_rides
+        bases.append(basis)
 
     seed = LoadState(ctl=days[-1].ctl, atl=days[-1].atl, tsb=days[-1].tsb)
 

@@ -76,7 +76,14 @@ def producer_rows(make_set: MakeSet) -> list[DailyProjectionRow]:
 
     def run(sessions: list[StrengthSession]) -> list[DailyProjectionRow]:
         days = project(
-            history, sessions, sets, rides, strength_k=0.1, today=TODAY, decay=Decay.EXPONENTIAL
+            history,
+            sessions,
+            sets,
+            rides,
+            strength_k=0.1,
+            today=TODAY,
+            decay=Decay.EXPONENTIAL,
+            typical_rides=1,
         )
         return [to_row(d, computed_at=RUN_AT) for d in days]
 
