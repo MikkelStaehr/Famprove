@@ -6,16 +6,19 @@ name: daily
 # re-enable under Actions → daily if that happens.
 
 on:
-  # 05:00, 12:00 and 20:00 Copenhagen all year (user, 2026-10-01: planned kg must be seen before
-  # same-day sessions). Cron is UTC, so both offsets are scheduled and the gate job keeps the
-  # three whose Copenhagen hour (scheduled UTC hour + today's offset) is 05, 12 or 20.
+  # 05, 12 and 20 Copenhagen all year (user, 2026-10-01: planned kg must be seen before same-day
+  # sessions). Cron is UTC, so both offsets are scheduled and the gate job keeps the three whose
+  # Copenhagen hour (scheduled UTC hour + today's offset) is 05, 12 or 20.
+  # Never on :00 or :30 (user, 2026-10-02): GitHub schedules are best-effort and the start of the
+  # hour is its busiest time; on :00 the first runs started 4-7 h late or not at all. CEST twins
+  # run at :07, CET twins at :37 (05:07/12:07/20:07 in summer, 05:37/12:37/20:37 in winter).
   schedule:
-    - cron: "0 3 * * *" # 05 CEST
-    - cron: "0 4 * * *" # 05 CET
-    - cron: "0 10 * * *" # 12 CEST
-    - cron: "0 11 * * *" # 12 CET
-    - cron: "0 18 * * *" # 20 CEST
-    - cron: "0 19 * * *" # 20 CET
+    - cron: "7 3 * * *" # 05 CEST
+    - cron: "37 4 * * *" # 05 CET
+    - cron: "7 10 * * *" # 12 CEST
+    - cron: "37 11 * * *" # 12 CET
+    - cron: "7 18 * * *" # 20 CEST
+    - cron: "37 19 * * *" # 20 CET
   workflow_dispatch:
     inputs:
       since:
