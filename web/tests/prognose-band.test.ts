@@ -281,7 +281,8 @@ test("§10e: DEV_FIXTURE=band spreads only 'recent' rows, low < value < high, gr
 });
 
 test("the prognose names its cycling basis and the hero its strength estimate", async () => {
-  const { typicalRidesNote, STRENGTH_ESTIMATE_NOTE } = await import("../src/lib/prognose-text.ts");
+  const { typicalRidesNote, STRENGTH_ESTIMATE_NOTE, COARSE_ZONES_NOTE } = await import("../src/lib/prognose-text.ts");
+  assert.equal(COARSE_ZONES_NOTE, "Zonerne er grove ved lav fitness.");
   const { typicalRidesOf } = await import("../src/lib/dashboard-view.ts");
   assert.equal(typicalRidesNote(1), "Cyklingen i prognosen bygger på 1 tur de sidste 28 dage.");
   assert.equal(typicalRidesNote(4), "Cyklingen i prognosen bygger på 4 ture de sidste 28 dage.");

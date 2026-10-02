@@ -62,6 +62,10 @@ export function strengthLine(s: ProjectedSession): string {
 /** At the form hero (user, 2026-10-02): strength TSS rests on STRENGTH_K, an anchor, not a fit. */
 export const STRENGTH_ESTIMATE_NOTE = "Styrke-TSS er et skøn (K ukalibreret).";
 
+/** At the form hero (user, 2026-10-02): the absolute zones stay; at CTL ~11 they are coarse.
+ * % of CTL was measured and rejected for now (61 % of days off the bar, 18 zone changes in 60 days). */
+export const COARSE_ZONES_NOTE = "Zonerne er grove ved lav fitness.";
+
 /** The data basis of the prognose's cycling (user, 2026-10-02): rides in the typical week's 28 days. */
 export function typicalRidesNote(rides: number): string {
   if (rides === 0) return "Cyklingen i prognosen bygger på 0 ture de sidste 28 dage, så den regner kun med planlagte ture.";

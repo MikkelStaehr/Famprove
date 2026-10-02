@@ -29,7 +29,7 @@ import {
   stopAfter,
   TSS_PER_DAY,
 } from "@/lib/format";
-import { prognoseSentence, STRENGTH_ESTIMATE_NOTE, typicalRidesNote } from "@/lib/prognose-text";
+import { COARSE_ZONES_NOTE, prognoseSentence, STRENGTH_ESTIMATE_NOTE, typicalRidesNote } from "@/lib/prognose-text";
 import { resolveToday } from "@/lib/today-view";
 import { zoneReading } from "@/lib/zone-scale";
 
@@ -135,7 +135,9 @@ function Hero({ view }: { readonly view: ReadyView }) {
         Fitness (CTL) {formatLoad(hero.ctl)} − træthed (ATL) {formatLoad(hero.atl)}
       </p>
       {/* User, 2026-10-02: STRENGTH_K = 0.035 is an anchor (~60 TSS per heavy session), not a calibration. */}
-      <p className="mt-1 text-14 text-text-muted">{STRENGTH_ESTIMATE_NOTE}</p>
+      <p className="mt-1 text-14 text-text-muted">
+        {STRENGTH_ESTIMATE_NOTE} {COARSE_ZONES_NOTE}
+      </p>
     </div>
   );
 }
