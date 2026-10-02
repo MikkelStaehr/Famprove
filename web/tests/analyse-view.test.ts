@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
   chartRows,
   EF_TREND_MIN_RIDES,
+  efWindowRides,
+  isEfRow,
   shownEfTrend,
   marksAt,
   buildAnalyseView,
@@ -18,6 +21,7 @@ import {
   weekBars,
 } from "../src/lib/analyse-view.ts";
 import type { CyclingWeekRow, RideMetricsRow } from "../src/lib/db/rows.ts";
+import { parseRideMetricsRow } from "../src/lib/db/rows.ts";
 
 const AT = "2026-10-01T03:00:00Z";
 
@@ -219,4 +223,25 @@ test("the EF trend needs 3 EF rides in the 28 days ending on the ride (Python's 
   const later = [...edge, ef("2026-06-30")];
   assert.equal(shownEfTrend(later[0] as Parameters<typeof shownEfTrend>[0], later), null); // only rides up to its own day count
   assert.equal(EF_TREND_MIN_RIDES, 3);
+});
+
+// Contract (CLAUDE.md): web/tests/fixtures/ef_window.json is Python's own output
+// (python/tests/test_contract_ef_window.py): ride_metrics rows + Python's ef_window count per EF
+// ride. The web's count must match it exactly, so the two windows can't drift apart.
+test("contract: the web's EF-ride count equals Python's ef_window on Python's rows", () => {
+  const doc: unknown = JSON.parse(readFileSync(new URL("./fixtures/ef_window.json", import.meta.url), "utf8"));
+  assert.ok(typeof doc === "object" && doc !== null && "rows" in doc && "counts" in doc);
+  const { rows: raw, counts } = doc;
+  assert.ok(Array.isArray(raw) && typeof counts === "object" && counts !== null);
+  const rows = raw.map(parseRideMetricsRow);
+  const points = rows.filter(isEfRow);
+  const expected = new Map(Object.entries(counts));
+  assert.equal(points.length, expected.size);
+  assert.ok(expected.size >= 8);
+  for (const p of points) {
+    const n = expected.get(p.activityId);
+    assert.equal(efWindowRides(p, points), n, `EF rides in the window of ${p.activityId}`);
+    assert.equal(shownEfTrend(p, points), typeof n === "number" && n >= EF_TREND_MIN_RIDES ? p.efTrend : null);
+  }
+  assert.ok(rows.some((r) => !isEfRow(r)), "non-EF rows are in the fixture and never counted");
 });

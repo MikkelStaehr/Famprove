@@ -16,8 +16,8 @@ export const AXIS_START: IsoDate = "2025-01-01";
 type EftpRow = RideMetricsRow & { readonly rollingFtpW: number };
 const isEftpRow = (r: RideMetricsRow): r is EftpRow => r.eftpOk && r.rollingFtpW !== null;
 /** An EF point: ef_ok, so ef is set (migration check). */
-type EfRow = RideMetricsRow & { readonly ef: number };
-const isEfRow = (r: RideMetricsRow): r is EfRow => r.efOk && r.ef !== null;
+export type EfRow = RideMetricsRow & { readonly ef: number };
+export const isEfRow = (r: RideMetricsRow): r is EfRow => r.efOk && r.ef !== null;
 /** A ride left out of the trends (it has a reason). */
 type ExcludedRow = RideMetricsRow & { readonly exclusion: RideExclusion };
 const isExcluded = (r: RideMetricsRow): r is ExcludedRow => r.exclusion !== null;
@@ -322,15 +322,20 @@ export function efTooFew(points: readonly RideMetricsRow[], currentYear: number)
 export const EF_TREND_MIN_RIDES = 3;
 const EF_TREND_DAYS = 28;
 
-/** Python's EF trend for this ride, or null when fewer than EF_TREND_MIN_RIDES EF rides back it. */
-export function shownEfTrend(r: EfRow, points: readonly EfRow[]): number | null {
-  if (r.efTrend === null) return null;
+/** EF rides in the EF_TREND_DAYS ending on this ride's date; held to Python's ef_window by
+ * web/tests/fixtures/ef_window.json (python/tests/test_contract_ef_window.py). */
+export function efWindowRides(r: EfRow, points: readonly EfRow[]): number {
   const end = dayNumber(r.date);
-  const rides = points.filter((q) => {
+  return points.filter((q) => {
     const d = dayNumber(q.date);
     return d <= end && d > end - EF_TREND_DAYS;
   }).length;
-  return rides >= EF_TREND_MIN_RIDES ? r.efTrend : null;
+}
+
+/** Python's EF trend for this ride, or null when fewer than EF_TREND_MIN_RIDES EF rides back it. */
+export function shownEfTrend(r: EfRow, points: readonly EfRow[]): number | null {
+  if (r.efTrend === null) return null;
+  return efWindowRides(r, points) >= EF_TREND_MIN_RIDES ? r.efTrend : null;
 }
 
 function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView | EfFew {

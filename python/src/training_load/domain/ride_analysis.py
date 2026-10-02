@@ -151,6 +151,14 @@ def _endurance(f: RideFacts, basis: Intensity) -> bool:
     return intensity is not None and intensity < ENDURANCE_MAX_IF
 
 
+def ef_window(day: date, points: Sequence[tuple[date, float]]) -> list[float]:
+    """The EF values of the points in the EF_TREND_DAYS ending on ``day``, both ends inclusive.
+    The one owner of the window: the trend median uses it, and the web's EF-ride count
+    (web/src/lib/analyse-view.ts efWindowRides) is held to it by a contract test."""
+    since = day - timedelta(days=EF_TREND_DAYS - 1)
+    return [v for d, v in points if since <= d <= day]
+
+
 def _gaps(days: Sequence[date]) -> list[bool]:
     """True where the previous point is more than MAX_GAP_DAYS earlier, or there is none."""
     return [i == 0 or (d - days[i - 1]).days > MAX_GAP_DAYS for i, d in enumerate(days)]
@@ -191,8 +199,7 @@ def analyse_rides(rides: Iterable[RideFacts], *, basis: Intensity = ENDURANCE) -
     for f, exclusion, eftp_ok, ef_ok, ef in first:
         trend = None
         if ef_ok:
-            since = f.day - timedelta(days=EF_TREND_DAYS - 1)
-            trend = statistics.median(v for d, v in ef_points if since <= d <= f.day)
+            trend = statistics.median(ef_window(f.day, ef_points))
         out.append(
             RideMetrics(
                 facts=f,
