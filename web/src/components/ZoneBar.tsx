@@ -13,10 +13,11 @@ import { BANDS, isZoneKey, pinned, position, THRESHOLDS, type ZoneKey, ZONE_FILL
 
 export type ZoneBarSize = "compact" | "hero";
 
-// slot = flag height + 6px notch, so nothing shifts between loading, no-TSB and loaded.
+// slot = flag height + 6px notch, so nothing shifts between loading, no-TSB and loaded. The flag
+// is a min-height: at 200 % text it may wrap (the zone label under the value), never overflow.
 const SIZE = {
-  compact: { flag: "h-8 px-3", value: "text-24", slot: "min-h-[2.375rem]" },
-  hero: { flag: "h-16 px-4", value: "text-56", slot: "min-h-[4.375rem]" },
+  compact: { flag: "min-h-8 px-3", value: "text-24", slot: "min-h-[2.375rem]" },
+  hero: { flag: "min-h-16 px-4", value: "text-56", slot: "min-h-[4.375rem]" },
 } as const;
 
 const pct = (x: number) => `${(x * 100).toFixed(4)}%`;
@@ -45,6 +46,20 @@ export function ZoneBar({ header, today, size }: ZoneBarProps) {
   const x = position(header.tsb);
   const zoneKey = header.zone !== null && isZoneKey(header.zone.key) ? header.zone.key : null;
   const notToday = header.date !== today;
+  const flagClass = `max-w-full flex-wrap items-center rounded-pill bg-slab text-on-slab ${s.flag}`;
+  const flag = (
+    <>
+      <span className={`whitespace-nowrap font-display font-extrabold italic tabular-nums ${s.value}`}>
+        {formatSigned(header.tsb)}
+      </span>
+      {zoneKey !== null && header.zone !== null && (
+        <span className="ml-2 inline-flex items-center whitespace-nowrap">
+          <span className={`size-3 shrink-0 rounded-mark ring-[1.5px] ring-on-slab ${ZONE_FILL[zoneKey]}`} />
+          <span className="ml-1.5 text-14 font-bold uppercase tracking-[0.04em]">{header.zone.label}</span>
+        </span>
+      )}
+    </>
+  );
   return (
     <div>
       <p className="sr-only">
@@ -60,24 +75,12 @@ export function ZoneBar({ header, today, size }: ZoneBarProps) {
             ) : undefined
           }
         />
-        <div className={`relative mt-2 ${s.slot}`}>
-          <span
-            className={`absolute top-0 inline-flex items-center whitespace-nowrap rounded-pill bg-slab text-on-slab ${s.flag}`}
-            style={{ left: pct(x), transform: `translateX(-${pct(x)})` }}
-          >
-            <span className={`font-display font-extrabold italic tabular-nums ${s.value}`}>
-              {formatSigned(header.tsb)}
-            </span>
-            {zoneKey !== null && header.zone !== null && (
-              <>
-                <span
-                  className={`ml-2 size-3 shrink-0 rounded-mark ring-[1.5px] ring-on-slab ${ZONE_FILL[zoneKey]}`}
-                />
-                <span className="ml-1.5 text-14 font-bold uppercase tracking-[0.04em]">
-                  {header.zone.label}
-                </span>
-              </>
-            )}
+        <div className={`relative mt-2 pb-1.5 ${s.slot}`}>
+          {/* An invisible in-flow copy reserves the flag's real height (it wraps at 200 % text),
+              so the notch and the bands below never sit under it. */}
+          <span className={`invisible flex w-fit ${flagClass}`}>{flag}</span>
+          <span className={`absolute top-0 inline-flex ${flagClass}`} style={{ left: pct(x), transform: `translateX(-${pct(x)})` }}>
+            {flag}
           </span>
           <span
             className="absolute bottom-0 h-1.5 w-2 -translate-x-1/2 bg-slab [clip-path:polygon(0_0,100%_0,50%_100%)]"
