@@ -1,6 +1,7 @@
 import { AnalyseTabs } from "@/components/AnalyseTabs";
 import { Card } from "@/components/Card";
 import { SkeletonBar as Bar } from "@/components/Skeleton";
+import { E1RM_PANELS_HEIGHT } from "@/lib/analyse-styrke-view";
 
 const BLOCK = "w-full rounded-control bg-track motion-safe:animate-pulse";
 
@@ -33,7 +34,7 @@ export default function Loading() {
         Henter styrkedata…
       </p>
       <Card id="e1rm" variant="calm" level={3} title="Estimeret 1RM pr. uge">
-        <div aria-hidden="true" className={`h-[462px] ${BLOCK}`} />
+        <div aria-hidden="true" className={`${E1RM_PANELS_HEIGHT} ${BLOCK}`} />
       </Card>
       <Card id="tonnage" variant="calm" level={3} title="Tonnage pr. uge">
         <div aria-hidden="true" className={`h-[372px] ${BLOCK}`} />

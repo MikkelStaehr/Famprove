@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  chartRows,
+  marksAt,
   buildAnalyseView,
   buildHero,
   deltaCopy,
@@ -153,4 +155,53 @@ test("page view: summary counts, sr sentences, freshness from the older table", 
     "eFTP fra intervals.icu for 3 ture med watt fra 1. jan. 2025 til 1. okt. 2026. Seneste 184 W den 15. sep. 2026, højeste 233 W den 12. sep. 2025, laveste 181 W den 10. mar. 2026. Pause uden punkter fra 12. sep. 2025 til 10. mar. 2026. 1 tur er udeladt; se listen Udeladte ture.",
   );
   assert.equal(buildAnalyseView({ rides: [], weeks: [] }, new Date(AT), "2026-10-01").kind, "empty");
+});
+
+test("hero sr: no year-ago sentence without the year-ago date (the visible line is hidden too)", () => {
+  const rows = [ride("2026-09-20", { eftpOk: true, rollingFtpW: 184, eftpYearAgoW: 233, eftpYearAgoDate: null, eftpDeltaW: -49 })];
+  const hero = buildHero(rows, 2026);
+  assert.ok(hero.kind === "eftp");
+  assert.equal(hero.detail, null);
+  assert.ok(!hero.sr.includes("Et år før"));
+});
+
+test("two rides on one day keep two marks, and the tooltip lists both", () => {
+  const chart = {
+    marks: [
+      { x: 100, y: 1.2, trend: 1.15, seg: 0, latest: false, excluded: false, tip: ["a"] },
+      { x: 100, y: 1.3, trend: 1.16, seg: 0, latest: false, excluded: false, tip: ["b"] },
+      { x: 104, y: null, trend: null, seg: 0, latest: false, excluded: true, tip: ["c"] },
+    ],
+    segments: 1,
+    domain: [1, 1.5] as const,
+    ticks: [1, 1.5],
+    sr: "",
+  };
+  const rows = chartRows(chart, "ef");
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows.filter((r) => r.x === 100).map((r) => r.dots), [1.2, 1.3]);
+  assert.deepEqual(rows.filter((r) => r.x === 100).map((r) => r.s0), [1.15, 1.16]);
+  assert.deepEqual(marksAt(rows, 100).flatMap((m) => m.tip), ["a", "b"]);
+  const excluded = rows.find((r) => r.x === 104);
+  assert.ok(excluded !== undefined && excluded.excl === 1 && excluded.dots === null && excluded.s0 === undefined);
+  assert.deepEqual(chartRows({ ...chart, marks: chart.marks.slice(0, 1) }, "eftp")[0]?.s0, 1.2);
+});
+
+test("EF line breaks: a gap or a missing trend starts a new segment", () => {
+  const ef = (date: string, o: Partial<RideMetricsRow>) =>
+    ride(date, { efOk: true, eftpOk: true, ef: 1.2, efTrend: 1.2, efGapBefore: false, ...o });
+  const rides = [
+    ef("2026-05-01", { efGapBefore: true }),
+    ef("2026-05-05", {}),
+    ef("2026-05-10", { efTrend: null }), // no trend: the line breaks here
+    ef("2026-05-12", {}),
+    ef("2026-07-01", { efGapBefore: true }), // > 21 days: a new segment
+    ef("2026-07-03", {}),
+  ];
+  const v = buildAnalyseView({ rides, weeks: [], weeksError: null }, new Date("2026-10-01T06:00:00Z"), "2026-10-01");
+  assert.ok(v.kind === "ready" && "marks" in v.ef);
+  const segs = v.ef.marks.filter((m) => !m.excluded).map((m) => m.seg);
+  assert.deepEqual(segs, [0, 0, 1, 1, 2, 2]);
+  assert.equal(v.ef.segments, 3);
+  assert.equal(v.ef.marks[2]?.trend, null);
 });

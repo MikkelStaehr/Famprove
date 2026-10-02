@@ -6,11 +6,21 @@
 import { addDays, dayNumber, isoWeekNumber, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
 import type { DataError } from "./data-error.ts";
-import type { CyclingAnalysisData, CyclingWeekRow, IsoDate, RideMetricsRow } from "./db/rows.ts";
+import type { CyclingAnalysisData, CyclingWeekRow, IsoDate, RideExclusion, RideMetricsRow } from "./db/rows.ts";
 import { formatDate, formatDateRange, formatDay, formatDayLong, formatDuration, formatLoad, formatSigned, formatWatts, LOCALE } from "./format.ts";
 
 /** The analysis window starts here (spec §4); weeks from 2024-12-30 are clipped to it. */
 export const AXIS_START: IsoDate = "2025-01-01";
+
+/** An eFTP point: eftp_ok, so rolling_ftp_w is set (migration check). */
+type EftpRow = RideMetricsRow & { readonly rollingFtpW: number };
+const isEftpRow = (r: RideMetricsRow): r is EftpRow => r.eftpOk && r.rollingFtpW !== null;
+/** An EF point: ef_ok, so ef is set (migration check). */
+type EfRow = RideMetricsRow & { readonly ef: number };
+const isEfRow = (r: RideMetricsRow): r is EfRow => r.efOk && r.ef !== null;
+/** A ride left out of the trends (it has a reason). */
+type ExcludedRow = RideMetricsRow & { readonly exclusion: RideExclusion };
+const isExcluded = (r: RideMetricsRow): r is ExcludedRow => r.exclusion !== null;
 const SINCE = "1. jan. 2025";
 const EF_MIN_POINTS = 5;
 const SEAM_MIN_WEEKS = 4;
@@ -180,21 +190,23 @@ export function deltaCopy(deltaW: number | null): { readonly direction: Directio
 
 /** The hero is the latest eftp_ok row (selection); its delta is passed through as delivered. */
 export function buildHero(rows: readonly RideMetricsRow[], currentYear: number): HeroView {
-  const latest = rows.findLast((r) => r.eftpOk && r.rollingFtpW !== null);
-  if (latest === undefined || latest.rollingFtpW === null) {
+  const latest = rows.findLast(isEftpRow);
+  if (latest === undefined) {
     const text = `Ingen ture med watt siden ${SINCE}, så der er ingen eFTP endnu.`;
     return { kind: "none", text, sr: text };
   }
   const w = formatLoad(latest.rollingFtpW);
-  const compare = latest.eftpYearAgoW !== null && latest.eftpYearAgoDate !== null;
-  const detail = compare
-    ? `Samme tid sidste år: ${formatWatts(latest.eftpYearAgoW ?? 0)} (${dayText(latest.eftpYearAgoDate ?? "", currentYear)})`
-    : null;
+  const yearAgoW = latest.eftpYearAgoW;
+  const yearAgoDate = latest.eftpYearAgoDate;
+  const detail =
+    yearAgoW !== null && yearAgoDate !== null
+      ? `Samme tid sidste år: ${formatWatts(yearAgoW)} (${dayText(yearAgoDate, currentYear)})`
+      : null;
   let sr = `Estimeret FTP ${w} watt den ${formatDayLong(latest.date)}.`;
-  if (compare && latest.eftpDeltaW !== null) {
+  if (detail !== null && yearAgoW !== null && latest.eftpDeltaW !== null) {
     const d = formatSigned(latest.eftpDeltaW);
     const spoken = d.startsWith("+") ? `plus ${d.slice(1)} watt` : d.startsWith("−") ? `minus ${d.slice(1)} watt` : "uændret";
-    sr += ` Et år før: ${formatLoad(latest.eftpYearAgoW ?? 0)} watt, ${spoken}.`;
+    sr += ` Et år før: ${formatLoad(yearAgoW)} watt, ${spoken}.`;
   }
   return {
     kind: "eftp",
@@ -230,14 +242,14 @@ function rideKind(type: string): string {
   return type === "VirtualRide" ? "Virtuel tur" : "Udendørs tur";
 }
 
-function excludedTip(r: RideMetricsRow, year: number): string[] {
+function excludedTip(r: ExcludedRow, year: number): string[] {
   const facts = exclusionFacts(r);
-  return [dayText(r.date, year), `Udeladt: ${exclusionText(r.exclusion ?? "").short}`, ...(facts === "" ? [] : [facts])];
+  return [dayText(r.date, year), `Udeladt: ${exclusionText(r.exclusion).short}`, ...(facts === "" ? [] : [facts])];
 }
 
 function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCount: number): LineChartView | null {
   const year = yearOf(today);
-  const points = rows.filter((r) => r.eftpOk && r.rollingFtpW !== null);
+  const points = rows.filter(isEftpRow);
   if (points.length < 2) return null;
   const marks: Mark[] = [];
   let seg = 0;
@@ -245,7 +257,7 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
   const pauses: string[] = [];
   let prev: RideMetricsRow | null = null;
   for (const r of rows) {
-    if (r.exclusion !== null && exclusionText(r.exclusion).eftp) {
+    if (isExcluded(r) && exclusionText(r.exclusion).eftp) {
       marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year) });
       continue;
     }
@@ -274,13 +286,13 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
       ],
     });
   }
-  const values = points.map((p) => p.rollingFtpW ?? 0);
+  const values = points.map((p) => p.rollingFtpW);
   const { domain, ticks } = niceTicks(Math.min(...values), Math.max(...values), 10);
-  const hiRow = points.reduce((a, b) => ((b.rollingFtpW ?? 0) > (a.rollingFtpW ?? 0) ? b : a));
-  const loRow = points.reduce((a, b) => ((b.rollingFtpW ?? 0) < (a.rollingFtpW ?? 0) ? b : a));
+  const hiRow = points.reduce((a, b) => (b.rollingFtpW > a.rollingFtpW ? b : a));
+  const loRow = points.reduce((a, b) => (b.rollingFtpW < a.rollingFtpW ? b : a));
   const sr = [
     `eFTP fra intervals.icu for ${points.length} ture med watt fra ${SINCE} til ${dateWithYear(today)}.`,
-    `Seneste ${formatLoad(last.rollingFtpW ?? 0)} W den ${dateWithYear(last.date)}, højeste ${formatLoad(hiRow.rollingFtpW ?? 0)} W den ${dateWithYear(hiRow.date)}, laveste ${formatLoad(loRow.rollingFtpW ?? 0)} W den ${dateWithYear(loRow.date)}.`,
+    `Seneste ${formatLoad(last.rollingFtpW)} W den ${dateWithYear(last.date)}, højeste ${formatLoad(hiRow.rollingFtpW)} W den ${dateWithYear(hiRow.date)}, laveste ${formatLoad(loRow.rollingFtpW)} W den ${dateWithYear(loRow.date)}.`,
     ...pauses,
     ...(excludedCount > 0 ? [`${rides(excludedCount)} er udeladt; se listen Udeladte ture.`] : []),
   ].join(" ");
@@ -303,13 +315,13 @@ export function efTooFew(points: readonly RideMetricsRow[], currentYear: number)
 
 function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView | EfFew {
   const year = yearOf(today);
-  const points = rows.filter((r) => r.efOk && r.ef !== null);
+  const points = rows.filter(isEfRow);
   if (points.length < EF_MIN_POINTS) return efTooFew(points, year);
   const marks: Mark[] = [];
   let seg = 0;
   let open = false; // the current segment has a trend value
   for (const r of rows) {
-    if (r.exclusion !== null && exclusionText(r.exclusion).ef) {
+    if (isExcluded(r) && exclusionText(r.exclusion).ef) {
       marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year) });
       continue;
     }
@@ -338,17 +350,54 @@ function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView
       ],
     });
   }
-  const values = points.flatMap((p) => [p.ef ?? 0, ...(p.efTrend === null ? [] : [p.efTrend])]);
+  const values = points.flatMap((p) => [p.ef, ...(p.efTrend === null ? [] : [p.efTrend])]);
   const { domain, ticks } = niceTicks(Math.min(...values), Math.max(...values), 0.05);
   const first = points[0];
   const last = points[points.length - 1];
   const lastTrend = points.findLast((p) => p.efTrend !== null);
   const sr =
     `EF på ${points.length} rolige ture fra ${dateWithYear(first.date)} til ${dateWithYear(last.date)}.` +
-    (lastTrend === undefined
-      ? ` Seneste tur ${formatEf(last.ef ?? 0)}.`
-      : ` Seneste trend ${formatEf(lastTrend.efTrend ?? 0)} den ${dateWithYear(lastTrend.date)}, seneste tur ${formatEf(last.ef ?? 0)}.`);
+    (lastTrend === undefined || lastTrend.efTrend === null
+      ? ` Seneste tur ${formatEf(last.ef)}.`
+      : ` Seneste trend ${formatEf(lastTrend.efTrend)} den ${dateWithYear(lastTrend.date)}, seneste tur ${formatEf(last.ef)}.`);
   return { marks, segments: seg + 1, domain, ticks, sr };
+}
+
+// --- chart rows ----------------------------------------------------------------------------
+
+/**
+ * One Recharts row per mark, so two rides on one day keep two marks (rows may share an x on a
+ * numeric axis). The line is read from one key per segment ("s0", "s1", …), set on this mark's
+ * row only; `excl` places an excluded ride's hollow mark at the axis bottom; `dots` is an EF
+ * ride's own value.
+ */
+export type ChartRow = {
+  readonly x: number;
+  readonly excl: number | null;
+  readonly dots: number | null;
+  readonly marks: readonly Mark[];
+  readonly [segment: `s${number}`]: number | undefined;
+};
+
+export function chartRows(chart: LineChartView, variant: "eftp" | "ef"): ChartRow[] {
+  const bottom = chart.domain[0];
+  return chart.marks
+    .map((m) => {
+      const line = m.excluded ? null : variant === "eftp" ? m.y : m.trend;
+      return {
+        x: m.x,
+        excl: m.excluded ? bottom : null,
+        dots: variant === "ef" && !m.excluded ? m.y : null,
+        marks: [m],
+        ...(line === null ? {} : { [`s${m.seg}`]: line }),
+      };
+    })
+    .sort((a, b) => a.x - b.x);
+}
+
+/** Every mark at an x, for the tooltip (two rides on one day are both listed). */
+export function marksAt(rows: readonly ChartRow[], x: number): readonly Mark[] {
+  return rows.filter((r) => r.x === x).flatMap((r) => r.marks);
 }
 
 // --- weeks (spec §5d) ----------------------------------------------------------------------
@@ -442,7 +491,7 @@ export function buildAnalyseView(data: CyclingAnalysisData, now: Date, today: Is
   const hi = dayNumber(today) + 0.5;
   const rows = data.rides;
   const plotted = rows.filter((r) => r.date >= AXIS_START); // the shared x domain starts 1 Jan 2025
-  const excludedRows = rows.filter((r) => r.exclusion !== null);
+  const excludedRows = rows.filter(isExcluded);
   const noWatt = rows.filter((r) => r.exclusion === null && !r.eftpOk).length;
   const weeks = data.weeks === null ? null : weekBars(data.weeks, today, lo);
   return {
@@ -471,8 +520,8 @@ export function buildAnalyseView(data: CyclingAnalysisData, now: Date, today: Is
             summary: `${rides(excludedRows.length)} udeladt fra trends`,
             items: [...excludedRows].reverse().map((r) => ({
               key: r.activityId,
-              title: `${dayText(r.date, year)} · ${exclusionText(r.exclusion ?? "").short}`,
-              explanation: exclusionText(r.exclusion ?? "").explanation,
+              title: `${dayText(r.date, year)} · ${exclusionText(r.exclusion).short}`,
+              explanation: exclusionText(r.exclusion).explanation,
               facts: exclusionFacts(r),
             })),
           },

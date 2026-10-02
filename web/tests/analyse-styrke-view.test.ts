@@ -217,8 +217,8 @@ test("block ruler: spans end on end_date (the last Sunday, inclusive), ongoing t
   assert.equal(v.lo, lo);
   assert.equal(v.hi, dayNumber("2026-10-04") + 0.5);
   assert.deepEqual(blockSpans(BLOCKS, v.lo, v.hi), [
-    { x0: lo, x1: dayNumber("2026-08-23") + 0.5, label: "Blok 11", deloadX0: dayNumber("2026-08-17") - 0.5 },
-    { x0: dayNumber("2026-09-21") - 0.5, x1: v.hi, label: "Blok 12", deloadX0: null },
+    { x0: lo, x1: dayNumber("2026-08-23") + 0.5, blockNo: 11, label: "Blok 11", deloadX0: dayNumber("2026-08-17") - 0.5 },
+    { x0: dayNumber("2026-09-21") - 0.5, x1: v.hi, blockNo: 12, label: "Blok 12", deloadX0: null },
   ]);
   assert.deepEqual(v.phaseRules, [dayNumber("2026-09-21") - 0.5]);
   assert.equal(v.hasDeload, true);
@@ -242,7 +242,7 @@ test("weeks: zero weeks stay visible, gap weeks read 'mellem blokke', tooltips a
   assert.equal(first.head, "Uge 33 · 10.–16. aug. · blok 11, uge 1 · før aktivitetslog");
   assert.equal(deload.head, "Uge 34 · 17.–23. aug. · blok 11, uge 2 · deload · før aktivitetslog");
   assert.equal(gap.head, "Uge 35 · 24.–30. aug. · mellem blokke");
-  assert.deepEqual(gap.tonnage, [0, 0, 0]);
+  assert.deepEqual(gap.tonnage, { SQUAT: 0, BENCH: 0, DEADLIFT: 0 });
   assert.deepEqual(gap.srRow.slice(1), ["mellem blokke", "0", "0", "0"]);
   assert.equal(first.e1rmTip[2], "Dødløft: ikke trænet");
   assert.equal(first.e1rmTip[1], "Bænkpres: intet tungt sæt med RPE");
@@ -289,4 +289,29 @@ test("a block published ahead in another phase draws no phase rule and joins no 
   assert.deepEqual(v.phaseRules, [dayNumber("2026-09-21") - 0.5]); // blok 12 only; blok 13 is after hi
   assert.ok(v.phaseRules.every((x) => x < v.hi));
   assert.ok(v.notes.every((n) => !n.includes("13")));
+});
+
+test("a missing lift row is 'mangler' (null), never 0; the strip max ignores it", () => {
+  const ws = weeks().filter((w) => !(w.weekStart === "2026-08-10" && w.lift === "BENCH"));
+  const v = ready(data(ws));
+  const week = v.weeks.find((w) => w.srRow[0].startsWith("Uge 33"));
+  assert.ok(week !== undefined);
+  assert.equal(week.tonnage.BENCH, null);
+  assert.equal(week.tonnageTip[1], "Bænkpres: mangler");
+  assert.equal(week.e1rmTip[1], "Bænkpres: mangler");
+  assert.equal(week.srRow[3], "mangler");
+  const benchLeft = ws.filter((w) => w.lift === "BENCH").map((w) => w.tonnageKg);
+  assert.equal(v.tonnageMax.BENCH, Math.max(0, ...benchLeft)); // the missing week is ignored, not 0
+});
+
+test("sheet 1RM lines are matched to block spans by block number", () => {
+  const v = ready();
+  const squat = v.panels?.find((p) => p.lift === "SQUAT");
+  assert.ok(squat !== undefined);
+  const spans = blockSpans(BLOCKS, v.lo, v.hi);
+  assert.ok(squat.sheet.length > 0);
+  for (const line of squat.sheet) {
+    assert.ok(spans.some((sp) => sp.x0 === line.x0 && sp.x1 === line.x1));
+  }
+  assert.deepEqual(spans.map((sp) => sp.blockNo), [11, 12]);
 });

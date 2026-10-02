@@ -14,7 +14,16 @@ import type {
   StrengthWeekRow,
 } from "./db/rows.ts";
 import { formatDate, formatDateRange, formatKg, LOCALE, stopAfter } from "./format.ts";
-import { LIFT_NAME, LIFTS, type StrengthLift } from "./lifts.ts";
+import { LIFT_NAME, LIFTS, perLift, type StrengthLift } from "./lifts.ts";
+
+/** The e1RM panels' height: the client chart's hydration skeleton and loading.tsx share it. */
+export const E1RM_PANELS_HEIGHT = "h-[492px]";
+
+/** A week row with an e1RM (and, for block bests, a block). */
+type E1rmRow = StrengthWeekRow & { readonly e1rmKg: number };
+const hasE1rm = (w: StrengthWeekRow): w is E1rmRow => w.e1rmKg !== null;
+type BlockRow = StrengthWeekRow & { readonly blockNo: number };
+const inBlock = (w: StrengthWeekRow): w is BlockRow => w.blockNo !== null;
 
 const dated = (date: IsoDate): string => `${formatDate(date)}${stopAfter(formatDate(date))}`;
 
@@ -74,6 +83,7 @@ export type AxisTick = { readonly x: number; readonly label: string };
 export type BlockSpan = {
   readonly x0: number;
   readonly x1: number;
+  readonly blockNo: number;
   readonly label: string; // "Blok 11"
   readonly deloadX0: number | null; // hatch from here to x1
 };
@@ -124,7 +134,7 @@ export type StrengthWeek = {
   readonly head: string; // tooltip line 1
   readonly e1rmTip: readonly string[];
   readonly tonnageTip: readonly string[];
-  readonly tonnage: readonly number[]; // SBD order; 0 = nothing lifted
+  readonly tonnage: Readonly<Record<StrengthLift, number | null>>; // 0 = nothing lifted; null = row missing
   readonly srRow: readonly [string, string, string, string, string];
 };
 
@@ -146,7 +156,7 @@ export type StyrkeView =
       readonly notes: readonly string[];
       readonly phaseSr: string | null;
       readonly weeks: readonly StrengthWeek[];
-      readonly tonnageMax: readonly number[];
+      readonly tonnageMax: Readonly<Record<StrengthLift, number>>;
       readonly rpeLine: string | null;
       readonly warnings: readonly string[]; // console.warn on the server (sheet 1RM ambiguity)
     };
@@ -278,7 +288,7 @@ export function blockSpans(blocks: readonly StrengthBlockRow[], lo: number, hi: 
       // end_date is the Sunday of the last week (inclusive, as /load); an ongoing block runs to the current week.
       const x1 = b.endDate === null ? hi : Math.min(dayNumber(b.endDate) + 0.5, hi);
       const deloadX0 = b.deloadStart === null ? null : Math.max(dayNumber(b.deloadStart) - 0.5, x0);
-      return { x0, x1, label: `Blok ${b.blockNo}`, deloadX0: deloadX0 !== null && deloadX0 < x1 ? deloadX0 : null };
+      return { x0, x1, blockNo: b.blockNo, label: `Blok ${b.blockNo}`, deloadX0: deloadX0 !== null && deloadX0 < x1 ? deloadX0 : null };
     })
     .filter((s) => s.x1 > s.x0);
 }
@@ -334,12 +344,12 @@ function panel(
   sheetRows: StrengthAnalysisData["sheetOneRm"],
   warnings: string[],
 ): E1rmPanel {
-  const rows = weeks.filter((w) => w.lift === lift && w.e1rmKg !== null);
+  const rows = weeks.filter((w): w is E1rmRow => w.lift === lift && hasE1rm(w));
   const sheet: SheetLine[] = [];
   const sheetSr: string[] = [];
   const sheetByBlock = new Map<number, number>();
   blocks.forEach((b) => {
-    const span = spans.find((s) => s.label === `Blok ${b.blockNo}`);
+    const span = spans.find((s) => s.blockNo === b.blockNo);
     if (span === undefined) return;
     const { kg, warning } = sheetOneRm(sheetRows, b.name, lift);
     if (warning !== null) warnings.push(warning);
@@ -352,12 +362,12 @@ function panel(
     const sheetKg = r.blockNo === null ? undefined : sheetByBlock.get(r.blockNo);
     return {
       x: dayNumber(r.weekStart) + 3,
-      y: r.e1rmKg ?? 0,
+      y: r.e1rmKg,
       logged: r.e1rmRpeSource === "logged",
       best: r.isBlockBest,
-      label: r.isBlockBest && r.e1rmKg !== null ? formatE1rm(r.e1rmKg) : null,
+      label: r.isBlockBest ? formatE1rm(r.e1rmKg) : null,
       // Under the ring when the point sits below its block's sheet line (a comparison, no maths).
-      labelBelow: sheetKg !== undefined && r.e1rmKg !== null && r.e1rmKg < sheetKg,
+      labelBelow: sheetKg !== undefined && r.e1rmKg < sheetKg,
     };
   });
   // One line per block: it breaks at every block boundary (and never joins points outside a block).
@@ -376,10 +386,10 @@ function panel(
   const last = rows[rows.length - 1].weekStart;
   const span = rows.length === 1 ? `1 uge med e1RM den ${dated(first)}` : `${rows.length} uger med e1RM fra ${formatDate(first)} til ${dated(last)}`;
   const bests = rows
-    .filter((r) => r.isBlockBest && r.e1rmKg !== null && r.blockNo !== null)
+    .filter((r): r is E1rmRow & BlockRow => r.isBlockBest && inBlock(r))
     .map((r) => {
-      const ph = r.phase ?? phaseOfBlock(blocks, weeks, r.blockNo ?? 0);
-      return `Bedst i ${blockLabel(r.blockNo ?? 0)}${ph === null ? "" : ` (${PHASE_TEXT[ph]})`}: ${formatE1rm(r.e1rmKg ?? 0)} kilo.`;
+      const ph = r.phase ?? phaseOfBlock(blocks, weeks, r.blockNo);
+      return `Bedst i ${blockLabel(r.blockNo)}${ph === null ? "" : ` (${PHASE_TEXT[ph]})`}: ${formatE1rm(r.e1rmKg)} kilo.`;
     });
   const distinctSheet = [...new Set(sheet.map((s) => s.label))];
   const sheetText =
@@ -421,7 +431,8 @@ export function strengthWeeks(
     const e1rmTip = LIFTS.map((l) => {
       const r = byLift(l);
       const name = LIFT_NAME[l];
-      if (r === undefined || r.status === null) return `${name}: ikke trænet`;
+      if (r === undefined) return `${name}: mangler`;
+      if (r.status === null) return `${name}: ikke trænet`;
       if (r.e1rmKg === null) return `${name}: intet tungt sæt med RPE`;
       const set = setText(r);
       const source = r.e1rmRpe === null ? "" : r.e1rmRpeSource === "logged" ? " logget" : " foreskrevet";
@@ -430,9 +441,12 @@ export function strengthWeeks(
     const tonnageTip = LIFTS.map((l) => {
       const r = byLift(l);
       const name = LIFT_NAME[l];
-      return r === undefined || r.status === null ? `${name}: ikke trænet` : `${name}: ${formatTonnage(r.tonnageKg)} kg · ${r.setsLifted} sæt`;
+      if (r === undefined) return `${name}: mangler`;
+      return r.status === null ? `${name}: ikke trænet` : `${name}: ${formatTonnage(r.tonnageKg)} kg · ${r.setsLifted} sæt`;
     });
-    const tonnage = LIFTS.map((l) => byLift(l)?.tonnageKg ?? 0);
+    // A missing row is null ("mangler"), never 0: 0 is a real week with nothing lifted.
+    const tonnage = perLift((l) => byLift(l)?.tonnageKg ?? null);
+    const tonnageText = (v: number | null) => (v === null ? "mangler" : formatTonnage(v));
     return {
       x0: Math.max(dayNumber(ws) - 0.5, lo),
       x1: dayNumber(ws) + 6.5,
@@ -444,9 +458,9 @@ export function strengthWeeks(
       srRow: [
         `Uge ${isoWeekNumber(ws)} · ${range}`,
         where,
-        formatTonnage(tonnage[0]),
-        formatTonnage(tonnage[1]),
-        formatTonnage(tonnage[2]),
+        tonnageText(tonnage.SQUAT),
+        tonnageText(tonnage.BENCH),
+        tonnageText(tonnage.DEADLIFT),
       ],
     };
   });
@@ -479,7 +493,7 @@ export function buildStyrkeView(data: StrengthAnalysisData, now: Date, today: Is
   const anyPrescribed = weeks.some((w) => w.e1rmKg !== null && w.e1rmRpeSource !== "logged");
   const anyLogged = weeks.some((w) => w.e1rmRpeSource === "logged");
   const phases = phaseSentence(started);
-  const preLog = [...new Set(weeks.filter((w) => w.status === "pre_log" && w.blockNo !== null).map((w) => w.blockNo ?? 0))];
+  const preLog = [...new Set(weeks.filter((w): w is BlockRow => w.status === "pre_log" && inBlock(w)).map((w) => w.blockNo))];
   const notes = [
     ...(panels !== null && anyPrescribed ? [NOTE_PRESCRIBED] : []),
     ...(phases === null
@@ -514,7 +528,12 @@ export function buildStyrkeView(data: StrengthAnalysisData, now: Date, today: Is
             .map((c) => `Faseskift fra ${PHASE_TEXT[c.from]} til ${PHASE_TEXT[c.block.phase ?? c.from]} den ${dated(c.block.startDate)}`)
             .join(" "),
     weeks: strengthRows,
-    tonnageMax: LIFTS.map((_, i) => Math.max(0, ...strengthRows.map((w) => w.tonnage[i]))),
+    tonnageMax: perLift((l) =>
+      Math.max(0, ...strengthRows.flatMap((w) => {
+        const v = w.tonnage[l];
+        return v === null ? [] : [v];
+      })),
+    ),
     rpeLine: anyLogged ? null : RPE_LINE,
     warnings,
   };

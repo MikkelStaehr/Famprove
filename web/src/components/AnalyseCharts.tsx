@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { ComposedChart, CartesianGrid, Line, Tooltip, XAxis, YAxis } from "recharts";
 
-import type { BlockSpan, E1rmPanel, StrengthWeek } from "@/lib/analyse-styrke-view";
-import { type AxisTick, formatEf, type LineChartView, type Mark, type Seam, type WeekBar } from "@/lib/analyse-view";
+import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
+import { type AxisTick, type ChartRow, chartRows, formatEf, type LineChartView, marksAt, type Seam, type WeekBar } from "@/lib/analyse-view";
 import { formatLoad } from "@/lib/format";
-import { LIFT_NAME, LIFTS } from "@/lib/lifts";
+import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
 import { ChartBoundary, TICK, useHydrated, useWide } from "./TrendChart";
 
@@ -95,9 +95,7 @@ function TipBox({ lines }: { readonly lines: readonly string[] }) {
   );
 }
 
-type Row = { x: number; excl: number | null; dots: number | null; marks: Mark[] } & Record<string, unknown>;
-
-type DotProps = { readonly cx?: number; readonly cy?: number; readonly payload?: Row; readonly value?: unknown };
+type DotProps = { readonly cx?: number; readonly cy?: number; readonly payload?: ChartRow; readonly value?: unknown };
 
 type LineChartProps = {
   readonly axis: Axis;
@@ -120,21 +118,8 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
   const wide = useWide();
   if (!hydrated) return <Skeleton height="h-(--chart-height)" />;
   const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
-  const bottom = chart.domain[0];
-  // One row per x; segment keys s0..sN carry the line (a new key after every break, spec §5b/§5c).
-  const byX = new Map<number, Row>();
-  for (const m of chart.marks) {
-    const row = byX.get(m.x) ?? { x: m.x, excl: null, dots: null, marks: [] };
-    row.marks.push(m);
-    if (m.excluded) row.excl = bottom;
-    else if (variant === "eftp") row[`s${m.seg}`] = m.y;
-    else {
-      row.dots = m.y;
-      if (m.trend !== null) row[`s${m.seg}`] = m.trend;
-    }
-    byX.set(m.x, row);
-  }
-  const rows = [...byX.values()].sort((a, b) => a.x - b.x);
+  // One row per mark (two rides on one day keep both); segment keys s0..sN carry the line.
+  const rows = chartRows(chart, variant);
   const segKeys = Array.from({ length: chart.segments }, (_, i) => `s${i}`);
 
   const pointDot = ({ cx, cy, payload, value }: DotProps) => {
@@ -193,8 +178,8 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
           isAnimationActive={false}
           cursor={{ stroke: "var(--text-muted)", strokeWidth: 1 }}
           content={({ active, label }) => {
-            const row = active && typeof label === "number" ? byX.get(label) : undefined;
-            return row === undefined ? null : <TipBox lines={row.marks.flatMap((m) => m.tip)} />;
+            const marks = active && typeof label === "number" ? marksAt(rows, label) : [];
+            return marks.length === 0 ? null : <TipBox lines={marks.flatMap((m) => m.tip)} />;
           }}
         />
         {variant === "ef" && (
@@ -326,7 +311,7 @@ function WeekGroup<W extends PickWeek>({
 type StripBar = {
   readonly x0: number;
   readonly x1: number;
-  readonly value: number;
+  readonly value: number | null; // null = no row ("mangler"): no bar, never a 0 tick
   readonly zero: boolean;
   readonly current: boolean;
   readonly active: boolean;
@@ -367,6 +352,7 @@ function Strip({
           0
         </span>
         {bars.map((w) => {
+          if (w.value === null) return null;
           const left = xCss(axis, w.x0);
           const width = `calc(${xCss(axis, w.x1)} - ${xCss(axis, w.x0)} - 1px)`;
           const color = w.current ? "bg-slab" : w.zero ? "bg-chart-mark" : "bg-text-muted";
@@ -609,7 +595,7 @@ export function E1rmPanels(props: PanelsProps) {
 function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProps) {
   const hydrated = useHydrated();
   const wide = useWide();
-  if (!hydrated) return <Skeleton height="h-[492px]" />;
+  if (!hydrated) return <Skeleton height={E1RM_PANELS_HEIGHT} />;
   return (
     <WeekGroup
       axis={axis}
@@ -624,7 +610,7 @@ function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProp
   );
 }
 
-type TonnageProps = StrengthProps & { readonly max: readonly number[] };
+type TonnageProps = StrengthProps & { readonly max: Readonly<Record<StrengthLift, number>> };
 
 export function TonnageStrips(props: TonnageProps) {
   return (
@@ -634,7 +620,6 @@ export function TonnageStrips(props: TonnageProps) {
   );
 }
 
-const LIFT_LABELS = LIFTS.map((l) => LIFT_NAME[l]);
 const TONNAGE_STRIP = 80;
 
 function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnageProps) {
@@ -651,19 +636,19 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnagePro
       padTop={BLOCK_ROOM}
     >
       {(active) =>
-        LIFT_LABELS.map((label, i) => (
+        LIFTS.map((lift) => (
           <Strip
-            key={label}
+            key={lift}
             axis={axis}
-            label={label}
+            label={LIFT_NAME[lift]}
             unit="kg"
             height={TONNAGE_STRIP}
-            max={max[i] ?? 0}
+            max={max[lift]}
             bars={weeks.map((w) => ({
               x0: w.x0,
               x1: w.x1,
-              value: w.tonnage[i] ?? 0,
-              zero: (w.tonnage[i] ?? 0) === 0,
+              value: w.tonnage[lift],
+              zero: w.tonnage[lift] === 0,
               current: w.current,
               active: w === active,
             }))}
