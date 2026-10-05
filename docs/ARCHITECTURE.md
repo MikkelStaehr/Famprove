@@ -62,6 +62,9 @@ Next.js (web/), server components only
 `strength_weeks` (derived: every ISO week x SQUAT/BENCH/DEADLIFT from the first block: tonnage, best e1RM, block best) ·
 `strength_set_kg` (persistent: planned and lifted kg per set with timestamps; like forecast_log it can't be rebuilt). `activities.raw` / `strength_activities.raw` hold the intervals.icu object as delivered.
 
+## Plan
+`docs/PLAN.md` lists every task and slice (id | title | size); commits end with `Slice: <id>`.
+
 ## Commands
 - Python, from `python/` (reads repo-root `.env.local`): `uv run check-config` · `uv run collect-intervals [--since 2026-01-01]`,
   `collect-strength`, `compute`, `collect-plan` · `uv run pytest` · `uv run ruff check src tests && uv run mypy`

@@ -33,6 +33,7 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - All DB access through one data layer (`src/lib/db/*` or `app/db/*`) – never inline queries in UI or handlers.
 - Secrets only in env files/vault. `.env.example` lists every var. Nothing secret is committed.
 - Small commits, conventional-commit messages (`feat:`, `fix:`, `refactor:`).
+- **Slices:** every commit ends with a `Slice: <id>` line (since 2026-10-05). Ids are lowercase and listed in `docs/PLAN.md` (## Slices: id | title | size, no status); a new task or slice gets its row before its first commit.
 - Prefer boring **code**. No new dependency without a one-line justification.
 - **No silent defaults.** A value that can't be parsed never silently becomes 0 or empty. Missing is `null`, not 0. Collectors count and log unparseable values per run, and fail loudly above a threshold. Key derived values get sanity bounds; implausible values are flagged, not used.
 - **Zero vs. missing per field.** Decide per field whether 0 is a valid value, and document it next to the field (schema comment or type). Missing is always `null`; 0 means a real zero only where the field allows it.
