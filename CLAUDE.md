@@ -1,6 +1,6 @@
 # Project: training-app
 
-Personal training-load app for one user. It combines cycling (intervals.icu) and strength (coach's Google Sheet) into one daily TSS series and derives CTL (42-day), ATL (7-day) and TSB = CTL − ATL, plotted over time with strength-block markers. Milestone 1 is done when Python collectors + a compute step fill Supabase idempotently from a daily GitHub Actions run, with tests for the parser and the CTL/ATL math. Milestone 2 is a read-only Next.js dashboard over `daily_load`.
+Personal training-load app for one user. It combines cycling (intervals.icu) and strength (coach's Google Sheet) into one daily TSS series and derives CTL (42-day), ATL (7-day) and TSB = CTL − ATL, plotted over time with strength-block markers. Milestone 1 is done when Python collectors + a compute step fill Supabase idempotently from a daily GitHub Actions run, with tests for the parser and the CTL/ATL math. Milestone 2 is a read-only Next.js dashboard over `daily_load`. Milestone 3 (next) is Analyse › Samlet: what each block did to total load and fitness.
 
 ## Stack
 - Frontend: Next.js (App Router, TypeScript, Tailwind) — milestone 2
@@ -96,7 +96,8 @@ Decisions (agreed with the user):
 - Layout: `python/` (uv project), `supabase/migrations/` (Supabase CLI), `web/` in M2.
 - Infra: Supabase project `iutgmfnqlmogfitezjnj`, GitHub repo `MikkelStaehr/Famprove` (public — nothing sensitive in git).
 
-## Milestone 2 brief (current)
+## Milestone 2 brief (done 2026-10-05)
+Done: Vercel production deploy green, and every daily slot from 2026-10-02 12:00 to 2026-10-05 12:00 served by the droplet with all 27 runs green (slice droplet-followup).
 Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Project overrides).
 - One screen, mobile first (390px), answering "how loaded am I right now, and is fitness going up?"
 - Reads Supabase server-side only (service key in server env, never in the client bundle), from `daily_load`, `blocks` and `weekly_load`. No writes.
@@ -108,6 +109,13 @@ Read-only Next.js dashboard in `web/`. Visual contract: `DESIGN.md` (see its Pro
 - Analyse / Cykel (decided 2026-10-01): rides since 2024-12-30 (the ISO week of 2025-01-01) in `ride_metrics` + `cycling_weeks`, computed in `domain/ride_analysis.py`. Exclusions (too_short < 5 min or < 1 km, power_outlier, hr_outlier) are analytics-only and shown with a reason; weekly hours (moving time) and load count every ride. eFTP = intervals.icu's `icu_rolling_ftp` on each real-power ride; EF = NP / avg HR on endurance rides ≥ 30 min, 28-day median; lines break after > 21 days. The EF trend line is drawn only where ≥ 3 EF rides fall in its 28-day window (2026-10-02): counted in the web (`analyse-view.shownEfTrend`), the one deliberate exception to "Python owns the numbers" — it only hides Python's ef_trend, never computes one. The endurance intensity basis is one switch, `ENDURANCE` = intervals.icu's IF < 0.75 (11 rides since 2025; NP / rolling eFTP selects 0 because the rolling eFTP is a floor). Revisit after an FTP test; consider an HR-zone-based endurance filter later.
 - Analyse / Styrke (decided 2026-10-01): kg counts as **lifted** once its session is matched to an intervals.icu activity; blok 11 (before the activity log) counts once its week has ended (`pre_log`); everything else is the plan and never counts. e1RM uses lifted kg only: kg × (1 + 0.0333 × (reps + 10 − RPE)) on competition-name top sets with an RPE prescription (≤ 8 reps); RPE = the logged LSRPE when present (the user logs it on the top set of each main lift from 2026-10-01), else the prescribed RPE. Week = best set, block = best week. Tonnage = kg × reps of lifted S/B/D sets, variants included. Phase per block in `domain/strength_analysis.PHASES` (≤ blok 11 in-season, ≥ 12 off-season; ask the user to confirm when a new block starts). The tab's 1RM table holds the user's old standard values: label it "1RM i arket (ikke testet)", never as progression. The Attempt Sheet tab is not used.
 - kg history (`strength_set_kg`, decided 2026-10-01): planned kg (first and last seen before the session is done) and lifted kg (once done, following corrections) with timestamps, for a later "how often and how much do I adjust in the gym" analysis. Planned null means "not observed". The daily workflow runs at 05:00, 12:00 and 20:00 Copenhagen so planned kg is usually seen before same-day sessions.
+
+## Milestone 3 brief (next, from 2026-10-26)
+Analyse › Samlet (slice `f` = `f1` data + `f2` UI): "Hvad gjorde hver blok ved min samlede belastning og fitness?" Starts after blok 12 ends (2026-10-25), so at least one block has both cycling and strength measured. Re-run the real-data checks before building.
+- Plan (tech-lead one-pager, 2026-10-01): `f1` = one migration `block_load` keyed (sheet_id, name), rebuilt by compute: mean weekly cycling / strength / total TSS over complete ISO weeks, CTL on start_date − 1 and on end_date (inclusive), an ongoing flag. `f2` = `/analyse/samlet` as the third tab: a block board plus weekly cycling/strength strips from `weekly_load`, with Styrke's block/phase ruler.
+- Decided (2026-10-01): complete weeks only; deload weeks count in the block mean; ΔCTL = CTL at end − CTL the day before start; gap weeks belong to no block; phase from `blocks.phase`. The split is shown in TSS only, never %, with an honesty note. Strength before 2026-08-10 and blok 11 strength show "ikke registreret", never 0.
+- Open (ask before `f1`): whether the user strength-trained Jan–Aug 2026 outside the sheet.
+- Not part of M3 (queued, each waits for go): `form-pct-ctl` (when CTL > 30), `rpe-trend` (once LSRPE is logged), `band-visibility`, `rpe-readable-nit`, `vo2max-estimate` (conditional). Garmin stays a non-goal.
 
 ## How we work: size every task first
 Before starting, the main session states the **size (S/M/L), the steps and the time budget** to the user. The user can change it.
