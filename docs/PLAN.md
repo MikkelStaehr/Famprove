@@ -2,6 +2,8 @@
 
 Every task and slice has a lowercase id here, and every commit ends with `Slice: <id>` (since
 2026-10-05). A new task or slice gets its row before its first commit; ids are never reused.
+A commit that only edits this file carries `Slice: plan-slices` (or no Slice line), never the id of
+a slice nobody worked on. Finished slices are marked by an empty commit with `Slice-Done: <id>` lines.
 Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was set.
 
 ## Slices
