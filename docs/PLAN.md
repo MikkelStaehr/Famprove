@@ -53,4 +53,4 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | rpe-trend | RPE trend on Styrke, once LSRPE is logged | — |
 | band-visibility | Prognose band visibility on real bands | S |
 | rpe-readable-nit | Redundant rpe_readable in planned_load | S |
-| vo2max-estimate | VO2max estimate from best 5-min W/kg; starts only with real max efforts (FTP/ramp test) or an estimate from intervals.icu or the watch | — |
+| vo2max-estimate | VO2max estimate from best 5-min W/kg, once real max efforts (FTP/ramp test) or an intervals.icu/watch estimate exist | — |
