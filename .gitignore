@@ -3,6 +3,10 @@
 !.env.example
 *service-account*.json
 *credentials*.json
+# Google key downloads are named <project-id>-<12 hex of the key id>.json (e.g. a GCP service
+# account key dropped in the repo root). Nothing at the root is tracked JSON: ignore all of it.
+/*.json
+*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].json
 secrets/
 
 # --- Node / Next.js ---
