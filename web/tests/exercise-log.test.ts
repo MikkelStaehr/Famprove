@@ -20,13 +20,11 @@ test("tapChange: first tick starts, the completing tick ends and names the next 
     kind: "start",
     exercise: "Squat",
     next: null,
-    previous: null,
   });
   assert.deepEqual(tapChange(ROWS, ticked("a"), "b", true), {
     kind: "end",
     exercise: "squat",
     next: "Dips",
-    previous: null,
   });
   // A one-row exercise: its only tick is its end (the server also sets its start).
   assert.equal(tapChange(ROWS, ticked("a", "b"), "c", true)?.kind, "end");
@@ -38,14 +36,12 @@ test("tapChange: unticking a done exercise undoes its end, its only tick undoes 
     kind: "undo-end",
     exercise: "Squat",
     next: "Dips",
-    previous: null,
   });
   assert.deepEqual(tapChange(ROWS, ticked("c"), "c", false)?.kind, "undo-end");
   assert.deepEqual(tapChange([...ROWS, { key: "e", name: "Facepulls" }], ticked("d"), "d", false), {
     kind: "undo-start",
     exercise: "Facepulls",
     next: null,
-    previous: "Dips",
   });
 });
 
@@ -61,8 +57,10 @@ test("tapChange: a middle row of an exercise is not a tap", () => {
 });
 
 test("parseTapInput: exact shape only", () => {
-  const ok = { kind: "end", exercise: " Squat ", next: "Dips", previous: null, date: "2026-10-12", session: 2 };
+  const ok = { kind: "end", exercise: " Squat ", next: "Dips", date: "2026-10-12", session: 2, at: null };
   assert.deepEqual(parseTapInput(ok), { ...ok, exercise: "Squat" });
+  const undo = { ...ok, kind: "undo-end", at: "2026-10-12T08:05:00.123+00:00" };
+  assert.deepEqual(parseTapInput(undo), { ...undo, exercise: "Squat" });
   for (const bad of [
     null,
     "x",
@@ -70,7 +68,11 @@ test("parseTapInput: exact shape only", () => {
     { ...ok, exercise: "" },
     { ...ok, exercise: "x".repeat(201) },
     { ...ok, next: 3 },
-    { ...ok, previous: undefined },
+    { ...ok, at: undefined },
+    { ...ok, at: "2026-10-12T08:05:00.000Z" }, // start / end never carry a time
+    { ...undo, at: null }, // an undo always does
+    { ...undo, at: "yesterday" },
+    { ...undo, at: "2026-10-12T25:61:00Z" },
     { ...ok, date: "12-10-2026" },
     { ...ok, session: 0 },
     { ...ok, session: 1.5 },
@@ -169,7 +171,7 @@ function options(db: FakeDb, overrides: Partial<RecordOptions> = {}): RecordOpti
 }
 
 function tap(kind: TapInput["kind"], exercise: string, more: Partial<TapInput> = {}): TapInput {
-  return { kind, exercise, next: null, previous: null, date: "2026-10-12", session: 1, ...more };
+  return { kind, exercise, next: null, date: "2026-10-12", session: 1, at: null, ...more };
 }
 
 function log(db: FakeDb): Array<[unknown, unknown, unknown]> {
@@ -178,7 +180,7 @@ function log(db: FakeDb): Array<[unknown, unknown, unknown]> {
 
 test("recordTap: first tick starts X; the completing tick ends X and starts the next", async () => {
   const db = fakeDb();
-  assert.deepEqual(await recordTap(tap("start", "Squat"), at(0), options(db)), { ok: true });
+  assert.deepEqual(await recordTap(tap("start", "Squat"), at(0), options(db)), { ok: true, at: iso(0) });
   assert.deepEqual(log(db), [[1, iso(0), null]]);
   await recordTap(tap("end", "Squat", { next: "Dips" }), at(5), options(db));
   assert.deepEqual(log(db), [
@@ -212,26 +214,36 @@ test("recordTap: re-ticking after a reload changes nothing (first write wins, no
   ]);
 });
 
-test("recordTap: undo clears exactly what its tap wrote", async () => {
+/** The timestamp a start / end tap returned (what it wrote), as the client keeps it. */
+async function written(input: TapInput, when: Date, db: FakeDb): Promise<string | null> {
+  const result = await recordTap(input, when, options(db));
+  assert.equal(result.ok, true);
+  return result.ok ? result.at : null;
+}
+
+test("recordTap: a tap returns what it wrote, and undo with that clears exactly it", async () => {
   const db = fakeDb();
-  await recordTap(tap("start", "Squat"), at(0), options(db));
-  await recordTap(tap("end", "Squat", { next: "Dips" }), at(5), options(db));
-  await recordTap(tap("undo-end", "Squat", { next: "Dips" }), at(6), options(db));
+  const start = await written(tap("start", "Squat"), at(0), db);
+  const end = await written(tap("end", "Squat", { next: "Dips" }), at(5), db);
+  assert.deepEqual([start, end], [iso(0), iso(5)]);
+  await recordTap(tap("undo-end", "Squat", { next: "Dips", at: end }), at(6), options(db));
   assert.deepEqual(log(db), [[1, iso(0), null]]); // Squat's real start stays; Dips' row is gone
-  await recordTap(tap("undo-start", "Squat"), at(7), options(db));
+  await recordTap(tap("undo-start", "Squat", { at: start }), at(7), options(db));
   assert.deepEqual(log(db), []);
 
   // A one-row first exercise: its tap wrote start and end, so its undo removes the row.
-  await recordTap(tap("end", "Facepulls"), at(10), options(db));
-  await recordTap(tap("undo-end", "Facepulls"), at(11), options(db));
+  const one = await written(tap("end", "Facepulls"), at(10), db);
+  await recordTap(tap("undo-end", "Facepulls", { at: one }), at(11), options(db));
   assert.deepEqual(log(db), []);
 });
 
-test("recordTap: undo-start keeps a start that the previous exercise's end wrote", async () => {
+test("recordTap: a tap that wrote nothing returns no timestamp, so there is nothing to undo", async () => {
   const db = fakeDb();
-  await recordTap(tap("end", "Dips", { next: "Facepulls" }), at(0), options(db));
-  await recordTap(tap("start", "Facepulls"), at(3), options(db)); // no-op: already started
-  await recordTap(tap("undo-start", "Facepulls", { previous: "Dips" }), at(4), options(db));
+  await written(tap("end", "Dips", { next: "Facepulls" }), at(0), db);
+  // Facepulls' first tick: its start was already written by Dips' end (first write wins).
+  assert.equal(await written(tap("start", "Facepulls"), at(3), db), null);
+  // An undo carrying any other tap's timestamp clears nothing.
+  await recordTap(tap("undo-start", "Facepulls", { at: iso(3) }), at(4), options(db));
   assert.deepEqual(log(db), [
     [2, iso(0), iso(0)],
     [3, iso(0), null],

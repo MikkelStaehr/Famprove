@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-import { logExerciseTap } from "@/app/actions";
 import type { IsoDate } from "@/lib/db/rows";
-import { tapChange, type TapInput } from "@/lib/exercise-taps";
+import { tapChange } from "@/lib/exercise-taps";
 import { formatSetLoad, formatSetsReps, prescriptionKg, spokenExercise } from "@/lib/format";
 import type { ExerciseView } from "@/lib/today-view";
 
@@ -73,37 +72,19 @@ type ListProps = {
 
 type Unsaved = "dev" | "failed" | null;
 
-/**
- * Saves the exercise timing tap a tick makes (lib/exercise-taps.ts) through the server action.
- * The tick itself is instant and in memory; a save that fails leaves the tick and shows why.
- * Server actions run one at a time per client, so taps reach the server in order.
- */
-function useTapLog(): {
-  readonly unsaved: Unsaved;
-  readonly save: (input: TapInput) => void;
-} {
-  const [unsaved, setUnsaved] = useState<Unsaved>(null);
-  const [, startTransition] = useTransition();
-  const save = (input: TapInput) =>
-    startTransition(async () => {
-      try {
-        const result = await logExerciseTap(input);
-        setUnsaved(result.ok ? null : result.reason === "dev" ? "dev" : "failed");
-      } catch {
-        setUnsaved("failed"); // offline, or a deployment that no longer knows this action
-      }
-    });
-  return { unsaved, save };
-}
-
 /** One <li> per sheet row in sheet order; consecutive rows with the same name form one run. */
 export function ExerciseList({ date, session, week, exercises }: ListProps) {
-  const { ticked, setTicked } = useTicks();
-  const { unsaved, save } = useTapLog();
+  const { ticked, setTicked, saveTap } = useTicks();
+  // A failed save stays reported until reload: a later success doesn't bring the lost time back.
+  const [unsaved, setUnsaved] = useState<Unsaved>(null);
+  // The tick is instant and in memory; the timing tap it makes is saved behind it (TickProvider).
   const toggle = (rowKey: string, done: boolean) => {
     const change = tapChange(exercises, (k) => ticked.has(tickKey(date, k)), rowKey, done);
     setTicked(tickKey(date, rowKey), done);
-    if (change !== null) save({ ...change, date, session });
+    if (change === null) return;
+    void saveTap(change, date, session).then((outcome) => {
+      if (outcome !== "saved") setUnsaved((was) => (was === "failed" ? was : outcome));
+    });
   };
   // The NÆSTE slab: the first unticked row in document order; none when every row is ticked.
   const nextIndex = exercises.findIndex((e) => !ticked.has(tickKey(date, e.key)));
@@ -139,7 +120,7 @@ export function ExerciseList({ date, session, week, exercises }: ListProps) {
           );
         })}
       </ol>
-      {unsaved === "failed" && <WarningLine>Tidspunktet blev ikke gemt. Fluebenet står.</WarningLine>}
+      {unsaved === "failed" && <WarningLine>Et tidspunkt blev ikke gemt. Fluebenet står.</WarningLine>}
       {unsaved === "dev" && (
         <p className="text-14 text-text-muted">Testvisning: tidspunkter gemmes ikke.</p>
       )}

@@ -130,7 +130,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - **Tick state:**
   - In memory only (client provider in the root layout). It survives in-app navigation and clears on reload.
   - No storage. One request per exercise start/end (added 2026-10-12, the app's only write): the tick that starts an exercise and the tick that completes it (its last row) save a timestamp to `exercise_log` through a server action; unticking undoes it. The tick never waits for the save.
-  - A failed save leaves the tick and shows a `WarningLine` under the rows: "Tidspunktet blev ikke gemt. Fluebenet står." Under DEV_TODAY / DEV_FIXTURE nothing is saved and a muted line says "Testvisning: tidspunkter gemmes ikke."
+  - A failed save leaves the tick and shows a `WarningLine` under the rows until reload (a later save doesn't bring the lost time back): "Et tidspunkt blev ikke gemt. Fluebenet står." Under DEV_TODAY / DEV_FIXTURE nothing is saved and a muted line says "Testvisning: tidspunkter gemmes ikke."
   - One footnote says what lasts: "Flueben forsvinder, når siden genindlæses; start og slut pr. øvelse gemmes. Log kg i arket."
 - **Ride steps:**
   - Left column: label and duration.

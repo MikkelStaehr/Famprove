@@ -10,9 +10,14 @@
  *                                                                   started_at if null
  *   undo-end    unticking a row of a completed X                 -> clears what the end tap wrote
  *   undo-start  unticking X's only ticked row                     -> clears what the start tap wrote
- * Every field one tap writes holds the same server timestamp, so the server can tell which tap
- * wrote a field by comparing values; the client never sends a time. Nothing computes from the
- * log: it is collected to split the Garmin HR stream of a strength session per exercise later.
+ * Every field one tap writes holds that tap's server timestamp, and the server returns it only
+ * when the tap wrote something (first write wins, so a re-tick after a reload writes nothing).
+ * The client keeps it in memory, like the ticks, and an undo sends it back: the server clears
+ * only fields that still hold exactly that value. The client never sends a time of its own.
+ * Limit: an exercise split around another one (Squat, Bench, Squat) is one row; the one in the
+ * middle then starts and ends inside it. No real session did that (checked 2026-10-12).
+ * Nothing computes from the log: it is collected to split the Garmin HR stream of a strength
+ * session per exercise later.
  */
 
 export type TapKind = "start" | "end" | "undo-end" | "undo-start";
@@ -22,14 +27,14 @@ export type TapChange = {
   readonly exercise: string; // the sheet name as written (trimmed)
   /** end / undo-end: the exercise of the first row after X's last row; null when X is last. */
   readonly next: string | null;
-  /** undo-start: the exercise of the row before X's first row; null when X is first. */
-  readonly previous: string | null;
 };
 
 /** What the server action receives (validated again on the server by parseTapInput). */
 export type TapInput = TapChange & {
   readonly date: string; // YYYY-MM-DD, the Today screen's date
   readonly session: number; // the n-th strength session of the ISO week
+  /** undo-*: the timestamp the server returned for the tap being undone; null for start / end. */
+  readonly at: string | null;
 };
 
 type Row = { readonly key: string; readonly name: string };
@@ -57,20 +62,21 @@ export function tapChange(
   const before = own.filter((i) => tickedBefore(rows[i].key)).length;
   const after = before + (done ? 1 : -1);
   const exercise = rows[index].name.trim();
-  const first = own[0];
   const last = own[own.length - 1];
   const next = last + 1 < rows.length ? rows[last + 1].name.trim() : null;
-  const previous = first > 0 ? rows[first - 1].name.trim() : null;
-  if (done && after === own.length) return { kind: "end", exercise, next, previous: null };
-  if (done && before === 0) return { kind: "start", exercise, next: null, previous: null };
-  if (!done && before === own.length) return { kind: "undo-end", exercise, next, previous: null };
-  if (!done && after === 0) return { kind: "undo-start", exercise, next: null, previous };
+  if (done && after === own.length) return { kind: "end", exercise, next };
+  if (done && before === 0) return { kind: "start", exercise, next: null };
+  if (!done && before === own.length) return { kind: "undo-end", exercise, next };
+  if (!done && after === 0) return { kind: "undo-start", exercise, next: null };
   return null;
 }
 
 const KINDS: readonly TapKind[] = ["start", "end", "undo-end", "undo-start"];
 export const MAX_SESSION = 14; // the sheet never plans more; anything above is not a session
 const MAX_NAME = 200;
+
+/** An ISO timestamp as the server returns or writes it, e.g. 2026-10-12T08:05:00.123+00:00. */
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
 
 function name(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -88,12 +94,13 @@ export function parseTapInput(raw: unknown): TapInput | null {
   const kind = KINDS.find((k) => k === r.kind);
   const exercise = name(r.exercise);
   const next = r.next === null ? null : name(r.next);
-  const previous = r.previous === null ? null : name(r.previous);
+  const undo = kind === "undo-end" || kind === "undo-start";
+  const at = typeof r.at === "string" && TIMESTAMP.test(r.at) && !Number.isNaN(Date.parse(r.at)) ? r.at : null;
   if (
     kind === undefined ||
     exercise === null ||
     (r.next !== null && next === null) ||
-    (r.previous !== null && previous === null) ||
+    (undo ? at === null : r.at !== null) ||
     typeof r.date !== "string" ||
     !/^\d{4}-\d{2}-\d{2}$/.test(r.date) ||
     typeof r.session !== "number" ||
@@ -103,5 +110,5 @@ export function parseTapInput(raw: unknown): TapInput | null {
   ) {
     return null;
   }
-  return { kind, exercise, next, previous, date: r.date, session: r.session };
+  return { kind, exercise, next, date: r.date, session: r.session, at };
 }

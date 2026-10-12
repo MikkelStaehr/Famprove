@@ -23,13 +23,15 @@ import { RowError } from "./rows.ts";
  *  - the date must be today (Copenhagen), and dev switches (DEV_TODAY, DEV_FIXTURE) write nothing;
  *  - every name must be in that ISO week's session of the sheet (strength_sets) and resolve in
  *    public.exercises (name or alias, trimmed, case-insensitive);
- *  - timestamps are this server's clock; every field one tap writes holds the same value, which
- *    is how an undo finds what its tap wrote (it clears a field only while it still holds it).
+ *  - timestamps are this server's clock; every field one tap writes holds that tap's timestamp,
+ *    returned as `at` only when the tap wrote something (first write wins). An undo sends that
+ *    `at` back and clears only fields that still hold it, so an undo of a tap that wrote nothing
+ *    (a re-tick after a reload) changes nothing.
  * Python never reads this table; nothing computes from it.
  */
 
 export type TapResult =
-  | { readonly ok: true }
+  | { readonly ok: true; readonly at: string | null } // at: what a start / end tap wrote, if anything
   | { readonly ok: false; readonly reason: "dev" | "invalid" | "failed" };
 
 const LOG = "exercise_log";
@@ -114,6 +116,11 @@ async function setIfNull(c: PostgrestClient, k: Key, fields: readonly Field[], a
   }
 }
 
+/** The same instant (the server returns "…+00:00", the tap wrote "…Z"). */
+function sameInstant(stored: string | null, at: string): boolean {
+  return stored !== null && Date.parse(stored) === Date.parse(at);
+}
+
 /** Clears every field that still holds `at` (what one tap wrote); deletes the row if empty. */
 async function clearIfEqual(c: PostgrestClient, k: Key, at: string, now: string): Promise<void> {
   for (const field of ["ended_at", "started_at"] as const) {
@@ -145,7 +152,7 @@ export async function recordTap(input: TapInput, now: Date, options: RecordOptio
   if (input.date !== localToday(now)) return { ok: false, reason: "invalid" };
   try {
     const c = makeClient();
-    const named = [input.exercise, input.next, input.previous].filter((n) => n !== null);
+    const named = [input.exercise, input.next].filter((n) => n !== null);
     const [inSession, ids] = await Promise.all([
       sessionNames(c, isoWeekStart(input.date), input.session),
       exerciseIds(c),
@@ -153,35 +160,38 @@ export async function recordTap(input: TapInput, now: Date, options: RecordOptio
     if (!named.every((n) => inSession.has(exerciseKey(n)) && ids.has(exerciseKey(n)))) {
       return { ok: false, reason: "invalid" };
     }
-    const key = (n: string): Key => ({ date: input.date, session: input.session, id: ids.get(exerciseKey(n)) ?? 0 });
+    const key = (n: string): Key => {
+      const id = ids.get(exerciseKey(n));
+      if (id === undefined) throw new RowError("exercise checked above has no id"); // unreachable
+      return { date: input.date, session: input.session, id };
+    };
     const x = key(input.exercise);
+    const next = input.next === null ? null : key(input.next);
     const at = now.toISOString();
     switch (input.kind) {
-      case "start":
+      case "start": {
         await setIfNull(c, x, ["started_at"], at);
-        break;
-      case "end":
-        await setIfNull(c, x, ["started_at", "ended_at"], at);
-        if (input.next !== null) await setIfNull(c, key(input.next), ["started_at"], at);
-        break;
-      case "undo-end": {
         const row = await readRow(c, x);
-        if (row?.endedAt == null) break;
-        await clearIfEqual(c, x, row.endedAt, at);
-        if (input.next !== null) await clearIfEqual(c, key(input.next), row.endedAt, at);
-        break;
+        return { ok: true, at: sameInstant(row?.startedAt ?? null, at) ? at : null };
       }
+      case "end": {
+        await setIfNull(c, x, ["started_at", "ended_at"], at);
+        if (next !== null) await setIfNull(c, next, ["started_at"], at);
+        const [own, following] = await Promise.all([readRow(c, x), next === null ? null : readRow(c, next)]);
+        const wrote =
+          sameInstant(own?.startedAt ?? null, at) ||
+          sameInstant(own?.endedAt ?? null, at) ||
+          sameInstant(following?.startedAt ?? null, at);
+        return { ok: true, at: wrote ? at : null };
+      }
+      case "undo-end":
       case "undo-start": {
-        const row = await readRow(c, x);
-        if (row?.startedAt == null) break;
-        // Set by the previous exercise's end tap, not by this exercise's first tick: keep it.
-        const previous = input.previous === null ? null : await readRow(c, key(input.previous));
-        if (previous?.endedAt === row.startedAt) break;
-        await clearIfEqual(c, x, row.startedAt, at);
-        break;
+        if (input.at === null) return { ok: false, reason: "invalid" }; // parseTapInput requires it
+        await clearIfEqual(c, x, input.at, at);
+        if (input.kind === "undo-end" && next !== null) await clearIfEqual(c, next, input.at, at);
+        return { ok: true, at: null };
       }
     }
-    return { ok: true };
   } catch (error) {
     if (error instanceof PostgrestError || error instanceof EnvError || error instanceof RowError) {
       console.error("exercise_log: tap not saved", error.message);
