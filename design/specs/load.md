@@ -1,6 +1,6 @@
 # Spec-lite – Belastning (`/load`)
 
-Owner: design-lead · 2026-09-30 · for `ui`. Contract: `DESIGN.md` Part A + Part B (Spurt), pattern pack `design/patterns/data-dashboard.md` (structure). Language and number rules as `design/specs/today.md` (top): Danish UI, `ons. 30. sep.`, `kl. 05.03`, decimal comma, U+2212, never translate TSS/W/FTP/CTL/ATL/TSB, block tab names or activity names.
+Owner: design-lead · 2026-09-30 · for `ui`. Contract: `DESIGN.md` Part A + Part B (Spurt), pattern pack `design/patterns/data-dashboard.md` (structure). Language and number rules as `design/specs/traening.md` (top): Danish UI, `ons. 30. sep.`, `kl. 05.03`, decimal comma, U+2212, never translate TSS/W/FTP/CTL/ATL/TSB, block tab names or activity names.
 
 ## 1. Question and primary action
 - "How loaded am I right now, and is fitness going up?"

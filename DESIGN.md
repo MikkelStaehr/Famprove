@@ -10,15 +10,15 @@ When Part B and a pattern pack conflict, Part B wins on look and the pack wins o
 ---
 
 ## Product profile
-- **Product type:** personal training companion. Three screens: **I dag** (what to do in today's session), **Belastning** (fitness, fatigue and form over time) and **Analyse** (am I getting fitter: Cykel and Styrke now, Samlet later).
+- **Product type:** personal training companion. Three screens: **Træning** (today's session, with its full-screen **Fokus** mode for one set at a time), **Belastning** (fitness, fatigue and form over time) and **Analyse** (am I getting fitter: Cykel and Styrke now, Samlet later).
 - **Primary users & context:** one user. On the phone in the gym between sets — a quick glance at arm's length, one hand, sweaty fingers — and at home; at the desk to review load.
 - **Platform:** mobile web (home-screen bookmark), desktop browser for review. Next.js on Vercel.
-- **Locale:** da-DK. Danish UI copy ("I dag", "Belastning", "2 af 8 udført"). Dates `ons. 30. sep.`, times `kl. 09.31`, decimal comma. Exercise names and sheet cells are shown **exactly as written** in the coach's sheet (often English: "Lat pulldowns", "Bicep of choice").
+- **Locale:** da-DK. Danish UI copy ("Træning", "Belastning", "7 af 24 sæt udført"). Dates `ons. 30. sep.`, times `kl. 09.31`, decimal comma. Exercise names and sheet cells are shown **exactly as written** in the coach's sheet (often English: "Lat pulldowns", "Bicep of choice").
 - **References the user likes:**
   - **Whoop** — dark, calm, one big number per state, colour means status.
   - **intervals.icu** — dense and honest data, serious about the numbers.
   - **Strava** — energetic, clear cards, confident typography.
-- **Pattern packs:** [`design/patterns/data-dashboard.md`](design/patterns/data-dashboard.md) for `/load` (Belastning). `/` (I dag) is a checklist/workout screen, not a dashboard.
+- **Pattern packs:** [`design/patterns/data-dashboard.md`](design/patterns/data-dashboard.md) for `/load` (Belastning). `/` (Træning) and `/fokus` (Fokus) are workout screens, not dashboards.
 
 ---
 
@@ -28,8 +28,8 @@ When Part B and a pattern pack conflict, Part B wins on look and the pack wins o
 1. One screen answers one question. If the user needs to scroll to find the answer, the layout is wrong.
 2. Mobile first. Design at 390px, then let it grow. Never the other way round.
 3. Show state honestly: loading, empty, error and stale each have their own visible treatment. Never a blank area.
-4. Numbers before decoration. On `/load` the key figure is the largest element; on `/` the session's prescription numbers are. Charts support, never replace.
-5. One primary action per screen, visually dominant. On `/` that is ticking a sheet row.
+4. Numbers before decoration. On `/load` the key figure is the largest element; on `/` the session's prescription numbers are; on `/fokus` the current set's reps and kg. Charts support, never replace.
+5. One primary action per screen, visually dominant. On `/` that is Begynd / Fortsæt træning; on `/fokus` one per view state (Udført, Til næste sæt, Tilbage til Træning).
 
 ## Tokens contract
 Token **names and roles** are fixed here; their **values** come from Part B.
@@ -37,14 +37,14 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - Every theme the direction ships (light, dark, or one only) meets the accessibility rules below.
 - Spacing: 4-point scale – 4, 8, 12, 16, 24, 32, 48, 64.
 - Radius: one value per role (control, card, pill), no exceptions.
-- Type: one scale, named by px (`text-12 … text-56`, set by Part B). Tabular numerals for every number that is compared or read mid-set. Glance sizes for `/` are in "Today" below.
+- Type: one scale, named by px (`text-12 … text-56`, set by Part B). Tabular numerals for every number that is compared or read mid-set. Glance sizes for `/` and `/fokus` are in "Træning" below.
 - Semantic colours carry meaning only with a label, icon or shape – never colour alone.
 - Tokens only: no magic values in components. Tailwind's default colour, text-size and radius scales stay removed.
 
 ## Layout
 - Max content width 720px on desktop; single column on mobile.
 - Hero block at top of `/load`: key figure + one-line status. Everything else below.
-- Sticky header only if there is navigation; otherwise none (overridden for `ScreenNav`, see "Today").
+- Sticky header only if there is navigation; otherwise none (overridden for `ScreenNav`, see "Træning").
 
 ## Components (minimum set)
 - `KeyFigure` – label, value, delta (with direction), status colour.
@@ -53,7 +53,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - `StatusBadge` – text + semantic colour.
 - `EmptyState` – icon, one sentence, optional action.
 - `ErrorState` – what failed, when, retry.
-- `ScreenNav` – tab strip (three links: I dag · Belastning · Analyse) in the root layout; current tab = `aria-current="page"`, marked by weight **and** a bar or fill, never colour alone.
+- `ScreenNav` – tab strip (three links: Træning · Belastning · Analyse; absent on `/fokus`) in the root layout; current tab = `aria-current="page"`, marked by weight **and** a bar or fill, never colour alone.
 
 ## Interaction
 - Touch targets ≥ 44×44px. Tap, not hover, for anything essential.
@@ -61,7 +61,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - Keyboard: every interactive element focusable, visible focus ring, logical tab order.
 - Loading: skeleton in the exact shape of the content, never a spinner in a card.
 - Data freshness: show "updated <time>" wherever data comes from a job; mark stale (> expected interval) in `--warning` with text and an icon.
-- Undo over confirm: tapping a ticked row again unticks it.
+- Undo over confirm: tapping a done set again reopens it; Fokus has Fortryd for the latest tap; Afslut needs no confirm (progress is kept).
 
 ## Accessibility checklist (run before merge)
 - [ ] WCAG 2.2 AA in every theme: text ≥ 4.5:1; large text, icons, check rings and control borders ≥ 3:1.
@@ -83,8 +83,8 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - No decoration that serves neither the direction nor the hierarchy.
 
 ## Project rules
-- **Screens:** three routes linked by `ScreenNav` ("I dag" · "Belastning" · "Analyse"). All UI copy is Danish; the exact strings live in `design/specs/today.md` §5a, `design/specs/load.md` §4 and §6, `design/specs/analyse.md` §6 and `design/specs/analyse-styrke.md` §4–6.
-  - `/` **Today / I dag** answers "What am I doing in this session, and how hard?" (spec `design/specs/today.md`, rules in "Today" below).
+- **Screens:** three routes linked by `ScreenNav` ("Træning" · "Belastning" · "Analyse"), plus `/fokus` without nav. All UI copy is Danish; the exact strings live in `design/specs/traening.md` §6, `design/specs/load.md` §4 and §6, `design/specs/analyse.md` §6 and `design/specs/analyse-styrke.md` §4–6.
+  - `/` **Træning** answers "What is my session, and how fresh am I for it?" and `/fokus` **Fokus** answers "What do I lift now?" (spec `design/specs/traening.md`, rules in "Træning" below).
   - `/load` **Training load / Belastning** answers "How loaded am I right now, and is fitness going up?". The bullets below, from "Key figure" to "Data", describe `/load`.
   - `/analyse` **Analyse** answers "Am I getting fitter?" in two sections, which are link tabs (`Cykel` · `Styrke`, `aria-current`, no tab roles, no Samlet placeholder) under the shared h1:
     - `/analyse` **Cykel** ("on the bike?", spec `design/specs/analyse.md`): the hero is the eFTP figure, and `--slab` marks the latest eFTP point and the current week.
@@ -92,7 +92,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
     - Both follow the data-dashboard pack. Each section shows its own `UpdatedLine` under the tabs.
 - **Pattern packs:**
   - `/load` follows [`design/patterns/data-dashboard.md`](design/patterns/data-dashboard.md). Conflict: the pack rounds kg to 1 decimal, but this app shows kg as logged (up to 2 decimals), because the user compares against their own sheet. DESIGN.md wins.
-  - `/` Today is not a dashboard, so the pack's "key figure is the largest element" does not apply there: the session's prescription numbers are. Its data-honesty rules do apply: freshness, gaps never shown as zeros, whole watts.
+  - `/` Træning and `/fokus` are not dashboards, so the pack's "key figure is the largest element" does not apply there: the session's prescription numbers (Fokus: reps and kg) are. Its data-honesty rules do apply: freshness, gaps never shown as zeros, whole watts.
 - **Key figure (hero):** TSB today (form = CTL − ATL) from the latest `daily_load` row, shown as the zone bar (Part B, hero size), with a one-line status.
 - **Chart:** CTL, ATL and TSB per day since 2026-01-01. Strength blocks shaded (`blocks.start_date` → `end_date`, an ongoing block runs to today); deload weeks marked (`blocks.deload_start` → `end_date`) by pattern, not only colour.
 - **Secondary:** this week's sessions (ISO week, Mon–Sun) — cycling TSS and strength TSS per day, plus the week total from `weekly_load`. A week switcher (`?week=2026-W33`, previous / next ISO week, "Back to this week") looks back; days expand to their rides and strength exercises.
@@ -105,42 +105,45 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - Title "Denne uge · uge N" for the latest week, "Uge N" otherwise; the "Tilbage til denne uge" link sits in the card action.
 - Switcher: previous / next are real links (44 × 44, `aria-label` names the target week), absent at the ends (an empty 44px box keeps the label centred). They use `scroll={false}` so switching keeps the scroll position and keyboard focus. Label: date range + ISO week (`2026-W33`).
 - Switching weeks re-renders only the day list: a `<Suspense>` keyed by the week shows its skeleton; hero and chart never flash. Detail errors show an ErrorState inside the card.
-- Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days (no ride and no strength activity) are a plain row reading "Hvile". Strength sits on its matched activity's date; planned-but-undone sessions are not shown (spec `design/specs/today.md` §8). Column heads are visual only; each row speaks "cykling N TSS, …".
+- Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days (no ride and no strength activity) are a plain row reading "Hvile". Strength sits on its matched activity's date; planned-but-undone sessions are not shown (spec `design/specs/traening.md` §8). Column heads are visual only; each row speaks "cykling N TSS, …".
 - Row grid: day + three 64px TSS columns when the list is ≥ 20rem wide (Tailwind `@xs` container query, so it tracks text size); narrower, e.g. at 200% text, the day moves above the numbers instead of scrolling sideways.
 - Missing values show "–", spoken as "ikke registreret". A blank kg on a weighted exercise reads "intet kg logget", never "0 kg". Score/set is labelled as the raw score before the strength factor.
 - VI (added 2026-10-12): after NP and IF on a ride, "VI 1,18" (Python's ride_metrics.vi, 2 decimals). The term "VI" is an `<abbr>` with the tooltip "Jævnhed – 1.0 = konstant effekt" (supplementary: hover only, so nothing essential depends on it). When Python flags it (VI > 1.15 on a Z2 day: a planned session or the ride named "Z2"), the value is `--warning` with the triangle from `WarningLine` and sr-only ", ujævn effekt på en Z2-dag": never colour alone. A ride without VI (no NP or no average power) shows no VI item.
 - Effective kg (added 2026-10-12): on a bodyweight exercise whose effective kg (Python: logged + BODYWEIGHT × the exercise's bodyweight fraction) differs from the logged kg, the load line adds "· 95 kg effektivt" in `--text-muted`, spoken ", effektivt 95 kg". The logged kg stays as written; nothing is shown where the two are the same.
 
-### Today (`/`, added by design-lead; full spec `design/specs/today.md`)
-- **Use:** a companion screen, read at arm's length (≈ 60–80 cm) in the gym or from the handlebar. The session is the hero. Form (TSB) is the compact zone bar in the header (Part B), not a key figure.
-- **Data:** server-side, read-only except the exercise timing taps (below). It uses the latest `daily_load` row for the form line, the next undone strength session of the ISO week (session k + 1 of N; the n-th strength activity of the week is session n, and undone sessions have no date), and `planned_sessions` for rides. Python computes every number, including target watts. "Today" is the Europe/Copenhagen date at request time.
+### Træning (`/`) and Fokus (`/fokus`) (design-lead; renamed from Today 2026-10-12; full spec `design/specs/traening.md`)
+- **Use:** a companion for the gym and the handlebar, read at arm's length (≈ 60–80 cm). `/` **Træning** is the overview of the day: the form flag with a one-line hint, the open strength session with its one primary action (**Begynd træning** / **Fortsæt træning**), ride and rest cards. `/fokus` **Fokus** is a full-screen mode for one set at a time, reached from that button; it is not a nav tab.
+- **Data:** server-side, read-only except the **set log** (below). Træning uses the latest `daily_load` row for the form flag, the next undone strength session of the ISO week (session k + 1 of N; the n-th strength activity of the week is session n, and undone sessions have no date), and `planned_sessions` for rides. Python computes every number, including target watts and the suggested kg; the web only formats. The rest timer (now − last done tap) is a clock, not a training metric. The date is the Europe/Copenhagen date at request time.
 - **Glance sizes** (Part B scale):
-  - text-32 Barlow Condensed 700 tabular: anything read mid-set or mid-interval, i.e. sets × reps, prescribed load, target watts.
-  - text-20: exercise names, the last-week reference, step labels and durations.
-  - text-16 / 14 muted: supporting lines.
-  - Nothing in a session card is smaller than 14px.
-- **As written:** sheet strings (name, sets, reps, prescribed load) are shown verbatim, e.g. "8 - 12", "RPE 6 - 7", "-10%". Only screen-reader text rewrites " - " to " to ". Python-computed numbers (watts, % FTP, durations) use the shared formatters: whole W, en-dash ranges.
-- **Tick rows:**
-  - Each sheet row is a `<label>` wrapping a native checkbox, and the whole row is the target.
-  - The check is a 28px circle, left of the text: a `--text-muted` ring, or filled `--slab` with a `--slab-mark` ✓ when ticked (Part B). The ✓ shape carries the meaning, not only colour.
-  - Ticked text turns `--text-muted`; a run's name only once the whole run is ticked. No strike-through, no reordering, rows never move. The only motion is Part B's 120ms press and 180ms colour hand-over, off under reduced motion.
-  - Retries ("Prøv igen") are in-app navigations, so ticks survive them; only a browser reload clears ticks.
-  - The focus ring surrounds the whole row.
-  - Consecutive rows with the same name show the name once, except the NÆSTE row (Part B). Dividers go between runs only.
-- **Tick state:**
-  - In memory only (client provider in the root layout). It survives in-app navigation and clears on reload.
-  - No storage. One request per exercise start/end (added 2026-10-12, the app's only write): the tick that starts an exercise and the tick that completes it (its last row) save a timestamp to `exercise_log` through a server action; unticking undoes it. The tick never waits for the save.
-  - A failed save leaves the tick and shows a `WarningLine` under the rows until reload (a later save doesn't bring the lost time back): "Et tidspunkt blev ikke gemt. Fluebenet står." Under DEV_TODAY / DEV_FIXTURE nothing is saved and a muted line says "Testvisning: tidspunkter gemmes ikke."
-  - One footnote says what lasts: "Flueben forsvinder, når siden genindlæses; start og slut pr. øvelse gemmes. Log kg i arket."
+  - Fokus: `text-56` for reps (Condensed 700 upright) and the kg figure (Condensed 800 italic for a suggestion, 700 upright for last week's logged kg); the rest timer `text-56` italic. These are the largest things on the screen.
+  - Træning: `text-32` Barlow Condensed 700 tabular for anything read mid-set or mid-interval (reps, prescription, target watts); `text-20` for exercise names, set lines, the Forslag / Sidste uge line, step labels and durations; `text-16` / 14 muted for supporting lines. Nothing in a session card is smaller than 14px.
+- **As written vs computed:** sheet strings (name, reps, prescription) are shown verbatim ("8 - 12", "RPE 6 - 7", "-12.5%"); only screen-reader text rewrites " - " to " til ". Python numbers use the shared formatters. In Condensed figures, **upright = as written in the sheet, italic = computed by the app** (the suggestion, the zone-flag value). The suggested kg always carries the word `Forslag` and never sits in the prescription line, so it can never pass for a prescribed or logged value. The sheet's own pre-filled kg is not shown on Træning or Fokus (decided 2026-10-12).
+- **Set groups and tick lines (Træning):**
+  - One group per sheet row: name (first group of a run, and the NÆSTE group), prescription line, Forslag / Sidste uge line, then one tick line per set.
+  - Each set is a `<label>` wrapping a native checkbox, ≥ 44px, the whole line is the target: check, `Sæt 1 af 2`, and a right-aligned status (`kl. 18.42`, `sprunget over`, or the Næste tag). Its accessible name is the full sentence (`Squat, sæt 1 af 2, 5 reps ved RPE 7, forslag 142,5 kg, sidste uge 140 kg`).
+  - Check: 28px circle. Open = `--text-muted` ring; done = `--slab` fill with a `--slab-mark` ✓; skipped = ring with a minus bar plus the word. Shape carries meaning, not colour. Done/skipped text turns muted; no strike-through, no reordering, lines never move.
+  - Tapping an open or skipped set marks it done; tapping a done set reopens it (undo). The focus ring surrounds the whole line.
+  - Dividers go between runs only; the slab hides the dividers it touches.
+- **Set state (replaces the in-memory tick rule, 2026-10-12):**
+  - Every set's state (open / done with `ended_at` / skipped) lives in the set log and is read back on every load, so ticks and Fokus survive reloads, devices and retries.
+  - Ticks and Fokus taps are optimistic: the UI changes within 100ms and never waits for the save. All writes go through the one server action; kg is never written (it is logged in the sheet).
+  - A failed save keeps the tick on screen and shows a `WarningLine` with the count of unsaved sets and a **Gem igen** button that resends them in order: "1 sæt er ikke gemt. De står her, men forsvinder, hvis siden genindlæses." Under DEV_TODAY / DEV_FIXTURE nothing is written and a muted line says "Testvisning: sæt gemmes ikke."
+  - Footnote: "Forslag er et skøn ud fra din e1RM og RPE, ikke trænerens tal. Hvert sæt gemmes, når du sætter flueben; kg logger du i arket."
+- **Fokus rules:**
+  - No ScreenNav. The top bar is fixed in layout: **Afslut** (link to `/`, no write, no confirm: progress is kept), the count "7 af 24 sæt udført", the segmented progress by position, and a reserved 44px last-tap row with **Fortryd** (undoes the latest done/skip; repeatable).
+  - Three view states, one primary action each, so Part A's "one primary action per screen" holds per state and needs no override: **set view** (the current set on a full `--slab` card, **Udført** inside it in `--slab-mark`; **Spring over** secondary below), **rest view** (`--surface` card with "Pause" and a count-up timer, the next set in a small slab, **Til næste sæt**: UI only, no write), **finished view** (slab card, counts, times, "Husk at logge kg i arket.", **Tilbage til Træning**).
+  - Reload rebuilds the view from the log: current set = first open set; rest view if the latest tap was a done tap.
+  - A screen wake lock is requested while Fokus is visible (enhancement; nothing shown if unsupported).
+  - Focus moves to the next view's primary button; one polite status region announces each set change once; the timer is never announced on its own. Inside a slab the focus outline is `--slab-mark`.
 - **Ride steps:**
   - Left column: label and duration.
   - Right column: watts in text-32, unit included ("238 W": a smaller capital W reads as "w"), % FTP below it in muted text.
   - Repeat groups get a "Gentag N gange" header, with their steps indented 16px behind a 2px `--chart-mark` rule.
-- **Order:** ride card(s), then the strength card, then the rest card (only when no ride today and no strength session left this week). Rest wording never depends on strength dates.
+- **Order (Træning):** page header (title, updated line, form flag + hint, session block with the primary button), then ride card(s), the strength card, and the rest card (only when no ride today and no strength session left this week). The session block sits above the ride card so the primary action is above the fold on every day. Rest wording never depends on strength dates.
 - **Freshness:**
-  - The same "updated" line as `/load`. The stale sentence names the consequence: "Form og styrkeprogrammet kan være forældet."
+  - The same "updated" line as `/load`. The stale sentence names the consequence: "Form og styrkeprogrammet kan være forældet." Fokus shows staleness only when stale, as a `WarningLine`.
   - A failed plan read is an ErrorState, never a rest day.
-- **Nav:** `ScreenNav` is a two-tab strip ("I dag" · "Belastning") at the top of both screens. **Not sticky**, which overrides "Sticky header only if there is navigation": in the gym the 44px goes to the session, and the nav is used rarely.
+- **Nav:** `ScreenNav` is a three-tab strip ("Træning" · "Belastning" · "Analyse") on every screen except `/fokus`. **Not sticky**, which overrides "Sticky header only if there is navigation": in the gym the 44px goes to the session, and the nav is used rarely.
 
 ---
 
@@ -151,7 +154,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 ## Personality
 **Energetic, bold, decisive.** Ink, warm grey and one volt accent; big condensed italic headings; prescriptions you can read at 70cm with sweaty hands. `/load` uses the same type and tokens but stays calm: no volt in the chart, card titles in text face.
 
-**The one idea:** `--slab` means **"you are here"**. It fills the NÆSTE row, the zone-bar flag and marker, ticked checks and done progress segments, and nothing else. In light it is ink, in dark it is volt.
+**The one idea:** `--slab` means **"you are here"**. It fills the NÆSTE group, the zone flag and marker, ticked checks, done progress segments, Fokus's set card and finish card, and the rest view's next-set preview, and nothing else. In light it is ink, in dark it is volt.
 
 ## Colour tokens
 Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the backgrounds listed.
@@ -165,10 +168,10 @@ Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the
 | `--text` | `#121212` | `#eef1f5` | 16.1 (bg), 18.7 (surface) / 17.1, 15.6:1 |
 | `--text-muted` | `#595959` | `#9ba6b4` | secondary text **and** the unticked check ring. 6.0, 7.0 / 7.8, 7.2:1 |
 | `--accent` | `#d4ff3a` | `#d4ff3a` | volt. Light: **only on ink** (via `--slab-mark`); never text, line or icon on `--bg`/`--surface` (1.0–1.2:1). Dark: 16.7:1 on bg; used only via `--slab` and `--focus` |
-| `--slab` | `#121212` | `#d4ff3a` | "you are here" fill: NÆSTE row, zone flag + marker, ticked check, done segments |
+| `--slab` | `#121212` | `#d4ff3a` | "you are here" fill: NÆSTE group, zone flag + marker, ticked check, done segments, Fokus set/finish card and next-set preview |
 | `--on-slab` | `#ffffff` | `#121212` | text on slab: 18.7 / 16.2:1 |
 | `--on-slab-muted` | `#bdbdbd` | `#3d4a0f` | secondary text on slab: 10.0 / 8.3:1 |
-| `--slab-mark` | `#d4ff3a` | `#121212` | ✓ in a ticked check, the check ring on the NÆSTE row, the NÆSTE tag fill: 16.2:1 against `--slab` |
+| `--slab-mark` | `#d4ff3a` | `#121212` | ✓ in a ticked check, the check ring on the NÆSTE group, the NÆSTE tag fill, the Udført button fill and the focus outline inside a slab: 16.2:1 against `--slab` |
 | `--focus` | `#121212` | `#d4ff3a` | 3px outline, 3px offset: 16.1 / 15.3:1 on bg/surface |
 | `--positive` / `--warning` / `--negative` | `#18743a` / `#8a4f00` / `#b42318` | `#4ade9a` / `#f5c451` / `#ff7b7b` | status text (stale line, errors), always with words or an icon. The `/load` fitness delta stays `--text` (neutral): a falling CTL in a deload week is planned, so red/green would judge what the data can't; the arrow + words carry direction. Light ≥ 5.0:1 on bg; dark ≥ 6.4:1 on bg, surface and block fill |
 | `--series-ctl` | `#121212` solid 2.5px | `#eef1f5` solid 2.5px | fitness: the line the question is about, so it gets the ink |
@@ -202,11 +205,12 @@ Tailwind `@theme inline`: `--font-sans: var(--font-barlow), system-ui, sans-seri
 
 | Token | Size / line-height | Face | Use |
 |---|---|---|---|
-| `text-56` | 56 / 1.0 | Condensed 800 italic, tabular | the `/load` zone-flag value. The largest element on `/load` (Part A principle 4) |
-| `text-44` | 44 / 1.0 | Condensed 800 italic, uppercase, −0.01em | page title: "I DAG", "BELASTNING". Date after it in `text-16` Barlow 500 `--text-muted`, sentence case |
-| `text-32` | 32 / 1.1 | Condensed 700 upright, tabular | **prescriptions**: sets × reps, prescribed load, target watts ("238 W", W the same size) |
+| `text-56` | 56 / 1.0 | Condensed 800 italic, tabular | the `/load` zone-flag value (the largest element on `/load`, Part A principle 4); Fokus's suggested kg and rest timer (computed = italic) |
+| `text-56` | 56 / 1.0 | Condensed 700 upright, tabular | Fokus's reps and last week's logged kg (as written / logged = upright). With the row above, the largest things on `/fokus` |
+| `text-44` | 44 / 1.0 | Condensed 800 italic, uppercase, −0.01em | page title: "TRÆNING", "BELASTNING"; Fokus's finish title "SESSION 2 ER KLARET". Date after it in `text-16` Barlow 500 `--text-muted`, sentence case |
+| `text-32` | 32 / 1.1 | Condensed 700 upright, tabular | **prescriptions** on Træning: reps ("5 reps"), prescribed load ("RPE 7"), target watts ("238 W", W the same size); Fokus button labels (italic 800) |
 | `text-32` | 32 / 1.0 | Condensed 800 italic, uppercase | session-card titles on `/` ("STYRKE", "CYKEL"). On `/load` card titles are `text-20` Barlow 700, sentence case (calm) |
-| `text-24` | 24 / 1.0 | Condensed 800 italic, tabular | Today's zone-flag value; the done count in "**2** af 8 udført" |
+| `text-24` | 24 / 1.0 | Condensed 800 italic, tabular | Træning's form-flag value; the done count in "**7** af 24 sæt udført"; the Begynd / Fortsæt button label |
 | `text-20` | 20 / 1.4 | Barlow 700 | exercise names, "Session 2 af 3 i denne uge", step labels and durations, last-week reference (500) |
 | `text-16` | 16 / 1.4 | Barlow 400 / 600 | body, block identity, nav tabs (600, current 700) |
 | `text-14` | 14 / 1.4 | Barlow 400 / 700 | supporting lines, footnote; labels ("FORM (TSB)", zone names, NÆSTE) in 700 uppercase +0.04em (NÆSTE +0.08em), threshold numbers 600 tabular |
@@ -238,28 +242,30 @@ Balanced: big type, tight rows. All values are on the Part A 4-point scale.
 ## Motion
 Snappy, short, and only on things you touched. Easing `ease-out`.
 - **Press:** a check scales to 0.9 on `:active` and fills in 120ms.
-- **Hand-over:** when a row is ticked, the slab colour cross-fades off that row and onto the next unticked row in 180ms. Colour only: rows never move or reorder.
-- **Progress:** the next segment fills in 120ms.
+- **Hand-over:** when the last open set of a group is ticked, the slab colour cross-fades off that group and onto the group of the next open set in 180ms. Colour only: lines never move or reorder.
+- **Progress:** the touched segment fills in 120ms.
+- **Fokus:** Udført, Til næste sæt and Spring over scale to 0.97 on `:active` (120ms); switching between set, rest and finished view cross-fades the card's opacity in 180ms. Nothing slides; the top bar never moves; timer digits, kg and reps never animate.
 - **Never animated:** numbers, the zone marker (no slide on load or update), the chart, page transitions.
 - **Reduced motion:** under `prefers-reduced-motion: reduce` every transition is 0ms and the press scale is off. The end state is the still alternative. Skeletons pulse only under `motion-safe`.
 
 ## Signature components
 
-### NÆSTE slab (Today, strength card)
-- The **first unticked row** in the session (document order) becomes the slab. No slab when every row is ticked.
-- It is filled `--slab` with `--on-slab` text. Prescriptions are also `--on-slab` (not muted). The check ring is 3px `--slab-mark`.
-- It bleeds 8px past the row on both sides (margin-inline −8px, padding 12px), with 8px margin-block and `rounded-control`.
-- The name line **always shows the exercise name**, even inside a run (override). The **NÆSTE** tag sits right-aligned on the same line: `text-14` 700 uppercase +0.08em, `--slab-mark` fill, `--slab` text, padding 2px 8px, `rounded-mark`.
-- The tag is part of the label text, so screen readers hear "Næste" too.
-- Focus: a 3px `--focus` outline with 3px offset around the whole row.
+### NÆSTE slab (Træning, strength card; rule changed 2026-10-12)
+- The **set group (sheet row) that holds the first open set** (document order; skipped sets are not open) becomes the slab. No slab when no set is open.
+- It is filled `--slab` with `--on-slab` text. Prescriptions are also `--on-slab` (not muted); labels ("Forslag", "Sidste uge") are `--on-slab-muted`. Inside it, the open check ring is 3px `--slab-mark`, a done check is `--slab-mark` filled with a `--slab` ✓.
+- It bleeds 8px past the group on both sides (margin-inline −8px, padding 12px), with 8px margin-block and `rounded-control`.
+- The group's name line **always shows the exercise name**, even inside a run (override). The **NÆSTE** tag sits right-aligned on the **first open set's line**: `text-14` 700 uppercase +0.08em, `--slab-mark` fill, `--slab` text, padding 2px 8px, `rounded-mark`.
+- The set's accessible name ends with ", næste", so screen readers hear it too.
+- Focus: a 3px `--focus` outline with 3px offset around the set line.
+- **In Fokus the slab grows into the whole set card** (the same "you are here", at full screen), with Udført inside it in the tag's colours (`--slab-mark` fill, `--slab` text).
 
-### Segmented progress (Today, strength card head)
+### Segmented progress (Træning strength card head and Fokus top bar)
 - The head reads "**2** af 8 udført": the count in `text-24` display, the rest in `text-16` 600.
-- Under it, one segment per sheet row of the session (8 in the sample): 8px high, 4px gaps, `rounded-mark`.
+- Under it, one segment **per set** of the session, **by position** (since 2026-10-12): done `--slab`, skipped `--track` with a 2px `--text-muted` centre bar, open `--track`. 8px high, 4px gaps (2px above 30 sets), `rounded-mark`.
 - The first *k* segments are `--slab`, where *k* is the ticked count (not the ticked positions). The rest are `--track`.
 - `aria-hidden`: the text carries the count.
 
-### Zone bar (form: Today header, `/load` hero)
+### Zone bar (form: `/load` hero; its flag alone on Træning)
 Replaces the TSB number + zone badge on both screens. It is one component (`ZoneBar`) in two sizes. On `/load` the chart gets **no zone banding** (see below).
 
 **Scale.** −40 … +30 TSS/dag, linear: `x = (clamp(tsb, −40, 30) + 40) / 70`. Band thresholds −30 / −10 / 5 / 20 (intervals.icu):
@@ -288,7 +294,7 @@ The thresholds are drawing constants for the scale only. They live in one fronte
 
 **Sizes:**
 
-| | Compact (Today header) | Hero (`/load`) |
+| | Compact (Træning: **flag only**, prefixed "TSB", with the one-line hint) | Hero (`/load`) |
 |---|---|---|
 | Value | `text-24` | `text-56` |
 | Pill padding | 4px 12px (32px high) | 4px 16px (64px high) |

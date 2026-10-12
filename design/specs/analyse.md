@@ -1,6 +1,6 @@
 # Spec – Analyse (`/analyse`), section Cykel
 
-Owner: design-lead · 2026-10-01 · task d (L) · for `ui`. Contract: `DESIGN.md` Part A + Part B (Spurt), pattern pack `design/patterns/data-dashboard.md` (structure). Language and number rules as `design/specs/today.md` (top): Danish UI, `tirs. 3. jun.`, `kl. 05.03`, decimal comma, U+2212, en-dash ranges, never translate W/NP/FTP/eFTP/EF/TSS. **The year is added to every date outside the current year** (`tirs. 3. jun. 2025`); the window spans two years.
+Owner: design-lead · 2026-10-01 · task d (L) · for `ui`. Contract: `DESIGN.md` Part A + Part B (Spurt), pattern pack `design/patterns/data-dashboard.md` (structure). Language and number rules as `design/specs/traening.md` (top): Danish UI, `tirs. 3. jun.`, `kl. 05.03`, decimal comma, U+2212, en-dash ranges, never translate W/NP/FTP/eFTP/EF/TSS. **The year is added to every date outside the current year** (`tirs. 3. jun. 2025`); the window spans two years.
 
 Data: `ride_metrics` and `cycling_weeks`, read server-side through `web/src/lib/db/*`, plotted as given. The UI never computes a training metric: no medians, no eFTP picking rules, no deltas. Allowed: sorting and filtering rows, counting rows, date to x position, and choosing a y domain.
 
@@ -11,7 +11,7 @@ Data: `ride_metrics` and `cycling_weeks`, read server-side through `web/src/lib/
 
 ## 2. Route, nav, section heading
 - `/analyse`, document title `Analyse`. Skeleton: `app/analyse/loading.tsx`.
-- **ScreenNav gets a third link**, `Analyse` → `/analyse` (`I dag` · `Belastning` · `Analyse`). The look is unchanged. The grid becomes `repeat(auto-fit, minmax(min(100%, 6.5rem), 1fr))`, so all three fit on one row at 390px ("Belastning" ≈ 110px in a ≈ 116px column) and they stack at 200% text without horizontal scroll.
+- **ScreenNav gets a third link**, `Analyse` → `/analyse` (`Træning` · `Belastning` · `Analyse`; was `I dag` until 2026-10-12). The look is unchanged. The grid becomes `repeat(auto-fit, minmax(min(100%, 6.5rem), 1fr))`, so all three fit on one row at 390px ("Belastning" ≈ 110px in a ≈ 116px column) and they stack at 200% text without horizontal scroll.
 - **Section heading (superseded by e2, 2026-10-01):** the visible h2 "Cykel" is replaced by the section tabs `Cykel` · `Styrke` (link tabs, no tab roles), specified in [`analyse-styrke.md`](analyse-styrke.md) §2. The panel keeps an `sr-only` h2 `Cykel`. The `UpdatedLine` moves under the tabs (8px). Nothing else on Cykel changes.
 
 ## 3. Layout (390px first; 1280 = the same single column, max 720px, Part B)
