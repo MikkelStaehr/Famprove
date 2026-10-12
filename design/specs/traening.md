@@ -55,7 +55,7 @@ Ride card(s) planned for today, then the Strength card (always), then the Rest c
    - The suggestion is **never** in the 32px prescription line: as written = big, the app's estimate = reference size with its label. `0 kg` never appears.
 4. **Set lines**, 4px under the reference line, flush (no gap between them). Each is a `<label>` wrapping a native checkbox: `min-h-11` (44px), padding 8px 4px, grid `28px 1fr auto`, gap-x 12px, items centred:
    - the 28px check (Part B), centred on the line;
-   - `Sæt 1 af 2` in `text-20` 600;
+   - `Sæt 1 af 2` in `text-20` 600, numbered across the run (§10 D11);
    - right-aligned status, `text-14` muted tabular: done `kl. 18.42` (its `ended_at`); skipped `sprunget over`; open nothing; the NÆSTE set shows the **Næste** tag here instead (Part B tag style).
    - **Accessible name** (one `sr-only` sentence; visual text `aria-hidden`): `Squat, sæt 1 af 2, 5 reps ved RPE 7, forslag 142,5 kg, sidste uge 140 kg` (+ `, sprunget over` / `, udført kl. 18.42` / `, næste`). Null suggestion: `, intet forslag`. Null last week: `, intet logget sidste uge`. SR rewrites " - " → " til ". Every name starts with the exercise name.
    - Checked = done. Skipped is unchecked with the skip mark and its words.
@@ -98,7 +98,7 @@ Full-screen: no ScreenNav, no page title text, no zone flag. Page gutter 12px. `
 ### 4.2 Set view (the current set: the first open set)
 **Set card**, 8px under the last-tap row: `--slab` fill (it is "you are here", blown up), `--on-slab` text, `rounded-card`, padding 24px 16px 16px.
 1. Exercise name as written, `text-32` Condensed 800 italic, uppercase via CSS, wraps (no truncation). `h2`.
-2. `Sæt 1 af 2`, `text-20` 700, 4px under.
+2. `Sæt 1 af 2`, `text-20` 700, 4px under, numbered across the run (§10 D11).
 3. 16px. **Reps + prescription** row (`flex-wrap`, baseline, gap-x 16px): reps as written in **`text-56` Condensed 700 upright tabular** followed by ` reps` in `text-32` Condensed 700 (`5 reps`, `8 - 12 reps`), then the prescription as written in `text-32` Condensed 700 (`RPE 7`, `RPE 5 - 7`, `-12.5%`).
 4. 16px. **Kg block:** a label line `text-14` 700 uppercase +0.04em `--on-slab-muted`, then the figure:
    - Suggestion present: label `Forslag`; `142,5` in **`text-56` Condensed 800 italic tabular** + ` kg` in `text-32` Condensed 800 italic (U+00A0 between). **Italic = computed by the app; upright = as written in the sheet** (the same rule the zone-flag value already follows). So the suggestion can never pass for a prescription.
@@ -286,4 +286,5 @@ Run with `serve.ps1` on port 3100; states via `DEV_FIXTURE` / `DEV_TODAY` where 
 - **D8 Fokus undo exists**: a `Fortryd` in a reserved last-tap row, repeatable. Needs the latest tap (set, kind, time) from the log, not only the latest done time.
 - **D9 Save failures are queued and retryable** (`Gem igen`), replacing "Et tidspunkt blev ikke gemt. Fluebenet står." (the tick no longer lives in memory only, so "står" would be untrue after reload). Whether a retry carries the original tap time is the main session's call; the spec only requires the order.
 - **D10 Screen wake lock in Fokus**, enhancement only.
+- **D11 Set numbers count across the run (changed 2026-10-12, design review).** `Sæt n af m` numbers sets across the **run** (consecutive sheet rows with the same trimmed name), not per sheet row: Bænk's 1 + 1 + 2 sets read `Sæt 1 af 4` … `Sæt 4 af 4`. Applies everywhere the number shows: Træning set lines (§3.3.4), their accessible names, Fokus set card (§4.2.2), rest-view next set (§4.3.3), last-tap line (§4.1.3), status announcements (§4.7). Why: per-row numbering showed `SÆT 1 AF 1` on three consecutive Fokus cards, which reads as "my tap didn't register". A single-row run is unchanged (`Sæt 1 af 2`).
 - No new colour or size tokens. New uses of existing tokens: `text-56` Condensed 700 upright (Fokus reps, last-week fallback), `--slab-mark` as the focus outline inside a slab.
