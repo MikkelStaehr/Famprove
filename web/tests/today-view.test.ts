@@ -93,6 +93,8 @@ function data(overrides: Partial<TodayPlanData>): TodayPlanData {
     previousWeek: [],
     rides: [],
     upcomingRides: [],
+    plannedSets: [],
+    setLog: [],
     ...overrides,
   };
 }

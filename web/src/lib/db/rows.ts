@@ -759,6 +759,87 @@ export type PrescribedSetRow = {
   readonly bodyweight: boolean;
 };
 
+/** Why a planned set has (or has no) suggested kg (python domain/planned_sets.py). */
+export type SuggestionBasis = "rpe_e1rm" | "not_rpe" | "no_e1rm" | "no_lift";
+const SUGGESTION_BASES: readonly SuggestionBasis[] = ["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift"];
+
+/**
+ * public.planned_sets: suggested kg per set of this ISO week and later, computed by Python
+ * (rolling e1RM of the exercise's parent lift x the RPE relation /analyse uses, rounded to 2.5).
+ * Null suggestedKg: no suggestion (basis says why), never 0.
+ */
+export type PlannedSetRow = {
+  readonly block: string;
+  readonly sheetRow: number;
+  readonly week: number;
+  readonly setNo: number;
+  readonly suggestedKg: number | null;
+  readonly basis: SuggestionBasis;
+};
+
+export const PLANNED_SETS_SELECT = {
+  table: "planned_sets",
+  columns: "sheet_id,block,sheet_row,week,set_no,suggested_kg,basis",
+  order: "sheet_id,block,sheet_row,week,set_no", // the primary key
+} as const;
+
+export function parsePlannedSetRow(raw: unknown): PlannedSetRow {
+  const f = new Fields(PLANNED_SETS_SELECT.table, raw);
+  const basis = f.string("basis");
+  const known = SUGGESTION_BASES.find((b) => b === basis);
+  if (known === undefined) throw new RowError(`planned_sets.basis: unknown value`);
+  const suggestedKg = f.numberOrNull("suggested_kg");
+  if (suggestedKg !== null && known !== "rpe_e1rm") {
+    throw new RowError("planned_sets: a suggestion only with basis rpe_e1rm");
+  }
+  return {
+    block: f.string("block"),
+    sheetRow: f.number("sheet_row"),
+    week: f.number("week"),
+    setNo: f.number("set_no"),
+    suggestedKg,
+    basis: known,
+  };
+}
+
+/**
+ * public.exercise_set_log: one row per set of a strength session that has been begun, done or
+ * skipped on the Træning screens (the app's only write, lib/db/set-log.ts). Timestamps are the
+ * server's clock; a skipped set has none.
+ */
+export type SetLogRow = {
+  readonly date: IsoDate;
+  readonly session: number;
+  readonly row: number; // strength_sets.sheet_row
+  readonly set: number; // strength_sets.set_no
+  readonly startedAt: string | null;
+  readonly endedAt: string | null;
+  readonly skipped: boolean;
+};
+
+export const SET_LOG_SELECT = {
+  table: "exercise_set_log",
+  columns: "date,session_no,row_no,set_no,started_at,ended_at,skipped",
+  order: "date,session_no,row_no,set_no", // the primary key
+} as const;
+
+export function parseSetLogRow(raw: unknown): SetLogRow {
+  const f = new Fields(SET_LOG_SELECT.table, raw);
+  const row: SetLogRow = {
+    date: f.date("date"),
+    session: f.number("session_no"),
+    row: f.number("row_no"),
+    set: f.number("set_no"),
+    startedAt: f.timestampOrNull("started_at"),
+    endedAt: f.timestampOrNull("ended_at"),
+    skipped: f.boolean("skipped"),
+  };
+  if (row.skipped && (row.startedAt !== null || row.endedAt !== null)) {
+    throw new RowError("exercise_set_log: a skipped set has no timestamps");
+  }
+  return row;
+}
+
 export const PRESCRIBED_SETS_SELECT = {
   table: "strength_sets",
   columns:

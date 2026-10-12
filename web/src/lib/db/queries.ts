@@ -22,10 +22,14 @@ import {
   DAILY_LOAD_SELECT,
   ISO_DATE,
   parseActivityRow,
+  parsePlannedSetRow,
   parsePlannedTargetRow,
   parsePrescribedSetRow,
+  parseSetLogRow,
+  PLANNED_SETS_SELECT,
   PLANNED_TARGETS_SELECT,
   PRESCRIBED_SETS_SELECT,
+  SET_LOG_SELECT,
   parseBlockRow,
   parseCyclingWeekRow,
   parseDailyLoadRow,
@@ -54,8 +58,10 @@ import type {
   DashboardData,
   DailyLoadRow,
   IsoDate,
+  PlannedSetRow,
   PlannedTargetRow,
   PrescribedSetRow,
+  SetLogRow,
   StrengthSessionRow,
   WeekDetailData,
 } from "./rows.ts";
@@ -188,6 +194,8 @@ export type TodayPlanData = {
   readonly previousWeek: readonly PrescribedSetRow[]; // same tabs, week - 1 (references)
   readonly rides: readonly PlannedTargetRow[]; // planned rides today
   readonly upcomingRides: readonly PlannedTargetRow[]; // planned rides in (today, today + 28]
+  readonly plannedSets: readonly PlannedSetRow[]; // suggested kg per set, this ISO week (Python)
+  readonly setLog: readonly SetLogRow[]; // today's logged sets, every session (exercise_set_log)
 };
 
 /**
@@ -203,11 +211,20 @@ export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
   const fixture = devFixture();
   if (fixture === "error") throw fixtureError(STRENGTH_SESSIONS_SELECT.table);
   if (fixture === "empty") {
-    return { weekStart, sessions: [], sets: [], previousWeek: [], rides: [], upcomingRides: [] };
+    return {
+      weekStart,
+      sessions: [],
+      sets: [],
+      previousWeek: [],
+      rides: [],
+      upcomingRides: [],
+      plannedSets: [],
+      setLog: [],
+    };
   }
   const db = client();
   const horizon = addDays(today, NEXT_SESSION_DAYS);
-  const [sessions, sets, rides, upcomingRides] = await Promise.all([
+  const [sessions, sets, rides, upcomingRides, plannedSets, setLog] = await Promise.all([
     selectAll(
       db,
       STRENGTH_SESSIONS_SELECT.table,
@@ -238,6 +255,13 @@ export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
       },
       parsePlannedTargetRow,
     ),
+    selectAll(
+      db,
+      PLANNED_SETS_SELECT.table,
+      { ...PLANNED_SETS_SELECT, filters: [["week_start", `eq.${weekStart}`]] },
+      parsePlannedSetRow,
+    ),
+    selectAll(db, SET_LOG_SELECT.table, { ...SET_LOG_SELECT, filters: [["date", `eq.${today}`]] }, parseSetLogRow),
   ]);
   // Last week's sets of the same tab(s): one query per (tab, week - 1). Tab names come from
   // this week's rows (server data) and go through URLSearchParams as eq. values.
@@ -257,7 +281,16 @@ export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
       ),
     ),
   );
-  return { weekStart, sessions, sets, previousWeek: previous.flat(), rides, upcomingRides };
+  return {
+    weekStart,
+    sessions,
+    sets,
+    previousWeek: previous.flat(),
+    rides,
+    upcomingRides,
+    plannedSets,
+    setLog,
+  };
 }
 
 /**

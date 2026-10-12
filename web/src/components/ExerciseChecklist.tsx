@@ -1,14 +1,10 @@
 "use client";
 
-import { useState } from "react";
-
 import type { IsoDate } from "@/lib/db/rows";
-import { tapChange } from "@/lib/exercise-taps";
 import { formatSetLoad, formatSetsReps, prescriptionKg, spokenExercise } from "@/lib/format";
 import type { ExerciseView } from "@/lib/today-view";
 
 import { tickKey, useTicks } from "./TickProvider";
-import { WarningLine } from "./WarningLine";
 
 /**
  * Today's sheet rows as tick rows (DESIGN.md › Today › Tick rows, Part B › NÆSTE slab). Each row
@@ -70,22 +66,11 @@ type ListProps = {
   readonly exercises: readonly ExerciseView[];
 };
 
-type Unsaved = "dev" | "failed" | null;
-
 /** One <li> per sheet row in sheet order; consecutive rows with the same name form one run. */
 export function ExerciseList({ date, session, week, exercises }: ListProps) {
-  const { ticked, setTicked, saveTap } = useTicks();
-  // A failed save stays reported until reload: a later success doesn't bring the lost time back.
-  const [unsaved, setUnsaved] = useState<Unsaved>(null);
-  // The tick is instant and in memory; the timing tap it makes is saved behind it (TickProvider).
-  const toggle = (rowKey: string, done: boolean) => {
-    const change = tapChange(exercises, (k) => ticked.has(tickKey(date, k)), rowKey, done);
-    setTicked(tickKey(date, rowKey), done);
-    if (change === null) return;
-    void saveTap(change, date, session).then((outcome) => {
-      if (outcome !== "saved") setUnsaved((was) => (was === "failed" ? was : outcome));
-    });
-  };
+  const { ticked, setTicked } = useTicks();
+  void session; // the per-set Træning screens log sets; this stopgap list keeps ticks in memory
+  const toggle = (rowKey: string, done: boolean) => setTicked(tickKey(date, rowKey), done);
   // The NÆSTE slab: the first unticked row in document order; none when every row is ticked.
   const nextIndex = exercises.findIndex((e) => !ticked.has(tickKey(date, e.key)));
   return (
@@ -120,10 +105,6 @@ export function ExerciseList({ date, session, week, exercises }: ListProps) {
           );
         })}
       </ol>
-      {unsaved === "failed" && <WarningLine>Et tidspunkt blev ikke gemt. Fluebenet står.</WarningLine>}
-      {unsaved === "dev" && (
-        <p className="text-14 text-text-muted">Testvisning: tidspunkter gemmes ikke.</p>
-      )}
     </>
   );
 }

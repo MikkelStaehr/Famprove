@@ -62,3 +62,7 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | exercise-log | Exercise timing log from Today's ticks (the app's first write path) | L |
 | ride-vi | Variability index (NP / average power) per ride, Z2 warning in the week card | M |
 | cycling-progress | Cycling progress view: VI, efficiency factor (power/HR) and eFTP (queued, not built) | — |
+| set-log | Per-set timing log (exercise_set_log) with begin / done / skip / undo, read back on reload | L |
+| suggested-kg | Suggested kg per planned set (rolling e1RM x RPE relation) in planned_sets | L |
+| traening | Træning overview: Today renamed, a tick per set, TSB hint, "Begynd træning" | L |
+| fokus | Fokus: one set at a time, rest timer, skip, progress; survives a reload | L |

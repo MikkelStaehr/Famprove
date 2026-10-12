@@ -2,7 +2,7 @@
 
 One user's training load: Python jobs pull cycling (intervals.icu) and strength (the coach's Google
 Sheet) into Supabase once a day and compute every number; a Next.js app shows it (read-only, except
-one server action that logs exercise start/end taps from Today into `exercise_log`).
+one server action that logs set taps from the Træning screens into `exercise_set_log`).
 Rules that shape everything: **Python owns all calculations** · the sheet is **read-only** · the
 Supabase service key is **server-side only** · every table has RLS with no anon access.
 
@@ -24,12 +24,14 @@ GitHub Actions daily.yml at 05, 12, 20 Copenhagen: the droplet's workflow_dispat
                                                           forecast_log (that prognose + a naive baseline, per run day),
                                                           ride_metrics + cycling_weeks (the ride analysis, rides since 2024-12-30),
                                                           blocks.phase, strength_weeks (e1RM + tonnage per week and lift),
-                                                          strength_set_kg (planned/lifted kg history; updated, never rebuilt)
+                                                          strength_set_kg (planned/lifted kg history; updated, never rebuilt),
+                                                          planned_sets (suggested kg per set, this ISO week on)
   collect-plan       planned_sessions (hand-filled) + FTP from intervals.icu → planned_targets
 
 Next.js (web/), server components only
   /       Today   ← daily_load (form line), strength_sessions + strength_sets (this ISO week, last week), planned_targets
-                  → exercise_log (the one write: start/end taps via app/actions.ts → lib/db/exercise-log.ts;
+                  ← planned_sets (suggested kg), exercise_set_log (today's logged sets, read back on reload)
+                  → exercise_set_log (the one write: set taps via app/actions.ts → lib/db/set-log.ts;
                     checked against strength_sets + exercises; Python never reads it)
   /load   Load    ← daily_load, blocks, weekly_load; week details ← activities, ride_metrics (VI), strength_sessions, strength_sets
   /analyse Analyse (Cykel) ← ride_metrics, cycling_weeks
@@ -40,15 +42,15 @@ Next.js (web/), server components only
 | Path | What lives there |
 |---|---|
 | `python/src/training_load/sources/` | Adapters that read the outside world: `intervals.py`, `google_drive.py`, `strength_sheet.py` (the coach-sheet parser and strength formula; formula lines never change) |
-| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: cycling = typical week + planned rides; strength = the coach's plan to the block's end, then the recent weeks with a low-high band; `naive_projection` = the baseline), `planned_load.py` (planned kg per set and the plan score of a session), `ride_analysis.py` (Analyse/Cykel: exclusions, eFTP/EF points and line breaks, EF 28-day median, year-ago eFTP, weekly totals; `ENDURANCE` = the EF intensity basis; VI = NP / average power and the Z2 VI warning), `strength_analysis.py` (Analyse/Styrke: lifted status, `PHASES`, e1RM from lifted kg, weekly rows), `kg_history.py` (planned/lifted kg transitions), `dates.py` (`SERIES_START` 2026-01-01 for daily_load, `ANALYSIS_START` 2024-12-30, the ISO week of 2025-01-01, for the ride analysis), `exercises.py` (the exercise catalogue: name/alias matching, muscle factor and bodyweight kg per sheet name, unknown-name defaults) |
+| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: cycling = typical week + planned rides; strength = the coach's plan to the block's end, then the recent weeks with a low-high band; `naive_projection` = the baseline), `planned_load.py` (planned kg per set and the plan score of a session), `ride_analysis.py` (Analyse/Cykel: exclusions, eFTP/EF points and line breaks, EF 28-day median, year-ago eFTP, weekly totals; `ENDURANCE` = the EF intensity basis; VI = NP / average power and the Z2 VI warning), `strength_analysis.py` (Analyse/Styrke: lifted status, `PHASES`, e1RM from lifted kg, weekly rows), `kg_history.py` (planned/lifted kg transitions), `dates.py` (`SERIES_START` 2026-01-01 for daily_load, `ANALYSIS_START` 2024-12-30, the ISO week of 2025-01-01, for the ride analysis), `exercises.py` (the exercise catalogue: name/alias matching, muscle factor and bodyweight kg per sheet name, unknown-name defaults), `planned_sets.py` (suggested kg per planned set: rolling e1RM x pct(RPE, reps), rounded to 2.5) |
 | `python/src/training_load/db/` | The only code that talks to Supabase (PostgREST over `requests`), one module per table |
 | `python/src/training_load/cli/` | The five console scripts, one per step of the daily job (`check-config` first) |
 | `python/src/training_load/*.py` | `config.py` (env, fail-fast), `http.py` (retrying HTTP seam), `narrow.py` (JSON → typed fields) |
 | `python/tests/` | pytest with synthetic fixtures (`conftest.py` builds a fake workbook and an in-memory PostgREST) and an anonymised real-data slice (`fixtures/blok12_slice.json`: refresh it when a new block starts); `test_contract_*.py` write the web's JSON fixtures (`REGENERATE_CONTRACT=1`) |
 | `supabase/migrations/` | Schema, RLS, grants; applied with `supabase db push` |
-| `web/src/lib/db/` | Server-only data layer (`server-only`): `queries.ts` entry points, `postgrest.ts` client (reads + `write`), `exercise-log.ts` (the one write path: exercise_log taps, input checks, undo), `rows.ts` typed parsers, `dev-fixture.ts` (DEV_FIXTURE, dev only: empty, stale, error, band, ef-few, lsrpe) |
-| `web/src/app/actions.ts` | The only server action: `logExerciseTap` (shape check, then `lib/db/exercise-log.ts`) |
-| `web/src/lib/*.ts` | Pure view models and formatting: `exercise-taps.ts` (which tap a tick is, the action's input shape), `dashboard-view.ts` (/load), `today-view.ts` (/), `zone-scale.ts` (zone-bar drawing scale, zone swatches and range texts, sr sentence, /load zone reading), `analyse-view.ts` (/analyse), `analyse-styrke-view.ts` (/analyse/styrke: lift board, e1RM panels, block ruler, tonnage weeks), `format.ts` (locale da-DK), `dates.ts` |
+| `web/src/lib/db/` | Server-only data layer (`server-only`): `queries.ts` entry points, `postgrest.ts` client (reads + `write`), `set-log.ts` (the one write path: exercise_set_log taps per set, input checks, undo), `rows.ts` typed parsers, `dev-fixture.ts` (DEV_FIXTURE, dev only: empty, stale, error, band, ef-few, lsrpe) |
+| `web/src/app/actions.ts` | The only server action: `logExerciseTap` (per-set shape check, then `lib/db/set-log.ts`) |
+| `web/src/lib/*.ts` | Pure view models and formatting: `set-taps.ts` (per-set tap rules: input shape, sheet order, progress, rest-timer start, optimistic mirror), `dashboard-view.ts` (/load), `today-view.ts` (/), `zone-scale.ts` (zone-bar drawing scale, zone swatches and range texts, sr sentence, /load zone reading), `analyse-view.ts` (/analyse), `analyse-styrke-view.ts` (/analyse/styrke: lift board, e1RM panels, block ruler, tonnage weeks), `format.ts` (locale da-DK), `dates.ts` |
 | `web/src/app/` | Routes: `page.tsx` (Today), `load/page.tsx`, `analyse/layout.tsx` (h1) + `analyse/page.tsx` (Cykel) + `analyse/styrke/page.tsx`, `layout.tsx` (nav + tick provider) |
 | `web/src/components/` | UI pieces; client components only where needed: `ZoneBar` (form on both screens), `TrendChart` + `ChartSeries` (legend swatches), `AnalyseCharts` (/analyse eFTP/EF charts, weekly strips, pause seams; Styrke e1RM panels, tonnage strips, block ruler), `AnalyseTabs` (Cykel / Styrke section links), `LoadExplainer` ("Hvad betyder det?"), `ScreenNav`, `TickProvider`, `ExerciseChecklist` (NÆSTE slab) |
 | `web/tests/` | `node --test` on the pure modules |
@@ -68,7 +70,9 @@ Next.js (web/), server components only
 `cycling_weeks` (derived: every ISO week since 2024-12-30, 0 for a week without rides) ·
 `strength_weeks` (derived: every ISO week x SQUAT/BENCH/DEADLIFT from the first block: tonnage, best e1RM, block best) ·
 `strength_set_kg` (persistent: planned and lifted kg per set with timestamps; like forecast_log it can't be rebuilt) ·
-`exercise_log` (persistent: start/end of each exercise per session from Today's taps; can't be rebuilt; written only by the web). `activities.raw` / `strength_activities.raw` hold the intervals.icu object as delivered.
+`exercise_log` (per exercise; superseded by `exercise_set_log`, written by the deployed app until the Træning code is deployed, then copied over and dropped by `supabase/followups/20261012140000_drop_exercise_log.sql`) ·
+`exercise_set_log` (persistent: start/end/skip of each set per session from the Træning screens' taps; can't be rebuilt; written only by the web; read back on reload) ·
+`planned_sets` (derived by compute: suggested kg per set of this ISO week and later, rolling e1RM of the parent lift x the RPE relation, rounded to 2.5). `activities.raw` / `strength_activities.raw` hold the intervals.icu object as delivered.
 
 ## Plan
 `docs/PLAN.md` lists every task and slice (id | title | size); commits end with `Slice: <id>`.
