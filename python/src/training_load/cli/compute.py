@@ -48,7 +48,6 @@ from training_load.domain.ride_analysis import (
     analyse_rides,
     is_z2,
     variability_index,
-    vi_ratio,
     weekly_totals,
 )
 from training_load.domain.sessions import daily_strength_tss, match_sessions
@@ -246,8 +245,11 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         log.warning(
             "unreadable raw ride fields (set to null): %s", dict(sorted(unreadable.items()))
         )
+    # NP and average power both delivered, yet no VI: a ratio outside the bounds or an average of 0.
     implausible_vi = sum(
-        1 for f in facts if vi_ratio(f) is not None and variability_index(f) is None
+        1
+        for f in facts
+        if f.np_w is not None and f.avg_w is not None and variability_index(f) is None
     )
     log.info(
         "VI on %d of %d rides (%d with a Z2 warning)",
