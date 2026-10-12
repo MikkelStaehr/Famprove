@@ -9,6 +9,7 @@ import {
   formSentence,
   lastWeekText,
   repsText,
+  runPositions,
   setStatus,
   spokenSetLine,
   suggestionView,
@@ -144,4 +145,35 @@ test("set line accessible names (spec §6)", () => {
   );
   // Week 1: no last-week part.
   assert.equal(spokenSetLine(e, 1, open.groups[0].sets[1]), "Squat, sæt 2 af 2, 5 reps ved RPE 7, forslag 142,5 kg");
+});
+
+test("D11: sets are numbered across the run (same trimmed name, consecutive rows), not per row", () => {
+  // Real shape: Bænk is 3 rows with 1 + 1 + 2 sets; a trailing space still joins the run.
+  const exercises = [
+    row(10, { name: "Bænk" }, 1),
+    row(11, { name: "Bænk " }, 1),
+    row(12, { name: "Bænk" }, 2),
+    row(20, { name: "Dips" }, 2),
+    row(30, { name: "Bænk" }, 1), // not consecutive: a run of its own
+  ];
+  const runs = runPositions(exercises);
+  const at = (r: number, n: number) => runs.get(setKey({ row: r, set: n }));
+  assert.deepEqual([at(10, 1), at(11, 1), at(12, 1), at(12, 2)], [
+    { index: 1, of: 4 },
+    { index: 2, of: 4 },
+    { index: 3, of: 4 },
+    { index: 4, of: 4 },
+  ]);
+  assert.deepEqual([at(20, 1), at(20, 2), at(30, 1)], [
+    { index: 1, of: 2 },
+    { index: 2, of: 2 },
+    { index: 1, of: 1 },
+  ]);
+
+  const view = checklistView(exercises, exercises.flatMap((e) => e.sets), new Map());
+  assert.deepEqual(
+    view.groups.slice(0, 3).flatMap((g) => g.sets.map((l) => `${l.n} af ${l.of}`)),
+    ["1 af 4", "2 af 4", "3 af 4", "4 af 4"],
+  );
+  assert.match(spokenSetLine(exercises[2], 3, view.groups[2].sets[1]), /^Bænk, sæt 4 af 4, /);
 });

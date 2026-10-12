@@ -174,7 +174,9 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         )}
         {lastLine !== null && (
           <p className="flex flex-wrap items-center gap-x-2 text-16 text-text-muted">
-            <span>{lastLine}</span>
+            <span>
+              <KeepClock text={lastLine} />
+            </span>
             <button
               type="button"
               onClick={onUndo}
@@ -404,5 +406,21 @@ function FinishedView({
         Tilbage til Træning
       </HomeLink>
     </div>
+  );
+}
+
+const CLOCK = /(kl\. \d{1,2}\.\d{2})/;
+
+/** "kl. 18.42" kept on one line: at 200% text a break between "kl." and the time reads badly. */
+function KeepClock({ text }: { readonly text: string }) {
+  // split() with a capturing group puts the times at the odd indexes.
+  return text.split(CLOCK).map((part, i) =>
+    i % 2 === 1 ? (
+      <span key={i} className="whitespace-nowrap">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
   );
 }

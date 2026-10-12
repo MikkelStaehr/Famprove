@@ -16,7 +16,7 @@ import {
   setKey,
   type SetRef,
 } from "./set-taps.ts";
-import type { ExerciseView, Reference } from "./training-view.ts";
+import { type ExerciseView, type Reference, runPositions } from "./training-view.ts";
 
 /** What Fokus needs of one sheet row (a subset of ExerciseView, so fixtures stay small). */
 export type FokusExercise = Pick<
@@ -46,17 +46,19 @@ export function fokusView(
   return { kind: "set", current: open };
 }
 
-/** One set in context: its sheet row, "Sæt n af m". */
+/** One set in context: its sheet row, "Sæt n af m" numbered across the run (spec §10 D11). */
 export type SetInContext = {
   readonly exercise: FokusExercise;
   readonly ref: SetRef;
-  readonly number: number; // n
-  readonly count: number; // m, the row's sets
+  readonly number: number; // n, position in the run (same-named consecutive rows)
+  readonly count: number; // m, the run's sets
 };
 
 export function setInContext(exercises: readonly FokusExercise[], ref: SetRef): SetInContext | null {
   const exercise = exercises.find((e) => e.row === ref.row);
   if (exercise === undefined) return null;
+  const run = runPositions(exercises).get(setKey(ref));
+  if (run !== undefined) return { exercise, ref, number: run.index, count: run.of };
   const i = exercise.sets.findIndex((s) => setKey(s) === setKey(ref));
   return { exercise, ref, number: i === -1 ? ref.set : i + 1, count: exercise.sets.length };
 }

@@ -358,10 +358,34 @@ export function repsText(e: Pick<ExerciseView, "repsText">): string | null {
   return e.repsText === null ? null : formatSetsReps(null, e.repsText);
 }
 
+/** A set's place in its run: "Sæt index af of". */
+export type RunPosition = { readonly index: number; readonly of: number };
+
+/**
+ * "Sæt n af m" numbers sets across the run (spec traening.md §10 D11): consecutive sheet rows
+ * with the same trimmed name count as one exercise, so Bænk's 1 + 1 + 2 sets read 1..4 af 4.
+ * Keyed by setKey; a single-row run is numbered as before. Both Træning and Fokus use this.
+ */
+export function runPositions(
+  exercises: readonly Pick<ExerciseView, "name" | "sets">[],
+): ReadonlyMap<string, RunPosition> {
+  const positions = new Map<string, RunPosition>();
+  let i = 0;
+  while (i < exercises.length) {
+    const name = exercises[i].name.trim();
+    let end = i + 1;
+    while (end < exercises.length && exercises[end].name.trim() === name) end += 1;
+    const refs = exercises.slice(i, end).flatMap((e) => e.sets);
+    refs.forEach((ref, n) => positions.set(setKey(ref), { index: n + 1, of: refs.length }));
+    i = end;
+  }
+  return positions;
+}
+
 export type SetLineView = {
   readonly ref: SetRef;
-  readonly n: number; // 1-based position in its sheet row
-  readonly of: number;
+  readonly n: number; // 1-based position in its run (same-named consecutive rows, D11)
+  readonly of: number; // the run's sets
   readonly state: SetState;
   readonly endedAt: string | null; // a done set's end
   readonly next: boolean; // the first open set of the session (the Næste tag)
@@ -399,6 +423,7 @@ export function checklistView(
   const first = firstOpen(order, log);
   const closed = (refs: readonly SetRef[]) => refs.every((r) => stateOf(log.get(setKey(r))) !== "open");
   const isSlab = (e: ExerciseView) => first !== null && e.sets.some((r) => r.row === first.row && r.set === first.set);
+  const runs = runPositions(exercises);
   const groups = exercises.map((e, i): SetGroupView => {
     const name = e.name.trim();
     const runStart = i === 0 || exercises[i - 1].name.trim() !== name;
@@ -417,10 +442,11 @@ export function checklistView(
       sets: e.sets.map((ref, n) => {
         const logged = log.get(setKey(ref));
         const state = stateOf(logged);
+        const run = runs.get(setKey(ref));
         return {
           ref,
-          n: n + 1,
-          of: e.sets.length,
+          n: run?.index ?? n + 1,
+          of: run?.of ?? e.sets.length,
           state,
           endedAt: state === "done" ? (logged?.endedAt ?? null) : null,
           next: first !== null && ref.row === first.row && ref.set === first.set,

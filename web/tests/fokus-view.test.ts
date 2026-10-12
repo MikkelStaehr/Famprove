@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   clockTime,
+  doneSentence,
   elapsedSeconds,
   finishCard,
   type FokusExercise,
@@ -17,7 +18,9 @@ import {
   repsWord,
   setInContext,
   setSentence,
+  setTitle,
   skippedText,
+  skipSentence,
   suggestionReason,
   undoSentence,
   unsavedText,
@@ -244,4 +247,33 @@ test("noSessionSentence: (c) with N = 1 and N > 1, and (d)", () => {
   assert.equal(noSessionSentence("all_done", 3), "Alle 3 sessioner er udført i denne uge.");
   assert.equal(noSessionSentence("all_done", 1), "Ugens session er udført.");
   assert.equal(noSessionSentence("no_program", 0), "Intet styrkeprogram i denne uge.");
+});
+
+test("D11: Fokus numbers sets across the run, in every text that shows the number", () => {
+  const bench = (row: number, sets: number, name = "Bænk"): FokusExercise => ({
+    ...SQUAT,
+    name,
+    row,
+    sets: Array.from({ length: sets }, (_, i) => ({ row, set: i + 1 })),
+  });
+  const exercises = [bench(10, 1), bench(11, 1, "Bænk "), bench(12, 2), PULLDOWN];
+  const first = setInContext(exercises, { row: 10, set: 1 });
+  const second = setInContext(exercises, { row: 11, set: 1 });
+  const last = setInContext(exercises, { row: 12, set: 2 });
+  assert.ok(first !== null && second !== null && last !== null);
+  assert.equal(setTitle(first), "Sæt 1 af 4");
+  assert.equal(setTitle(last), "Sæt 4 af 4");
+  assert.equal(nextSetSummary(second).title, "Bænk · sæt 2 af 4");
+  assert.match(setSentence(second, 3), /^Bænk, sæt 2 af 4: /);
+  assert.equal(doneSentence(first), "Bænk, sæt 1 udført. Pause.");
+  assert.equal(skipSentence(last), "Sæt 4 sprunget over.");
+  assert.equal(undoSentence(second), "Fortrudt: Bænk, sæt 2 er åben igen.");
+  assert.equal(
+    lastTapText(exercises, { kind: "done", ref: { row: 12, set: 1 }, at: T0 }),
+    "Bænk · sæt 3 udført kl. 18.00",
+  );
+  // A single-row run is unchanged.
+  const pull = setInContext(exercises, { row: 7, set: 1 });
+  assert.ok(pull !== null);
+  assert.equal(setTitle(pull), "Sæt 1 af 1");
 });

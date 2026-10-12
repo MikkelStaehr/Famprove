@@ -24,8 +24,10 @@ export function ScreenNav() {
   if (pathname === "/fokus" || pathname.startsWith("/fokus/")) return null;
   return (
     <header className="mx-auto w-full max-w-content px-3 pt-3 pb-1">
-      <nav aria-label="Hovedmenu">
-      <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-1 rounded-pill bg-track p-1">
+      {/* @container: below 3 × 6.5rem + gaps + padding (20.5rem) the tabs wrap, and a pill track
+          would become a blob, so the wrapped track takes rounded-card (spec traening.md, 200% text). */}
+      <nav aria-label="Hovedmenu" className="@container">
+      <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-1 rounded-pill bg-track p-1 @max-[20.5rem]:rounded-card">
         {TABS.map((tab) => {
           const current = isCurrent(pathname, tab.href);
           return (
