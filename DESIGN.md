@@ -112,7 +112,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 
 ### Today (`/`, added by design-lead; full spec `design/specs/today.md`)
 - **Use:** a companion screen, read at arm's length (≈ 60–80 cm) in the gym or from the handlebar. The session is the hero. Form (TSB) is the compact zone bar in the header (Part B), not a key figure.
-- **Data:** read-only and server-side. It uses the latest `daily_load` row for the form line, the next undone strength session of the ISO week (session k + 1 of N; the n-th strength activity of the week is session n, and undone sessions have no date), and `planned_sessions` for rides. Python computes every number, including target watts. "Today" is the Europe/Copenhagen date at request time.
+- **Data:** server-side, read-only except the exercise timing taps (below). It uses the latest `daily_load` row for the form line, the next undone strength session of the ISO week (session k + 1 of N; the n-th strength activity of the week is session n, and undone sessions have no date), and `planned_sessions` for rides. Python computes every number, including target watts. "Today" is the Europe/Copenhagen date at request time.
 - **Glance sizes** (Part B scale):
   - text-32 Barlow Condensed 700 tabular: anything read mid-set or mid-interval, i.e. sets × reps, prescribed load, target watts.
   - text-20: exercise names, the last-week reference, step labels and durations.
@@ -128,8 +128,9 @@ Token **names and roles** are fixed here; their **values** come from Part B.
   - Consecutive rows with the same name show the name once, except the NÆSTE row (Part B). Dividers go between runs only.
 - **Tick state:**
   - In memory only (client provider in the root layout). It survives in-app navigation and clears on reload.
-  - No storage and no requests.
-  - One footnote says so: "Flueben forsvinder, når siden genindlæses. Log kg i arket."
+  - No storage. One request per exercise start/end (added 2026-10-12, the app's only write): the tick that starts an exercise and the tick that completes it (its last row) save a timestamp to `exercise_log` through a server action; unticking undoes it. The tick never waits for the save.
+  - A failed save leaves the tick and shows a `WarningLine` under the rows: "Tidspunktet blev ikke gemt. Fluebenet står." Under DEV_TODAY / DEV_FIXTURE nothing is saved and a muted line says "Testvisning: tidspunkter gemmes ikke."
+  - One footnote says what lasts: "Flueben forsvinder, når siden genindlæses; start og slut pr. øvelse gemmes. Log kg i arket."
 - **Ride steps:**
   - Left column: label and duration.
   - Right column: watts in text-32, unit included ("238 W": a smaller capital W reads as "w"), % FTP below it in muted text.

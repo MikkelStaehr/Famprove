@@ -52,7 +52,7 @@ Ride card(s) planned for today, then the Strength card (always; with N = 0 it sh
   - Focus: 3px `--focus` outline, 3px offset, around the whole row (`label:has(:focus-visible)`), following `rounded-control`.
 - **Motion** (Part B): the check scales to 0.9 on `:active` and fills in 120ms; on tick, the slab colour cross-fades off the row and onto the next unticked row in 180ms (colour only). `ease-out`. Under `prefers-reduced-motion: reduce` all 0ms and no scale. Nothing else moves: not numbers, not the zone marker.
 - **Footnote** after the list (`text-14` muted): §5a.
-- **Tick state:** in memory only (client provider in the root layout, keyed by date + block + sheet row). Survives in-app navigation, clears on reload. Controlled checkboxes. No storage, cookies or requests; works offline.
+- **Tick state:** in memory only (client provider in the root layout, keyed by date + block + sheet row). Survives in-app navigation, clears on reload. Controlled checkboxes. No storage or cookies; ticking works offline. Since 2026-10-12 the tick that starts an exercise and the tick that completes it (its last row) each send one request to save a timestamp in `exercise_log` (DESIGN.md › Today › Tick state); the tick never waits for it, and a failed save shows "Tidspunktet blev ikke gemt. Fluebenet står."
 
 ### Ride card (`Card id="ride-{n}"`, one per planned session, in table order)
 - **Title:** "Cykel" (`text-32` display, uppercase via CSS). **Action:** "I alt 1:15 t" (`text-16` 600 tabular).
@@ -158,7 +158,9 @@ Every "Prøv igen" is an in-app navigation (`next/link`, `prefetch={false}`), so
 | Week-1 note | `Uge 1 i blokken: ingen kg fra sidste uge at sammenligne med endnu.` |
 | Reference | `Sidste uge 100 kg` · `kropsvægt` · `kropsvægt + 10 kg` · `Intet logget sidste uge` |
 | Counts | `10 - 15 reps` · `2 sæt` · `1 sæt` |
-| Footnote | `Flueben forsvinder, når siden genindlæses. Log kg i arket.` |
+| Footnote | `Flueben forsvinder, når siden genindlæses; start og slut pr. øvelse gemmes. Log kg i arket.` |
+| Tap not saved (WarningLine) | `Tidspunktet blev ikke gemt. Fluebenet står.` |
+| Dev switches on (muted) | `Testvisning: tidspunkter gemmes ikke.` |
 | States (c)/(d) | see §3a table |
 | Ride | `Cykel` · `I alt 1:15 t` · `Mål ud fra FTP 250 W` · `Trin` (aria) · `Gentag 4 gange` / `Gentag 1 gang` · `Tur uden navn` |
 | Ride gaps | `Ingen FTP fra intervals.icu, så målene står kun i % FTP.` · `Kunne ikke læse trinene, så der vises ingen mål. Ret dem i planned_sessions ({problem}).` · `Der er ikke indtastet trin for denne tur.` |

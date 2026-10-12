@@ -120,8 +120,10 @@ function NextSession({ date, session }: { readonly date: IsoDate; readonly sessi
           </p>
         )}
       </div>
-      <ExerciseList date={date} week={session.week} exercises={session.exercises} />
-      <p className="text-14 text-text-muted">Flueben forsvinder, når siden genindlæses. Log kg i arket.</p>
+      <ExerciseList date={date} session={session.session} week={session.week} exercises={session.exercises} />
+      <p className="text-14 text-text-muted">
+        Flueben forsvinder, når siden genindlæses; start og slut pr. øvelse gemmes. Log kg i arket.
+      </p>
     </>
   );
 }

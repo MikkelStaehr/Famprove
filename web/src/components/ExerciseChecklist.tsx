@@ -1,10 +1,15 @@
 "use client";
 
+import { useState, useTransition } from "react";
+
+import { logExerciseTap } from "@/app/actions";
 import type { IsoDate } from "@/lib/db/rows";
+import { tapChange, type TapInput } from "@/lib/exercise-taps";
 import { formatSetLoad, formatSetsReps, prescriptionKg, spokenExercise } from "@/lib/format";
 import type { ExerciseView } from "@/lib/today-view";
 
 import { tickKey, useTicks } from "./TickProvider";
+import { WarningLine } from "./WarningLine";
 
 /**
  * Today's sheet rows as tick rows (DESIGN.md › Today › Tick rows, Part B › NÆSTE slab). Each row
@@ -61,46 +66,84 @@ export function TickSegments({ date, rowKeys }: ProgressProps) {
 
 type ListProps = {
   readonly date: IsoDate;
+  readonly session: number; // the n-th strength session of the ISO week (exercise_log.session_no)
   readonly week: number;
   readonly exercises: readonly ExerciseView[];
 };
 
+type Unsaved = "dev" | "failed" | null;
+
+/**
+ * Saves the exercise timing tap a tick makes (lib/exercise-taps.ts) through the server action.
+ * The tick itself is instant and in memory; a save that fails leaves the tick and shows why.
+ * Server actions run one at a time per client, so taps reach the server in order.
+ */
+function useTapLog(): {
+  readonly unsaved: Unsaved;
+  readonly save: (input: TapInput) => void;
+} {
+  const [unsaved, setUnsaved] = useState<Unsaved>(null);
+  const [, startTransition] = useTransition();
+  const save = (input: TapInput) =>
+    startTransition(async () => {
+      try {
+        const result = await logExerciseTap(input);
+        setUnsaved(result.ok ? null : result.reason === "dev" ? "dev" : "failed");
+      } catch {
+        setUnsaved("failed"); // offline, or a deployment that no longer knows this action
+      }
+    });
+  return { unsaved, save };
+}
+
 /** One <li> per sheet row in sheet order; consecutive rows with the same name form one run. */
-export function ExerciseList({ date, week, exercises }: ListProps) {
+export function ExerciseList({ date, session, week, exercises }: ListProps) {
   const { ticked, setTicked } = useTicks();
+  const { unsaved, save } = useTapLog();
+  const toggle = (rowKey: string, done: boolean) => {
+    const change = tapChange(exercises, (k) => ticked.has(tickKey(date, k)), rowKey, done);
+    setTicked(tickKey(date, rowKey), done);
+    if (change !== null) save({ ...change, date, session });
+  };
   // The NÆSTE slab: the first unticked row in document order; none when every row is ticked.
   const nextIndex = exercises.findIndex((e) => !ticked.has(tickKey(date, e.key)));
   return (
-    <ol aria-label="Øvelser" className="flex flex-col">
-      {exercises.map((exercise, i) => {
-        const name = exercise.name.trim();
-        const runStart = i === 0 || exercises[i - 1].name.trim() !== name;
-        const key = tickKey(date, exercise.key);
-        // The run's name only reads as done once every row of the run is ticked, so "Squat"
-        // never looks finished after the first top set. Only the run's first row shows it.
-        let runDone = false;
-        if (runStart) {
-          let end = i + 1;
-          while (end < exercises.length && exercises[end].name.trim() === name) end += 1;
-          runDone = exercises.slice(i, end).every((row) => ticked.has(tickKey(date, row.key)));
-        }
-        // Dividers go between runs only; the slab hides the dividers it touches.
-        const divider = runStart && i > 0 && i !== nextIndex && i - 1 !== nextIndex;
-        return (
-          <li key={exercise.key} className={divider ? "border-t border-border" : undefined}>
-            <ExerciseRow
-              exercise={exercise}
-              week={week}
-              showName={runStart}
-              runDone={runDone}
-              next={i === nextIndex}
-              done={ticked.has(key)}
-              onToggle={(done) => setTicked(key, done)}
-            />
-          </li>
-        );
-      })}
-    </ol>
+    <>
+      <ol aria-label="Øvelser" className="flex flex-col">
+        {exercises.map((exercise, i) => {
+          const name = exercise.name.trim();
+          const runStart = i === 0 || exercises[i - 1].name.trim() !== name;
+          const key = tickKey(date, exercise.key);
+          // The run's name only reads as done once every row of the run is ticked, so "Squat"
+          // never looks finished after the first top set. Only the run's first row shows it.
+          let runDone = false;
+          if (runStart) {
+            let end = i + 1;
+            while (end < exercises.length && exercises[end].name.trim() === name) end += 1;
+            runDone = exercises.slice(i, end).every((row) => ticked.has(tickKey(date, row.key)));
+          }
+          // Dividers go between runs only; the slab hides the dividers it touches.
+          const divider = runStart && i > 0 && i !== nextIndex && i - 1 !== nextIndex;
+          return (
+            <li key={exercise.key} className={divider ? "border-t border-border" : undefined}>
+              <ExerciseRow
+                exercise={exercise}
+                week={week}
+                showName={runStart}
+                runDone={runDone}
+                next={i === nextIndex}
+                done={ticked.has(key)}
+                onToggle={(done) => toggle(exercise.key, done)}
+              />
+            </li>
+          );
+        })}
+      </ol>
+      {unsaved === "failed" && <WarningLine>Tidspunktet blev ikke gemt. Fluebenet står.</WarningLine>}
+      {unsaved === "dev" && (
+        <p className="text-14 text-text-muted">Testvisning: tidspunkter gemmes ikke.</p>
+      )}
+    </>
   );
 }
 

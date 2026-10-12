@@ -1,7 +1,7 @@
 import "server-only";
 
 /**
- * Minimal read-only PostgREST client (no supabase-js). Mirrors
+ * Minimal PostgREST client (no supabase-js): reads, plus `write` for the one write path. Mirrors
  * python/src/training_load/db/client.py:
  *  - Auth: `apikey: <key>` always; `Authorization: Bearer <key>` only for legacy JWT keys
  *    (prefix "eyJ"). New sb_secret_ keys go in apikey only.
@@ -120,6 +120,46 @@ function selectParams(query: SelectQuery): URLSearchParams {
   for (const [column, expression] of query.filters ?? []) params.append(column, expression);
   params.set("order", query.order);
   return params;
+}
+
+/**
+ * One write (the app's only write path is public.exercise_log, see lib/db/exercise-log.ts):
+ * POST / PATCH / DELETE `table` with `params` (filters, on_conflict), `Prefer: return=minimal` plus
+ * `prefer`, no-store, REQUEST_TIMEOUT_MS. PostgrestError on network failure or non-2xx; the
+ * message names the table and status, never the body.
+ */
+export async function write(
+  client: PostgrestClient,
+  table: string,
+  method: "POST" | "PATCH" | "DELETE",
+  options: {
+    readonly params?: readonly Filter[];
+    readonly body?: Readonly<Record<string, unknown>>;
+    readonly prefer?: string;
+  },
+): Promise<void> {
+  const params = new URLSearchParams();
+  for (const [column, expression] of options.params ?? []) params.append(column, expression);
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  let response: Response;
+  try {
+    response = await client.fetch(`${client.restUrl}/${table}${query}`, {
+      method,
+      headers: {
+        ...authHeaders(client.key),
+        "Content-Type": "application/json",
+        Prefer: ["return=minimal", options.prefer].filter(Boolean).join(","),
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (cause) {
+    throw new PostgrestError(table, null, `${table}: ${method} failed`, { cause });
+  }
+  if (!response.ok) {
+    throw new PostgrestError(table, response.status, `${table}: ${method} HTTP ${response.status}`);
+  }
 }
 
 /**
