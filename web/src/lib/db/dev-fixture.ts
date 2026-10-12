@@ -12,16 +12,54 @@
  *   lsrpe  real /analyse/styrke rows with the latest LSRPE_POINTS e1RM points per lift marked as
  *          logged-RPE (full colour), so that state can be screenshotted before real LSRPE exists.
  *          Illustrative only: the e1RM values are unchanged.
+ *   midsession  real Træning rows with an illustrative set log for today: in every session of the
+ *          week, the first MIDSESSION_DONE sets done (one every 3 minutes, the last 1:42 ago) and the
+ *          next one skipped, so the overview and Fokus can be screenshotted mid-session without a
+ *          write (taps are refused under a dev switch, lib/db/set-log.ts).
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
  */
 import { LIFTS } from "../lifts.ts";
 import { PostgrestError } from "./postgrest.ts";
-import type { DailyProjectionRow, ProjectedSession, RideMetricsRow, StrengthWeekRow } from "./rows.ts";
+import type {
+  DailyProjectionRow,
+  IsoDate,
+  PrescribedSetRow,
+  ProjectedSession,
+  RideMetricsRow,
+  SetLogRow,
+  StrengthWeekRow,
+} from "./rows.ts";
 
-export type DevFixture = "empty" | "stale" | "error" | "band" | "ef-few" | "lsrpe";
-const FIXTURES: readonly DevFixture[] = ["empty", "stale", "error", "band", "ef-few", "lsrpe"];
+export type DevFixture = "empty" | "stale" | "error" | "band" | "ef-few" | "lsrpe" | "midsession";
+const FIXTURES: readonly DevFixture[] = ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession"];
+
+/** DEV_FIXTURE=midsession: sets done per session before the skipped one. */
+export const MIDSESSION_DONE = 3;
+
+/**
+ * An illustrative set log for `today` (DEV_FIXTURE=midsession): per session, in the sheet's order,
+ * MIDSESSION_DONE sets done 3 minutes apart (the last one ending 102 s before `now`), then one
+ * skipped. Never written anywhere.
+ */
+export function midsessionLog(sets: readonly PrescribedSetRow[], today: IsoDate, now: Date): SetLogRow[] {
+  const bySession = new Map<number, PrescribedSetRow[]>();
+  for (const s of sets) bySession.set(s.session, [...(bySession.get(s.session) ?? []), s]);
+  const log: SetLogRow[] = [];
+  for (const [session, rows] of bySession) {
+    const ordered = rows.toSorted((a, b) => a.sheetRow - b.sheetRow || a.setNo - b.setNo);
+    const at = (k: number) => new Date(now.getTime() - 102_000 - (MIDSESSION_DONE - k) * 180_000).toISOString();
+    ordered.slice(0, MIDSESSION_DONE).forEach((s, k) =>
+      log.push({ date: today, session, row: s.sheetRow, set: s.setNo, startedAt: at(k), endedAt: at(k + 1), skipped: false, updatedAt: at(k + 1) }),
+    );
+    const skipped = ordered[MIDSESSION_DONE];
+    if (skipped !== undefined) {
+      log.push({ date: today, session, row: skipped.sheetRow, set: skipped.setNo, startedAt: null, endedAt: null, skipped: true, updatedAt: at(MIDSESSION_DONE - 0.5) });
+    }
+  }
+  return log;
+}
 
 /** Three days: well past the 26 h staleness limit. */
 export const STALE_AGE_MS = 3 * 24 * 60 * 60 * 1000;

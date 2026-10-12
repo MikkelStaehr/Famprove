@@ -10,6 +10,7 @@ import {
   fixtureError,
   illustrativeBands,
   illustrativeLogged,
+  midsessionLog,
   staleComputedAt,
 } from "./dev-fixture.ts";
 import { readSupabaseEnv } from "./env.ts";
@@ -289,7 +290,7 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     rides,
     upcomingRides,
     plannedSets,
-    setLog,
+    setLog: fixture === "midsession" ? midsessionLog(sets, today, new Date()) : setLog,
   };
 }
 
