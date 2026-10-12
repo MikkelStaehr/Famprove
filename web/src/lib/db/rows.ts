@@ -815,11 +815,12 @@ export type SetLogRow = {
   readonly startedAt: string | null;
   readonly endedAt: string | null;
   readonly skipped: boolean;
+  readonly updatedAt: string; // the row's latest write; for a skipped set, the skip's time
 };
 
 export const SET_LOG_SELECT = {
   table: "exercise_set_log",
-  columns: "date,session_no,row_no,set_no,started_at,ended_at,skipped",
+  columns: "date,session_no,row_no,set_no,started_at,ended_at,skipped,updated_at",
   order: "date,session_no,row_no,set_no", // the primary key
 } as const;
 
@@ -833,6 +834,7 @@ export function parseSetLogRow(raw: unknown): SetLogRow {
     startedAt: f.timestampOrNull("started_at"),
     endedAt: f.timestampOrNull("ended_at"),
     skipped: f.boolean("skipped"),
+    updatedAt: f.timestamp("updated_at"),
   };
   if (row.skipped && (row.startedAt !== null || row.endedAt !== null)) {
     throw new RowError("exercise_set_log: a skipped set has no timestamps");

@@ -123,7 +123,7 @@ function selectParams(query: SelectQuery): URLSearchParams {
 }
 
 /**
- * One write (the app's only write path is public.exercise_log, see lib/db/exercise-log.ts):
+ * One write (the app's only write path is public.exercise_set_log, see lib/db/set-log.ts):
  * POST / PATCH / DELETE `table` with `params` (filters, on_conflict), `Prefer: return=minimal` plus
  * `prefer`, no-store, REQUEST_TIMEOUT_MS. PostgrestError on network failure or non-2xx; the
  * message names the table and status, never the body.

@@ -1,7 +1,19 @@
 import "server-only";
 
 import { isoWeekStart } from "../dates.ts";
-import { neighbours, sessionOrder, setKey, type SetRef, type SetTapInput } from "../set-taps.ts";
+import {
+  type LoggedSet,
+  neighbours,
+  nextOpen,
+  refused,
+  sameInstant,
+  sessionOrder,
+  setKey,
+  type SetRef,
+  type SetTapInput,
+  startAfter,
+  stateOf,
+} from "../set-taps.ts";
 import { localToday } from "../today-view.ts";
 import { devFixture } from "./dev-fixture.ts";
 import { EnvError, readSupabaseEnv } from "./env.ts";
@@ -11,10 +23,9 @@ import {
   type PostgrestClient,
   PostgrestError,
   selectAll,
-  selectFirst,
   write,
 } from "./postgrest.ts";
-import { RowError } from "./rows.ts";
+import { parseSetLogRow, RowError, SET_LOG_SELECT } from "./rows.ts";
 
 /**
  * The app's only write path: public.exercise_set_log, from the Træning screens' taps via the
@@ -23,9 +34,10 @@ import { RowError } from "./rows.ts";
  *  - the date must be today (Copenhagen); dev switches (DEV_TODAY, DEV_FIXTURE) write nothing;
  *  - the set must be in that ISO week's session of the sheet (strength_sets), and its exercise
  *    must resolve in public.exercises (name or alias, trimmed, case-insensitive);
- *  - next / previous set come from the sheet's order here, never from the client;
+ *  - the next open set and the previous set come from the sheet's order and the session's log
+ *    here, never from the client;
  *  - timestamps are this server's clock; one tap writes one value T everywhere, which is how an
- *    undo finds what its tap wrote (it clears a field only while it still holds T).
+ *    undo finds what its tap wrote (it clears a start only while it holds T, on a set not done).
  * Python never reads this table; nothing computes from it; the app never writes kg.
  */
 
@@ -35,12 +47,6 @@ export type SetTapResult =
 
 const LOG = "exercise_set_log";
 type Field = "started_at" | "ended_at";
-type Logged = {
-  readonly startedAt: string | null;
-  readonly endedAt: string | null;
-  readonly skipped: boolean;
-  readonly updatedAt: string;
-};
 type Key = { readonly date: string; readonly session: number; readonly ref: SetRef; readonly exerciseId: number };
 
 function client(): PostgrestClient {
@@ -51,12 +57,6 @@ function client(): PostgrestClient {
 function record(raw: unknown, table: string): Record<string, unknown> {
   if (typeof raw !== "object" || raw === null) throw new RowError(`${table}: a row must be an object`);
   return raw as Record<string, unknown>; // a PostgREST row object, narrowed field by field
-}
-
-function textOrNull(r: Record<string, unknown>, column: string): string | null {
-  const value = r[column];
-  if (value === null || typeof value === "string") return value;
-  throw new RowError(`${LOG}.${column} must be text or null`);
 }
 
 function nameKey(name: string): string {
@@ -110,24 +110,15 @@ function keyParams(k: Key): Filter[] {
   ];
 }
 
-async function read(c: PostgrestClient, k: Key): Promise<Logged | null> {
-  return selectFirst(
+/** The session's logged sets (the screens read the same rows back). */
+async function sessionLog(c: PostgrestClient, date: string, session: number): Promise<Map<string, LoggedSet>> {
+  const rows = await selectAll(
     c,
     LOG,
-    { columns: "started_at,ended_at,skipped,updated_at", order: "date", filters: keyParams(k) },
-    (raw) => {
-      const r = record(raw, LOG);
-      if (typeof r.skipped !== "boolean" || typeof r.updated_at !== "string") {
-        throw new RowError(`${LOG} row must have skipped and updated_at`);
-      }
-      return {
-        startedAt: textOrNull(r, "started_at"),
-        endedAt: textOrNull(r, "ended_at"),
-        skipped: r.skipped,
-        updatedAt: r.updated_at,
-      };
-    },
+    { ...SET_LOG_SELECT, filters: [["date", `eq.${date}`], ["session_no", `eq.${session}`]] },
+    parseSetLogRow,
   );
+  return new Map(rows.map((r) => [setKey(r), r]));
 }
 
 /** Creates the set's row if needed (with `values`), never overwriting an existing one. */
@@ -159,14 +150,30 @@ async function setIfNull(c: PostgrestClient, k: Key, fields: readonly Field[], a
   }
 }
 
-async function deleteIfEmpty(c: PostgrestClient, k: Key): Promise<void> {
+/** Deletes the session's rows left with no timestamps and not skipped. */
+async function deleteEmpty(c: PostgrestClient, date: string, session: number): Promise<void> {
   await write(c, LOG, "DELETE", {
-    params: [...keyParams(k), ["started_at", "is.null"], ["ended_at", "is.null"], ["skipped", "is.false"]],
+    params: [
+      ["date", `eq.${date}`],
+      ["session_no", `eq.${session}`],
+      ["started_at", "is.null"],
+      ["ended_at", "is.null"],
+      ["skipped", "is.false"],
+    ],
   });
 }
 
-function sameInstant(a: string | null, b: string | null): boolean {
-  return a !== null && b !== null && Date.parse(a) === Date.parse(b);
+/** Clears every start in the session that holds `t` on a set that isn't done (one tap's T). */
+async function clearStarts(c: PostgrestClient, date: string, session: number, t: string, at: string): Promise<void> {
+  await write(c, LOG, "PATCH", {
+    params: [
+      ["date", `eq.${date}`],
+      ["session_no", `eq.${session}`],
+      ["started_at", `eq.${t}`],
+      ["ended_at", "is.null"],
+    ],
+    body: { started_at: null, updated_at: at },
+  });
 }
 
 /** Under `next dev` with DEV_TODAY or DEV_FIXTURE the screen is not today's: write nothing. */
@@ -201,16 +208,18 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
     };
     const own = keyOf(names.has(setKey(target)) ? target : null);
     if (own === null) return { ok: false, reason: "invalid" }; // not in the session, or unknown
-    const { previous, next } = neighbours(order, target);
-    const after = keyOf(next); // null: the last set (or an exercise the catalogue doesn't know)
-    const before = keyOf(previous);
+    const log = await sessionLog(c, input.date, input.session);
+    if (refused(log, input.kind, target)) return { ok: false, reason: "invalid" }; // skip a done set
+    const logged = log.get(setKey(target));
+    const { previous } = neighbours(order, target);
+    const after = keyOf(nextOpen(order, log, target)); // null: no open set after it
     const at = now.toISOString();
-    const logged = await read(c, own);
     switch (input.kind) {
       case "begin":
-        if (logged?.skipped !== true) await setIfNull(c, own, ["started_at"], at);
+        if (stateOf(logged) === "open") await setIfNull(c, own, ["started_at"], at);
         break;
       case "done":
+        if (stateOf(logged) === "done") break; // first write wins
         if (logged?.skipped === true) await patch(c, own, [], { skipped: false, updated_at: at });
         await setIfNull(c, own, ["started_at", "ended_at"], at);
         if (after !== null) await setIfNull(c, after, ["started_at"], at);
@@ -221,31 +230,19 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
         if (after !== null) await setIfNull(c, after, ["started_at"], at);
         break;
       case "undo": {
-        if (logged === null) break;
+        if (logged === undefined) break;
+        const previousLogged = previous === null ? undefined : log.get(setKey(previous));
         if (logged.skipped) {
-          // The skip wrote no time on this set; the next set's start holds the skip's time.
-          const restored = before === null ? null : ((await read(c, before))?.endedAt ?? null);
-          await patch(c, own, [], { skipped: false, started_at: restored, updated_at: at });
-          if (after !== null) {
-            await patch(c, after, [["started_at", `eq.${logged.updatedAt}`]], { started_at: null, updated_at: at });
-            await deleteIfEmpty(c, after);
-          }
+          // The skip wrote no time on this set: its start comes back from the previous set.
+          await patch(c, own, [], { skipped: false, started_at: startAfter(previousLogged), updated_at: at });
+          await clearStarts(c, input.date, input.session, logged.updatedAt ?? at, at);
         } else if (logged.endedAt !== null) {
-          const t = logged.endedAt;
-          await patch(c, own, [["ended_at", `eq.${t}`]], { ended_at: null, updated_at: at });
-          await patch(c, own, [["started_at", `eq.${t}`]], { started_at: null, updated_at: at });
-          if (after !== null) {
-            await patch(c, after, [["started_at", `eq.${t}`]], { started_at: null, updated_at: at });
-            await deleteIfEmpty(c, after);
-          }
-        } else if (logged.startedAt !== null) {
-          // A begin: undone unless the previous set's end wrote this start.
-          const previousEnd = before === null ? null : ((await read(c, before))?.endedAt ?? null);
-          if (!sameInstant(previousEnd, logged.startedAt)) {
-            await patch(c, own, [["started_at", `eq.${logged.startedAt}`]], { started_at: null, updated_at: at });
-          }
+          await patch(c, own, [["ended_at", `eq.${logged.endedAt}`]], { ended_at: null, updated_at: at });
+          await clearStarts(c, input.date, input.session, logged.endedAt, at);
+        } else if (logged.startedAt !== null && !sameInstant(startAfter(previousLogged), logged.startedAt)) {
+          await clearStarts(c, input.date, input.session, logged.startedAt, at); // a begin
         }
-        await deleteIfEmpty(c, own);
+        await deleteEmpty(c, input.date, input.session);
         break;
       }
     }

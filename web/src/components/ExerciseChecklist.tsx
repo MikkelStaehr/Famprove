@@ -61,7 +61,7 @@ export function TickSegments({ date, rowKeys }: ProgressProps) {
 
 type ListProps = {
   readonly date: IsoDate;
-  readonly session: number; // the n-th strength session of the ISO week (exercise_log.session_no)
+  readonly session: number; // the n-th strength session of the ISO week (exercise_set_log.session_no)
   readonly week: number;
   readonly exercises: readonly ExerciseView[];
 };

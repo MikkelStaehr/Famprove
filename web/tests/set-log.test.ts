@@ -14,6 +14,7 @@ import {
   setKey,
   type SetTapInput,
   stateOf,
+  lastTap,
 } from "../src/lib/set-taps.ts";
 
 // --- pure rules ------------------------------------------------------------------------------
@@ -58,7 +59,9 @@ test("applyTap: begin starts set 1; done ends it and starts the next; skip leave
   ]);
   assert.deepEqual(progress(ORDER, log), { done: 2, skipped: 1, total: 5 });
   assert.equal(stateOf(log.get("26#1")), "skipped");
-  assert.equal(restStart(log), T(5));
+  assert.equal(restStart(log), null); // the latest tap was a skip: no rest timer
+  assert.equal(restStart(apply(log, "undo", 26, 1, 7)), T(5)); // back to the done before it
+  assert.deepEqual(lastTap(log), { ref: { row: 26, set: 1 }, kind: "skip", at: T(6) });
   assert.deepEqual(firstOpen(ORDER, log), { row: 27, set: 1 });
   // Done twice changes nothing (first write wins).
   assert.deepEqual(view(apply(log, "done", 25, 1, 9)), view(log));
@@ -79,6 +82,25 @@ test("applyTap: undo clears what its tap wrote", () => {
   assert.deepEqual(view(apply(skipped, "undo", 26, 1, 8)).slice(2), [["26#1", T(5), null, false]]);
   // Undo a begin: the row disappears.
   assert.deepEqual(view(apply(apply(empty, "begin", 25, 1, 0), "undo", 25, 1, 1)), []);
+});
+
+test("applyTap: undo keeps the start of a set that is already done; skip of a done set is refused", () => {
+  let log = apply(empty, "done", 25, 1, 2);
+  log = apply(log, "done", 25, 2, 5); // its start is set 1's end (T2)
+  const undone = apply(log, "undo", 25, 1, 6);
+  assert.deepEqual(view(undone), [
+    ["25#2", T(2), T(5), false], // 25#2 keeps its real start
+    ["26#1", T(5), null, false], // and Dips the start 25#2's done gave it
+  ]);
+  assert.deepEqual(view(apply(undone, "done", 25, 1, 7)).map((r) => r[0]), ["25#1", "25#2", "26#1"]);
+  assert.deepEqual(view(apply(log, "skip", 25, 1, 8)), view(log)); // refused
+});
+
+test("applyTap: done and skip start the next OPEN set", () => {
+  let log = apply(empty, "done", 26, 1, 1); // Dips first, out of order
+  log = apply(log, "done", 25, 2, 3);
+  assert.equal(log.get("27#1")?.startedAt, T(1)); // Dips' done started the next open set
+  assert.equal(log.get("26#1")?.endedAt, T(1)); // 25#2's done didn't touch the done Dips
 });
 
 test("parseSetTapInput: exact shape only", () => {
@@ -250,9 +272,20 @@ test("recordSetTap: undo clears exactly what its tap wrote", async () => {
     ["25#1", 1, iso(0), iso(2), false],
     ["25#2", 1, iso(2), null, false], // start restored from set 1's end; Dips' start gone again
   ]);
-  await recordSetTap(tap("undo", 25, 1), at(9), options(db));
-  await recordSetTap(tap("undo", 25, 2), at(10), options(db)); // a start set 1 wrote: kept... then gone with it
-  assert.deepEqual(log(db).map((r) => r[0]), ["25#1"]);
+  await recordSetTap(tap("undo", 25, 2), at(9), options(db)); // a start set 1 wrote: kept
+  assert.deepEqual(log(db).map((r) => r[0]), ["25#1", "25#2"]);
+});
+
+test("recordSetTap: undoing a set keeps the start of a later set that is done; a redo works", async () => {
+  const db = fakeDb();
+  await recordSetTap(tap("done", 25, 1), at(2), options(db));
+  await recordSetTap(tap("done", 25, 2), at(5), options(db));
+  await recordSetTap(tap("undo", 25, 1), at(6), options(db));
+  assert.deepEqual(log(db).slice(0, 1), [["25#2", 1, iso(2), iso(5), false]]);
+  assert.deepEqual(await recordSetTap(tap("done", 25, 1), at(7), options(db)), { ok: true, at: iso(7) });
+  assert.ok(db.tables.exercise_set_log.every(valid));
+  // Skipping a done set is refused: its end would be lost.
+  assert.deepEqual(await recordSetTap(tap("skip", 25, 2), at(8), options(db)), { ok: false, reason: "invalid" });
 });
 
 test("recordSetTap: a set not in the session, another day, or a bad input is refused, nothing written", async () => {
