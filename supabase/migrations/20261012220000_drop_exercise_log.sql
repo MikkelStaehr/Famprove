@@ -1,5 +1,5 @@
--- How to apply: move this file into supabase/migrations/ (give it the current timestamp if a newer migration exists)
--- and run `supabase db push` from the repo root, or paste it into the Supabase SQL editor (one of the two, not both).
+-- Applied with supabase db push right after the Træning code was deployed (2026-10-12).
+-- (It waited in supabase/followups/ until then: the old app wrote exercise_log until the deploy.)
 --
 -- =============================================================================
 -- Drop exercise_log (follow-up to 20261012130000_set_log_planned_sets.sql). Not in

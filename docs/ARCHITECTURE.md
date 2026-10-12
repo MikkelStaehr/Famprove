@@ -71,7 +71,6 @@ Next.js (web/), server components only
 `cycling_weeks` (derived: every ISO week since 2024-12-30, 0 for a week without rides) ·
 `strength_weeks` (derived: every ISO week x SQUAT/BENCH/DEADLIFT from the first block: tonnage, best e1RM, block best) ·
 `strength_set_kg` (persistent: planned and lifted kg per set with timestamps; like forecast_log it can't be rebuilt) ·
-`exercise_log` (per exercise; superseded by `exercise_set_log`, written by the deployed app until the Træning code is deployed, then copied over and dropped by `supabase/followups/20261012140000_drop_exercise_log.sql`) ·
 `exercise_set_log` (persistent: start/end/skip of each set per session from the Træning screens' taps; can't be rebuilt; written only by the web; read back on reload) ·
 `planned_sets` (derived by compute: suggested kg per set of this ISO week and later, rolling e1RM of the parent lift x the RPE relation, rounded to 2.5). `activities.raw` / `strength_activities.raw` hold the intervals.icu object as delivered.
 
