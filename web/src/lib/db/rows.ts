@@ -177,9 +177,20 @@ export type StrengthSessionRow = {
   readonly tss: number; // strength TSS on `date` (0 when undone or extra)
 };
 
+/**
+ * public.ride_metrics' variability index for the week card (Python: NP / average power, 2 dp;
+ * vi_warning = VI > 1.15 on a Z2 day). Null vi: missing or implausible; vi_warning is null then.
+ */
+export type RideViRow = {
+  readonly activityId: string;
+  readonly vi: number | null;
+  readonly viWarning: boolean | null;
+};
+
 /** The selected week's sessions, as returned by queries.loadWeekDetail. */
 export type WeekDetailData = {
   readonly activities: readonly ActivityRow[]; // ascending by start
+  readonly rideVi: readonly RideViRow[]; // ride_metrics of those rides (rides before ANALYSIS_START have none)
   readonly sessions: readonly StrengthSessionRow[]; // done in the week, by week and number
   readonly sets: readonly StrengthSetRow[]; // the ISO week's prescription, by session, sheet order
 };
@@ -196,6 +207,12 @@ export const STRENGTH_SETS_SELECT = {
   columns:
     "week_start,session,sheet_id,block,week,sheet_row,set_no,type,name,reps,logged_kg,kg,bodyweight,rpe,prescribed,score",
   order: "week_start,session,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
+} as const;
+
+export const RIDE_VI_SELECT = {
+  table: "ride_metrics",
+  columns: "activity_id,vi,vi_warning",
+  order: "activity_id", // the primary key
 } as const;
 
 export const STRENGTH_SESSIONS_SELECT = {
@@ -631,6 +648,16 @@ export function parseStrengthSetRow(raw: unknown): StrengthSetRow {
     prescribed: f.stringOrNull("prescribed"),
     score: f.number("score"),
   };
+}
+
+export function parseRideViRow(raw: unknown): RideViRow {
+  const f = new Fields(RIDE_VI_SELECT.table, raw);
+  const vi = f.numberOrNull("vi");
+  const viWarning = f.booleanOrNull("vi_warning");
+  if ((vi === null) !== (viWarning === null)) {
+    throw new RowError("ride_metrics.vi and vi_warning must both be set or both be null");
+  }
+  return { activityId: f.string("activity_id"), vi, viWarning };
 }
 
 export function parseStrengthSessionRow(raw: unknown): StrengthSessionRow {

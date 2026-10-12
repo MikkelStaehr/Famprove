@@ -15,6 +15,7 @@ import {
   formatLoad,
   formatScore,
   formatSetLoad,
+  formatVi,
   formatWatts,
 } from "@/lib/format";
 
@@ -173,6 +174,7 @@ function Cycling({ date, tss, rides }: CyclingProps) {
               />
               <Metric term="NP" value={ride.np === null ? null : formatWatts(ride.np)} />
               <Metric term="IF" value={ride.intensityPct === null ? null : formatIf(ride.intensityPct)} />
+              <ViMetric vi={ride.vi} warning={ride.viWarning} />
               <Metric term="TSS" value={ride.tss === null ? null : formatLoad(ride.tss)} />
               <Metric term="Kilde" value={formatDevice(ride.device)} />
             </dl>
@@ -195,6 +197,33 @@ function Metric({ term, value }: { readonly term: string; readonly value: string
             <span className="sr-only">ikke registreret</span>
           </>
         )}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * VI (Python: NP / average power) next to NP and IF. The term carries the explanation as a
+ * tooltip. A warning (Python: VI > 1.15 on a Z2 day) is --warning with a triangle and words for
+ * screen readers, never colour alone. A ride without VI shows nothing (an HR-only ride has no NP).
+ */
+function ViMetric({ vi, warning }: { readonly vi: number | null; readonly warning: boolean }) {
+  if (vi === null) return null;
+  return (
+    <div className="flex gap-1">
+      <dt className="text-text-muted">
+        <abbr title="Jævnhed – 1.0 = konstant effekt" className="no-underline">
+          VI
+        </abbr>
+      </dt>
+      <dd className={warning ? "flex items-center gap-1 text-warning" : undefined}>
+        {warning && (
+          <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="currentColor">
+            <path d="M6 1 11 11H1Z" />
+          </svg>
+        )}
+        {formatVi(vi)}
+        {warning && <span className="sr-only">, ujævn effekt på en Z2-dag</span>}
       </dd>
     </div>
   );

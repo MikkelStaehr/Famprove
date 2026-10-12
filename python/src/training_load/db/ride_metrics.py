@@ -36,6 +36,8 @@ class RideMetricsRow(TypedDict):
     eftp_year_ago_date: str | None  # ISO date of the comparison point
     eftp_year_ago_w: int | None
     eftp_delta_w: int | None  # rolling_ftp_w - eftp_year_ago_w
+    vi: float | None  # NP / average power, 2 dp (domain.ride_analysis.variability_index)
+    vi_warning: bool | None  # vi > 1.15 on a Z2 day; null without vi
     computed_at: str  # ISO timestamptz (UTC), the same on every row of one compute run
 
 
@@ -76,6 +78,8 @@ def to_row(m: RideMetrics, computed_at: datetime) -> RideMetricsRow:
         eftp_delta_w=(
             f.rolling_ftp_w - year_ago[1] if year_ago and f.rolling_ftp_w is not None else None
         ),
+        vi=m.vi,
+        vi_warning=m.vi_warning,
         computed_at=computed_at.isoformat(),
     )
 

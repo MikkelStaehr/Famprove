@@ -18,10 +18,17 @@ Rules agreed with the user (2026-10-01):
   ending on the ride's date.
 - A line breaks when more than 21 days pass between two points (no carrying forward).
 - A year ago (for the headline): the latest eFTP point 365-386 days before an eFTP point.
+Added 2026-10-12 (slice ride-vi), for the week card and the future progress view:
+- VI (variability index) = NP / average power (intervals.icu icu_weighted_avg_watts /
+  icu_average_watts), 2 dp, on every ride with both. A ratio outside VI_BOUNDS is implausible:
+  no VI, counted by compute (never clamped).
+- VI warning: VI > VI_WARNING_ABOVE on a Z2 day, i.e. a planned session that day or the ride's
+  own name contains "Z2" as a word (planned_sessions has no type column); null without a VI.
 """
 
+import re
 import statistics
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from enum import Enum
@@ -76,6 +83,8 @@ class RideFacts:
     ftp_w: int | None  # the FTP set in intervals.icu at the time
     if_set: float | None  # intervals.icu IF as a ratio (on ftp_w; HR-based without power)
     rolling_ftp_w: int | None  # intervals.icu's eFTP on the day
+    avg_w: int | None = None  # intervals.icu icu_average_watts (raw); None without power
+    name: str | None = None  # the activity name, e.g. "Z2 Base — 34 km"
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +99,8 @@ class RideMetrics:
     ef_trend: float | None
     ef_gap_before: bool
     eftp_year_ago: tuple[date, int] | None = None  # (day, W) of the comparison point
+    vi: float | None = None  # NP / average power, 2 dp; None: missing or implausible
+    vi_warning: bool | None = None  # vi > VI_WARNING_ABOVE on a Z2 day; None without vi
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +162,32 @@ def _endurance(f: RideFacts, basis: Intensity) -> bool:
     return intensity is not None and intensity < ENDURANCE_MAX_IF
 
 
+VI_BOUNDS: Final = (1.0, 2.0)
+"""NP is never below average power, and above 2x it the power data is broken."""
+VI_WARNING_ABOVE: Final = 1.15
+_Z2: Final = re.compile(r"\bz2\b", re.IGNORECASE)
+
+
+def is_z2(name: str | None) -> bool:
+    """A workout name that says Z2: "Z2 Base — 34 km", "z2 ride"; not "Z25"."""
+    return name is not None and _Z2.search(name) is not None
+
+
+def vi_ratio(f: RideFacts) -> float | None:
+    """NP / average power, unrounded; None when either is missing (or average power is 0)."""
+    if f.np_w is None or f.avg_w is None or f.avg_w <= 0:
+        return None
+    return f.np_w / f.avg_w
+
+
+def variability_index(f: RideFacts) -> float | None:
+    """VI to 2 dp, or None when missing or implausible (outside VI_BOUNDS before rounding)."""
+    ratio = vi_ratio(f)
+    if ratio is None or not VI_BOUNDS[0] <= ratio <= VI_BOUNDS[1]:
+        return None
+    return round(ratio, 2)
+
+
 def ef_window(day: date, points: Sequence[tuple[date, float]]) -> list[float]:
     """The EF values of the points in the EF_TREND_DAYS ending on ``day``, both ends inclusive.
     The one owner of the window: the trend median uses it, and the web's EF-ride count
@@ -164,8 +201,14 @@ def _gaps(days: Sequence[date]) -> list[bool]:
     return [i == 0 or (d - days[i - 1]).days > MAX_GAP_DAYS for i, d in enumerate(days)]
 
 
-def analyse_rides(rides: Iterable[RideFacts], *, basis: Intensity = ENDURANCE) -> list[RideMetrics]:
-    """Every ride, ordered by (day, activity_id), with its trend values and exclusion."""
+def analyse_rides(
+    rides: Iterable[RideFacts],
+    *,
+    basis: Intensity = ENDURANCE,
+    z2_days: Collection[date] = frozenset(),
+) -> list[RideMetrics]:
+    """Every ride, ordered by (day, activity_id), with its trend values and exclusion.
+    ``z2_days``: dates with a planned session named Z2 (the VI warning's other source)."""
     ordered = sorted(rides, key=lambda f: (f.day, f.activity_id))
     first: list[tuple[RideFacts, Exclusion | None, bool, bool, float | None]] = []
     for f in ordered:
@@ -200,6 +243,8 @@ def analyse_rides(rides: Iterable[RideFacts], *, basis: Intensity = ENDURANCE) -
         trend = None
         if ef_ok:
             trend = statistics.median(ef_window(f.day, ef_points))
+        vi = variability_index(f)
+        z2_day = f.day in z2_days or is_z2(f.name)
         out.append(
             RideMetrics(
                 facts=f,
@@ -212,6 +257,8 @@ def analyse_rides(rides: Iterable[RideFacts], *, basis: Intensity = ENDURANCE) -
                 ef_trend=trend,
                 ef_gap_before=ef_ok and ef_gap[f.activity_id],
                 eftp_year_ago=year_ago(f.day) if eftp_ok else None,
+                vi=vi,
+                vi_warning=None if vi is None else (vi > VI_WARNING_ABOVE and z2_day),
             )
         )
     return out

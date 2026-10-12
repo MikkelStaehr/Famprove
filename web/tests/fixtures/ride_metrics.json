@@ -23,6 +23,8 @@
     "eftp_year_ago_date": null,
     "eftp_year_ago_w": null,
     "eftp_delta_w": null,
+    "vi": 1.17,
+    "vi_warning": false,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -49,6 +51,8 @@
     "eftp_year_ago_date": "2025-04-01",
     "eftp_year_ago_w": 233,
     "eftp_delta_w": -38,
+    "vi": 1.17,
+    "vi_warning": true,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -75,6 +79,8 @@
     "eftp_year_ago_date": "2025-04-01",
     "eftp_year_ago_w": 233,
     "eftp_delta_w": -38,
+    "vi": 1.4,
+    "vi_warning": false,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -101,6 +107,8 @@
     "eftp_year_ago_date": null,
     "eftp_year_ago_w": null,
     "eftp_delta_w": null,
+    "vi": null,
+    "vi_warning": null,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -127,6 +135,8 @@
     "eftp_year_ago_date": null,
     "eftp_year_ago_w": null,
     "eftp_delta_w": null,
+    "vi": null,
+    "vi_warning": null,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -153,6 +163,8 @@
     "eftp_year_ago_date": "2025-04-01",
     "eftp_year_ago_w": 233,
     "eftp_delta_w": -38,
+    "vi": 1.17,
+    "vi_warning": false,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -179,6 +191,8 @@
     "eftp_year_ago_date": null,
     "eftp_year_ago_w": null,
     "eftp_delta_w": null,
+    "vi": null,
+    "vi_warning": null,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -205,6 +219,8 @@
     "eftp_year_ago_date": "2025-04-01",
     "eftp_year_ago_w": 233,
     "eftp_delta_w": -38,
+    "vi": 1.13,
+    "vi_warning": false,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -231,6 +247,8 @@
     "eftp_year_ago_date": null,
     "eftp_year_ago_w": null,
     "eftp_delta_w": null,
+    "vi": 1.17,
+    "vi_warning": false,
     "computed_at": "2026-10-01T03:00:00+00:00"
   },
   {
@@ -257,6 +275,92 @@
     "eftp_year_ago_date": null,
     "eftp_year_ago_w": null,
     "eftp_delta_w": null,
+    "vi": 1.1,
+    "vi_warning": false,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "activity_id": "i110",
+    "date": "2026-05-22",
+    "type": "Ride",
+    "moving_s": 5400,
+    "distance_m": 45000.0,
+    "load": 80,
+    "np_w": 175,
+    "avg_hr": 148,
+    "device_watts": true,
+    "ftp_w": 250,
+    "if_set": 0.7,
+    "rolling_ftp_w": 195,
+    "if_eftp": 0.8974358974358975,
+    "ef": 1.1824324324324325,
+    "exclusion": null,
+    "eftp_ok": true,
+    "eftp_gap_before": false,
+    "ef_ok": true,
+    "ef_trend": 1.1805019305019306,
+    "ef_gap_before": false,
+    "eftp_year_ago_date": null,
+    "eftp_year_ago_w": null,
+    "eftp_delta_w": null,
+    "vi": 1.17,
+    "vi_warning": true,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "activity_id": "i111",
+    "date": "2026-05-23",
+    "type": "Ride",
+    "moving_s": 5400,
+    "distance_m": 45000.0,
+    "load": 80,
+    "np_w": 175,
+    "avg_hr": 148,
+    "device_watts": true,
+    "ftp_w": 250,
+    "if_set": 0.7,
+    "rolling_ftp_w": 195,
+    "if_eftp": 0.8974358974358975,
+    "ef": 1.1824324324324325,
+    "exclusion": null,
+    "eftp_ok": true,
+    "eftp_gap_before": false,
+    "ef_ok": true,
+    "ef_trend": 1.1824324324324325,
+    "ef_gap_before": false,
+    "eftp_year_ago_date": null,
+    "eftp_year_ago_w": null,
+    "eftp_delta_w": null,
+    "vi": null,
+    "vi_warning": null,
+    "computed_at": "2026-10-01T03:00:00+00:00"
+  },
+  {
+    "activity_id": "i112",
+    "date": "2026-05-24",
+    "type": "Ride",
+    "moving_s": 5400,
+    "distance_m": 45000.0,
+    "load": 80,
+    "np_w": 175,
+    "avg_hr": 148,
+    "device_watts": true,
+    "ftp_w": 250,
+    "if_set": 0.7,
+    "rolling_ftp_w": 195,
+    "if_eftp": 0.8974358974358975,
+    "ef": 1.1824324324324325,
+    "exclusion": null,
+    "eftp_ok": true,
+    "eftp_gap_before": false,
+    "ef_ok": true,
+    "ef_trend": 1.1824324324324325,
+    "ef_gap_before": false,
+    "eftp_year_ago_date": null,
+    "eftp_year_ago_w": null,
+    "eftp_delta_w": null,
+    "vi": 1.03,
+    "vi_warning": false,
     "computed_at": "2026-10-01T03:00:00+00:00"
   }
 ]

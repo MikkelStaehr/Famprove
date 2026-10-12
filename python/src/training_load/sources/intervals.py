@@ -179,6 +179,8 @@ def ride_facts(activity: CyclingActivity, unreadable: Counter[str]) -> RideFacts
         ftp_w=activity.ftp,
         if_set=None if activity.intensity_pct is None else activity.intensity_pct / 100,
         rolling_ftp_w=read("icu_rolling_ftp", opt_int),
+        avg_w=read("icu_average_watts", opt_int),
+        name=activity.name,
     )
 
 

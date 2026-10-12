@@ -49,9 +49,9 @@
   },
   {
     "week_start": "2026-05-18",
-    "rides": 1,
-    "moving_s": 5400,
-    "load": 80,
+    "rides": 4,
+    "moving_s": 21600,
+    "load": 320,
     "excluded": 0,
     "computed_at": "2026-10-01T03:00:00+00:00"
   }

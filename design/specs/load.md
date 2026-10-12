@@ -73,6 +73,7 @@ Structure unchanged (DESIGN.md › Week card).
 | Rest row | `Hvile` |
 | Strength section | `Session 2 · Program - blok 12 (offseason) · uge 1` · `Styrke · ikke i programmet` · `Styrke 1:12:48 · 86 TSS` |
 | Ride metrics | `Bevægelsestid` · `Kilde` · `Ukendt enhed` · `Tur uden navn` |
+| VI (added 2026-10-12) | term `VI` with tooltip `Jævnhed – 1.0 = konstant effekt`; on a warning the value is `--warning` with a triangle, spoken `, ujævn effekt på en Z2-dag` |
 | Missing values | `–`, spoken `ikke registreret` · blank kg: `intet kg logget` · score label `score pr. sæt (før styrkefaktor)` |
 | Row sr | `cykling 86 TSS, styrke 0 TSS, i alt 86 TSS` |
 | Empty | `Ingen ugetotal for denne uge endnu.` · `Ingen træningsdage registreret i uge 39.` |

@@ -95,6 +95,11 @@ export function formatIf(percent: number): string {
   return IF_FORMAT.format(Math.round(percent) / 100);
 }
 
+/** Variability index (NP / average power) with 2 decimals: 1.18 -> "1,18". */
+export function formatVi(vi: number): string {
+  return IF_FORMAT.format(vi);
+}
+
 /** Power in whole watts with its unit: 249.6 -> "250 W". */
 export function formatWatts(watts: number): string {
   return `${formatLoad(watts)} W`;

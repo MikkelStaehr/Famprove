@@ -5,7 +5,8 @@ parse every row. When the producer changes, regenerate them:
     REGENERATE_CONTRACT=1 uv run pytest tests/test_contract_ride_analysis.py
 Edge cases kept in them: every exclusion reason, a ride without a power meter, a missing
 distance, a VirtualRide, EF points with a trend, line breaks, a year-ago eFTP comparison,
-and weeks without rides.
+weeks without rides, and VI: a value, a Z2 warning by ride name and by planned session, and an
+implausible ratio left null.
 """
 
 import json
@@ -40,6 +41,7 @@ BASE = RideFacts(
     ftp_w=250,
     if_set=0.70,
     rolling_ftp_w=195,
+    avg_w=150,  # VI 175 / 150 = 1.17
 )
 
 
@@ -59,8 +61,12 @@ def producer_rows() -> tuple[list[RideMetricsRow], list[CyclingWeekRow]]:
         r(6, 14, type="VirtualRide", np_w=170, avg_hr=150, distance_m=None, if_set=0.68),
         r(7, 16, has_raw=False, avg_hr=None, device_watts=None, rolling_ftp_w=None),  # no_raw
         r(8, 45, np_w=165, avg_hr=140, if_set=0.66, rolling_ftp_w=190),  # after a break
+        r(10, 46, name="Z2 Base — 34 km"),  # VI 1.17 > 1.15 on a Z2 ride: warning
+        r(11, 47, avg_w=60),  # NP / avg = 2.9: implausible, VI null
+        r(12, 48, avg_w=170),  # VI 1.03 on a planned Z2 day: no warning
     ]
-    metrics = analyse_rides(rides, basis=Intensity.SET_FTP)
+    z2_days = {START + timedelta(days=48), START + timedelta(days=0)}  # planned "Z2" sessions
+    metrics = analyse_rides(rides, basis=Intensity.SET_FTP, z2_days=z2_days)
     weeks = weekly_totals(metrics, first=START, last=START + timedelta(days=48))
     return (
         [to_row(m, RUN_AT) for m in metrics],
@@ -102,3 +108,9 @@ def test_the_fixtures_keep_their_edge_cases() -> None:
     assert any(r["eftp_delta_w"] == 195 - 233 for r in rides)
     assert any(r["eftp_ok"] and r["eftp_delta_w"] is None for r in rides)
     assert any(w["rides"] == 0 for w in weeks) and any(w["excluded"] > 0 for w in weeks)
+    vi = {r["activity_id"]: (r["vi"], r["vi_warning"]) for r in rides}
+    assert vi["i110"] == (1.17, True)  # Z2 by its own name
+    assert vi["i100"] == (1.17, True)  # Z2 by the planned session that day
+    assert vi["i111"] == (None, None)  # implausible
+    assert vi["i112"] == (1.03, False)  # Z2 day, even pacing
+    assert vi["i105"] == (None, None)  # HR only: no NP

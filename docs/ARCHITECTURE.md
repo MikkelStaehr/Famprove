@@ -31,7 +31,7 @@ Next.js (web/), server components only
   /       Today   ← daily_load (form line), strength_sessions + strength_sets (this ISO week, last week), planned_targets
                   → exercise_log (the one write: start/end taps via app/actions.ts → lib/db/exercise-log.ts;
                     checked against strength_sets + exercises; Python never reads it)
-  /load   Load    ← daily_load, blocks, weekly_load; week details ← activities, strength_sessions, strength_sets
+  /load   Load    ← daily_load, blocks, weekly_load; week details ← activities, ride_metrics (VI), strength_sessions, strength_sets
   /analyse Analyse (Cykel) ← ride_metrics, cycling_weeks
   /analyse/styrke Analyse (Styrke) ← strength_weeks, blocks (phase), strength_sets.e1rm (the sheet 1RM)
 ```
@@ -40,7 +40,7 @@ Next.js (web/), server components only
 | Path | What lives there |
 |---|---|
 | `python/src/training_load/sources/` | Adapters that read the outside world: `intervals.py`, `google_drive.py`, `strength_sheet.py` (the coach-sheet parser and strength formula; formula lines never change) |
-| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: cycling = typical week + planned rides; strength = the coach's plan to the block's end, then the recent weeks with a low-high band; `naive_projection` = the baseline), `planned_load.py` (planned kg per set and the plan score of a session), `ride_analysis.py` (Analyse/Cykel: exclusions, eFTP/EF points and line breaks, EF 28-day median, year-ago eFTP, weekly totals; `ENDURANCE` = the EF intensity basis), `strength_analysis.py` (Analyse/Styrke: lifted status, `PHASES`, e1RM from lifted kg, weekly rows), `kg_history.py` (planned/lifted kg transitions), `dates.py` (`SERIES_START` 2026-01-01 for daily_load, `ANALYSIS_START` 2024-12-30, the ISO week of 2025-01-01, for the ride analysis), `exercises.py` (the exercise catalogue: name/alias matching, muscle factor and bodyweight kg per sheet name, unknown-name defaults) |
+| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: cycling = typical week + planned rides; strength = the coach's plan to the block's end, then the recent weeks with a low-high band; `naive_projection` = the baseline), `planned_load.py` (planned kg per set and the plan score of a session), `ride_analysis.py` (Analyse/Cykel: exclusions, eFTP/EF points and line breaks, EF 28-day median, year-ago eFTP, weekly totals; `ENDURANCE` = the EF intensity basis; VI = NP / average power and the Z2 VI warning), `strength_analysis.py` (Analyse/Styrke: lifted status, `PHASES`, e1RM from lifted kg, weekly rows), `kg_history.py` (planned/lifted kg transitions), `dates.py` (`SERIES_START` 2026-01-01 for daily_load, `ANALYSIS_START` 2024-12-30, the ISO week of 2025-01-01, for the ride analysis), `exercises.py` (the exercise catalogue: name/alias matching, muscle factor and bodyweight kg per sheet name, unknown-name defaults) |
 | `python/src/training_load/db/` | The only code that talks to Supabase (PostgREST over `requests`), one module per table |
 | `python/src/training_load/cli/` | The five console scripts, one per step of the daily job (`check-config` first) |
 | `python/src/training_load/*.py` | `config.py` (env, fail-fast), `http.py` (retrying HTTP seam), `narrow.py` (JSON → typed fields) |
@@ -64,7 +64,7 @@ Next.js (web/), server components only
 `blocks` (strength blocks + deload) · `weekly_load` (view) · `planned_sessions` (you fill) ·
 `planned_targets` (derived watts) · `daily_projection` (the prognose, next 56 days, rebuilt by `compute`; estimates only) ·
 `forecast_log` (every run day's prognose and naive baseline, upserted per day, never pruned: for measuring forecast error later) ·
-`ride_metrics` (derived: every ride since 2024-12-30 with its trend values and why it is left out of them) ·
+`ride_metrics` (derived: every ride since 2024-12-30 with its trend values, VI and VI warning, and why it is left out of the trends) ·
 `cycling_weeks` (derived: every ISO week since 2024-12-30, 0 for a week without rides) ·
 `strength_weeks` (derived: every ISO week x SQUAT/BENCH/DEADLIFT from the first block: tonnage, best e1RM, block best) ·
 `strength_set_kg` (persistent: planned and lifted kg per set with timestamps; like forecast_log it can't be rebuilt) ·

@@ -30,10 +30,12 @@ import {
   parseCyclingWeekRow,
   parseDailyLoadRow,
   parseRideMetricsRow,
+  parseRideViRow,
   parseProjectionRow,
   parseStrengthSessionRow,
   PROJECTION_SELECT,
   RIDE_METRICS_SELECT,
+  RIDE_VI_SELECT,
   SHEET_ONE_RM_SELECT,
   STRENGTH_BLOCKS_SELECT,
   STRENGTH_WEEKS_SELECT,
@@ -117,9 +119,9 @@ export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<Week
   }
   const fixture = devFixture();
   if (fixture === "error") throw fixtureError(ACTIVITIES_SELECT.table);
-  if (fixture === "empty") return { activities: [], sessions: [], sets: [] };
+  if (fixture === "empty") return { activities: [], rideVi: [], sessions: [], sets: [] };
   const db = client();
-  const [activities, sessions, sets] = await Promise.all([
+  const [activities, rideVi, sessions, sets] = await Promise.all([
     selectAll(
       db,
       ACTIVITIES_SELECT.table,
@@ -131,6 +133,12 @@ export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<Week
         ],
       },
       parseActivityRow,
+    ),
+    selectAll(
+      db,
+      RIDE_VI_SELECT.table,
+      { ...RIDE_VI_SELECT, filters: [["date", `gte.${start}`], ["date", `lte.${end}`]] },
+      parseRideViRow,
     ),
     selectAll(
       db,
@@ -148,7 +156,7 @@ export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<Week
       parseStrengthSetRow,
     ),
   ]);
-  return { activities, sessions, sets };
+  return { activities, rideVi, sessions, sets };
 }
 
 /** Days ahead the rest state looks for the next planned ride. */

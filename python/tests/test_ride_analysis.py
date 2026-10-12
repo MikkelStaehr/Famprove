@@ -15,6 +15,8 @@ from training_load.domain.ride_analysis import (
     RideFacts,
     analyse_rides,
     classify,
+    is_z2,
+    variability_index,
     weekly_totals,
 )
 from training_load.sources.intervals import parse_activities, ride_facts
@@ -193,3 +195,57 @@ def test_year_ago_is_the_latest_eftp_point_365_to_386_days_earlier() -> None:
     out = {m.facts.activity_id: m for m in analyse_rides(rides)}
     assert out["i5"].eftp_year_ago == (DAY - timedelta(days=370), 231)
     assert out["i6"].eftp_year_ago is None and out["i1"].eftp_year_ago is None
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Z2 Base — 34 km", True),
+        ("z2 ride", True),
+        ("Endurance Z2", True),
+        ("Z25 test", False),
+        ("Morning Ride", False),
+        (None, False),
+    ],
+)
+def test_a_z2_day_is_z2_as_a_word_in_the_name(name: str | None, expected: bool) -> None:
+    assert is_z2(name) is expected
+
+
+@pytest.mark.parametrize(
+    ("np_w", "avg_w", "expected"),
+    [
+        (177, 150, 1.18),  # Sun 11 Oct 2026, real numbers
+        (150, 150, 1.0),
+        (300, 150, 2.0),
+        (149, 150, None),  # 0.993: NP below average power is broken data, even if it rounds to 0.99
+        (310, 150, None),  # above 2: implausible
+        (None, 150, None),
+        (177, None, None),
+        (177, 0, None),
+    ],
+)
+def test_vi_is_np_over_average_power_within_bounds(
+    np_w: int | None, avg_w: int | None, expected: float | None
+) -> None:
+    assert variability_index(replace(RIDE, np_w=np_w, avg_w=avg_w)) == expected
+
+
+def test_the_vi_warning_needs_a_z2_day_and_a_vi_above_1_15() -> None:
+    rides = [
+        ride(1, DAY, avg_w=150, name="Morning Ride"),  # 1.2, not Z2
+        ride(2, DAY + timedelta(days=1), avg_w=150, name="Z2 Base"),  # 1.2 on Z2: warning
+        ride(3, DAY + timedelta(days=2), avg_w=160),  # 1.13 on a planned Z2 day: fine
+        ride(4, DAY + timedelta(days=3), avg_w=150),  # 1.2 on a planned Z2 day: warning
+        ride(5, DAY + timedelta(days=4), avg_w=None, name="Z2"),  # no VI: no verdict
+    ]
+    planned = {DAY + timedelta(days=2), DAY + timedelta(days=3)}
+    got = [(m.vi, m.vi_warning) for m in analyse_rides(rides, z2_days=planned)]
+    assert got == [(1.2, False), (1.2, True), (1.12, False), (1.2, True), (None, None)]
+
+
+def test_ride_facts_read_average_power_and_name_from_the_activity() -> None:
+    [activity] = parse_activities([raw_ride("i9", "2026-05-04T08:00:00")]).cycling
+    facts = ride_facts(activity, Counter())
+    assert facts.name == activity.name
+    assert facts.avg_w == (activity.raw or {}).get("icu_average_watts")

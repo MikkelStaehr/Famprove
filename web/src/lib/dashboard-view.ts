@@ -17,6 +17,7 @@ import type {
   DailyProjectionRow,
   DashboardData,
   IsoDate,
+  RideViRow,
   StrengthSessionRow,
   StrengthSetRow,
   WeekDetailData,
@@ -130,6 +131,8 @@ export type RideDetail = {
   readonly movingTimeS: number | null;
   readonly np: number | null; // W
   readonly intensityPct: number | null; // IF as a percent
+  readonly vi: number | null; // ride_metrics.vi (Python: NP / average power); null: none
+  readonly viWarning: boolean; // ride_metrics.vi_warning (Python: VI > 1.15 on a Z2 day)
   readonly tss: number | null;
   readonly device: string | null; // intervals.icu device_name, e.g. "HAMMERHEAD Karoo"
 };
@@ -295,7 +298,7 @@ export function selectWeek(
   };
 }
 
-function rideDetail(a: ActivityRow): RideDetail {
+function rideDetail(a: ActivityRow, vi: RideViRow | undefined): RideDetail {
   return {
     id: a.id,
     name: a.name,
@@ -303,6 +306,8 @@ function rideDetail(a: ActivityRow): RideDetail {
     movingTimeS: a.movingTimeS,
     np: a.weightedAvgWatts,
     intensityPct: a.intensityPct,
+    vi: vi?.vi ?? null,
+    viWarning: vi?.viWarning === true,
     tss: a.trainingLoad,
     device: a.deviceName,
   };
@@ -353,10 +358,11 @@ function sessionDetail(row: StrengthSessionRow, sets: readonly StrengthSetRow[])
  * sessions that weren't done don't appear. Rest = no ride and no strength activity.
  */
 export function dayDetails(week: WeekView, detail: WeekDetailData): DayDetail[] {
+  const vi = new Map(detail.rideVi.map((r) => [r.activityId, r]));
   return week.days.map((day) => {
     const rides = detail.activities
       .filter((a) => a.startDateLocal.slice(0, 10) === day.date)
-      .map(rideDetail);
+      .map((a) => rideDetail(a, vi.get(a.id)));
     const sessions = detail.sessions
       .filter((s) => s.date === day.date)
       .map((s) => sessionDetail(s, detail.sets));

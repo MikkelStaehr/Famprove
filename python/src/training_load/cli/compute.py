@@ -43,7 +43,14 @@ from training_load.domain.projection import (
     project,
     typical_ride_count,
 )
-from training_load.domain.ride_analysis import analyse_rides, weekly_totals
+from training_load.domain.ride_analysis import (
+    VI_BOUNDS,
+    analyse_rides,
+    is_z2,
+    variability_index,
+    vi_ratio,
+    weekly_totals,
+)
 from training_load.domain.sessions import daily_strength_tss, match_sessions
 from training_load.domain.strength import derive_blocks, iso_week_start
 from training_load.domain.strength_analysis import (
@@ -162,7 +169,8 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     if analysis.e1rm_out_of_bounds:
         log.warning("%d sets left out of e1RM (implausible value)", analysis.e1rm_out_of_bounds)
 
-    rides = [PlannedRide(date=p.date, name=p.name, steps=p.steps) for p in all_sessions(db)]
+    planned = all_sessions(db)
+    rides = [PlannedRide(date=p.date, name=p.name, steps=p.steps) for p in planned]
     deload_weeks = {iso_week_start(b.deload_start) for b in blocks if b.deload_start}
     projection = project(
         days,
@@ -220,7 +228,7 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
             fields_before = unreadable.total()
             facts.append(ride_facts(a, unreadable))
             unreadable_rides += unreadable.total() > fields_before
-    metrics = analyse_rides(facts)
+    metrics = analyse_rides(facts, z2_days={p.date for p in planned if is_z2(p.name)})
     weeks = weekly_totals(metrics, first=ANALYSIS_START, last=today)
     sync_ride_metrics(db, metrics, weeks, computed_at=computed_at)
     excluded = Counter(m.exclusion for m in metrics if m.exclusion is not None)
@@ -237,6 +245,21 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     if unreadable:
         log.warning(
             "unreadable raw ride fields (set to null): %s", dict(sorted(unreadable.items()))
+        )
+    implausible_vi = sum(
+        1 for f in facts if vi_ratio(f) is not None and variability_index(f) is None
+    )
+    log.info(
+        "VI on %d of %d rides (%d with a Z2 warning)",
+        sum(1 for m in metrics if m.vi is not None),
+        len(metrics),
+        sum(1 for m in metrics if m.vi_warning),
+    )
+    if implausible_vi:
+        log.warning(
+            "%d rides have an implausible VI (NP / average power outside %s-%s): left null",
+            implausible_vi,
+            *VI_BOUNDS,
         )
     problems = excluded["no_raw"] + unreadable_rides  # a ride without raw has no fields to read
     if facts and problems > MAX_RIDE_PROBLEM_SHARE * len(facts):

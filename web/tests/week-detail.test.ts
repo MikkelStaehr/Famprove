@@ -154,6 +154,7 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
   );
   const detail = dayDetails(w, {
     activities: [ride({ id: "i9", startDateLocal: "2026-09-30T07:00:00", deviceName: null })],
+    rideVi: [{ activityId: "i9", vi: 1.18, viWarning: true }],
     sessions: [
       done(1, "2026-09-29"),
       done(4, "2026-10-01", { block: null, week: null, activityId: "x", movingTimeS: 2710, tss: 0 }),
@@ -194,6 +195,7 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
 
   assert.equal(wed.strength, null); // no strength until intervals logs it
   assert.equal(wed.rides[0]?.device, null);
+  assert.deepEqual([wed.rides[0]?.vi, wed.rides[0]?.viWarning], [1.18, true]); // Python's, as stored
   assert.equal(wed.rest, false);
 
   const extra = thu.strength?.sessions[0];
@@ -209,6 +211,7 @@ test("effective kg: a bodyweight exercise with nothing logged shows its bodyweig
   );
   const [tue] = dayDetails(w, {
     activities: [],
+    rideVi: [],
     sessions: [done(1, "2026-09-29")],
     sets: [
       set({ name: "Glute ham raise", type: "HAMSTRINGS", bodyweight: true, loggedKg: 0, kg: 51 }),
@@ -274,4 +277,18 @@ test("parseActivityRow and parseStrengthSetRow map and validate", () => {
   assert.throws(() => parseStrengthSetRow({ ...raw, week_start: "2026-9-28" }), RowError);
   assert.throws(() => parseStrengthSetRow({ ...raw, bodyweight: "no" }), RowError);
   assert.throws(() => parseActivityRow({ id: "i1", start_date_local: "yesterday" }), RowError);
+});
+
+test("a ride without ride_metrics (before 2024-12-30) has no VI and no warning", () => {
+  const w = weekView(
+    { daily: [day("2026-09-30", 60, 0)], blocks: [], weeks: [], projection: [] },
+    week(40, "2026-09-28"),
+  );
+  const [wed] = dayDetails(w, {
+    activities: [ride({ id: "i9", startDateLocal: "2026-09-30T07:00:00" })],
+    rideVi: [],
+    sessions: [],
+    sets: [],
+  });
+  assert.deepEqual([wed.rides[0]?.vi, wed.rides[0]?.viWarning], [null, false]);
 });

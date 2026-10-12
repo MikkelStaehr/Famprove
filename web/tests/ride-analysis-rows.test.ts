@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { EF_FEW_POINTS, fewEfPoints } from "../src/lib/db/dev-fixture.ts";
-import { parseCyclingWeekRow, parseRideMetricsRow, RowError } from "../src/lib/db/rows.ts";
+import { parseCyclingWeekRow, parseRideMetricsRow, parseRideViRow, RowError } from "../src/lib/db/rows.ts";
 
 function fixture(name: string): unknown[] {
   const raw: unknown = JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8"));
@@ -53,4 +53,18 @@ test("DEV_FIXTURE=ef-few keeps only the latest EF points", () => {
   assert.deepEqual(kept.map((r) => r.activityId), many.filter((r) => r.efOk).slice(-EF_FEW_POINTS).map((r) => r.activityId));
   assert.ok(few.every((r) => r.efOk || (r.efTrend === null && !r.efGapBefore)));
   assert.equal(few.length, many.length);
+});
+
+test("contract: the week card's VI parses from every ride_metrics row Python writes", () => {
+  const vi = fixture("ride_metrics.json").map(parseRideViRow);
+  const by = new Map(vi.map((r) => [r.activityId, [r.vi, r.viWarning]]));
+  assert.deepEqual(by.get("i110"), [1.17, true]); // Z2 by the ride's own name
+  assert.deepEqual(by.get("i112"), [1.03, false]); // Z2 day, even pacing
+  assert.deepEqual(by.get("i111"), [null, null]); // implausible ratio
+  assert.deepEqual(by.get("i105"), [null, null]); // HR only
+});
+
+test("ride_metrics: a VI without its warning flag (or the other way round) is rejected", () => {
+  assert.throws(() => parseRideViRow({ activity_id: "i1", vi: 1.2, vi_warning: null }), RowError);
+  assert.throws(() => parseRideViRow({ activity_id: "i1", vi: null, vi_warning: false }), RowError);
 });
