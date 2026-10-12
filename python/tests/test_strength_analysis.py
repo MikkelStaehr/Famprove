@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 import openpyxl
 import pytest
 
+from conftest import legacy_scoring
 from training_load.domain.kg_history import KgState, gone_states, kg_keys, next_kg_state
 from training_load.domain.strength import Block, StrengthSet
 from training_load.domain.strength_analysis import (
@@ -325,5 +326,5 @@ def test_a_tab_without_any_header_row_counts_the_missing_lsrpe_column() -> None:
         [None, "SQUAT", "Squat", None, 1, 5, "RPE 6", 140, 7]
     )  # an LSRPE-like cell, no header
     issues: Counter[str] = Counter()
-    [parsed] = parse_tab(ws, "Program - blok 12", 80.0, issues)
+    [parsed] = parse_tab(ws, "Program - blok 12", legacy_scoring(80.0), issues)
     assert parsed["logged_rpe"] is None and issues[LSRPE_COLUMN_MISSING] == 1

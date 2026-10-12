@@ -15,7 +15,13 @@ from typing import cast
 import pytest
 
 import test_real_slice as real
-from conftest import SYNTHETIC_BODYWEIGHT, SYNTHETIC_SHEET_ID, InMemoryPostgrest, raw_ride
+from conftest import (
+    SYNTHETIC_BODYWEIGHT,
+    SYNTHETIC_SHEET_ID,
+    InMemoryPostgrest,
+    legacy_scoring,
+    raw_ride,
+)
 from training_load.cli import collect_strength, compute
 from training_load.config import GoogleSettings
 from training_load.db.client import JsonRow
@@ -197,7 +203,9 @@ def week1(parsed: list[ParsedSet], row: int) -> ParsedSet:
 def test_lsrpe_on_the_real_slice_reads_comma_text_and_counts_junk_once_per_cell() -> None:
     issues: Counter[str] = Counter()
     edits = {(25, LSRPE_W1): "7,5", (26, LSRPE_W1): "7.8", (28, LSRPE_W1): 8, (29, LSRPE_W1): "x"}
-    parsed = parse_all(real.workbook(edits | {(30, LSRPE_W1): " "}), real.BODYWEIGHT, issues)
+    parsed = parse_all(
+        real.workbook(edits | {(30, LSRPE_W1): " "}), legacy_scoring(real.BODYWEIGHT), issues
+    )
     assert issues == Counter({LSRPE_NOT_HALF: 2})  # per cell, not per set (row 30 has 2 sets)
     assert [week1(parsed, r)["logged_rpe"] for r in (25, 26, 28, 29, 30)] == [
         7.5,
@@ -216,7 +224,9 @@ def test_lsrpe_on_the_real_slice_reads_comma_text_and_counts_junk_once_per_cell(
 def test_a_tab_without_lsrpe_in_its_column_counts_it_and_ignores_the_cells() -> None:
     issues: Counter[str] = Counter()
     parsed = parse_all(
-        real.workbook({(24, LSRPE_W1): "RPE", (25, LSRPE_W1): "7"}), real.BODYWEIGHT, issues
+        real.workbook({(24, LSRPE_W1): "RPE", (25, LSRPE_W1): "7"}),
+        legacy_scoring(real.BODYWEIGHT),
+        issues,
     )
     assert issues == Counter({LSRPE_COLUMN_MISSING: 1})
     assert {p["logged_rpe"] for p in parsed} == {None}
@@ -229,7 +239,7 @@ def test_lsrpe_junk_hits_the_issue_threshold_exactly_like_kg_junk(n: int) -> Non
 
     def fails(edits: dict[tuple[int, int], object]) -> bool:
         issues: Counter[str] = Counter()
-        parsed = parse_all(real.workbook(edits), real.BODYWEIGHT, issues)
+        parsed = parse_all(real.workbook(edits), legacy_scoring(real.BODYWEIGHT), issues)
         try:
             collect_strength.check_issues(issues, parsed)
         except collect_strength.TooManyIssuesError:

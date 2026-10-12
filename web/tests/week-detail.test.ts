@@ -185,6 +185,11 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
       ["Dips", 1, 264.6],
     ],
   );
+  // Effective kg (Python's strength_sets.kg) only where it differs from the logged kg.
+  assert.deepEqual(
+    s1?.exercises.map((e) => e.effectiveKg),
+    [null, 90],
+  );
   assert.equal(tue.rest, false);
 
   assert.equal(wed.strength, null); // no strength until intervals logs it
@@ -195,6 +200,30 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
   assert.deepEqual([extra?.block, extra?.tss, extra?.exercises.length], [null, 0, 0]);
   assert.equal(thu.rest, false);
   assert.equal(fri.rest, true);
+});
+
+test("effective kg: a bodyweight exercise with nothing logged shows its bodyweight share", () => {
+  const w = weekView(
+    { daily: [day("2026-09-29", 0, 10)], blocks: [], weeks: [], projection: [] },
+    week(40, "2026-09-28"),
+  );
+  const [tue] = dayDetails(w, {
+    activities: [],
+    sessions: [done(1, "2026-09-29")],
+    sets: [
+      set({ name: "Glute ham raise", type: "HAMSTRINGS", bodyweight: true, loggedKg: 0, kg: 51 }),
+      set({ sheetRow: 10, name: "Pullups", bodyweight: true, loggedKg: null, kg: 85 }),
+      set({ sheetRow: 11, name: "Facepulls", loggedKg: null, kg: 0 }), // blank: nothing to show
+    ],
+  });
+  assert.deepEqual(
+    tue.strength?.sessions[0]?.exercises.map((e) => [e.name, e.effectiveKg]),
+    [
+      ["Glute ham raise", 51],
+      ["Pullups", 85],
+      ["Facepulls", null],
+    ],
+  );
 });
 
 test("parseActivityRow and parseStrengthSetRow map and validate", () => {

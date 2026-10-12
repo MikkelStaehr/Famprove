@@ -19,18 +19,23 @@ columns are 0-based tuple indices of ``ws.iter_rows(values_only=True)``):
       per week w: col 4 + 8w = sets, 5 + 8w = reps (5 or "8 - 12"),
       6 + 8w = load text ("RPE 7 - 8" or "-10%"), 7 + 8w = logged kg (number or empty).
   ABS row: col 1 empty, col 2 starting with "Abs".
-  Bodyweight row: name containing "dips" / "chin" / "pull-up" / "push-up".
+  Bodyweight row: name containing "dips" / "chin" / "pull-up" / "push-up" (``legacy_scoring``;
+      production scores by the public.exercises catalogue, which InMemoryPostgrest seeds with the
+      same values for every fixture name, so the old expectations still hold).
 
   Covers: a filled week, an unfilled (future) week, a week whose ONLY logged kg is on a
   bodyweight or ABS row (not filled), a tempo variant, blok 12 with one filled week (makes
   blok 11 finished), and a date after the test's fixed ``today``.
 """
 
+import datetime as dt
 import io
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
+from functools import cache
+from pathlib import Path
 from typing import Any
 
 import openpyxl
@@ -38,8 +43,10 @@ import pytest
 from openpyxl.worksheet.worksheet import Worksheet
 
 from training_load.db.client import Filters, JsonRow, Postgrest
+from training_load.domain.exercises import Scorer, Scoring, name_key
 from training_load.domain.strength import StrengthSet
 from training_load.http import DEFAULT_TIMEOUT_S, HttpResponse, QueryParams
+from training_load.sources.strength_sheet import parse_all
 
 SYNTHETIC_BODYWEIGHT = 80.0
 SYNTHETIC_SHEET_ID = "synthetic-sheet"
@@ -146,6 +153,90 @@ def workbook_bytes() -> bytes:
     return build_workbook()
 
 
+SLICE = json.loads((Path(__file__).parent / "fixtures" / "blok12_slice.json").read_text("utf-8"))
+SLICE_TAB: str = SLICE["tab"]
+
+
+def slice_workbook(edits: Mapping[tuple[int, int], object] | None = None) -> bytes:
+    """The real-data slice (fixtures/blok12_slice.json) as xlsx, with the real cell types;
+    ``edits`` overrides (row, 0-based col)."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = SLICE_TAB
+    values: dict[tuple[int, int], object] = {}
+    for row, col, kind, value in SLICE["cells"]:
+        values[(row, col)] = dt.datetime.fromisoformat(value) if kind == "d" else value
+    values.update(edits or {})
+    for (row, col), value in values.items():
+        ws.cell(row=row, column=col + 1, value=value)  # type: ignore[call-overload]  # slice cells are str/float/datetime
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+# The scoring rule from before the exercise catalogue (2026-10-12), kept in the tests only: a
+# catalogue holding the same values must score every set exactly as before (tech-lead A3).
+LEGACY_LEG_TYPES = (
+    "SQUAT",
+    "DEADLIFT",
+    "QUADS",
+    "HAMSTRINGS",
+    "GLUTES",
+    "ADDUCTORS",
+    "CALVES",
+    "LOWER BACK",
+)
+LEGACY_BODYWEIGHT_NAMES = ("dips", "chin", "pull-up", "pullup", "push-up")
+
+
+def _legacy_factor(sheet_type: str) -> float:
+    return 1.0 if sheet_type.startswith(LEGACY_LEG_TYPES) else 0.6
+
+
+def _legacy_bodyweight(name: str) -> bool:
+    return any(b in name.lower() for b in LEGACY_BODYWEIGHT_NAMES)
+
+
+def legacy_scoring(bodyweight: float) -> Scorer:
+    """The old rule as a scorer: leg TYPEs 1.0, the rest 0.6; bodyweight names add BODYWEIGHT."""
+
+    def score(sheet_type: str, name: str) -> Scoring:
+        return Scoring(
+            muscle_factor=_legacy_factor(sheet_type),
+            bodyweight_kg=bodyweight if _legacy_bodyweight(name) else None,
+        )
+
+    return score
+
+
+@cache
+def legacy_catalog_rows() -> tuple[JsonRow, ...]:
+    """public.exercises rows that reproduce ``legacy_scoring`` for every (TYPE, name) in the
+    synthetic workbook and the real slice: what InMemoryPostgrest starts with."""
+    seen: dict[str, tuple[str, str]] = {}
+
+    def record(sheet_type: str, name: str) -> Scoring:
+        seen.setdefault(name_key(name), (sheet_type, name.strip()))
+        return Scoring(muscle_factor=1.0, bodyweight_kg=None)
+
+    for workbook in (build_workbook(), slice_workbook()):
+        parse_all(workbook, record)
+    return tuple(
+        {
+            "id": i,
+            "name": name,
+            "aliases": [],
+            "category": "accessory",
+            "parent_lift": None,
+            "muscle_factor": _legacy_factor(sheet_type),
+            "bodyweight_fraction": 1.0 if _legacy_bodyweight(name) else None,
+            "tracks_e1rm": False,
+        }
+        for i, (sheet_type, name) in enumerate(sorted(seen.values(), key=lambda v: v[1]), start=1)
+    )
+
+
 _DEFAULT_SET = StrengthSet(
     sheet_id=SYNTHETIC_SHEET_ID,
     block=BLOK_11,
@@ -171,7 +262,11 @@ def make_set() -> Callable[..., StrengthSet]:
 
     # Any: overrides span every StrengthSet field type; dataclasses.replace checks them.
     def factory(**overrides: Any) -> StrengthSet:
-        return replace(_DEFAULT_SET, **overrides)
+        made = replace(_DEFAULT_SET, **overrides)
+        if "muscle_factor" in overrides:
+            return made
+        # As collect-strength stores it with the seeded catalogue (the old rule, see above).
+        return replace(made, muscle_factor=_legacy_factor(made.type))
 
     return factory
 
@@ -272,6 +367,7 @@ class FakeSend:
 
 PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "activities": ("id",),
+    "exercises": ("id",),
     "strength_sets": ("sheet_id", "block", "sheet_row", "week", "set_no"),
     "strength_activities": ("id",),
     "strength_sessions": ("week_start", "session"),
@@ -333,6 +429,8 @@ class InMemoryPostgrest(Postgrest):
     def __init__(self) -> None:
         super().__init__("https://fake.supabase.co", "sb_secret_fake", FakeSend())
         self.tables: dict[str, list[JsonRow]] = {name: [] for name in PRIMARY_KEYS}
+        # The catalogue as the old rule had it, so collect-strength scores the fixtures as before.
+        self.tables["exercises"] = [dict(row) for row in legacy_catalog_rows()]
 
     def _pk(self, table: str, row: Mapping[str, object]) -> tuple[object, ...]:
         return tuple(row[c] for c in PRIMARY_KEYS[table])
@@ -367,6 +465,30 @@ class InMemoryPostgrest(Postgrest):
         for row in rows:
             by_key[self._pk(table, row)] = dict(row)
         self.tables[table] = list(by_key.values())
+
+    def insert_ignore(
+        self, table: str, rows: Sequence[Mapping[str, object]], *, on_conflict: str
+    ) -> None:
+        """Skip rows whose on_conflict key exists; give an identity id where the table has one."""
+        self._same_keys(rows)
+        columns = on_conflict.split(",")
+        existing = {tuple(r[c] for c in columns) for r in self.tables[table]}
+        for row in rows:
+            key = tuple(row[c] for c in columns)
+            if key in existing:
+                continue
+            existing.add(key)
+            stored = dict(row)
+            if PRIMARY_KEYS[table] == ("id",) and "id" not in stored:
+                stored = {
+                    "id": 1 + max((int(str(r["id"])) for r in self.tables[table]), default=0),
+                    "aliases": [],
+                    "parent_lift": None,
+                    "bodyweight_fraction": None,
+                    "tracks_e1rm": False,
+                    **stored,
+                }
+            self.tables[table].append(stored)
 
     def delete(self, table: str, filters: Filters) -> None:
         assert filters, "unfiltered delete"

@@ -108,6 +108,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days (no ride and no strength activity) are a plain row reading "Hvile". Strength sits on its matched activity's date; planned-but-undone sessions are not shown (spec `design/specs/today.md` §8). Column heads are visual only; each row speaks "cykling N TSS, …".
 - Row grid: day + three 64px TSS columns when the list is ≥ 20rem wide (Tailwind `@xs` container query, so it tracks text size); narrower, e.g. at 200% text, the day moves above the numbers instead of scrolling sideways.
 - Missing values show "–", spoken as "ikke registreret". A blank kg on a weighted exercise reads "intet kg logget", never "0 kg". Score/set is labelled as the raw score before the strength factor.
+- Effective kg (added 2026-10-12): on a bodyweight exercise whose effective kg (Python: logged + BODYWEIGHT × the exercise's bodyweight fraction) differs from the logged kg, the load line adds "· 95 kg effektivt" in `--text-muted`, spoken ", effektivt 95 kg". The logged kg stays as written; nothing is shown where the two are the same.
 
 ### Today (`/`, added by design-lead; full spec `design/specs/today.md`)
 - **Use:** a companion screen, read at arm's length (≈ 60–80 cm) in the gym or from the handlebar. The session is the hero. Form (TSB) is the compact zone bar in the header (Part B), not a key figure.

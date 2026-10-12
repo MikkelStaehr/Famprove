@@ -124,6 +124,18 @@ class Postgrest:
             params=[("on_conflict", on_conflict)],
         )
 
+    def insert_ignore(
+        self, table: str, rows: Sequence[Mapping[str, object]], *, on_conflict: str
+    ) -> None:
+        """POST ?on_conflict=<cols> with ``Prefer: resolution=ignore-duplicates``: rows whose key
+        already exists are skipped, never updated. Same identical-keys rule as ``insert``."""
+        self._post(
+            table,
+            rows,
+            prefer="resolution=ignore-duplicates,return=minimal",
+            params=[("on_conflict", on_conflict)],
+        )
+
     def delete(self, table: str, filters: Filters) -> None:
         """DELETE matching rows. Raises EmptyFilterError when ``filters`` is empty."""
         if not filters:

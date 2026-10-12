@@ -3,7 +3,8 @@
 Future weeks have no kg in the sheet, so the score formula (sources.strength_sheet.set_score,
 reused unchanged) needs a planned kg per set. Rules, in order (decided with the user, 2026-10-01):
   entered       kg the user already wrote in the sheet: the stored score is used as-is
-  abs/bodyweight the stored score already holds the fixed ABS score or BODYWEIGHT (+ any kg)
+  abs/bodyweight the stored score already holds the fixed ABS score or BODYWEIGHT x the exercise's
+                bodyweight fraction (+ any kg)
   rpe_e1rm      main lift (SQUAT/BENCH/DEADLIFT, not tempo) with "RPE x": kg = e1RM x the
                 formula's own %1RM for that RPE and reps, 1 / (1 + 0.0333 * (reps + 10 - RPE))
   pct_e1rm      main lift with a "75%" load cell: kg = e1RM x 75%
@@ -13,6 +14,8 @@ reused unchanged) needs a planned kg per set. Rules, in order (decided with the 
   (none)        no kg found: the set is NOT scored and is counted as unscored, never 0
 An RPE cell that isn't whole or half values on 1-10 ("RPE 7,8") is never used: that set is
 unscored too (strength_sheet.rpe_readable, the user's rule of 2026-10-01).
+The muscle factor is the set's own (public.exercises at collect time); a set stored by older code
+has none and is scored with domain.exercises.UNKNOWN_FACTOR (compute counts those in a warning).
 """
 
 import re
@@ -21,9 +24,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from training_load.domain.exercises import UNKNOWN_FACTOR
 from training_load.domain.strength import StrengthSet
 from training_load.sources.strength_sheet import (
-    BODYWEIGHT_EX,
     decimal_dots,
     mid,
     rpe_readable,
@@ -57,7 +60,9 @@ def _legacy_mid(text: str) -> float | None:
 
 def _legacy_score(s: StrengthSet, kg: float, e1rm: dict[str, float]) -> float:
     load = decimal_dots(s.prescribed)  # "RPE 7,5" is 7.5, as in the parser
-    result: object = set_score(s.type, s.name, s.reps, kg, load, 0.0, e1rm)  # type: ignore[no-untyped-call]  # untyped legacy module, see above
+    factor = UNKNOWN_FACTOR if s.muscle_factor is None else s.muscle_factor
+    # bodyweight None: bodyweight sets never get here (their stored score already includes it).
+    result: object = set_score(s.type, s.name, s.reps, kg, load, None, factor, e1rm)  # type: ignore[no-untyped-call]  # untyped legacy module, see above
     assert isinstance(result, tuple)
     return float(result[2])
 
@@ -67,10 +72,6 @@ def prescribed_rpe(prescribed: str | None) -> float | None:
     if prescribed is None or "RPE" not in prescribed or not rpe_readable(prescribed):
         return None
     return _legacy_mid(str(decimal_dots(prescribed)))
-
-
-def _is_bodyweight(s: StrengthSet) -> bool:
-    return s.bodyweight or any(b in s.name.lower() for b in BODYWEIGHT_EX)
 
 
 def _main_lift_kg(s: StrengthSet) -> tuple[float, str] | None:
@@ -109,7 +110,6 @@ def _accessory_kg(s: StrengthSet, history: Sequence[StrengthSet]) -> tuple[float
 
 
 def _raw_score(s: StrengthSet, kg: float) -> float:
-    # bodyweight 0: bodyweight sets never get here (their stored score already includes it).
     return _legacy_score(s, kg, {s.type: s.e1rm} if s.e1rm is not None else {})
 
 
@@ -126,7 +126,7 @@ def planned_session_score(
     planned_kg: dict[int, float] = {}  # id(set) -> kg, for the backoff rows
     backoffs: list[StrengthSet] = []
     for s in session_sets:
-        if s.logged_kg is not None or s.type == "ABS" or _is_bodyweight(s):
+        if s.logged_kg is not None or s.type == "ABS" or s.bodyweight:
             source = (
                 "entered"
                 if s.logged_kg is not None

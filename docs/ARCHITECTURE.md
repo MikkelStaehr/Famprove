@@ -14,7 +14,9 @@ GitHub Actions daily.yml at 05, 12, 20 Copenhagen: the droplet's workflow_dispat
   collect-intervals  intervals.icu API (last 14 d)      → activities (rides), strength_activities (WeightTraining),
                                                           each with the API object as `raw`
   collect-strength   Google Drive xlsx export (read)    → strength_sets (ISO week + session 1..N, no dates;
-                                                          the week's cells as `raw`, LSRPE as logged_rpe)
+                     + exercises (muscle factor,             the week's cells as `raw`, LSRPE as logged_rpe,
+                       bodyweight fraction per name)         each set scored with its exercise's values);
+                                                          unknown names → exercises (insert only)
   compute            activities + strength_sets + strength_activities
                                                         → strength_sessions, daily_load, blocks (+ view weekly_load),
                                                           daily_projection (the 56-day prognose; + planned_sessions),
@@ -35,7 +37,7 @@ Next.js (web/), server components only
 | Path | What lives there |
 |---|---|
 | `python/src/training_load/sources/` | Adapters that read the outside world: `intervals.py`, `google_drive.py`, `strength_sheet.py` (the coach-sheet parser and strength formula; formula lines never change) |
-| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: cycling = typical week + planned rides; strength = the coach's plan to the block's end, then the recent weeks with a low-high band; `naive_projection` = the baseline), `planned_load.py` (planned kg per set and the plan score of a session), `ride_analysis.py` (Analyse/Cykel: exclusions, eFTP/EF points and line breaks, EF 28-day median, year-ago eFTP, weekly totals; `ENDURANCE` = the EF intensity basis), `strength_analysis.py` (Analyse/Styrke: lifted status, `PHASES`, e1RM from lifted kg, weekly rows), `kg_history.py` (planned/lifted kg transitions), `dates.py` (`SERIES_START` 2026-01-01 for daily_load, `ANALYSIS_START` 2024-12-30, the ISO week of 2025-01-01, for the ride analysis) |
+| `python/src/training_load/domain/` | Pure calculations, stdlib only: `load.py` (CTL/ATL, `DECAY`), `form.py` (ramp, intervals.icu zones), `strength.py` (session numbers, filled weeks, blocks), `sessions.py` (n-th strength activity of an ISO week = session n; strength TSS), `cycling.py`, `daily.py`, `plan.py` (watt targets), `projection.py` (the 56-day prognose: cycling = typical week + planned rides; strength = the coach's plan to the block's end, then the recent weeks with a low-high band; `naive_projection` = the baseline), `planned_load.py` (planned kg per set and the plan score of a session), `ride_analysis.py` (Analyse/Cykel: exclusions, eFTP/EF points and line breaks, EF 28-day median, year-ago eFTP, weekly totals; `ENDURANCE` = the EF intensity basis), `strength_analysis.py` (Analyse/Styrke: lifted status, `PHASES`, e1RM from lifted kg, weekly rows), `kg_history.py` (planned/lifted kg transitions), `dates.py` (`SERIES_START` 2026-01-01 for daily_load, `ANALYSIS_START` 2024-12-30, the ISO week of 2025-01-01, for the ride analysis), `exercises.py` (the exercise catalogue: name/alias matching, muscle factor and bodyweight kg per sheet name, unknown-name defaults) |
 | `python/src/training_load/db/` | The only code that talks to Supabase (PostgREST over `requests`), one module per table |
 | `python/src/training_load/cli/` | The five console scripts, one per step of the daily job (`check-config` first) |
 | `python/src/training_load/*.py` | `config.py` (env, fail-fast), `http.py` (retrying HTTP seam), `narrow.py` (JSON → typed fields) |
@@ -51,7 +53,8 @@ Next.js (web/), server components only
 
 ## Tables
 `activities` (rides) · `strength_activities` (WeightTraining from intervals.icu) ·
-`strength_sets` (every prescribed set: plan + logged kg + cells as written; ISO week + session number) ·
+`strength_sets` (every prescribed set: plan + logged kg + effective kg + cells as written; ISO week + session number; the muscle_factor it was scored with) ·
+`exercises` (hand-edited catalogue: muscle factor, bodyweight fraction, category per exercise name and its aliases) ·
 `strength_sessions` (derived: per ISO week and session number, the activity that did it, its date, TSS) ·
 `daily_load` (one row per day since 2026-01-01: TSS, CTL, ATL, TSB, ramp, zone, `computed_at`) ·
 `blocks` (strength blocks + deload) · `weekly_load` (view) · `planned_sessions` (you fill) ·
@@ -74,5 +77,5 @@ Next.js (web/), server components only
 
 ## Where to change what
 Strength session rule → `domain/sessions.py` · ride-analysis thresholds and the EF intensity basis → `domain/ride_analysis.py` · program phases, competition-lift names and e1RM rules → `domain/strength_analysis.py` · Decay variant → `domain/load.py` `DECAY` · form-zone bands → `domain/form.py` + `web/src/lib/zone-scale.ts` (drawing only; `web/tests/zone-scale.test.ts` fails if they drift) · strength formula →
-don't (it's the coach's, in `sources/strength_sheet.py`) · `STRENGTH_K` / `BODYWEIGHT` → env ·
+don't (it's the coach's, in `sources/strength_sheet.py`) · muscle factor / bodyweight fraction per exercise → `public.exercises` rows (Supabase table editor) · `STRENGTH_K` / `BODYWEIGHT` → env ·
 tokens and layout rules → `DESIGN.md` (Part B = the Spurt direction) and `web/src/app/globals.css` · zone labels shown in the UI → `web/src/lib/dashboard-view.ts`.

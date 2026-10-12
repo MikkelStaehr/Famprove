@@ -126,7 +126,7 @@ def test_a_backoff_follows_an_entered_top_set_at_90_percent(make_set: MakeSet) -
     result = planned_session_score([top, backoff], [])
     assert result.sources == {"entered": 1, "backoff": 1}
     # The backoff is scored by the unchanged formula at 108 kg (90% of the entered 120 kg).
-    scored: object = set_score("SQUAT", "Squat", 5.0, 108.0, "-10%", 0.0, {"SQUAT": 150.0})  # type: ignore[no-untyped-call]  # untyped legacy formula module
+    scored: object = set_score("SQUAT", "Squat", 5.0, 108.0, "-10%", None, 1.0, {"SQUAT": 150.0})  # type: ignore[no-untyped-call]  # untyped legacy formula module
     assert isinstance(scored, tuple)
     assert result.score == pytest.approx(300.0 + float(scored[2]))
 

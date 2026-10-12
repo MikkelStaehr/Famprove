@@ -11,6 +11,7 @@ import {
   formatDevice,
   formatDuration,
   formatIf,
+  formatKg,
   formatLoad,
   formatScore,
   formatSetLoad,
@@ -267,6 +268,12 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
           <span className="sr-only">
             {e.sets} sæt af {e.reps} reps{load !== null && ` med ${load}`}
           </span>
+          {e.effectiveKg !== null && (
+            <span className="text-text-muted">
+              <span aria-hidden="true"> · {formatKg(e.effectiveKg)} kg effektivt</span>
+              <span className="sr-only">, effektivt {formatKg(e.effectiveKg)} kg</span>
+            </span>
+          )}
           {load === null && (
             <span className="text-text-muted">
               <span aria-hidden="true"> · </span>

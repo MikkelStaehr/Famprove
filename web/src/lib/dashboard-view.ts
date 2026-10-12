@@ -142,7 +142,10 @@ export type ExerciseDetail = {
   readonly sets: number;
   readonly reps: number;
   readonly loggedKg: number | null; // as logged; null when blank or unreadable
-  readonly bodyweight: boolean; // kg in the score = BODYWEIGHT + loggedKg
+  readonly bodyweight: boolean; // kg in the score = BODYWEIGHT x the exercise's fraction + loggedKg
+  /** strength_sets.kg (Python: logged + BODYWEIGHT x bodyweight_fraction) when it differs from
+   * the logged kg, i.e. on a bodyweight exercise; null when they are the same. */
+  readonly effectiveKg: number | null;
   readonly prescribed: string | null; // the coach's load cell, e.g. "RPE 7 - 8"
   readonly scorePerSet: number; // raw set score (before STRENGTH_K), from Python
 };
@@ -324,6 +327,7 @@ function exerciseDetails(sets: readonly StrengthSetRow[]): ExerciseDetail[] {
     reps: first.reps,
     loggedKg: first.loggedKg,
     bodyweight: first.bodyweight,
+    effectiveKg: first.bodyweight && first.kg !== (first.loggedKg ?? 0) ? first.kg : null,
     prescribed: first.prescribed,
     scorePerSet: first.score,
   }));

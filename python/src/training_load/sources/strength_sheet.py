@@ -2,10 +2,12 @@
 Læser Benjamins program-tab (Powerlifting Now-template) fra xlsx-eksport
 og producerer en sæt-tabel med rå score pr. sæt (formlen er uændret fra strength_collector.py).
 
-Brug:  parse_all(xlsx_bytes, bodyweight, issues)   (læser alle "Program - blok *"-tabs)
+Brug:  parse_all(xlsx_bytes, scoring, issues)   (læser alle "Program - blok *"-tabs)
 Celler der ikke kan læses bliver aldrig stille til 0: de tælles i ``issues`` (årsag -> antal),
 og manglende/ulæselig kg gemmes som None. Selve score-formlen er uændret.
-STRENGTH_K (tidl. K) ganges på i domain.strength; BODYWEIGHT kommer fra env via parameteren.
+STRENGTH_K (tidl. K) ganges på i domain.strength. Muskelfaktor og kropsvægt pr. øvelse kommer fra
+public.exercises via ``scoring(type, navn)`` (domain.exercises, 2026-10-12): kropsvægt-kg =
+BODYWEIGHT x bodyweight_fraction; resten af formlen er uændret.
 """
 import io, math, re, datetime as dt
 from collections import Counter
@@ -23,8 +25,9 @@ class ParsedSet(TypedDict):
     set: int
     reps: float
     logged_kg: float | None  # kg som logget, før kropsvægt; None = tom, ulæselig, eller 0 på en vægtøvelse (fx -10%-formlen før topsættet er logget). 0 er en rigtig værdi KUN på kropsvægtøvelser (kun kropsvægt)
-    kg: float             # kg brugt i scoren (logged_kg + bodyweight for kropsvægtøvelser)
-    bodyweight: bool
+    kg: float             # effektiv kg brugt i scoren (logged_kg + BODYWEIGHT x bodyweight_fraction for kropsvægtøvelser)
+    bodyweight: bool      # øvelsen har en bodyweight_fraction i public.exercises
+    muscle_factor: float  # øvelsens muskelfaktor fra public.exercises (ukendt navn: 0.6)
     rpe: float | None
     prescribed: str | None  # foreskrevet load-celle som tekst (fx 'RPE 7 - 8'), kun til visning
     sets_text: str | None   # sets-cellen som skrevet (fx '2'), kun til visning
@@ -35,8 +38,6 @@ class ParsedSet(TypedDict):
     score: float          # rå score, før STRENGTH_K
 
 ABS_SET_SCORE = 10*20*(0.6**2)   # fast score pr. abs-sæt (10 reps @ 20 kg RPE 6)
-LEG_TYPES = ("SQUAT","DEADLIFT","QUADS","HAMSTRINGS","GLUTES","ADDUCTORS","CALVES","LOWER BACK")
-BODYWEIGHT_EX = ("dips","chin","pull-up","pullup","push-up")
 
 # RPE-ækvivalent fra %E1RM og reps (Tuchscherer, forenklet)
 # e1rm% ≈ 1 / (1 + 0.0333*(reps + (10-rpe)))   -> løst for rpe
@@ -132,19 +133,20 @@ def logged_rpe(cell: object, issues: Counter[str]) -> float | None:
 E1RM_RANGE = (20.0, 400.0)   # kg; et 1RM udenfor er aldrig et rigtigt 1RM
 E1RM_OUT_OF_RANGE = "1RM out of range"
 
-def set_score(typ, name, reps, kg, load, bodyweight, e1rm):
-    """Score for ét sæt: formlen fra strength_collector.py, uændret (flyttet hertil så prognosen
-    kan genbruge den). kg = logget kg (0 hvis tom). Returnerer (kg brugt, rpe, score, kropsvægt?)."""
-    bw = any(b in name.lower() for b in BODYWEIGHT_EX)
+def set_score(typ, name, reps, kg, load, bodyweight_kg, factor, e1rm):
+    """Score for ét sæt: formlen fra strength_collector.py (flyttet hertil så prognosen kan genbruge
+    den). kg = logget kg (0 hvis tom). bodyweight_kg (BODYWEIGHT x fraction, None = ikke en
+    kropsvægtøvelse) og factor (muskelfaktor) kommer fra public.exercises; før 2026-10-12 stod de
+    her som navneliste og ben-TYPEs. Returnerer (kg brugt, rpe, score, kropsvægt?)."""
+    bw = bodyweight_kg is not None
     if typ == "ABS":
         score = ABS_SET_SCORE; rpe=None
     else:
-        if bw: kg += bodyweight
+        if bw: kg += bodyweight_kg
         main = typ in e1rm and "tempo" not in name.lower()   # tempo ≈ 20-25% lettere, brug foreskrevet RPE
         rpe = rpe_from_pct(kg/e1rm[typ], reps) if (main and kg) else None
         if rpe is None: rpe = mid(load) if isinstance(load,str) and "RPE" in str(load) else None
         if rpe is None: rpe = 6.0     # ukendt (fx -10% uden kg endnu)
-        factor = 1.0 if typ.startswith(LEG_TYPES) else 0.6
         score = reps * kg * (rpe/10)**2 * factor
     return kg, rpe, score, bw
 
@@ -163,19 +165,20 @@ def read_e1rm(rows, issues: Counter[str]) -> dict[str, float]:
             del e1rm[lift]
     return e1rm
 
-def parse_all(data: bytes, bodyweight: float, issues: Counter[str] | None = None,
+def parse_all(data: bytes, scoring, issues: Counter[str] | None = None,
               counts_issues=None) -> list[ParsedSet]:
-    """``counts_issues(tab)`` False: the tab is parsed but its unreadable cells aren't counted
+    """``scoring(type, name)`` -> domain.exercises.Scoring (muscle factor, bodyweight kg) per row.
+    ``counts_issues(tab)`` False: the tab is parsed but its unreadable cells aren't counted
     (the caller drops it anyway, e.g. a template tab without a block number)."""
     wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     sets = []
     for tab in wb.sheetnames:
         if tab.startswith("Program - blok"):
             counted = counts_issues is None or counts_issues(tab)
-            sets += parse_tab(wb[tab], tab, bodyweight, issues if counted else Counter())
+            sets += parse_tab(wb[tab], tab, scoring, issues if counted else Counter())
     return sets
 
-def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
+def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
     issues = Counter() if issues is None else issues
     rows = list(ws.iter_rows(values_only=True))
     e1rm = read_e1rm(rows, issues)
@@ -200,6 +203,7 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
             if any(4+w*8 < len(r) and r[4+w*8] not in (None,0,"") for w in range(len(week_dates))):
                 issues[ROW_WITHOUT_TYPE] += 1   # foreskrevet, men uden TYPE: ville ellers forsvinde stille
             continue
+        exercise = scoring(typ, name)
         for w,date in enumerate(week_dates):
             base = 4 + w*8          # SETS-kolonne for uge w
             nsets, reps, load, kg = r[base], r[base+1], r[base+2], r[base+3]
@@ -218,12 +222,14 @@ def parse_tab(ws, tab, bodyweight, issues: Counter[str] | None = None):
             logged = kg
             rpe_ok = rpe_readable(load)
             if not rpe_ok: issues[RPE_NOT_HALF] += 1   # tælles; cellens RPE bruges aldrig ("RPE ukendt")
-            kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load) if rpe_ok else None, bodyweight, e1rm)
+            kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load) if rpe_ok else None,
+                                           exercise.bodyweight_kg, exercise.muscle_factor, e1rm)
             raw = {key: json_cell(cell) for key, cell in zip(RAW_KEYS, cells)}
             lsrpe = logged_rpe(cells[4], issues) if lsrpe_ok else None
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
+                                      muscle_factor=exercise.muscle_factor,
                                       prescribed=prescribed_text(load),
                                       sets_text=sets_text, reps_text=reps_text,
                                       e1rm=e1rm.get(typ), raw=raw, logged_rpe=lsrpe))

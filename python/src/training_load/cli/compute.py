@@ -33,6 +33,7 @@ from training_load.db.strength_sets import all_sets
 from training_load.domain.cycling import daily_cycling_tss
 from training_load.domain.daily import build_daily_load
 from training_load.domain.dates import ANALYSIS_START, SERIES_START, today_local
+from training_load.domain.exercises import UNKNOWN_FACTOR
 from training_load.domain.kg_history import gone_states, kg_keys, next_kg_state
 from training_load.domain.load import DECAY
 from training_load.domain.projection import (
@@ -107,6 +108,13 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     """
     activities = all_activities(db)
     sets = all_sets(db)
+    if legacy := sum(1 for s in sets if s.muscle_factor is None):
+        log.warning(
+            "%d strength sets have no muscle_factor (stored by older code): the prognose scores "
+            "planned ones with %s; run collect-strength first",
+            legacy,
+            UNKNOWN_FACTOR,
+        )
     lifts = all_strength_activities(db)
     sessions = match_sessions(sets, lifts, strength_k)
     sync_strength_sessions(db, sessions)

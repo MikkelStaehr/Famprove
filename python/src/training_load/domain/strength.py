@@ -65,6 +65,9 @@ class StrengthSet:
     reps_text: str | None = None  # coach's reps cell as written (e.g. "8 - 12"); display only
     e1rm: float | None = None  # the tab's 1RM for this lift (main lifts only), for planned kg
     logged_rpe: float | None = None  # LSRPE as logged (whole or half 1-10); None = not logged
+    # public.exercises' factor at collect time; scores planned sets without kg. None: a row
+    # stored by code from before the catalogue (2026-10-12).
+    muscle_factor: float | None = None
     raw: Mapping[str, object] | None = field(default=None, compare=False)
     """The week's cells as written (sets .. mean_weight); None for rows stored before raw."""
 

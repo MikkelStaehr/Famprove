@@ -5,7 +5,13 @@ from datetime import date, datetime
 
 import pytest
 
-from conftest import BLOK_11_SECTIONS, SYNTHETIC_BODYWEIGHT, SYNTHETIC_SHEET_ID, build_workbook
+from conftest import (
+    BLOK_11_SECTIONS,
+    SYNTHETIC_BODYWEIGHT,
+    SYNTHETIC_SHEET_ID,
+    build_workbook,
+    legacy_scoring,
+)
 from training_load.cli.collect_strength import section_key, to_domain
 from training_load.domain.sessions import (
     StrengthActivity,
@@ -151,7 +157,7 @@ def test_undone_session_row(week_40: list[StrengthSet]) -> None:
 
 
 def _workbook_sets(workbook: bytes) -> list[StrengthSet]:
-    parsed = parse_all(workbook, SYNTHETIC_BODYWEIGHT)
+    parsed = parse_all(workbook, legacy_scoring(SYNTHETIC_BODYWEIGHT))
     slots = number_sessions((section_key(p), p["date"]) for p in parsed)
     return [to_domain(p, SYNTHETIC_SHEET_ID, slots[section_key(p)]) for p in parsed]
 

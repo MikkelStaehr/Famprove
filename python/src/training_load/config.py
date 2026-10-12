@@ -56,7 +56,7 @@ class CollectIntervalsConfig:
 class CollectStrengthConfig:
     google: GoogleSettings
     supabase: SupabaseSettings
-    bodyweight: float  # BODYWEIGHT, kg, added to bodyweight exercises
+    bodyweight: float  # BODYWEIGHT, kg; x each exercise's bodyweight_fraction (public.exercises)
 
 
 @dataclass(frozen=True, slots=True)

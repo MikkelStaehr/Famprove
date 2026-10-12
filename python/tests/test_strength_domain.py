@@ -5,7 +5,14 @@ from datetime import date
 
 import pytest
 
-from conftest import BLOK_11, BLOK_12, FIXED_TODAY, SYNTHETIC_BODYWEIGHT, SYNTHETIC_SHEET_ID
+from conftest import (
+    BLOK_11,
+    BLOK_12,
+    FIXED_TODAY,
+    SYNTHETIC_BODYWEIGHT,
+    SYNTHETIC_SHEET_ID,
+    legacy_scoring,
+)
 from training_load.cli.collect_strength import section_key, to_domain
 from training_load.domain.strength import (
     Block,
@@ -27,7 +34,7 @@ MakeSet = Callable[..., StrengthSet]
 
 @pytest.fixture
 def workbook_sets(workbook_bytes: bytes) -> list[StrengthSet]:
-    parsed = parse_all(workbook_bytes, SYNTHETIC_BODYWEIGHT)
+    parsed = parse_all(workbook_bytes, legacy_scoring(SYNTHETIC_BODYWEIGHT))
     slots = number_sessions((section_key(p), p["date"]) for p in parsed)
     return [to_domain(p, SYNTHETIC_SHEET_ID, slots[section_key(p)]) for p in parsed]
 

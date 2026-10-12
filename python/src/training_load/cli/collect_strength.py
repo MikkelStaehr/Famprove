@@ -1,4 +1,8 @@
-"""`collect-strength`: export the coach's workbook, parse it, replace public.strength_sets."""
+"""`collect-strength`: export the coach's workbook, parse it, replace public.strength_sets.
+
+Each row is scored with its exercise's muscle factor and bodyweight fraction from public.exercises
+(domain.exercises); names the catalogue doesn't know are scored with the defaults, logged, and
+added to the table for the user to correct."""
 
 import logging
 import math
@@ -15,7 +19,9 @@ from training_load.config import (
     mask_in_ci,
 )
 from training_load.db.client import Postgrest
+from training_load.db.exercises import add_unknown, all_exercises
 from training_load.db.strength_sets import replace_for_sheet
+from training_load.domain.exercises import Catalog
 from training_load.domain.strength import (
     SectionKey,
     SessionSlot,
@@ -117,26 +123,40 @@ def to_domain(parsed: ParsedSet, sheet_id: str, slot: SessionSlot) -> StrengthSe
         e1rm=parsed["e1rm"],
         raw=parsed["raw"],
         logged_rpe=parsed["logged_rpe"],
+        muscle_factor=parsed["muscle_factor"],
     )
 
 
 def run(google: GoogleSettings, *, bodyweight: float, send: HttpSend, db: Postgrest) -> int:
     """1. access_token + download_workbook(file_id=google.sheet_id) -> xlsx bytes
-    2. parse_all(xlsx, bodyweight, issues), minus tabs without a block number
-    3. check_issues: log unreadable cells per reason; raise above MAX_ISSUE_SHARE
-    4. number_sessions per ISO week -> to_domain each
-    5. replace_for_sheet(db, google.sheet_id, sets)  (refuses 0 rows)
+    2. the exercise catalogue (public.exercises): muscle factor + bodyweight fraction per name
+    3. parse_all(xlsx, the catalogue's scorer, issues), minus tabs without a block number
+    4. check_issues: log unreadable cells per reason; raise above MAX_ISSUE_SHARE
+    5. names the catalogue doesn't know: warn (named) and add them with the defaults
+    6. number_sessions per ISO week -> to_domain each
+    7. replace_for_sheet(db, google.sheet_id, sets)  (refuses 0 rows)
     Returns the number of sets written; logs the per-tab counts.
     """
     token = access_token(google.service_account_info)
     xlsx = download_workbook(send, token=token, file_id=google.sheet_id)
+    catalog = Catalog(all_exercises(db))
+    for conflict in catalog.conflicts:
+        log.warning("public.exercises: %s (the first by id is used)", conflict)
     issues: Counter[str] = Counter()
-    parsed = parse_all(xlsx, bodyweight, issues, counts_issues=has_block_number)
+    parsed = parse_all(xlsx, catalog.scorer(bodyweight), issues, counts_issues=has_block_number)
     unnumbered = sorted({p["block"] for p in parsed if not has_block_number(p["block"])})
     if unnumbered:
         log.warning("skipping tabs without a block number: %s", ", ".join(unnumbered))
         parsed = [p for p in parsed if p["block"] not in unnumbered]
     check_issues(issues, parsed)
+    if unknown := catalog.unknown(p["name"] for p in parsed):
+        log.warning(
+            "%d exercises not in public.exercises, scored as accessory (factor 0.6, no bodyweight) "
+            "and added there with those values: %s",
+            len(unknown),
+            ", ".join(unknown),
+        )
+        add_unknown(db, unknown)
     slots = number_sessions((section_key(p), p["date"]) for p in parsed)
     if shared := shared_weeks(slots):
         log.warning("%d weeks have sessions from more than one tab", len(shared))

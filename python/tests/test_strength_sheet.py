@@ -9,7 +9,14 @@ from datetime import date
 
 import pytest
 
-from conftest import BLOK_11, BLOK_11_SECTIONS, BLOK_12, SYNTHETIC_BODYWEIGHT, build_workbook
+from conftest import (
+    BLOK_11,
+    BLOK_11_SECTIONS,
+    BLOK_12,
+    SYNTHETIC_BODYWEIGHT,
+    build_workbook,
+    legacy_scoring,
+)
 from training_load.sources.strength_sheet import (
     RPE_NOT_HALF,
     ParsedSet,
@@ -24,7 +31,7 @@ from training_load.sources.strength_sheet import (
 
 @pytest.fixture
 def parsed(workbook_bytes: bytes) -> list[ParsedSet]:
-    return parse_all(workbook_bytes, SYNTHETIC_BODYWEIGHT)
+    return parse_all(workbook_bytes, legacy_scoring(SYNTHETIC_BODYWEIGHT))
 
 
 def first(parsed: list[ParsedSet], block: str, name: str, week: int) -> ParsedSet:
@@ -79,8 +86,8 @@ def test_logged_kg_excludes_bodyweight_and_kg_includes_it(parsed: list[ParsedSet
 
 
 def test_bodyweight_param_only_changes_bodyweight_exercise_scores(workbook_bytes: bytes) -> None:
-    light = parse_all(workbook_bytes, 70.0)
-    heavy = parse_all(workbook_bytes, 90.0)
+    light = parse_all(workbook_bytes, legacy_scoring(70.0))
+    heavy = parse_all(workbook_bytes, legacy_scoring(90.0))
     changed = {a["name"] for a, b in zip(light, heavy, strict=True) if a["score"] != b["score"]}
     assert changed == {"Dips", "Chin-ups"}
 
@@ -189,8 +196,8 @@ def test_kg_typed_as_text_parses_like_numbers() -> None:
         ),
         (dates_2, [(tempo[0], tempo[1], [(3, 6, "RPE 6", "70,0"), *tempo[2][1:]]), *rest_2]),
     ]
-    typed = parse_all(build_workbook(as_text), SYNTHETIC_BODYWEIGHT)
-    numeric = parse_all(build_workbook(), SYNTHETIC_BODYWEIGHT)
+    typed = parse_all(build_workbook(as_text), legacy_scoring(SYNTHETIC_BODYWEIGHT))
+    numeric = parse_all(build_workbook(), legacy_scoring(SYNTHETIC_BODYWEIGHT))
 
     def parsed(sets: list[ParsedSet]) -> list[dict[str, object]]:
         return [{k: v for k, v in p.items() if k != "raw"} for p in sets]  # raw keeps the text
@@ -213,7 +220,9 @@ def tempo_week_1(load: str, issues: Counter[str] | None = None) -> ParsedSet:
     tempo, *rest_2 = rows_2
     weeks = [(3, 6, load, 70), *tempo[2][1:]]
     workbook = build_workbook([first_section, (dates_2, [(tempo[0], tempo[1], weeks), *rest_2])])
-    return first(parse_all(workbook, SYNTHETIC_BODYWEIGHT, issues), BLOK_11, tempo[1], 1)
+    return first(
+        parse_all(workbook, legacy_scoring(SYNTHETIC_BODYWEIGHT), issues), BLOK_11, tempo[1], 1
+    )
 
 
 def test_an_rpe_cell_with_a_comma_decimal_scores_like_a_dot() -> None:

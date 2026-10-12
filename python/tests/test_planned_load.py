@@ -115,3 +115,13 @@ def test_an_rpe_cell_that_is_not_whole_or_half_leaves_the_set_unscored(make_set:
     squat = plan(make_set, type="SQUAT", name="Squat", reps=5.0, prescribed="RPE 7,8", e1rm=150.0)
     result = planned_session_score([squat], [])
     assert (result.score, result.unscored, result.sources) == (0.0, 1, {})
+
+
+def test_a_planned_set_is_scored_with_its_own_muscle_factor(make_set: MakeSet) -> None:
+    """The factor comes from public.exercises via strength_sets.muscle_factor (2026-10-12)."""
+    squat = {"type": "SQUAT", "name": "Squat", "reps": 5.0, "prescribed": "RPE 8", "e1rm": 150.0}
+    full = planned_session_score([plan(make_set, **squat, muscle_factor=1.0)], []).score
+    isolation = planned_session_score([plan(make_set, **squat, muscle_factor=0.3)], []).score
+    older_row = planned_session_score([plan(make_set, **squat, muscle_factor=None)], []).score
+    assert isolation == pytest.approx(full * 0.3)
+    assert older_row == pytest.approx(full * 0.6)  # stored by older code: the unknown default
