@@ -20,14 +20,16 @@ RUN_WEEK = date(2026, 10, 12)  # a Monday
 TODAY = date(2026, 10, 14)
 
 
-def lift(id: int, name: str, parent: str | None, category: str = "main") -> Exercise:
-    return Exercise(id, name, (), category, parent, 1.0, None, parent is not None)
+def lift(
+    id: int, name: str, parent: str | None, category: str = "main", scale: float = 1.0
+) -> Exercise:
+    return Exercise(id, name, (), category, parent, 1.0, None, parent is not None, scale)
 
 
 CATALOG = Catalog(
     [
         lift(1, "Squat", "SQUAT"),
-        lift(2, "3.0.0 Tempo squat", "SQUAT", "accessory"),
+        lift(2, "3.0.0 Tempo squat", "SQUAT", "accessory", scale=0.8),
         lift(3, "Bænk", "BENCH"),
         lift(4, "Facepulls", None, "isolation"),
     ]
@@ -98,7 +100,8 @@ def test_a_variant_uses_its_parent_lift_and_a_range_its_middle(make_set: MakeSet
     s = planned(make_set, type="SQUAT", name="3.0.0 tempo squat ", reps=3.0, prescribed="RPE 5 - 7")
     [p] = planned_sets([s], CATALOG, WEEKS, today=TODAY)
     assert (p.exercise_id, p.e1rm_lift, p.rpe) == (2, "SQUAT", 6.0)
-    assert p.suggested_kg == round_to_step(174.965 * pct_of_e1rm(3, 6))
+    # The tempo variant's suggestion_scale (0.8): 174.965 x 0.811 x 0.8 = 113.5 -> 112.5
+    assert p.suggested_kg == round_to_step(174.965 * pct_of_e1rm(3, 6) * 0.8) == 112.5
 
 
 @pytest.mark.parametrize(

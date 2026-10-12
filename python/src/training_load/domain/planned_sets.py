@@ -1,6 +1,7 @@
 """Suggested kg per planned set, for the Træning screen (decided with the user 2026-10-12).
 
-  suggested kg = rolling e1RM of the exercise's lift x pct(RPE, reps), rounded to ROUND_TO_KG
+  suggested kg = rolling e1RM of the exercise's lift x pct(RPE, reps) x suggestion_scale,
+                 rounded to ROUND_TO_KG
 
 - The lift: the exercise's parent_lift in public.exercises (a main lift is its own parent).
 - Rolling e1RM: the highest weekly best e1RM (strength_weeks, the numbers /analyse shows) of that
@@ -11,6 +12,8 @@
   (checked 2026-10-12: Home has an RPE word scale; the only 1RM formula is Brzycki, without RPE).
 - RPE: the prescribed RPE, the mid of a range ("RPE 5 - 7" -> 6); an RPE cell that isn't whole or
   half values is never used. Reps: the set's reps, the mid of a range ("8 - 12" -> 10).
+- suggestion_scale: the exercise's multiplier in public.exercises (1.0; tempo variants 0.8, as
+  they inherit the competition lift's e1RM: about 20 % too heavy on 2026-10-12 data).
 - No suggestion is null, never 0, and `basis` says why: not_rpe (e.g. "-12.5%" or no load cell),
   no_lift (no parent lift: an accessory, or a name the catalogue doesn't know), no_e1rm (no e1RM
   for that lift in the window).
@@ -105,8 +108,9 @@ def planned_sets(
             basis = "no_e1rm"
         else:
             basis = "rpe_e1rm"
+        scale = exercise.suggestion_scale if exercise is not None else 1.0
         suggested = (
-            round_to_step(e1rm_kg * pct)
+            round_to_step(e1rm_kg * pct * scale)
             if basis == "rpe_e1rm" and e1rm_kg is not None and pct is not None
             else None
         )

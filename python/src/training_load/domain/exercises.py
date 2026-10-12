@@ -35,6 +35,7 @@ class Exercise:
     muscle_factor: float
     bodyweight_fraction: float | None  # None: not a bodyweight exercise (0 would add nothing)
     tracks_e1rm: bool  # stored for later; nothing reads it yet
+    suggestion_scale: float = 1.0  # multiplies the suggested kg (tempo variants 0.8)
 
 
 @dataclass(frozen=True, slots=True)

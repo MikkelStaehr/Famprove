@@ -9,7 +9,8 @@ from training_load.narrow import opt_float, opt_str, req_bool, req_float, req_in
 
 TABLE: Final = "exercises"
 COLUMNS: Final = (
-    "id,name,aliases,category,parent_lift,muscle_factor,bodyweight_fraction,tracks_e1rm"
+    "id,name,aliases,category,parent_lift,muscle_factor,bodyweight_fraction,tracks_e1rm,"
+    "suggestion_scale"
 )
 
 
@@ -33,6 +34,7 @@ def from_row(row: JsonRow) -> Exercise:
         muscle_factor=req_float(row, "muscle_factor"),
         bodyweight_fraction=opt_float(row, "bodyweight_fraction"),
         tracks_e1rm=req_bool(row, "tracks_e1rm"),
+        suggestion_scale=req_float(row, "suggestion_scale"),
     )
 
 
