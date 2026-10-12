@@ -58,3 +58,7 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | vo2max-estimate | VO2max estimate from best 5-min W/kg, once real max efforts (FTP/ramp test) or an intervals.icu/watch estimate exist | — |
 | m3 | Milestone 3: Analyse › Samlet (f) | — |
 | ignore-key-json | Ignore Google key files (root JSON, <project>-<12 hex>.json) | S |
+| exercises | Exercise catalogue: muscle factor and bodyweight fraction from a table, effective kg in the week card | L |
+| exercise-log | Exercise timing log from Today's ticks (the app's first write path) | L |
+| ride-vi | Variability index (NP / average power) per ride, Z2 warning in the week card | M |
+| cycling-progress | Cycling progress view: VI, efficiency factor (power/HR) and eFTP (queued, not built) | — |
