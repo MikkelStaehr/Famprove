@@ -80,9 +80,14 @@ export function formatUpdatedAt(computedAt: string): string {
   return `${UPDATED_DATE_FORMAT.format(at)} kl. ${UPDATED_TIME_FORMAT.format(at)}`;
 }
 
+/** A time (ISO timestamptz) as a time of day in LOCAL_TZ: "18.42". */
+export function formatTimeOfDay(at: string): string {
+  return UPDATED_TIME_FORMAT.format(new Date(at));
+}
+
 /** A tap's time (ISO timestamptz) as a clock time in LOCAL_TZ: "kl. 18.42". */
 export function formatClock(at: string): string {
-  return `kl. ${UPDATED_TIME_FORMAT.format(new Date(at))}`;
+  return `kl. ${formatTimeOfDay(at)}`;
 }
 
 /** A signed whole number written out for screen readers: 4 -> "plus 4", −24 -> "minus 24", 0 -> "0". */
@@ -223,43 +228,12 @@ export function spokenSetsReps(sets: string | null, reps: string | null): string
   return null;
 }
 
-/** What one prescribed sheet row asks for. The sheet strings stay as written apart from ranges. */
-/**
- * This week's kg for the prescription line (spec today.md §3b): null -> nothing (never "0 kg");
- * a no-break space keeps "140 kg" together at normal text sizes.
- */
-export function prescriptionKg(kg: number | null, bodyweight: boolean): string | null {
-  const text = kg === null ? null : formatSetLoad(kg, bodyweight);
-  return text === null ? null : text.replace(/ kg$/, "\u00A0kg");
-}
-
 export type ExerciseWords = {
   readonly name: string;
   readonly setsText: string | null;
   readonly repsText: string | null;
   readonly prescribed: string | null;
 };
-
-/**
- * The accessible name of a tick row, e.g. "Squat, 1 sæt af 3 reps ved RPE 5, sidste uge 100 kg".
- * `lastWeek`: undefined in week 1 (no reference line), null when nothing was logged, else the
- * formatted load ("100 kg", "kropsvægt + 10 kg").
- */
-export function spokenExercise(
-  e: ExerciseWords,
-  lastWeek: string | null | undefined,
-  kg: string | null = null,
-): string {
-  const amount = spokenSetsReps(e.setsText, e.repsText);
-  const load = e.prescribed === null ? null : spokenRange(e.prescribed);
-  const what = amount !== null && load !== null ? `${amount} ved ${load}` : (amount ?? load);
-  const parts = [e.name.trim()];
-  if (what !== null) parts.push(what);
-  if (kg !== null) parts.push(kg);
-  if (lastWeek === null) parts.push("intet logget sidste uge");
-  else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);
-  return parts.join(", ");
-}
 
 /**
  * The full stop that ends a sentence after `text`: none when `text` already ends with one.

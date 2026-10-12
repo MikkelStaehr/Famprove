@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { setKey } from "@/lib/set-taps";
 
 import { useSession } from "./SetLogProvider";
+import { settle } from "./useSetLog";
 
 /**
  * Træning's header session block (spec traening.md §3.1.4): which session, then the one primary
  * action. Begynd / Fortsæt writes "begin" on the first open set (only when it has no start yet)
- * and opens Fokus without waiting for the save. Every set closed: the finished note, no button.
+ * and opens Fokus once that save has landed (at most FLUSH_WAIT_MS), so Fokus reads it back.
+ * Every set closed: the finished note, no button.
  */
 export function SessionBlock() {
   const { session, setLog, view } = useSession();
@@ -18,7 +20,7 @@ export function SessionBlock() {
     const first = view.first;
     if (first === null) return;
     if (setLog.log.get(setKey(first))?.startedAt == null) setLog.tap("begin", first);
-    router.push("/fokus?view=set"); // opens the set view, not a rest view (spec §4.5)
+    void settle(setLog.flush).then(() => router.push("/fokus?view=set")); // the set view (spec §4.5)
   };
   return (
     <section aria-labelledby="session-heading" className="mt-4 flex flex-col">

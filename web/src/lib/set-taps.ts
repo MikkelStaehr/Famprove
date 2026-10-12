@@ -21,6 +21,8 @@
 
 export type SetRef = { readonly row: number; readonly set: number };
 export type SetTapKind = "begin" | "done" | "skip" | "undo";
+/** What an undo undoes, as the client saw the set: so a retry of a half-done undo only finishes it. */
+export type Undoes = "done" | "skip" | "begin";
 
 /** What the server action receives (validated again on the server). */
 export type SetTapInput = {
@@ -29,6 +31,7 @@ export type SetTapInput = {
   readonly session: number; // the n-th strength session of the ISO week
   readonly row: number; // strength_sets.sheet_row
   readonly set: number; // strength_sets.set_no
+  readonly undoes: Undoes | null; // set exactly for kind "undo"
 };
 
 /** One set's logged state, as read back from the log (or optimistically applied). */
@@ -86,6 +89,18 @@ export function startAfter(previous: LoggedSet | undefined): string | null {
   return previous.endedAt;
 }
 
+/**
+ * Whether `start` on `target` was written by another set's tap (a done's end or a skip's time):
+ * then undoing target's begin keeps it. Only a begin's own time belongs to no other set.
+ */
+export function startFromAnotherTap(log: ReadonlyMap<string, LoggedSet>, target: SetRef, start: string): boolean {
+  for (const l of log.values()) {
+    if (l.row === target.row && l.set === target.set) continue;
+    if (sameInstant(l.endedAt, start) || (l.skipped && sameInstant(l.updatedAt, start))) return true;
+  }
+  return false;
+}
+
 /** The first set that is neither done nor skipped; null when every set is. */
 export function firstOpen(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): SetRef | null {
   return order.find((s) => stateOf(log.get(setKey(s))) === "open") ?? null;
@@ -127,6 +142,16 @@ export function restStart(log: ReadonlyMap<string, LoggedSet>): string | null {
   return last !== null && last.kind === "done" ? last.at : null;
 }
 
+/** What an undo of `target` would undo now; null when there is nothing to undo. */
+export function undoesOf(log: ReadonlyMap<string, LoggedSet>, target: SetRef): Undoes | null {
+  const own = log.get(setKey(target));
+  if (own === undefined) return null;
+  if (own.skipped) return "skip";
+  if (own.endedAt !== null) return "done";
+  if (own.startedAt !== null && !startFromAnotherTap(log, target, own.startedAt)) return "begin";
+  return null;
+}
+
 /** Whether the server would refuse the tap (the screens don't offer it). */
 export function refused(log: ReadonlyMap<string, LoggedSet>, kind: SetTapKind, target: SetRef): boolean {
   return kind === "skip" && stateOf(log.get(setKey(target))) === "done";
@@ -165,15 +190,18 @@ export function applyTap(
     case "begin":
       if (stateOf(own) === "open" && own?.startedAt == null) put(next, target, { startedAt: at }, at);
       break;
-    case "done":
-      if (stateOf(own) === "done") break;
-      put(next, target, { skipped: false, startedAt: own?.startedAt ?? at, endedAt: at }, at);
-      if (following !== null && log.get(setKey(following))?.startedAt == null) put(next, following, { startedAt: at }, at);
+    case "done": {
+      const t = stateOf(own) === "done" && own?.endedAt != null ? own.endedAt : at; // a retry keeps T
+      if (stateOf(own) !== "done") put(next, target, { skipped: false, startedAt: own?.startedAt ?? t, endedAt: t }, at);
+      if (following !== null && log.get(setKey(following))?.startedAt == null) put(next, following, { startedAt: t }, at);
       break;
-    case "skip":
-      put(next, target, { skipped: true, startedAt: null, endedAt: null }, at);
-      if (following !== null && log.get(setKey(following))?.startedAt == null) put(next, following, { startedAt: at }, at);
+    }
+    case "skip": {
+      const t = own?.skipped === true && own.updatedAt !== null ? own.updatedAt : at; // a retry keeps T
+      if (own?.skipped !== true) put(next, target, { skipped: true, startedAt: null, endedAt: null }, t);
+      if (following !== null && log.get(setKey(following))?.startedAt == null) put(next, following, { startedAt: t }, at);
       break;
+    }
     case "undo": {
       if (own === undefined) break;
       const { previous } = neighbours(order, target);
@@ -185,9 +213,8 @@ export function applyTap(
         const t = own.endedAt;
         put(next, target, { endedAt: null }, at);
         clearStarts(next, t, at);
-      } else if (own.startedAt !== null) {
-        const prev = previous === null ? undefined : log.get(setKey(previous));
-        if (!sameInstant(startAfter(prev), own.startedAt)) put(next, target, { startedAt: null }, at);
+      } else if (own.startedAt !== null && !startFromAnotherTap(log, target, own.startedAt)) {
+        put(next, target, { startedAt: null }, at); // a begin
       }
       break;
     }
@@ -196,6 +223,7 @@ export function applyTap(
 }
 
 const KINDS: readonly SetTapKind[] = ["begin", "done", "skip", "undo"];
+const UNDOES: readonly Undoes[] = ["done", "skip", "begin"];
 export const MAX_SESSION = 14; // the sheet never plans more; anything above is not a session
 const MAX_ROW = 10_000;
 const MAX_SET = 100;
@@ -212,15 +240,17 @@ export function parseSetTapInput(raw: unknown): SetTapInput | null {
   const session = whole(r.session, MAX_SESSION);
   const row = whole(r.row, MAX_ROW);
   const set = whole(r.set, MAX_SET);
+  const undoes = UNDOES.find((u) => u === r.undoes) ?? null;
   if (
     kind === undefined ||
     session === null ||
     row === null ||
     set === null ||
     typeof r.date !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(r.date)
+    !/^\d{4}-\d{2}-\d{2}$/.test(r.date) ||
+    (kind === "undo" ? undoes === null : r.undoes !== null)
   ) {
     return null;
   }
-  return { kind, date: r.date, session, row, set };
+  return { kind, date: r.date, session, row, set, undoes };
 }

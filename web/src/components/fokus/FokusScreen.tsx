@@ -75,7 +75,7 @@ const FADE_IN = "transition-opacity duration-180 ease-out starting:opacity-0 mot
  * sæt" writes nothing: it only dismisses the current rest.
  */
 export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening }: FokusScreenProps) {
-  const { log, tap, unsaved, retry, dev, flush } = useSetLog(session.log, session.order, date, session.session);
+  const { log, tap, unsaved, retry, rejected, dev, flush } = useSetLog(session.log, session.order, date, session.session);
   const [dismissed, setDismissed] = useState<string | null>(() =>
     enteredFromTraening ? restStart(new Map(session.log.map((l) => [setKey(l), l]))) : null,
   );
@@ -172,6 +172,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
             </button>
           </WarningLine>
         )}
+        {rejected && <WarningLine>Et tryk blev afvist. Genindlæs siden.</WarningLine>}
         {lastLine !== null && (
           <p className="flex flex-wrap items-center gap-x-2 text-16 text-text-muted">
             <span>

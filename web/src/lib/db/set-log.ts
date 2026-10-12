@@ -6,12 +6,12 @@ import {
   neighbours,
   nextOpen,
   refused,
-  sameInstant,
   sessionOrder,
   setKey,
   type SetRef,
   type SetTapInput,
   startAfter,
+  startFromAnotherTap,
   stateOf,
 } from "../set-taps.ts";
 import { localToday } from "../training-view.ts";
@@ -218,28 +218,45 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
       case "begin":
         if (stateOf(logged) === "open") await setIfNull(c, own, ["started_at"], at);
         break;
-      case "done":
-        if (stateOf(logged) === "done") break; // first write wins
+      case "done": {
+        // A retry of a done that already landed (partly) finishes it with the tap's own time, so
+        // one tap keeps one T everywhere (undo finds it) and the next set still gets its start.
+        const t = stateOf(logged) === "done" && logged?.endedAt != null ? logged.endedAt : at;
         if (logged?.skipped === true) await patch(c, own, [], { skipped: false, updated_at: at });
-        await setIfNull(c, own, ["started_at", "ended_at"], at);
-        if (after !== null) await setIfNull(c, after, ["started_at"], at);
+        await setIfNull(c, own, ["started_at", "ended_at"], t);
+        if (after !== null) await setIfNull(c, after, ["started_at"], t);
         break;
-      case "skip":
-        await ensure(c, own, { skipped: true }, at);
-        await patch(c, own, [], { skipped: true, started_at: null, ended_at: null, updated_at: at });
-        if (after !== null) await setIfNull(c, after, ["started_at"], at);
+      }
+      case "skip": {
+        // As done: a retry reuses the skip's own time (its updated_at) for the next set's start.
+        const t = logged?.skipped === true && logged.updatedAt !== null ? logged.updatedAt : at;
+        if (logged?.skipped !== true) {
+          await ensure(c, own, { skipped: true }, t);
+          await patch(c, own, [], { skipped: true, started_at: null, ended_at: null, updated_at: t });
+        }
+        if (after !== null) await setIfNull(c, after, ["started_at"], t);
         break;
+      }
       case "undo": {
-        if (logged === undefined) break;
-        const previousLogged = previous === null ? undefined : log.get(setKey(previous));
-        if (logged.skipped) {
-          // The skip wrote no time on this set: its start comes back from the previous set.
+        // Applied only while the set is still what the client undid (input.undoes); otherwise this
+        // is a retry of an undo that already landed, and only the cleanup is left. The tap's own
+        // mark (the set's end, or its skip) is cleared last, so a partial undo is finished by its retry.
+        const state = logged === undefined ? null : logged.skipped ? "skip" : logged.endedAt !== null ? "done" : "begin";
+        if (logged !== undefined && input.undoes === "skip" && state === "skip") {
+          const previousLogged = previous === null ? undefined : log.get(setKey(previous));
+          await clearStarts(c, input.date, input.session, logged.updatedAt ?? at, at); // the starts the skip wrote
           await patch(c, own, [], { skipped: false, started_at: startAfter(previousLogged), updated_at: at });
-          await clearStarts(c, input.date, input.session, logged.updatedAt ?? at, at);
-        } else if (logged.endedAt !== null) {
-          await patch(c, own, [["ended_at", `eq.${logged.endedAt}`]], { ended_at: null, updated_at: at });
-          await clearStarts(c, input.date, input.session, logged.endedAt, at);
-        } else if (logged.startedAt !== null && !sameInstant(startAfter(previousLogged), logged.startedAt)) {
+        } else if (logged?.endedAt != null && input.undoes === "done" && state === "done") {
+          const t = logged.endedAt;
+          await clearStarts(c, input.date, input.session, t, at); // on sets that aren't done
+          await patch(c, own, [["started_at", `eq.${t}`], ["ended_at", `eq.${t}`]], { started_at: null, updated_at: at });
+          await patch(c, own, [["ended_at", `eq.${t}`]], { ended_at: null, updated_at: at });
+        } else if (
+          logged?.startedAt != null &&
+          input.undoes === "begin" &&
+          state === "begin" &&
+          !startFromAnotherTap(log, target, logged.startedAt)
+        ) {
           await clearStarts(c, input.date, input.session, logged.startedAt, at); // a begin
         }
         await deleteEmpty(c, input.date, input.session);

@@ -199,6 +199,7 @@ export function SaveNotes() {
           </button>
         </WarningLine>
       )}
+      {setLog.rejected && <WarningLine>Et tryk blev afvist. Genindlæs siden.</WarningLine>}
       {(devSwitches || setLog.dev) && <p className="text-14 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
     </>
   );

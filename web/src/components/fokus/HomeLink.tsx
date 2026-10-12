@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode, Ref } from "react";
 
-/** How long leaving Fokus waits for queued saves before it navigates anyway (offline, slow). */
-export const FLUSH_WAIT_MS = 3000;
+import { settle } from "@/components/useSetLog";
 
 /**
  * A link back to Træning (Afslut, Tilbage til Træning) that first lets the queued set taps land,
@@ -32,8 +31,7 @@ export function HomeLink({
       onClick={(event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
         event.preventDefault();
-        const waited = new Promise<void>((resolve) => setTimeout(resolve, FLUSH_WAIT_MS));
-        void Promise.race([flush(), waited]).then(() => router.push("/"));
+        void settle(flush).then(() => router.push("/"));
       }}
     >
       {children}

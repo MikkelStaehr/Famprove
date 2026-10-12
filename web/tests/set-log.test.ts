@@ -104,8 +104,10 @@ test("applyTap: done and skip start the next OPEN set", () => {
 });
 
 test("parseSetTapInput: exact shape only", () => {
-  const ok = { kind: "done", date: "2026-10-12", session: 1, row: 25, set: 2 };
+  const ok = { kind: "done", date: "2026-10-12", session: 1, row: 25, set: 2, undoes: null };
   assert.deepEqual(parseSetTapInput(ok), ok);
+  const undo = { ...ok, kind: "undo", undoes: "skip" };
+  assert.deepEqual(parseSetTapInput(undo), undo);
   for (const bad of [
     null,
     { ...ok, kind: "delete" },
@@ -114,6 +116,9 @@ test("parseSetTapInput: exact shape only", () => {
     { ...ok, row: 1.5 },
     { ...ok, set: "2" },
     { ...ok, date: "12-10-2026" },
+    { ...ok, undoes: "done" }, // only an undo says what it undoes
+    { ...undo, undoes: null }, // and an undo always does
+    { ...undo, undoes: "kg" },
   ]) {
     assert.equal(parseSetTapInput(bad), null, JSON.stringify(bad));
   }
@@ -222,7 +227,7 @@ function options(db: FakeDb, overrides: Partial<RecordOptions> = {}): RecordOpti
 }
 
 function tap(kind: SetTapInput["kind"], row: number, set: number, more: Partial<SetTapInput> = {}): SetTapInput {
-  return { kind, date: "2026-10-12", session: 1, row, set, ...more };
+  return { kind, date: "2026-10-12", session: 1, row, set, undoes: kind === "undo" ? "done" : null, ...more };
 }
 
 function log(db: FakeDb): Array<[string, unknown, unknown, unknown, unknown]> {
@@ -267,12 +272,12 @@ test("recordSetTap: undo clears exactly what its tap wrote", async () => {
     ["25#2", 1, iso(2), null, false], // its start was set 1's end: kept; Dips' start is gone
   ]);
   await recordSetTap(tap("skip", 25, 2), at(7), options(db));
-  await recordSetTap(tap("undo", 25, 2), at(8), options(db));
+  await recordSetTap(tap("undo", 25, 2, { undoes: "skip" }), at(8), options(db));
   assert.deepEqual(log(db), [
     ["25#1", 1, iso(0), iso(2), false],
     ["25#2", 1, iso(2), null, false], // start restored from set 1's end; Dips' start gone again
   ]);
-  await recordSetTap(tap("undo", 25, 2), at(9), options(db)); // a start set 1 wrote: kept
+  await recordSetTap(tap("undo", 25, 2, { undoes: "begin" }), at(9), options(db)); // a start set 1 wrote: kept
   assert.deepEqual(log(db).map((r) => r[0]), ["25#1", "25#2"]);
 });
 

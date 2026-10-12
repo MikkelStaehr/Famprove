@@ -15,8 +15,6 @@ import {
   formatUpdatedAt,
   formatWatts,
   formatWeekParam,
-  prescriptionKg,
-  spokenExercise,
   stopAfter,
 } from "../src/lib/format.ts";
 
@@ -110,20 +108,3 @@ test("formatDateRange shares the month when it can", () => {
   assert.equal(formatDateRange("2026-09-28", "2026-10-04"), "28. sep.–4. okt.");
 });
 
-test("prescriptionKg: nothing without kg, a no-break space before kg, bodyweight words", () => {
-  assert.equal(prescriptionKg(null, false), null);
-  assert.equal(prescriptionKg(null, true), null);
-  assert.equal(prescriptionKg(140, false), "140 kg");
-  assert.equal(prescriptionKg(22.5, false), "22,5 kg");
-  assert.equal(prescriptionKg(0, true), "kropsvægt");
-  assert.equal(prescriptionKg(12.5, true), "kropsvægt + 12,5 kg");
-});
-
-test("spokenExercise reads this week's kg only when there is one", () => {
-  const squat = { name: "Squat", setsText: "1", repsText: "3", prescribed: "RPE 5" };
-  assert.equal(
-    spokenExercise(squat, "137,5 kg", "140 kg"),
-    "Squat, 1 sæt af 3 reps ved RPE 5, 140 kg, sidste uge 137,5 kg",
-  );
-  assert.equal(spokenExercise(squat, "137,5 kg"), "Squat, 1 sæt af 3 reps ved RPE 5, sidste uge 137,5 kg");
-});

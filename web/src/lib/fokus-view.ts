@@ -5,7 +5,7 @@
  * (the rest timer is a clock: now − the last done tap).
  */
 import type { Freshness } from "./dashboard-view.ts";
-import { formatKg, formatSetLoad, formatUpdatedAt, spokenRange } from "./format.ts";
+import { formatKg, formatSetLoad, formatTimeOfDay, formatUpdatedAt, spokenRange } from "./format.ts";
 import type { SuggestionBasis } from "./db/rows.ts";
 import {
   firstOpen,
@@ -153,16 +153,9 @@ export function lastWeekLine(e: FokusExercise, week: number): LastWeekLine | nul
   return { kind: "kg", text: referenceText(e.reference) };
 }
 
-const CLOCK_FORMAT = new Intl.DateTimeFormat("da-DK", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-  timeZone: "Europe/Copenhagen",
-});
-
 /** A tap's time of day in Copenhagen: "2026-10-12T16:42:05Z" -> "18.42". */
 export function clockTime(iso: string): string {
-  return CLOCK_FORMAT.format(new Date(iso));
+  return formatTimeOfDay(iso);
 }
 
 /** Whole seconds from `since` to `now`, never negative (a clock a little behind the server's). */
