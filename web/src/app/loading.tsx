@@ -4,7 +4,7 @@ import { ZoneBarSkeleton } from "@/components/ZoneBar";
 const ROWS = 4;
 
 /**
- * Today's skeleton (the nav is real, from the layout): the real h1 with a bar for the date, a bar
+ * Træning's skeleton (the nav is real, from the layout): the real h1 with a bar for the date, a bar
  * for the updated line, the compact ZoneBar skeleton, then one card with a title bar, the progress
  * bar and tick rows (28px circle, name bar, prescription bar). Pulses only under motion-safe.
  */

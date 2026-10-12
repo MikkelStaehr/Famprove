@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { hero } from "../src/lib/dashboard-view.ts";
 import type { DailyLoadRow } from "../src/lib/db/rows.ts";
 import { formatDay, formatDayLong, formatKg, formatSigned, formatUpdatedAt } from "../src/lib/format.ts";
-import { todayHeader } from "../src/lib/today-view.ts";
+import { trainingHeader } from "../src/lib/training-view.ts";
 import { pinned, position, THRESHOLDS, zoneSentence } from "../src/lib/zone-scale.ts";
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
@@ -215,13 +215,13 @@ const row = (tsb: number, formZone: string | null): DailyLoadRow => ({
   computedAt: "2026-09-30T03:03:00Z",
 });
 
-test("TSB +4 stored as form_zone 'fresh' shows FRISK on Today and /load (zone never derived from TSB)", () => {
-  const header = todayHeader(row(4, "fresh"), new Date("2026-09-30T08:00:00Z"));
+test("TSB +4 stored as form_zone 'fresh' shows FRISK on Træning and /load (zone never derived from TSB)", () => {
+  const header = trainingHeader(row(4, "fresh"), new Date("2026-09-30T08:00:00Z"));
   assert.equal(header?.zone?.key, "fresh");
   assert.equal(header?.zone?.label, "Frisk");
   assert.equal(hero(row(4, "fresh")).zone?.label, "Frisk");
   assert.equal(zoneSentence(4, header?.zone?.key ?? null), "Form plus 4 TSS per dag: frisk, som går fra 5 til 20.");
-  assert.equal(todayHeader(row(4, null), new Date("2026-09-30T08:00:00Z"))?.zone, null);
+  assert.equal(trainingHeader(row(4, null), new Date("2026-09-30T08:00:00Z"))?.zone, null);
 });
 
 // --- Danish formats ------------------------------------------------------------------------

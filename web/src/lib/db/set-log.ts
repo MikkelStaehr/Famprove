@@ -14,7 +14,7 @@ import {
   startAfter,
   stateOf,
 } from "../set-taps.ts";
-import { localToday } from "../today-view.ts";
+import { localToday } from "../training-view.ts";
 import { devFixture } from "./dev-fixture.ts";
 import { EnvError, readSupabaseEnv } from "./env.ts";
 import {

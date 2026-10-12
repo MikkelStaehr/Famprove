@@ -7,7 +7,7 @@ type CardProps = {
   /** Optional control shown right of the title. */
   readonly action?: ReactNode;
   /**
-   * "session": Today's cards (Part B: 32px Condensed 800 italic, uppercase via CSS).
+   * "session": Træning's cards (Part B: 32px Condensed 800 italic, uppercase via CSS).
    * "calm": /load's cards (20px Barlow 700, sentence case).
    */
   readonly variant: "session" | "calm";

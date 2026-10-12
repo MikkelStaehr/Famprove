@@ -8,24 +8,24 @@ import { StrengthCard } from "@/components/StrengthCard";
 import { UpdatedLine } from "@/components/UpdatedLine";
 import { ZoneBar, ZoneBarError } from "@/components/ZoneBar";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
-import { loadTodayForm, loadTodayPlan, NEXT_SESSION_DAYS } from "@/lib/db/queries";
+import { loadTrainingForm, loadTrainingPlan, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDay, formatUpdatedAt } from "@/lib/format";
 import {
-  buildTodayPlan,
+  buildTrainingPlan,
   resolveToday,
-  todayHeader,
-  type TodayHeader,
-  type TodayPlan,
-} from "@/lib/today-view";
+  trainingHeader,
+  type TrainingHeader,
+  type TrainingPlan,
+} from "@/lib/training-view";
 
 export const metadata: Metadata = {
   title: "I dag · Belastning",
 };
 
 type Failed = { readonly kind: "error"; readonly error: DataError; readonly at: Date };
-type FormState = { readonly kind: "ready"; readonly header: TodayHeader | null } | Failed;
-type PlanState = { readonly kind: "ready"; readonly plan: TodayPlan } | Failed;
+type FormState = { readonly kind: "ready"; readonly header: TrainingHeader | null } | Failed;
+type PlanState = { readonly kind: "ready"; readonly plan: TrainingPlan } | Failed;
 
 /**
  * The form line and the plan load independently: a failed plan read shows the plan's
@@ -34,7 +34,7 @@ type PlanState = { readonly kind: "ready"; readonly plan: TodayPlan } | Failed;
  */
 async function loadFormState(today: IsoDate, now: Date): Promise<FormState> {
   try {
-    return { kind: "ready", header: todayHeader(await loadTodayForm(today), now) };
+    return { kind: "ready", header: trainingHeader(await loadTrainingForm(today), now) };
   } catch (error) {
     if (isDataError(error)) {
       console.error("today: loading form failed", error);
@@ -46,7 +46,7 @@ async function loadFormState(today: IsoDate, now: Date): Promise<FormState> {
 
 async function loadPlanState(today: IsoDate): Promise<PlanState> {
   try {
-    return { kind: "ready", plan: buildTodayPlan(await loadTodayPlan(today), today) };
+    return { kind: "ready", plan: buildTrainingPlan(await loadTrainingPlan(today), today) };
   } catch (error) {
     if (isDataError(error)) {
       console.error("today: loading plan failed", error);
@@ -57,7 +57,7 @@ async function loadPlanState(today: IsoDate): Promise<PlanState> {
 }
 
 /** `/`: "What am I doing in this session, and how hard?" (design/specs/today.md). */
-export default async function TodayPage() {
+export default async function TrainingPage() {
   await connection(); // request time: "today" is the Copenhagen date now, never the build's
   const now = new Date();
   const today = resolveToday(now, process.env);
@@ -100,7 +100,7 @@ export default async function TodayPage() {
  * week's strength (every state of spec §3a, including "no program"), then the Rest card when no
  * ride is planned today and no strength session is left.
  */
-function DayCards({ plan }: { readonly plan: TodayPlan }) {
+function DayCards({ plan }: { readonly plan: TrainingPlan }) {
   return (
     <>
       {plan.rides.map((ride, i) => (

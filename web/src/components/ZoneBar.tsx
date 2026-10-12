@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDay, formatDayLong, formatSigned } from "@/lib/format";
-import type { TodayHeader } from "@/lib/today-view";
+import type { TrainingHeader } from "@/lib/training-view";
 import { BANDS, isZoneKey, pinned, position, THRESHOLDS, type ZoneKey, ZONE_FILL, zoneSentence } from "@/lib/zone-scale";
 
 /**
@@ -24,7 +24,7 @@ const pct = (x: number) => `${(x * 100).toFixed(4)}%`;
 
 type ZoneBarProps = {
   /** null: no daily_load rows yet. */
-  readonly header: TodayHeader | null;
+  readonly header: TrainingHeader | null;
   readonly today: IsoDate;
   readonly size: ZoneBarSize;
 };

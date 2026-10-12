@@ -1,5 +1,5 @@
 import { formatDay } from "@/lib/format";
-import type { NextDay } from "@/lib/today-view";
+import type { NextDay } from "@/lib/training-view";
 
 import { Card } from "./Card";
 import { EmptyState } from "./EmptyState";

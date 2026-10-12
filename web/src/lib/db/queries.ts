@@ -169,9 +169,9 @@ export async function loadWeekDetail(start: IsoDate, end: IsoDate): Promise<Week
 export const NEXT_SESSION_DAYS = 28;
 
 /** The form line: the latest daily_load row on or before `today` (null when none). */
-export async function loadTodayForm(today: IsoDate): Promise<DailyLoadRow | null> {
+export async function loadTrainingForm(today: IsoDate): Promise<DailyLoadRow | null> {
   await connection();
-  if (!ISO_DATE.test(today)) throw new RangeError("loadTodayForm: invalid date");
+  if (!ISO_DATE.test(today)) throw new RangeError("loadTrainingForm: invalid date");
   const fixture = devFixture();
   if (fixture === "error") throw fixtureError(DAILY_LOAD_SELECT.table);
   if (fixture === "empty") return null;
@@ -186,8 +186,8 @@ export async function loadTodayForm(today: IsoDate): Promise<DailyLoadRow | null
     : latest;
 }
 
-/** Everything the Today screen's plan reads for one local date (form is loaded separately). */
-export type TodayPlanData = {
+/** Everything the Træning screen's plan reads for one local date (form is loaded separately). */
+export type TrainingPlanData = {
   readonly weekStart: IsoDate; // Monday of today's ISO week
   readonly sessions: readonly StrengthSessionRow[]; // this ISO week: planned, done and extra
   readonly sets: readonly PrescribedSetRow[]; // this ISO week's prescription, every session
@@ -204,9 +204,9 @@ export type TodayPlanData = {
  * chosen by the server (never raw user input); it is validated again here. Reads only;
  * throws EnvError / PostgrestError / RowError.
  */
-export async function loadTodayPlan(today: IsoDate): Promise<TodayPlanData> {
+export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData> {
   await connection();
-  if (!ISO_DATE.test(today)) throw new RangeError("loadTodayPlan: invalid date");
+  if (!ISO_DATE.test(today)) throw new RangeError("loadTrainingPlan: invalid date");
   const weekStart = isoWeekStart(today);
   const fixture = devFixture();
   if (fixture === "error") throw fixtureError(STRENGTH_SESSIONS_SELECT.table);

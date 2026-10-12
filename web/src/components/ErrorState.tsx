@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 type Retry =
-  // Server-rendered: a soft navigation re-reads the route. Never a full reload, so Today's
+  // Server-rendered: a soft navigation re-reads the route. Never a full reload, so Træning's
   // ticks (held in the root layout) survive a retry.
   | { readonly href: string }
   | { readonly onRetry: () => void }; // client boundary: re-render

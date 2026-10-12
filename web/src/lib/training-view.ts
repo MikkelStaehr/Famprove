@@ -1,19 +1,22 @@
 /**
- * Pure view model for the Today screen (no I/O, no React; tested with `node --test`).
+ * Pure view model for the Træning screen (no I/O, no React; tested with `node --test`).
  * It selects and groups what Python stored; it never calculates training numbers
  * (watts, TSB and zones all come from the database).
  */
 import { freshness, zoneDisplay } from "./dashboard-view.ts";
 import type { Freshness, Hero } from "./dashboard-view.ts";
 import { addDays, isoWeekNumber } from "./dates.ts";
-import type { TodayPlanData } from "./db/queries.ts";
+import type { TrainingPlanData } from "./db/queries.ts";
 import type {
   DailyLoadRow,
   IsoDate,
   PlanItem,
+  PlannedSetRow,
   PrescribedSetRow,
   StrengthSessionRow,
+  SuggestionBasis,
 } from "./db/rows.ts";
+import { type LoggedSet, sessionOrder, type SetRef } from "./set-taps.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
 
@@ -30,7 +33,7 @@ export function localToday(now: Date): IsoDate {
 }
 
 /**
- * The date the Today screen shows: the local date, or DEV_TODAY (YYYY-MM-DD) when running
+ * The date the Træning screen shows: the local date, or DEV_TODAY (YYYY-MM-DD) when running
  * under `next dev` — for looking at other days while developing. `nodeEnv` defaults to the
  * literal `process.env.NODE_ENV`, which the build inlines, so production never reads DEV_TODAY.
  * A malformed value is warned about, never silently ignored.
@@ -61,6 +64,11 @@ export type ExerciseView = {
   /** This week's kg from the sheet (the user's own number: planned ahead or lifted); null = none. */
   readonly kg: number | null;
   readonly reference: Reference | null; // last week's logged kg for the same sheet row
+  readonly row: number; // strength_sets.sheet_row: the set log's row_no
+  /** Python's suggested kg for this row's sets (planned_sets; all sets of a row share it). */
+  readonly suggestedKg: number | null;
+  readonly suggestionBasis: SuggestionBasis | null; // null: no planned_sets row (yet)
+  readonly sets: readonly SetRef[]; // this row's sets, 1..n (each has its own tick)
 };
 
 /** The next session to do: session k + 1 of this ISO week. It has no date until it's done. */
@@ -70,6 +78,9 @@ export type StrengthSession = {
   readonly block: string;
   readonly week: number;
   readonly exercises: readonly ExerciseView[]; // sheet order
+  readonly order: readonly SetRef[]; // every set of the session in the sheet's order
+  /** The session's logged sets today (exercise_set_log), read back so progress survives a reload. */
+  readonly log: readonly LoggedSet[];
 };
 
 /** A strength activity logged this ISO week (the n-th is session n). */
@@ -114,7 +125,7 @@ export type NextDay = {
   readonly rides: readonly string[]; // planned ride names
 };
 
-export type TodayHeader = {
+export type TrainingHeader = {
   readonly date: IsoDate; // the daily_load row's date (normally today)
   readonly tsb: number;
   readonly zone: Hero["zone"];
@@ -122,11 +133,11 @@ export type TodayHeader = {
 };
 
 /**
- * The day's plan. The form line (TodayHeader) is built and loaded separately.
+ * The day's plan. The form line (TrainingHeader) is built and loaded separately.
  * kind: "strength" when a session is left this week (state "next"), "ride" when a ride is
  * planned today, "both", or "rest" (no ride today and no session left: the Rest card shows).
  */
-export type TodayPlan = {
+export type TrainingPlan = {
   readonly date: IsoDate;
   readonly kind: "strength" | "ride" | "both" | "rest";
   readonly strength: StrengthWeek;
@@ -151,14 +162,25 @@ function references(previous: readonly PrescribedSetRow[]): Map<string, Referenc
   return refs;
 }
 
-function exercisesOf(sets: readonly PrescribedSetRow[], refs: Map<string, Reference>): ExerciseView[] {
+function plannedKey(s: { readonly block: string; readonly sheetRow: number; readonly week: number; readonly setNo: number }): string {
+  return `${s.block}#${s.sheetRow}#${s.week}#${s.setNo}`;
+}
+
+function exercisesOf(
+  sets: readonly PrescribedSetRow[],
+  refs: Map<string, Reference>,
+  planned: ReadonlyMap<string, PlannedSetRow>,
+): ExerciseView[] {
   const rows = new Map<string, ExerciseView>();
   const ordered = sets.toSorted(
     (a, b) => a.block.localeCompare(b.block) || a.sheetRow - b.sheetRow || a.setNo - b.setNo,
   );
+  const setsOf = new Map<string, SetRef[]>();
   for (const s of ordered) {
     const key = rowKey(s);
+    setsOf.set(key, [...(setsOf.get(key) ?? []), { row: s.sheetRow, set: s.setNo }]);
     if (!rows.has(key)) {
+      const suggestion = planned.get(plannedKey(s));
       rows.set(key, {
         key,
         name: s.name,
@@ -169,16 +191,20 @@ function exercisesOf(sets: readonly PrescribedSetRow[], refs: Map<string, Refere
         bodyweight: s.bodyweight,
         kg: s.loggedKg,
         reference: refs.get(key) ?? null,
+        row: s.sheetRow,
+        suggestedKg: suggestion?.suggestedKg ?? null,
+        suggestionBasis: suggestion?.basis ?? null,
+        sets: [],
       });
     }
   }
-  return [...rows.values()];
+  return [...rows.values()].map((r) => ({ ...r, sets: setsOf.get(r.key) ?? [] }));
 }
 
 type DoneRow = StrengthSessionRow & { readonly date: IsoDate };
 
 /** This ISO week's strength (see StrengthWeek). Rows of other weeks are ignored. */
-export function strengthWeek(data: TodayPlanData, today: IsoDate): StrengthWeek {
+export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWeek {
   const week = data.sessions.filter((r) => r.weekStart === data.weekStart);
   const planned = week.filter((r) => r.block !== null);
   const done: DoneSession[] = week
@@ -203,6 +229,12 @@ export function strengthWeek(data: TodayPlanData, today: IsoDate): StrengthWeek 
   if (slot === undefined || slot.block === null || slot.week === null) {
     return { ...base, state: "all_done", next: null };
   }
+  const sessionSets = data.sets.filter((s) => s.weekStart === data.weekStart && s.session === slot.session);
+  const exercises = exercisesOf(
+    sessionSets,
+    references(data.previousWeek),
+    new Map(data.plannedSets.map((p) => [plannedKey(p), p])),
+  );
   return {
     ...base,
     state: "next",
@@ -211,15 +243,14 @@ export function strengthWeek(data: TodayPlanData, today: IsoDate): StrengthWeek 
       of: planned.length,
       block: slot.block,
       week: slot.week,
-      exercises: exercisesOf(
-        data.sets.filter((s) => s.weekStart === data.weekStart && s.session === slot.session),
-        references(data.previousWeek),
-      ),
+      exercises,
+      order: sessionOrder(exercises.flatMap((e) => e.sets)),
+      log: data.setLog.filter((l) => l.date === today && l.session === slot.session),
     },
   };
 }
 
-function nextDay(data: TodayPlanData, today: IsoDate): NextDay | null {
+function nextDay(data: TrainingPlanData, today: IsoDate): NextDay | null {
   const dates = data.upcomingRides.map((r) => r.date).filter((d) => d > today);
   if (dates.length === 0) return null;
   const date = dates.reduce((a, b) => (b < a ? b : a));
@@ -228,7 +259,7 @@ function nextDay(data: TodayPlanData, today: IsoDate): NextDay | null {
 }
 
 /** The form line from the latest daily_load row (null when there is none). */
-export function todayHeader(latest: DailyLoadRow | null, now: Date): TodayHeader | null {
+export function trainingHeader(latest: DailyLoadRow | null, now: Date): TrainingHeader | null {
   return latest === null
     ? null
     : {
@@ -239,7 +270,7 @@ export function todayHeader(latest: DailyLoadRow | null, now: Date): TodayHeader
       };
 }
 
-export function buildTodayPlan(data: TodayPlanData, today: IsoDate): TodayPlan {
+export function buildTrainingPlan(data: TrainingPlanData, today: IsoDate): TrainingPlan {
   const strength = strengthWeek(data, today);
   const rides: RideView[] = data.rides.map((r) => ({
     name: r.name,

@@ -6,7 +6,7 @@ import {
   formatWatts,
   spokenRange,
 } from "@/lib/format";
-import type { RideView } from "@/lib/today-view";
+import type { RideView } from "@/lib/training-view";
 
 import { Card } from "./Card";
 import { EmptyState } from "./EmptyState";

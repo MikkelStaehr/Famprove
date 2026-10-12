@@ -11,7 +11,7 @@ import { LIFT_NAME, LIFTS } from "@/lib/lifts";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { loadStrengthAnalysis } from "@/lib/db/queries";
 import { formatUpdatedAt } from "@/lib/format";
-import { resolveToday } from "@/lib/today-view";
+import { resolveToday } from "@/lib/training-view";
 
 export const metadata: Metadata = { title: "Analyse · Styrke" };
 

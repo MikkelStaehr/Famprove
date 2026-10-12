@@ -30,7 +30,7 @@ import {
   TSS_PER_DAY,
 } from "@/lib/format";
 import { COARSE_ZONES_NOTE, prognoseSentence, STRENGTH_ESTIMATE_NOTE, typicalRidesNote } from "@/lib/prognose-text";
-import { resolveToday } from "@/lib/today-view";
+import { resolveToday } from "@/lib/training-view";
 import { zoneReading } from "@/lib/zone-scale";
 
 export const metadata: Metadata = {

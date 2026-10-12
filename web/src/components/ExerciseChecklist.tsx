@@ -2,12 +2,12 @@
 
 import type { IsoDate } from "@/lib/db/rows";
 import { formatSetLoad, formatSetsReps, prescriptionKg, spokenExercise } from "@/lib/format";
-import type { ExerciseView } from "@/lib/today-view";
+import type { ExerciseView } from "@/lib/training-view";
 
 import { tickKey, useTicks } from "./TickProvider";
 
 /**
- * Today's sheet rows as tick rows (DESIGN.md › Today › Tick rows, Part B › NÆSTE slab). Each row
+ * Træning's sheet rows as tick rows (DESIGN.md › Træning › Tick rows, Part B › NÆSTE slab). Each row
  * is a <label> wrapping a native, controlled checkbox, so the whole row is the target and Space
  * toggles it. Visible text is exactly as written in the sheet; the accessible name is one
  * sr-only sentence ("Squat, 1 sæt af 3 reps ved RPE 5, 140 kg, sidste uge 137,5 kg") and the visual copy

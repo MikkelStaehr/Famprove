@@ -740,9 +740,9 @@ export function parseProjectionRow(raw: unknown): DailyProjectionRow {
   };
 }
 
-// --- Today screen ------------------------------------------------------------------------
+// --- Træning screen ------------------------------------------------------------------------
 
-/** One prescribed set of the coach's sheet (plan + what was logged), for the Today screen. */
+/** One prescribed set of the coach's sheet (plan + what was logged), for the Træning screen. */
 export type PrescribedSetRow = {
   readonly weekStart: IsoDate; // Monday of the ISO week
   readonly session: number; // 1..N within the ISO week; never a weekday

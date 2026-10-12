@@ -155,7 +155,7 @@ export function formatWeekParam(param: string, year: number): string {
   return Number(match[1]) === year ? week : `${week} ${match[1]}`;
 }
 
-// --- Today screen ------------------------------------------------------------------------
+// --- Træning screen ------------------------------------------------------------------------
 
 /**
  * Whole-number range with an en dash and no spaces: (225, 250) -> "225–250". Ends that round

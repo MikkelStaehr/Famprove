@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDay, stopAfter } from "@/lib/format";
-import type { DoneSession, StrengthSession, StrengthWeek } from "@/lib/today-view";
+import type { DoneSession, StrengthSession, StrengthWeek } from "@/lib/training-view";
 
 import { Card } from "./Card";
 import { ExerciseList, TickProgress, TickSegments } from "./ExerciseChecklist";
@@ -10,7 +10,7 @@ import { ActivityWords, hasActivityWords } from "./MovingTime";
 
 type StrengthCardProps = {
   readonly id: string;
-  /** Today; the tick key date for the rows of the next session. */
+  /** The screen's date; the tick key date for the rows of the next session. */
   readonly date: IsoDate;
   readonly strength: StrengthWeek;
 };
