@@ -1,38 +1,31 @@
 import type { ReactNode } from "react";
 
-import type { IsoDate } from "@/lib/db/rows";
 import { formatDay, stopAfter } from "@/lib/format";
 import type { DoneSession, StrengthSession, StrengthWeek } from "@/lib/training-view";
 
 import { Card } from "./Card";
-import { ExerciseList, TickProgress, TickSegments } from "./ExerciseChecklist";
+import { SaveNotes, SetChecklist, SetCount, SetSegments } from "./SetChecklist";
 import { ActivityWords, hasActivityWords } from "./MovingTime";
 
 type StrengthCardProps = {
   readonly id: string;
-  /** The screen's date; the tick key date for the rows of the next session. */
-  readonly date: IsoDate;
   readonly strength: StrengthWeek;
 };
 
 /**
- * This ISO week's strength (spec today.md §3a): what's done so far, then the next session
- * (k + 1 of N, no date: it has none until it's done), or that the week is done / has no program.
+ * This ISO week's strength (spec traening.md §3.3, §5): what's done so far, then the next
+ * session's sets (k + 1 of N, no date: it has none until it's done), or that the week is done /
+ * has no program. The session line and identity sit in the page header (SessionBlock); the
+ * per-set parts read the set log from SetLogProvider, which the page puts around the card.
  */
-export function StrengthCard({ id, date, strength }: StrengthCardProps) {
+export function StrengthCard({ id, strength }: StrengthCardProps) {
   const next = strength.state === "next" ? strength.next : null;
-  const rowKeys = next?.exercises.map((e) => e.key) ?? [];
   return (
-    <Card
-      id={id}
-      variant="session"
-      title="Styrke"
-      action={next !== null ? <TickProgress date={date} rowKeys={rowKeys} /> : undefined}
-    >
-      {next !== null && <TickSegments date={date} rowKeys={rowKeys} />}
+    <Card id={id} variant="session" title="Styrke" action={next !== null ? <SetCount /> : undefined}>
+      {next !== null && <SetSegments />}
       {strength.done.length > 0 && <DoneList done={strength.done} />}
       {next !== null ? (
-        <NextSession date={date} session={next} />
+        <NextSession session={next} />
       ) : strength.state === "all_done" ? (
         <WeekNote
           title={
@@ -103,26 +96,18 @@ function DoneMark() {
   );
 }
 
-/** The next session to do, with the rows to tick exactly as written in the sheet. */
-function NextSession({ date, session }: { readonly date: IsoDate; readonly session: StrengthSession }) {
+/** The next session's sets, as written in the sheet, each with its own tick. */
+function NextSession({ session }: { readonly session: StrengthSession }) {
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <h3 className="text-20 font-bold">
-          Session {session.session} af {session.of} i denne uge
-        </h3>
-        <p className="text-16">
-          {session.block} · uge {session.week}
-        </p>
-        {session.week === 1 && (
-          <p className="text-14 text-text-muted">
-            Uge 1 i blokken: ingen kg fra sidste uge at sammenligne med endnu.
-          </p>
-        )}
-      </div>
-      <ExerciseList date={date} session={session.session} week={session.week} exercises={session.exercises} />
+      {session.week === 1 && (
+        <p className="text-14 text-text-muted">Uge 1 i blokken: ingen kg fra sidste uge at sammenligne med endnu.</p>
+      )}
+      <SetChecklist />
+      <SaveNotes />
       <p className="text-14 text-text-muted">
-        Flueben forsvinder, når siden genindlæses; start og slut pr. øvelse gemmes. Log kg i arket.
+        Forslag er et skøn ud fra din e1RM og RPE, ikke trænerens tal. Hvert sæt gemmes, når du sætter flueben; kg
+        logger du i arket.
       </p>
     </>
   );

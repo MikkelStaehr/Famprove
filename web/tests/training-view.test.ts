@@ -95,6 +95,7 @@ function data(overrides: Partial<TrainingPlanData>): TrainingPlanData {
     upcomingRides: [],
     plannedSets: [],
     setLog: [],
+    setLogFailed: false,
     ...overrides,
   };
 }

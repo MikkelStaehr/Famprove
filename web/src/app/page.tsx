@@ -4,10 +4,13 @@ import { connection } from "next/server";
 import { ErrorState } from "@/components/ErrorState";
 import { RestCard } from "@/components/RestCard";
 import { RideCard } from "@/components/RideCard";
+import { SessionBlock } from "@/components/SessionBlock";
+import { SetLogProvider } from "@/components/SetLogProvider";
 import { StrengthCard } from "@/components/StrengthCard";
 import { UpdatedLine } from "@/components/UpdatedLine";
-import { ZoneBar, ZoneBarError } from "@/components/ZoneBar";
+import { ZoneBarError, ZoneFlagRow } from "@/components/ZoneBar";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
+import { devFixture } from "@/lib/db/dev-fixture";
 import { loadTrainingForm, loadTrainingPlan, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDay, formatUpdatedAt } from "@/lib/format";
@@ -20,7 +23,7 @@ import {
 } from "@/lib/training-view";
 
 export const metadata: Metadata = {
-  title: "I dag · Belastning",
+  title: "Træning",
 };
 
 type Failed = { readonly kind: "error"; readonly error: DataError; readonly at: Date };
@@ -37,7 +40,7 @@ async function loadFormState(today: IsoDate, now: Date): Promise<FormState> {
     return { kind: "ready", header: trainingHeader(await loadTrainingForm(today), now) };
   } catch (error) {
     if (isDataError(error)) {
-      console.error("today: loading form failed", error);
+      console.error("træning: loading form failed", error);
       return { kind: "error", error, at: new Date() };
     }
     throw error;
@@ -49,25 +52,31 @@ async function loadPlanState(today: IsoDate): Promise<PlanState> {
     return { kind: "ready", plan: buildTrainingPlan(await loadTrainingPlan(today), today) };
   } catch (error) {
     if (isDataError(error)) {
-      console.error("today: loading plan failed", error);
+      console.error("træning: loading plan failed", error);
       return { kind: "error", error, at: new Date() };
     }
     throw error;
   }
 }
 
-/** `/`: "What am I doing in this session, and how hard?" (design/specs/today.md). */
+/** Under `next dev` with DEV_TODAY or DEV_FIXTURE taps are not saved (lib/db/set-log.ts says so too). */
+function devSwitchesOn(): boolean {
+  return process.env.NODE_ENV === "development" && (Boolean(process.env.DEV_TODAY) || devFixture() !== null);
+}
+
+/** `/`: "What is my session, and how fresh am I for it?" (design/specs/traening.md §3). */
 export default async function TrainingPage() {
   await connection(); // request time: "today" is the Copenhagen date now, never the build's
   const now = new Date();
   const today = resolveToday(now, process.env);
   const [form, plan] = await Promise.all([loadFormState(today, now), loadPlanState(today)]);
   const header = form.kind === "ready" ? form.header : null;
-  return (
+  const session = plan.kind === "ready" && plan.plan.strength.state === "next" ? plan.plan.strength.next : null;
+  const page = (
     <>
       <header className="flex flex-col">
         <h1 className="flex flex-wrap items-baseline gap-x-3">
-          <span className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">I dag</span>
+          <span className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">Træning</span>
           <span className="sr-only">, </span>
           <time dateTime={today} className="text-16 font-medium text-text-muted">
             {formatDay(today)}
@@ -86,18 +95,26 @@ export default async function TrainingPage() {
           {form.kind === "error" ? (
             <ZoneBarError retry={plan.kind !== "error"} />
           ) : (
-            <ZoneBar header={form.header} today={today} size="compact" />
+            <ZoneFlagRow header={form.header} today={today} />
           )}
         </div>
+        {session !== null && <SessionBlock />}
       </header>
       {plan.kind === "error" ? <PlanError error={plan.error} at={plan.at} /> : <DayCards plan={plan.plan} />}
     </>
+  );
+  return session === null ? (
+    page
+  ) : (
+    <SetLogProvider session={session} date={today} devSwitches={devSwitchesOn()}>
+      {page}
+    </SetLogProvider>
   );
 }
 
 /**
  * Ride card(s) first (short, so a strength list can't push them out of sight), then this ISO
- * week's strength (every state of spec §3a, including "no program"), then the Rest card when no
+ * week's strength (every state of spec §5, including "no program"), then the Rest card when no
  * ride is planned today and no strength session is left.
  */
 function DayCards({ plan }: { readonly plan: TrainingPlan }) {
@@ -106,7 +123,7 @@ function DayCards({ plan }: { readonly plan: TrainingPlan }) {
       {plan.rides.map((ride, i) => (
         <RideCard key={`ride-${i}`} id={`ride-${i + 1}`} ride={ride} />
       ))}
-      <StrengthCard id="strength" date={plan.date} strength={plan.strength} />
+      <StrengthCard id="strength" strength={plan.strength} />
       {plan.kind === "rest" && (
         <RestCard next={plan.next} lookaheadDays={NEXT_SESSION_DAYS} doneToday={plan.doneToday} />
       )}
@@ -117,7 +134,7 @@ function DayCards({ plan }: { readonly plan: TrainingPlan }) {
 function PlanError({ error, at }: { readonly error: DataError; readonly at: Date }) {
   return (
     <ErrorState
-      title="Kunne ikke hente dagens plan"
+      title="Kunne ikke hente dagens træning"
       what={describeDataError(error)}
       detail={error.message}
       at={{ iso: at.toISOString(), text: formatUpdatedAt(at.toISOString()) }}

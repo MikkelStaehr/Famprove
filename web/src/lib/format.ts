@@ -80,6 +80,19 @@ export function formatUpdatedAt(computedAt: string): string {
   return `${UPDATED_DATE_FORMAT.format(at)} kl. ${UPDATED_TIME_FORMAT.format(at)}`;
 }
 
+/** A tap's time (ISO timestamptz) as a clock time in LOCAL_TZ: "kl. 18.42". */
+export function formatClock(at: string): string {
+  return `kl. ${UPDATED_TIME_FORMAT.format(new Date(at))}`;
+}
+
+/** A signed whole number written out for screen readers: 4 -> "plus 4", −24 -> "minus 24", 0 -> "0". */
+export function spokenSigned(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded > 0) return `plus ${rounded}`;
+  if (rounded < 0) return `minus ${Math.abs(rounded)}`;
+  return "0";
+}
+
 const KG_FORMAT = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
 
 /** Seconds as h:mm, rounded to the minute: 3720 -> "1:02", 2700 -> "0:45". */

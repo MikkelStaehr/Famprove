@@ -16,7 +16,19 @@ import type {
   StrengthSessionRow,
   SuggestionBasis,
 } from "./db/rows.ts";
-import { type LoggedSet, sessionOrder, type SetRef } from "./set-taps.ts";
+import { formatClock, formatKg, formatSetLoad, formatSetsReps, spokenRange, spokenSigned } from "./format.ts";
+import {
+  firstOpen,
+  type LoggedSet,
+  progress,
+  type Progress,
+  sessionOrder,
+  setKey,
+  type SetRef,
+  type SetState,
+  stateOf,
+} from "./set-taps.ts";
+import type { ZoneKey } from "./zone-scale.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
 
@@ -81,6 +93,7 @@ export type StrengthSession = {
   readonly order: readonly SetRef[]; // every set of the session in the sheet's order
   /** The session's logged sets today (exercise_set_log), read back so progress survives a reload. */
   readonly log: readonly LoggedSet[];
+  readonly logFailed: boolean; // the log couldn't be read: shown as open, with a warning (§5)
 };
 
 /** A strength activity logged this ISO week (the n-th is session n). */
@@ -246,6 +259,7 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
       exercises,
       order: sessionOrder(exercises.flatMap((e) => e.sets)),
       log: data.setLog.filter((l) => l.date === today && l.session === slot.session),
+      logFailed: data.setLogFailed,
     },
   };
 }
@@ -284,4 +298,171 @@ export function buildTrainingPlan(data: TrainingPlanData, today: IsoDate): Train
   const kind = left && rides.length > 0 ? "both" : left ? "strength" : rides.length > 0 ? "ride" : "rest";
   const doneToday = strength.done.some((d) => d.isToday);
   return { date: today, kind, strength, doneToday, rides, next: nextDay(data, today) };
+}
+
+// --- Træning overview: header and set list (spec traening.md §3, §6) ------------------------
+
+/** The one-line hint under the TSB flag, per zone (spec §6). Shown as written, no full stop. */
+export const TSB_HINT: Readonly<Record<ZoneKey, string>> = {
+  high_risk: "Meget træt: forvent at ligge klart under",
+  optimal: "Forvent at ligge lidt under",
+  grey_zone: "Forvent dit normale niveau",
+  fresh: "Frisk: forvent at ligge på niveau eller over",
+  transition: "Meget frisk, men fitness er på vej ned",
+};
+
+const ZONE_WORD: Readonly<Record<ZoneKey, string>> = {
+  high_risk: "høj risiko",
+  optimal: "optimal",
+  grey_zone: "gråzone",
+  fresh: "frisk",
+  transition: "overgang",
+};
+
+/**
+ * The form row's sr-only sentence: "Form minus 24 TSS per dag, optimal. Forvent at ligge lidt
+ * under." Without a zone: "Form plus 4 TSS per dag. Zone ikke beregnet." `fromDate` is the
+ * spoken date when the row is not today's ("søndag 27. september").
+ */
+export function formSentence(tsb: number, zone: ZoneKey | null, fromDate?: string): string {
+  const value = `Form ${spokenSigned(tsb)} TSS per dag`;
+  const parts = [zone === null ? `${value}. Zone ikke beregnet.` : `${value}, ${ZONE_WORD[zone]}. ${TSB_HINT[zone]}.`];
+  if (fromDate !== undefined) parts.push(`Tallet er fra ${fromDate}.`);
+  return parts.join(" ");
+}
+
+/** Why a row has no suggestion (spec §6); a missing planned_sets row has no reason. */
+const NO_SUGGESTION: Readonly<Record<Exclude<SuggestionBasis, "rpe_e1rm">, string>> = {
+  not_rpe: "Intet forslag til %-sæt",
+  no_e1rm: "Intet forslag: ingen e1RM endnu",
+  no_lift: "Intet forslag til denne øvelse",
+};
+
+/** Python's suggested kg ("142,5 kg"), or the words for its absence. "0 kg" never shows. */
+export type SuggestionView = { readonly kg: string } | { readonly kg: null; readonly words: string };
+
+export function suggestionView(e: Pick<ExerciseView, "suggestedKg" | "suggestionBasis">): SuggestionView {
+  if (e.suggestedKg !== null && e.suggestedKg > 0) return { kg: `${formatKg(e.suggestedKg)} kg` };
+  const basis = e.suggestionBasis;
+  return { kg: null, words: basis === null || basis === "rpe_e1rm" ? "Intet forslag" : NO_SUGGESTION[basis] };
+}
+
+/** Last week's logged load: undefined in week 1 (no item), null when nothing was logged. */
+export function lastWeekText(e: Pick<ExerciseView, "reference">, week: number): string | null | undefined {
+  if (week < 2) return undefined;
+  return e.reference === null ? null : formatSetLoad(e.reference.kg, e.reference.bodyweight);
+}
+
+/** The reps cell with its word, as written: "5 reps", "8 - 12 reps", "1 rep"; null when blank. */
+export function repsText(e: Pick<ExerciseView, "repsText">): string | null {
+  return e.repsText === null ? null : formatSetsReps(null, e.repsText);
+}
+
+export type SetLineView = {
+  readonly ref: SetRef;
+  readonly n: number; // 1-based position in its sheet row
+  readonly of: number;
+  readonly state: SetState;
+  readonly endedAt: string | null; // a done set's end
+  readonly next: boolean; // the first open set of the session (the Næste tag)
+};
+
+export type SetGroupView = {
+  readonly exercise: ExerciseView;
+  readonly showName: boolean; // first group of a run, or the slab group
+  readonly nameMuted: boolean; // every set of the run is done or skipped
+  readonly closed: boolean; // every set of this group is done or skipped
+  readonly slab: boolean; // holds the first open set (NÆSTE)
+  readonly dividerBefore: boolean; // between runs, unless the slab touches it
+  readonly sets: readonly SetLineView[];
+};
+
+export type ChecklistView = {
+  readonly groups: readonly SetGroupView[];
+  readonly progress: Progress;
+  readonly segments: readonly SetState[]; // by position in the session's order
+  readonly first: SetRef | null; // the first open set; null when every set is done or skipped
+  /** The header's primary action: none touched, some touched, or every set closed. */
+  readonly primary: "begin" | "continue" | "finished";
+};
+
+/**
+ * The strength card's list from the sheet rows and the set log: one group per sheet row, runs of
+ * the same trimmed name, the NÆSTE group (the one holding the first open set; skipped sets are not
+ * open), and the counts. Pure: the log decides every state, nothing is reordered.
+ */
+export function checklistView(
+  exercises: readonly ExerciseView[],
+  order: readonly SetRef[],
+  log: ReadonlyMap<string, LoggedSet>,
+): ChecklistView {
+  const first = firstOpen(order, log);
+  const closed = (refs: readonly SetRef[]) => refs.every((r) => stateOf(log.get(setKey(r))) !== "open");
+  const isSlab = (e: ExerciseView) => first !== null && e.sets.some((r) => r.row === first.row && r.set === first.set);
+  const groups = exercises.map((e, i): SetGroupView => {
+    const name = e.name.trim();
+    const runStart = i === 0 || exercises[i - 1].name.trim() !== name;
+    let start = i;
+    while (start > 0 && exercises[start - 1].name.trim() === name) start -= 1;
+    let end = i + 1;
+    while (end < exercises.length && exercises[end].name.trim() === name) end += 1;
+    const slab = isSlab(e);
+    return {
+      exercise: e,
+      showName: runStart || slab,
+      nameMuted: closed(exercises.slice(start, end).flatMap((x) => x.sets)),
+      closed: closed(e.sets),
+      slab,
+      dividerBefore: runStart && i > 0 && !slab && !isSlab(exercises[i - 1]),
+      sets: e.sets.map((ref, n) => {
+        const logged = log.get(setKey(ref));
+        const state = stateOf(logged);
+        return {
+          ref,
+          n: n + 1,
+          of: e.sets.length,
+          state,
+          endedAt: state === "done" ? (logged?.endedAt ?? null) : null,
+          next: first !== null && ref.row === first.row && ref.set === first.set,
+        };
+      }),
+    };
+  });
+  const p = progress(order, log);
+  return {
+    groups,
+    progress: p,
+    segments: order.map((r) => stateOf(log.get(setKey(r)))),
+    first,
+    primary: first === null ? "finished" : p.done + p.skipped > 0 ? "continue" : "begin",
+  };
+}
+
+/** A done set's status: "kl. 18.42". */
+export function setStatus(line: Pick<SetLineView, "state" | "endedAt">): string | null {
+  if (line.state === "skipped") return "sprunget over";
+  return line.state === "done" && line.endedAt !== null ? formatClock(line.endedAt) : null;
+}
+
+/**
+ * One set line's accessible name (spec §3.3, §6): "Squat, sæt 1 af 2, 5 reps ved RPE 7, forslag
+ * 142,5 kg, sidste uge 140 kg" + ", udført kl. 18.42" / ", sprunget over" / ", næste". Sheet
+ * ranges are spoken " til "; week 1 has no last-week part.
+ */
+export function spokenSetLine(e: ExerciseView, week: number, line: SetLineView): string {
+  const reps = repsText(e);
+  const spokenReps = reps === null ? null : spokenRange(reps);
+  const load = e.prescribed === null ? null : spokenRange(e.prescribed);
+  const what = spokenReps !== null && load !== null ? `${spokenReps} ved ${load}` : (spokenReps ?? load);
+  const parts = [e.name.trim(), `sæt ${line.n} af ${line.of}`];
+  if (what !== null) parts.push(what);
+  const suggestion = suggestionView(e);
+  parts.push(suggestion.kg !== null ? `forslag ${suggestion.kg}` : "intet forslag");
+  const lastWeek = lastWeekText(e, week);
+  if (lastWeek === null) parts.push("intet logget sidste uge");
+  else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);
+  if (line.state === "done") parts.push(line.endedAt !== null ? `udført ${formatClock(line.endedAt)}` : "udført");
+  else if (line.state === "skipped") parts.push("sprunget over");
+  else if (line.next) parts.push("næste");
+  return parts.join(", ");
 }

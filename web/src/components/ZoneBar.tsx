@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { IsoDate } from "@/lib/db/rows";
-import { formatDay, formatDayLong, formatSigned } from "@/lib/format";
-import type { TrainingHeader } from "@/lib/training-view";
+import { formatDay, formatDayLong, formatSigned, stopAfter } from "@/lib/format";
+import { formSentence, type TrainingHeader, TSB_HINT } from "@/lib/training-view";
 import { BANDS, isZoneKey, pinned, position, THRESHOLDS, type ZoneKey, ZONE_FILL, zoneSentence } from "@/lib/zone-scale";
 
 /**
@@ -93,6 +93,46 @@ export function ZoneBar({ header, today, size }: ZoneBarProps) {
         <Thresholds />
         {zoneKey === null && <p className="mt-1 text-14 text-text-muted">Zone ikke beregnet.</p>}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Træning's form row (spec traening.md §3.1.3): the zone flag on its own (compact, prefixed
+ * "TSB", no bands, notch or marker) and the zone's one-line hint, plus "Tallet er fra …" when the
+ * latest row is not today's. One sr-only sentence carries all of it; the visual copy is hidden.
+ */
+export function ZoneFlagRow({ header, today }: { readonly header: TrainingHeader | null; readonly today: IsoDate }) {
+  if (header === null) return <p className="text-16 text-text-muted">Form (TSB) er ikke beregnet endnu.</p>;
+  const zoneKey = header.zone !== null && isZoneKey(header.zone.key) ? header.zone.key : null;
+  const notToday = header.date !== today;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p className="sr-only">{formSentence(header.tsb, zoneKey, notToday ? formatDayLong(header.date) : undefined)}</p>
+      <span
+        aria-hidden="true"
+        className="inline-flex min-h-8 max-w-full flex-wrap items-center rounded-pill bg-slab px-3 py-1 text-on-slab"
+      >
+        <span className="text-14 font-bold tracking-[0.04em] text-on-slab-muted uppercase">TSB</span>
+        <span className="ml-1.5 font-display text-24 font-extrabold whitespace-nowrap tabular-nums italic">
+          {formatSigned(header.tsb)}
+        </span>
+        {zoneKey !== null && header.zone !== null && (
+          <span className="ml-2 inline-flex items-center whitespace-nowrap">
+            <span className={`size-3 shrink-0 rounded-mark ring-[1.5px] ring-on-slab ${ZONE_FILL[zoneKey]}`} />
+            <span className="ml-1.5 text-14 font-bold tracking-[0.04em] uppercase">{header.zone.label}</span>
+          </span>
+        )}
+      </span>
+      <p aria-hidden="true" className={`text-16 font-medium ${zoneKey === null ? "text-text-muted" : ""}`}>
+        {zoneKey === null ? "Zone ikke beregnet." : TSB_HINT[zoneKey]}
+      </p>
+      {notToday && (
+        <p aria-hidden="true" className="text-14 font-semibold">
+          Tallet er fra <time dateTime={header.date}>{formatDay(header.date)}</time>
+          {stopAfter(formatDay(header.date))}
+        </p>
+      )}
     </div>
   );
 }

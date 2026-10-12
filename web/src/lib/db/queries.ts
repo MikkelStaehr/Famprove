@@ -197,6 +197,7 @@ export type TrainingPlanData = {
   readonly upcomingRides: readonly PlannedTargetRow[]; // planned rides in (today, today + 28]
   readonly plannedSets: readonly PlannedSetRow[]; // suggested kg per set, this ISO week (Python)
   readonly setLog: readonly SetLogRow[]; // today's logged sets, every session (exercise_set_log)
+  readonly setLogFailed: boolean; // the set log couldn't be read: sets show as open, with a warning
 };
 
 /**
@@ -221,6 +222,7 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
       upcomingRides: [],
       plannedSets: [],
       setLog: [],
+      setLogFailed: false,
     };
   }
   const db = client();
@@ -262,7 +264,16 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
       { ...PLANNED_SETS_SELECT, filters: [["week_start", `eq.${weekStart}`]] },
       parsePlannedSetRow,
     ),
-    selectAll(db, SET_LOG_SELECT.table, { ...SET_LOG_SELECT, filters: [["date", `eq.${today}`]] }, parseSetLogRow),
+    // The set log is read on its own: if it fails, the plan still shows (every set open, a
+    // warning) instead of the whole screen failing (spec traening.md §5).
+    selectAll(db, SET_LOG_SELECT.table, { ...SET_LOG_SELECT, filters: [["date", `eq.${today}`]] }, parseSetLogRow).then(
+      (rows): readonly SetLogRow[] | null => rows,
+      (error: unknown) => {
+        if (!isDataError(error)) throw error;
+        console.error("training: reading the set log failed", error);
+        return null;
+      },
+    ),
   ]);
   // Last week's sets of the same tab(s): one query per (tab, week - 1). Tab names come from
   // this week's rows (server data) and go through URLSearchParams as eq. values.
@@ -290,7 +301,8 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     rides,
     upcomingRides,
     plannedSets,
-    setLog: fixture === "midsession" ? midsessionLog(sets, today, new Date()) : setLog,
+    setLog: fixture === "midsession" ? midsessionLog(sets, today, new Date()) : (setLog ?? []),
+    setLogFailed: setLog === null,
   };
 }
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/", label: "I dag" },
+  { href: "/", label: "Træning" },
   { href: "/load", label: "Belastning" },
   { href: "/analyse", label: "Analyse" },
 ] as const;
@@ -16,12 +16,15 @@ function isCurrent(pathname: string, href: string): boolean {
 /**
  * DESIGN.md ScreenNav (Part B): a --track pill with three tabs, not sticky. The current tab has
  * aria-current="page", a --text fill with --bg text and weight 700: fill and weight, never
- * colour alone (and deliberately not --slab).
+ * colour alone (and deliberately not --slab). It renders its own <header> and nothing at all on
+ * /fokus (a full-screen mode whose only exit is Afslut, spec traening.md §2).
  */
 export function ScreenNav() {
   const pathname = usePathname();
+  if (pathname === "/fokus" || pathname.startsWith("/fokus/")) return null;
   return (
-    <nav aria-label="Hovedmenu">
+    <header className="mx-auto w-full max-w-content px-3 pt-3 pb-1">
+      <nav aria-label="Hovedmenu">
       <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-1 rounded-pill bg-track p-1">
         {TABS.map((tab) => {
           const current = isCurrent(pathname, tab.href);
@@ -40,6 +43,7 @@ export function ScreenNav() {
           );
         })}
       </ul>
-    </nav>
+      </nav>
+    </header>
   );
 }

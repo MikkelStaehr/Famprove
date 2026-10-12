@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
 
 import { ScreenNav } from "@/components/ScreenNav";
-import { TickProvider } from "@/components/TickProvider";
 
 import "./globals.css";
 
@@ -31,17 +30,17 @@ const barlowCondensed = Barlow_Condensed({
   display: "swap",
 });
 
-/** The nav sits outside the pages, so it also shows while a page loads or fails. Not sticky. */
+/**
+ * The nav sits outside the pages, so it also shows while a page loads or fails. Not sticky, and
+ * absent on /fokus (ScreenNav renders nothing there). Its header ends with 4px, so the page's
+ * title is 16px under the nav and Fokus's top bar 12px from the top.
+ */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="da" className={`${barlow.variable} ${barlowCondensed.variable}`}>
       <body className="bg-bg font-sans text-16 text-text antialiased">
-        <header className="mx-auto w-full max-w-content px-3 pt-3">
-          <ScreenNav />
-        </header>
-        <main className="mx-auto flex w-full max-w-content flex-col gap-4 px-3 pt-4 pb-12">
-          <TickProvider>{children}</TickProvider>
-        </main>
+        <ScreenNav />
+        <main className="mx-auto flex w-full max-w-content flex-col gap-4 px-3 pt-3 pb-12">{children}</main>
       </body>
     </html>
   );

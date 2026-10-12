@@ -25,9 +25,11 @@ import {
 export type SetLog = {
   readonly log: ReadonlyMap<string, LoggedSet>;
   readonly tap: (kind: SetTapKind, ref: SetRef) => void;
-  readonly unsaved: number; // taps whose save failed, waiting for retry
+  readonly unsaved: number; // sets with a tap whose save failed, waiting for retry
   readonly retry: () => void;
   readonly dev: boolean; // the dev switches are on: nothing is saved
+  /** Resolves when every queued save has been sent (before leaving a screen). */
+  readonly flush: () => Promise<void>;
 };
 
 export function useSetLog(
@@ -73,5 +75,9 @@ export function useSetLog(
     });
   }, [send]);
 
-  return { log, tap, unsaved: failed.length, retry, dev };
+  const flush = useCallback(() => queue.current, []);
+
+  const unsaved = new Set(failed.map((f) => setKey(f))).size;
+
+  return { log, tap, unsaved, retry, dev, flush };
 }
