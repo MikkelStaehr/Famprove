@@ -18,27 +18,19 @@ export function useElapsed(since: string): number {
 }
 
 /**
- * The count-up clock (traening.md §4.3, fokus-pause.md §2.2, §3.2). The digits never animate
- * and are never announced (role timer, aria-live off). The server's and the browser's clocks
- * differ by a moment, so the first text may be replaced on hydration (suppressHydrationWarning).
- * `positive`: the recommended rest is reached (the band line under it says so in words).
+ * The count-up clock (traening.md §4.3, fokus-pause.md §2.2, §3.2). The digits never animate,
+ * never change colour (fokus-instrument.md §4.3) and are never announced (role timer, aria-live
+ * off). The server's and the browser's clocks differ by a moment, so the first text may be
+ * replaced on hydration (suppressHydrationWarning).
  */
-export function RestTimer({
-  seconds,
-  label,
-  positive = false,
-}: {
-  readonly seconds: number;
-  readonly label: "Pause" | "Opvarmning";
-  readonly positive?: boolean;
-}) {
+export function RestTimer({ seconds, label }: { readonly seconds: number; readonly label: "Pause" | "Opvarmning" }) {
   return (
     <p
       role="timer"
       aria-live="off"
       aria-label={label}
       suppressHydrationWarning
-      className={`font-display text-56 leading-none font-extrabold tabular-nums italic ${positive ? "text-positive" : "text-text"}`}
+      className="font-mono text-56 leading-none font-normal text-text tabular-nums"
     >
       {formatTimer(seconds)}
     </p>

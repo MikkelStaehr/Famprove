@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-
 /**
- * Fokus's skeleton (§5): the real Afslut link, a count bar, the 8px progress track, the empty
- * 44px last-tap row, a --track card in the set card's shape (name bar, two 56px bars, the 64px
- * Udført pill) and the 48px Spring over pill. Pulses only under motion-safe.
+ * Fokus's skeleton (§5, fokus-instrument.md §6): the real Afslut link, then hairlines and 1px
+ * --text-muted placeholder rules where the count, the barcode, the name, the figures, Udført and
+ * Spring over will be. No grey blocks, no shimmer.
  */
 export default function Loading() {
+  const rule = "block h-px bg-text-muted";
   return (
     <div className="mx-auto flex w-full max-w-phone flex-col">
       <h1 className="sr-only">Fokus</h1>
@@ -16,24 +16,22 @@ export default function Loading() {
       <div className="flex items-center justify-between gap-3">
         <Link
           href="/"
-          className="inline-flex min-h-11 shrink-0 items-center rounded-pill border-2 border-text-muted px-4 text-16 font-semibold text-text"
+          className="inline-flex min-h-11 shrink-0 items-center font-mono text-16 font-medium text-text underline decoration-1 underline-offset-4"
         >
           Afslut
         </Link>
-        <span aria-hidden="true" className="block h-lh w-2/5 rounded-mark bg-track text-24 motion-safe:animate-pulse" />
+        <span aria-hidden="true" className={`${rule} w-2/5`} />
       </div>
       <div aria-hidden="true" className="flex flex-col">
-        <span className="mt-3 block h-2 rounded-mark bg-track motion-safe:animate-pulse" />
+        <span className="mt-4 block h-6 border-b border-border" />
         <span className="mt-2 block min-h-11" />
-        <div className="mt-2 flex flex-col rounded-card bg-track px-4 pt-6 pb-4 motion-safe:animate-pulse">
-          <span className="block h-lh rounded-mark bg-surface w-3/5 text-32" />
-          <span className="block h-lh rounded-mark bg-surface mt-1 w-1/4 text-20" />
-          <span className="block h-lh rounded-mark bg-surface mt-4 w-1/2 text-56" />
-          <span className="block h-lh rounded-mark bg-surface mt-4 w-1/5 text-14" />
-          <span className="block h-lh rounded-mark bg-surface w-2/5 text-56" />
-          <span className="mt-6 block min-h-16 rounded-pill bg-surface" />
-        </div>
-        <span className="mt-4 block min-h-12 w-36 self-center rounded-pill bg-track motion-safe:animate-pulse" />
+        <span className="mt-2 flex h-10 items-end"><span className={`${rule} w-3/5`} /></span>
+        <span className="mt-4 block h-px bg-border" />
+        <span className="mt-4 flex h-14 items-end"><span className={`${rule} w-1/2`} /></span>
+        <span className="mt-4 block h-px bg-border" />
+        <span className="mt-4 flex h-14 items-end"><span className={`${rule} w-2/5`} /></span>
+        <span className="mt-6 block min-h-16 border border-text-muted" />
+        <span className="mt-4 block min-h-12 w-36 self-center border border-text-muted" />
       </div>
     </div>
   );

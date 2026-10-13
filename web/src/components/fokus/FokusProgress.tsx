@@ -1,33 +1,35 @@
 import { type SetRef, setKey, type SetState } from "@/lib/set-taps";
 
 /**
- * Segmented progress (DESIGN.md Part B), one segment per set by position: done --slab, skipped
- * --track with a 2px --text-muted bar (shape, not colour), open --track. 8px high; 4px gaps, 2px
- * above 30 sets. aria-hidden: the count text carries it.
+ * Progress barcode (DESIGN.md Part B signature 2, fokus-instrument.md §1): one tick per set in
+ * sheet order, bottom-aligned on a hairline. Done 2×16px ink, skipped 2×6px muted, open 1×6px
+ * muted, the current set 2×24px --accent (none when finished). Shape carries state; aria-hidden:
+ * the count text carries it.
  */
 export function FokusProgress({
   order,
   stateOf,
+  current,
 }: {
   readonly order: readonly SetRef[];
   readonly stateOf: (ref: SetRef) => SetState;
+  readonly current: SetRef | null;
 }) {
+  const now = current === null ? null : setKey(current);
   return (
-    <div aria-hidden="true" className={`flex ${order.length > 30 ? "gap-0.5" : "gap-1"}`}>
+    <div aria-hidden="true" className="flex h-6 items-end justify-between border-b border-border">
       {order.map((ref) => {
+        const key = setKey(ref);
         const state = stateOf(ref);
-        return (
-          <span
-            key={setKey(ref)}
-            className={`relative h-2 flex-1 rounded-mark transition-colors duration-120 ease-out motion-reduce:transition-none ${
-              state === "done" ? "bg-slab" : "bg-track"
-            }`}
-          >
-            {state === "skipped" && (
-              <span className="absolute inset-x-1/4 top-1/2 h-0.5 -translate-y-1/2 bg-text-muted" />
-            )}
-          </span>
-        );
+        const tick =
+          key === now
+            ? "h-6 w-0.5 bg-accent"
+            : state === "done"
+              ? "h-4 w-0.5 bg-text"
+              : state === "skipped"
+                ? "h-1.5 w-0.5 bg-text-muted"
+                : "h-1.5 w-px bg-text-muted";
+        return <span key={key} data-state={key === now ? "current" : state} className={`block shrink-0 ${tick}`} />;
       })}
     </div>
   );

@@ -28,34 +28,14 @@ import {
 import type { LoggedSet, SetRef } from "@/lib/set-taps";
 import { formatKg } from "@/lib/format";
 
+import { ArrowIcon, CheckIcon, Hairline, INK_LINK, PRIMARY_FILL } from "./Instrument";
 import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
-export const PRESS =
-  "transition-transform duration-120 ease-out active:scale-97 motion-reduce:transition-none motion-reduce:active:scale-100";
-export const PRIMARY_INK = `flex min-h-16 w-full items-center justify-center gap-2 rounded-pill bg-text px-4 font-display text-32 font-extrabold text-bg uppercase italic ${PRESS}`;
-export const IN_SLAB_FOCUS = "focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-slab-mark";
-
-function Check({ className }: { readonly className: string }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className={`shrink-0 ${className}`} fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4.5 12.5 9.5 17.5 19.5 6.5" />
-    </svg>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6 shrink-0" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 12h15M13 6l6 6-6 6" />
-    </svg>
-  );
-}
-
 export function PrimaryButton({ primary, onClick, children }: { readonly primary: PrimaryRef; readonly onClick: () => void; readonly children: string }) {
   return (
-    <button ref={primary} type="button" onClick={onClick} className={`mt-4 ${PRIMARY_INK}`}>
+    <button ref={primary} type="button" onClick={onClick} className={`mt-4 ${PRIMARY_FILL}`}>
       {children}
       <ArrowIcon />
     </button>
@@ -84,7 +64,7 @@ export function FeelBlock({
   const felt = logged?.feltRpe ?? null;
   return (
     <section aria-labelledby={`${id}-q`} className="mt-2 flex flex-col">
-      <h2 id={`${id}-q`} className="text-20 font-bold">
+      <h2 id={`${id}-q`} className="font-grotesk text-20 font-normal">
         {feelQuestion(set, named)}
       </h2>
       <div role="group" aria-labelledby={`${id}-q`} className="mt-2 grid grid-cols-3 gap-2">
@@ -95,12 +75,14 @@ export function FeelBlock({
               key={o.value}
               type="button"
               aria-pressed={on}
+              aria-label={o.label}
               onClick={() => onTap("feel", set.ref, nextFeel(felt, o.value))}
-              className={`flex min-h-14 items-center justify-center gap-1 rounded-control px-1 text-16 leading-tight font-bold transition-colors duration-120 ease-out motion-reduce:transition-none ${
-                on ? "border-2 border-slab bg-slab text-on-slab" : "border-2 border-text-muted text-text"
+              className={`flex min-h-14 items-center justify-center gap-2 px-1 font-mono text-16 leading-tight font-medium text-text uppercase ${
+                on ? "border-2 border-text" : "border border-text-muted"
               }`}
             >
-              {on && <Check className="size-4" />}
+              {/* The lamp: filled --accent when lit, hollow when off (shape, not colour alone). */}
+              <span aria-hidden="true" data-lamp={on ? "on" : "off"} className={`block size-2.5 shrink-0 ${on ? "bg-accent" : "border border-text-muted"}`} />
               <span>{o.label}</span>
             </button>
           );
@@ -149,25 +131,30 @@ function RepsStepper({
     };
     timer.current = window.setTimeout(() => pending.current?.(), 600);
   };
-  const stepButton = "flex size-14 items-center justify-center rounded-control border-2 text-24 font-bold disabled:border-border disabled:text-text-muted";
+  const stepButton =
+    "flex size-14 items-center justify-center border border-text-muted text-text disabled:border-dashed disabled:text-text-muted";
   return (
     <div role="group" aria-labelledby={`${id}-l`} className="mt-3 flex items-center justify-between gap-3">
       <p id={`${id}-l`} className="flex flex-col">
-        <span className="text-16 font-semibold">Reps i sæt {set.number}</span>
-        <span className="text-14 text-text-muted">
+        <span className="font-grotesk text-16">Reps i sæt {set.number}</span>
+        <span className="caption">
           {low} - {top}
         </span>
       </p>
       <div className="flex items-center gap-2">
-        <button type="button" disabled={value <= min} onClick={() => change(-1)} className={`${stepButton} border-text-muted`}>
-          <span aria-hidden="true">−</span>
+        <button type="button" disabled={value <= min} aria-disabled={value <= min} onClick={() => change(-1)} className={stepButton}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M5 12h14" />
+          </svg>
           <span className="sr-only">Færre reps</span>
         </button>
-        <output aria-live="polite" className="min-w-[3ch] text-center font-display text-32 font-bold tabular-nums">
+        <output aria-live="polite" className="min-w-[3ch] text-center font-mono text-32 font-normal">
           {value}
         </output>
-        <button type="button" disabled={value >= max} onClick={() => change(1)} className={`${stepButton} border-text-muted`}>
-          <span aria-hidden="true">+</span>
+        <button type="button" disabled={value >= max} aria-disabled={value >= max} onClick={() => change(1)} className={stepButton}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M5 12h14M12 5v14" />
+          </svg>
           <span className="sr-only">Flere reps</span>
         </button>
       </div>
@@ -192,24 +179,19 @@ export function PauseCard({ since, exercise, onAnnounce }: { readonly since: str
   const rail = exercise.restMinS !== null && exercise.restMaxS !== null ? restRail(seconds, exercise.restMinS, exercise.restMaxS) : null;
   const ok = band.kind === "ready" || band.kind === "over";
   return (
-    <section aria-label="Pause" className="mt-3 flex flex-col rounded-card bg-surface p-4 shadow-card">
-      <p className="flex items-baseline justify-between gap-2">
-        <span className="text-14 font-bold tracking-[0.04em] text-text-muted uppercase">Pause</span>
-        {label !== null && <span className="text-14 font-semibold text-text">{label}</span>}
+    <section aria-label="Pause" className="mt-4 flex flex-col">
+      <Hairline />
+      <p className="mt-4 flex items-baseline justify-between gap-2">
+        <span className="caption">Pause</span>
+        {label !== null && <span className="caption">{label}</span>}
       </p>
       <div className="mt-1">
-        <RestTimer seconds={seconds} label="Pause" positive={ok} />
+        <RestTimer seconds={seconds} label="Pause" />
       </div>
-      {rail !== null && (
-        <div aria-hidden="true" className="relative mt-2 h-2 w-full bg-track">
-          <div className="absolute inset-y-0 left-0 bg-slab" style={{ width: `${rail.fill * 100}%` }} />
-          <div className="absolute -inset-y-0.5 w-0.5 bg-text" style={{ left: `${rail.min * 100}%` }} />
-          <div className="absolute -inset-y-0.5 w-0.5 bg-text" style={{ left: `${rail.max * 100}%` }} />
-        </div>
-      )}
+      {rail !== null && exercise.restMaxS !== null && <RestScale rail={rail} scaleS={1.2 * exercise.restMaxS} />}
       {band.kind !== "none" && (
-        <p className={`mt-2 flex items-center gap-1 text-16 font-semibold ${ok ? "text-positive" : "text-text-muted"}`}>
-          {ok && <Check className="size-4" />}
+        <p className={`mt-2 flex items-center gap-2 text-16 ${ok ? "text-text" : "text-text-muted"}`}>
+          {ok && <CheckIcon className="size-4 text-accent" />}
           {band.text}
         </p>
       )}
@@ -217,20 +199,62 @@ export function PauseCard({ since, exercise, onAnnounce }: { readonly since: str
   );
 }
 
-/** §2: the warm-up of `exercise`, with Python's ramp on a main lift. */
+/** A position on the scale, kept inside it: `width` is the mark's width in px. */
+function at(fraction: number, width: number): string {
+  return `calc(${Math.min(1, Math.max(0, fraction))} * (100% - ${width}px))`;
+}
+
+/**
+ * The rest scale (fokus-instrument.md §4.4): 0 … 1.2 × max, ticks every 30 s, labelled minutes,
+ * MIN and MAX marks, and the red "now" tick, which jumps once a second (no transition) and stays
+ * pinned at the right end past the scale.
+ */
+function RestScale({ rail, scaleS }: { readonly rail: ReturnType<typeof restRail>; readonly scaleS: number }) {
+  const ticks: number[] = [];
+  for (let t = 0; t <= scaleS; t += 30) ticks.push(t);
+  return (
+    <div aria-hidden="true" data-scale-s={scaleS} className="relative mt-2 h-14 w-full">
+      <span className="absolute inset-x-0 bottom-4 block h-px bg-text-muted" />
+      {ticks.map((t) =>
+        t % 60 === 0 ? (
+          <span key={t}>
+            <span className="absolute bottom-4 block h-3 w-px bg-text" style={{ left: at(t / scaleS, 1) }} />
+            <span className="absolute bottom-0 -translate-x-1/2 font-mono text-12 leading-none text-text-muted" style={{ left: at(t / scaleS, 1) }}>
+              {t / 60}
+            </span>
+          </span>
+        ) : (
+          <span key={t} className="absolute bottom-4 block h-1.5 w-px bg-text-muted" style={{ left: at(t / scaleS, 1) }} />
+        ),
+      )}
+      <span className="absolute bottom-4 block h-6 w-0.5 bg-text" style={{ left: at(rail.min, 2) }} />
+      <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: at(rail.min, 2) }}>
+        Min
+      </span>
+      <span className="absolute bottom-4 block h-6 w-px bg-text" style={{ left: at(rail.max, 1) }} />
+      <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: at(rail.max, 1) }}>
+        Max
+      </span>
+      <span data-now={rail.fill} className="absolute bottom-4 block h-8 w-0.5 bg-accent" style={{ left: at(rail.fill, 2) }} />
+    </div>
+  );
+}
+
+/** §2: the warm-up of `exercise`, with Python's ramp on a main lift (fokus-instrument.md §3: a mono table). */
 export function WarmupCard({ since, exercise, mainLift }: { readonly since: string | null; readonly exercise: FokusExercise; readonly mainLift: boolean }) {
   const ramp = rampState(exercise, mainLift);
   const basis = rampBasis(exercise);
   return (
-    <section aria-labelledby="fokus-warmup" className="mt-3 flex flex-col rounded-card bg-surface p-4 shadow-card">
-      <h2 id="fokus-warmup" className="font-display text-32 leading-[1.05] font-extrabold uppercase italic [overflow-wrap:anywhere]">
+    <section aria-labelledby="fokus-warmup" className="mt-2 flex flex-col">
+      <h2 id="fokus-warmup" className="font-grotesk text-32 font-normal [overflow-wrap:anywhere]">
         {warmupTitle(exercise)}
       </h2>
-      <div className="mt-2">
+      <Hairline className="mt-4" />
+      <div className="mt-4">
         {since === null ? (
           <>
             {/* No recorded start (§2.2): a static clock, never one running from page load. */}
-            <p role="timer" aria-live="off" aria-label="Opvarmning" className="font-display text-56 leading-none font-extrabold tabular-nums italic text-text-muted">
+            <p role="timer" aria-live="off" aria-label="Opvarmning" className="font-mono text-56 leading-none font-normal text-text-muted">
               {formatTimer(0)}
             </p>
             <p className="mt-1 text-16 text-text-muted">{WARMUP_NOT_STARTED}</p>
@@ -240,24 +264,27 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
         )}
       </div>
       {ramp === "ramp" && exercise.ramp !== null && (
-        <div className="mt-3 flex flex-col">
-          {basis !== null && <p className="text-14 text-text-muted">{basis}</p>}
-          <ol aria-label="Opvarmningssæt" className="mt-1 grid grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-2">
+        <div className="@container mt-4 flex flex-col">
+          {basis !== null && <p className="caption">{basis}</p>}
+          {/* One row of columns while they fit (21rem at 100 % text); stacked at 200 % text. */}
+          <ol aria-label="Opvarmningssæt" className="mt-2 grid gap-4 @min-[21rem]:auto-cols-fr @min-[21rem]:grid-flow-col">
             {exercise.ramp.map((r) => (
-              <li key={r.pct} className="flex flex-col">
-                <span className="font-display text-24 font-extrabold tabular-nums italic">
-                  {formatKg(r.kg)}&nbsp;kg
+              <li key={r.pct} className="flex flex-col @min-[21rem]:not-first:border-l @min-[21rem]:not-first:border-border @min-[21rem]:not-first:pl-4">
+                <span className="caption">{Math.round(r.pct)}&nbsp;%</span>
+                <span className="font-mono">
+                  <span className="text-24 text-text">{formatKg(r.kg)}</span>
+                  <span className="text-16 text-text-muted">&nbsp;kg</span>
                 </span>
-                <span className="text-14 text-text-muted tabular-nums">
-                  {r.reps} reps · {Math.round(r.pct)}&nbsp;%
+                <span className="font-mono text-14 text-text-muted">{r.reps} reps</span>
+                <span aria-hidden="true" className="relative mt-2 block h-px bg-text" style={{ width: `${Math.min(100, r.pct)}%` }}>
+                  <span className="absolute right-0 bottom-0 block h-2 w-px bg-text" />
                 </span>
-                <span aria-hidden="true" className="mt-1 block h-1 bg-slab" style={{ width: `${Math.min(100, r.pct)}%` }} />
               </li>
             ))}
           </ol>
         </div>
       )}
-      {ramp === "none" && <p className="mt-3 text-16 text-text-muted">Intet kg at regne opvarmningen ud fra.</p>}
+      {ramp === "none" && <p className="mt-4 text-16 text-text-muted">Intet kg at regne opvarmningen ud fra.</p>}
     </section>
   );
 }
@@ -266,30 +293,28 @@ function WarmupTimer({ since }: { readonly since: string }) {
   return <RestTimer seconds={useElapsed(since)} label="Opvarmning" />;
 }
 
-/** §1.2: the next set, small (mini slab), with last week and the coach's note. */
+/** §1.2: the next set without a background (Part B): caption + title, a hairline, mono values. */
 export function NextSetCard({ next, week, inWarmup }: { readonly next: SetInContext; readonly week: number; readonly inWarmup: boolean }) {
   const summary = nextSetSummary(next, inWarmup);
   const e = next.exercise;
   // The card always has a last-week line (§1.2.3), suggestion or not.
   const lastWeek = lastWeekLine({ ...e, suggestedKg: e.suggestedKg ?? 0 }, week);
   return (
-    <div className="mt-3 flex flex-col gap-1 rounded-control bg-slab p-3 text-on-slab">
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="rounded-mark bg-slab-mark px-2 py-0.5 text-14 font-bold tracking-[0.08em] text-slab uppercase">Næste</span>
-        <span className="text-20 font-bold">{summary.title}</span>
+    <div className="mt-4 flex flex-col gap-1">
+      <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="caption">Næste</span>
+        <span className="font-grotesk text-20">{summary.title}</span>
       </p>
-      <p className="text-16 font-medium tabular-nums">{summary.line}</p>
-      {lastWeek !== null && (
-        <p className="text-16">
-          {lastWeek.kind === "kg" ? (
-            <>
-              <span className="text-on-slab-muted">Sidste uge</span> <span className="font-semibold">{lastWeek.text}</span>
-            </>
-          ) : (
-            <span className="text-on-slab-muted">{lastWeek.text}</span>
-          )}
-        </p>
-      )}
+      <Hairline className="mt-1" />
+      <p className="mt-1 font-mono text-16">{summary.line}</p>
+      {lastWeek !== null &&
+        (lastWeek.kind === "kg" ? (
+          <p className="flex flex-wrap items-baseline gap-x-2">
+            <span className="caption">Sidste uge</span> <span className="font-mono text-16">{lastWeek.text}</span>
+          </p>
+        ) : (
+          <p className="text-16 text-text-muted">{lastWeek.text}</p>
+        ))}
       {e.notes !== null && e.notes.trim() !== "" && <Note text={e.notes.trim()} />}
     </div>
   );
@@ -302,7 +327,7 @@ function Note({ text }: { readonly text: string }) {
     <div className="flex flex-col items-start">
       <p className={`text-16 [overflow-wrap:anywhere] ${long && !open ? "line-clamp-2" : ""}`}>Note: {text}</p>
       {long && !open && (
-        <button type="button" onClick={() => setOpen(true)} className={`-my-2.5 min-h-11 text-16 font-semibold underline decoration-1 underline-offset-3 ${IN_SLAB_FOCUS}`}>
+        <button type="button" onClick={() => setOpen(true)} className={`-my-2.5 ${INK_LINK}`}>
           Hele noten
         </button>
       )}
@@ -320,9 +345,8 @@ export function Footer({ order, log }: { readonly order: readonly SetRef[]; read
   const text = footerText(order, log, now);
   if (text === null) return null;
   return (
-    <p suppressHydrationWarning className="mt-4 text-16 font-medium text-text-muted tabular-nums">
+    <p suppressHydrationWarning className="mt-4 font-mono text-14 text-text-muted">
       {text}
     </p>
   );
 }
-

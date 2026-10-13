@@ -76,6 +76,49 @@
   }
 }
 
+/* Instrument (DESIGN.md Part B, pilot): scoped to the Fokus root; :root above stays Spurt. body:has()
+   gives the page behind the scope the same tokens (body paints the background). */
+[data-direction="instrument"],
+body:has([data-direction="instrument"]) {
+  --bg: #eae0d2;
+  --surface: #e3d8c4;
+  --border: #d7c9ae;
+  --track: #d7c9ae;
+  --text: #2d2d2d;
+  --text-muted: #665946;
+  --accent: #e0362b;
+  --on-accent: #141414;
+  --focus: #2d2d2d;
+  --positive: var(--accent);
+  --negative: var(--accent);
+  --warning: var(--text);
+  /* Leftover slab classes render unfilled. */
+  --slab: var(--bg);
+  --on-slab: var(--text);
+  --on-slab-muted: var(--text-muted);
+  --slab-mark: var(--accent);
+  --series-ctl: var(--text);
+  --series-atl: var(--text);
+  --series-tsb: var(--text);
+  --chart-mark: var(--text-muted);
+  --card-shadow: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-direction="instrument"],
+  body:has([data-direction="instrument"]) {
+    --bg: #141414;
+    --surface: #1c1c1c;
+    --border: #2d2d2d;
+    --track: #2d2d2d;
+    --text: #eae0d2;
+    --text-muted: #a68763;
+    --accent: #e0362b;
+    --on-accent: #141414;
+    --focus: #eae0d2;
+  }
+}
+
 @media (min-width: 640px) {
   :root {
     --chart-height: 240px;
@@ -131,9 +174,13 @@
   --color-series-tsb: var(--series-tsb);
   --color-block-fill: var(--block-fill);
   --color-chart-mark: var(--chart-mark);
+  --color-on-accent: var(--on-accent);
 
   --font-sans: var(--font-barlow), system-ui, sans-serif;
   --font-display: var(--font-barlow-condensed), system-ui, sans-serif;
+  /* Instrument (Part B Type): loaded by app/fokus/layout.tsx only. */
+  --font-grotesk: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 
   --text-12: 0.75rem;
   --text-12--line-height: 1.4;
@@ -179,4 +226,15 @@ body {
 /* Day rows draw their own chevron; Safari still paints the native <summary> marker otherwise. */
 summary::-webkit-details-marker {
   display: none;
+}
+
+/* Instrument caption (Part B Type): mono 500, uppercase, +0.08em, muted; 14px on Fokus. */
+@utility caption {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 500;
+  font-size: --theme(--text-14);
+  line-height: --theme(--text-14--line-height);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
