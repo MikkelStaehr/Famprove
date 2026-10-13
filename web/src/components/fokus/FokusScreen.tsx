@@ -284,7 +284,7 @@ function SetView({
             </p>
           )}
           {kg.kind === "suggestion" && kg.capped && (
-            <p className="text-16 text-on-slab-muted">{CAPPED_WORD}: højst 2,5 kg op og 5 kg ned fra sidste uge</p>
+            <p className="text-16 text-on-slab-muted">{CAPPED_WORD} i forhold til sidste uge</p>
           )}
           {kg.kind === "last_week" && (
             <>

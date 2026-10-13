@@ -144,17 +144,22 @@ def weekly_cap(suggested: float, last_kg: float | None) -> tuple[float, float | 
 
 
 def last_week_kg(
-    sets: Iterable[StrengthSet],
+    sets: Iterable[StrengthSet], statuses: Mapping[SetKey, KgStatus]
 ) -> dict[tuple[str, int, date], tuple[float, float, float]]:
-    """(block, sheet_row, week_start) -> (reps, prescribed RPE, logged kg) of every RPE set with
-    logged kg; the highest kg when a row has several sets."""
-    out: dict[tuple[str, int, date], tuple[float, float, float]] = {}
+    """(block, sheet_row, week_start) -> (reps, prescribed RPE, logged kg) of each lifted RPE row:
+    its first set with logged kg, as Træning's "Sidste uge" shows it. A session that wasn't
+    lifted (pre-filled kg of a missed session) anchors nothing."""
+    first: dict[tuple[str, int, date], StrengthSet] = {}
     for s in sets:
-        rpe = prescribed_rpe(s.prescribed)
-        if rpe is None or s.logged_kg is None or s.logged_kg <= 0:
+        if statuses[set_key(s)] == "planned" or s.logged_kg is None or s.logged_kg <= 0:
             continue
         key = (s.block, s.sheet_row, s.week_start)
-        if key not in out or s.logged_kg > out[key][2]:
+        if key not in first or s.set_no < first[key].set_no:
+            first[key] = s
+    out: dict[tuple[str, int, date], tuple[float, float, float]] = {}
+    for key, s in first.items():
+        rpe = prescribed_rpe(s.prescribed)
+        if rpe is not None and s.logged_kg is not None:
             out[key] = (s.reps, rpe, s.logged_kg)
     return out
 
@@ -172,7 +177,7 @@ def planned_sets(
         lift: rolling_e1rm(sets, statuses, lift, run_week)
         for lift in ("SQUAT", "BENCH", "DEADLIFT")
     }
-    logged = last_week_kg(sets)
+    logged = last_week_kg(sets, statuses)
     out: list[PlannedSet] = []
     for s in sets:
         if s.week_start < run_week:

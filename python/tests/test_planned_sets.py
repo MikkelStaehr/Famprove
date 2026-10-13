@@ -224,3 +224,23 @@ def test_only_this_week_and_later_get_rows(sheet: Sheet) -> None:
         if p.sheet_row == 50
     ]
     assert got == [RUN_WEEK, RUN_WEEK + timedelta(weeks=1)]
+
+
+def test_no_cap_in_week_1_of_a_new_block_or_after_a_missed_session(sheet: Sheet) -> None:
+    sheet.add(week_start=LAST_WEEK, reps=3.0, prescribed="RPE 7", logged_kg=150.0)  # e1RM 180
+    # The same row number last week, but in the previous block: not the same prescription.
+    sheet.add(week_start=LAST_WEEK, block="Program - blok 10", sheet_row=60, reps=3.0,
+              prescribed="RPE 6", logged_kg=120.0)  # fmt: skip
+    new_block = sheet.add(sheet_row=60, reps=3.0, prescribed="RPE 6")
+    # Last week's session was missed: its pre-filled kg is the plan, not an anchor.
+    sheet.add("planned", week_start=LAST_WEEK, sheet_row=61, reps=3.0, prescribed="RPE 6",
+              logged_kg=120.0)  # fmt: skip
+    missed = sheet.add(sheet_row=61, reps=3.0, prescribed="RPE 6")
+    by_row = {p.sheet_row: p for p in sheet.plan()}
+    for s in (new_block, missed):
+        assert (by_row[s.sheet_row].suggested_kg, by_row[s.sheet_row].uncapped_kg) == (145.0, None)
+
+
+def test_an_implausible_e1rm_is_left_out(sheet: Sheet) -> None:
+    sheet.add(week_start=LAST_WEEK, reps=3.0, prescribed="RPE 7", logged_kg=900.0)  # a typo
+    assert rolling_e1rm(sheet.sets, sheet.statuses, "SQUAT", RUN_WEEK) is None
