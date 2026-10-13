@@ -250,3 +250,28 @@ summary::-webkit-details-marker {
 html:has([data-direction="instrument"]) {
   scroll-padding-bottom: 6rem;
 }
+
+/* Fokus grain (Revision 4, fokus-round4.md §4): 3 % static fractal noise, both themes, /fokus only.
+   Fixed behind the content (z -1 inside the isolated root), never interactive. The pinned primary's
+   dock repeats it over its page colour, aligned to the viewport, so its bar shows no seam. */
+[data-direction="instrument"] {
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  isolation: isolate;
+}
+[data-direction="instrument"]::before,
+[data-direction="instrument"] .fokus-dock::before {
+  content: "";
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.03;
+  background: var(--grain) repeat;
+  background-size: 160px;
+}
+[data-direction="instrument"]::before {
+  position: fixed;
+}
+[data-direction="instrument"] .fokus-dock::before {
+  position: absolute;
+  background-attachment: fixed;
+}

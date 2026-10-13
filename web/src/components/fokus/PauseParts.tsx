@@ -14,7 +14,6 @@ import {
   rampState,
   repsRange,
   restBand,
-  restRail,
   restSentence,
   type SetInContext,
   stepperBounds,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/fokus-view";
 import type { LoggedSet, SetRef } from "@/lib/set-taps";
 import { formatKg } from "@/lib/format";
+import { dotField, FIELD_WIDTH } from "@/lib/fokus-marks";
 
 import { ArrowIcon, INK_LINK, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { RestTimer, useElapsed } from "./RestTimer";
@@ -65,7 +65,8 @@ export function FeelBlock({
       <h2 id={`${id}-q`} className="font-grotesk text-20 font-normal">
         {feelQuestion(set, named)}
       </h2>
-      <div role="group" aria-labelledby={`${id}-q`} className="mt-3 grid grid-cols-3 gap-2">
+      {/* Round 4: one segmented control, a 1px --text-muted box, --border hairlines inside only. */}
+      <div role="group" aria-labelledby={`${id}-q`} className="mt-3 grid grid-cols-3 border border-text-muted">
         {FEEL_OPTIONS.map((o) => {
           const on = felt === o.value;
           return (
@@ -75,13 +76,11 @@ export function FeelBlock({
               aria-pressed={on}
               aria-label={o.label}
               onClick={() => onTap("feel", set.ref, nextFeel(felt, o.value))}
-              className={`flex min-h-14 flex-col items-center justify-center gap-1.5 px-2 font-grotesk text-16 leading-tight font-medium text-text ${
-                on ? "border-2 border-text" : "border border-text-muted"
+              className={`relative flex min-h-14 items-center justify-center px-2 font-grotesk text-16 leading-tight font-medium not-first:border-l not-first:border-border focus-visible:z-10 focus-visible:outline-offset-2 ${
+                on ? "bg-text text-bg" : "text-text"
               }`}
             >
-              {/* The lamp: filled ink when lit, hollow when off (shape, not colour alone; red is the primary's). */}
-              <span aria-hidden="true" data-lamp={on ? "on" : "off"} className={`block size-2.5 shrink-0 ${on ? "bg-text" : "border border-text-muted"}`} />
-              <span>{o.label}</span>
+              {o.label}
             </button>
           );
         })}
@@ -174,23 +173,19 @@ export function PauseCard({ since, exercise, onAnnounce }: { readonly since: str
     }
     said.current = band.kind;
   }, [band, exercise.restMinS, exercise.restMaxS, onAnnounce]);
-  const rail = exercise.restMinS !== null && exercise.restMaxS !== null ? restRail(seconds, exercise.restMinS, exercise.restMaxS) : null;
+  // rest_min_s or rest_max_s null: no field (§3.1).
+  const rail = exercise.restMinS !== null && exercise.restMaxS !== null;
   return (
     <section aria-label="Pause" className="mt-10 flex flex-col">
       <p className="caption">Pause</p>
       <div className="mt-3">
         <RestTimer seconds={seconds} label="Pause" />
       </div>
-      {rail !== null && exercise.restMaxS !== null && (
-        <Scale scaleS={1.2 * exercise.restMaxS} now={rail.fill} min={rail.min} max={rail.max} />
+      {rail && exercise.restMaxS !== null && (
+        <Scale seconds={seconds} scaleS={1.2 * exercise.restMaxS} minS={exercise.restMinS} maxS={exercise.restMaxS} />
       )}
     </section>
   );
-}
-
-/** A position on the scale, kept inside it: `width` is the mark's width in px. */
-function at(fraction: number, width: number): string {
-  return `calc(${Math.min(1, Math.max(0, fraction))} * (100% - ${width}px))`;
 }
 
 /** The scale's end value in minutes: 360 -> "6", 600 -> "10", 144 -> "2,4". */
@@ -198,41 +193,49 @@ function endMinutes(scaleS: number): string {
   return (Math.round((scaleS / 60) * 10) / 10).toString().replace(".", ",");
 }
 
+/** An x in viewBox units as a CSS left inside the 360-wide field. */
+const pct = (x: number): string => `${(x / FIELD_WIDTH) * 100}%`;
+
 /**
- * The timer's scale (fokus-instrument.md §4.4), directly under the clock: 0 … `scaleS`, ticks every
- * 30 s (taller on the minute, unlabelled), the red "now" tick, which jumps once a second (no
- * transition) and stays pinned at the right end past the scale. Labels only at 0, MIN, MAX and the
- * end (round 3). The pause adds its MIN and MAX marks; the warm-up has none (no recommended rest).
+ * The dot field (fokus-round4.md §3.1): 60 × 6 dots filling column-major with elapsed time, MIN
+ * (2 units) and MAX (1 unit) as taller ink marks, the red tick at the front. A drawing scale only
+ * (lib/fokus-marks): it steps once a second with the timer, no transition or animation ever.
  */
-function Scale({ scaleS, now, min, max }: { readonly scaleS: number; readonly now: number; readonly min?: number; readonly max?: number }) {
-  const ticks: number[] = [];
-  for (let t = 0; t <= scaleS; t += 30) ticks.push(t);
-  const marks = min !== undefined && max !== undefined;
+function Scale({ seconds, scaleS, minS, maxS }: { readonly seconds: number; readonly scaleS: number; readonly minS: number | null; readonly maxS: number | null }) {
+  const f = dotField(seconds, scaleS, minS, maxS);
+  const marks = f.minX !== null && f.maxX !== null;
   return (
-    <div aria-hidden="true" data-scale-s={scaleS} className={`relative mt-3 w-full ${marks ? "h-17" : "h-11"}`}>
-      <span className="absolute inset-x-0 bottom-4 block h-px bg-text-muted" />
-      {ticks.map((t) => (
-        <span
-          key={t}
-          className={`absolute bottom-4 block w-px ${t % 60 === 0 ? "h-3 bg-text" : "h-1.5 bg-text-muted"}`}
-          style={{ left: at(t / scaleS, 1) }}
-        />
-      ))}
-      <span className="absolute bottom-0 left-0 font-mono text-12 leading-none text-text-muted">0</span>
-      <span className="absolute right-0 bottom-0 font-mono text-12 leading-none text-text-muted">{endMinutes(scaleS)}</span>
-      {marks && (
-        <>
-          <span className="absolute bottom-4 block h-6 w-0.5 bg-text" style={{ left: at(min, 2) }} />
-          <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: at(min, 2) }}>
+    <div aria-hidden="true" className="mt-3 flex w-full flex-col">
+      {marks && f.minX !== null && f.maxX !== null && (
+        <div className="relative h-4">
+          <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: pct(f.minX + 1) }}>
             Min
           </span>
-          <span className="absolute bottom-4 block h-6 w-px bg-text" style={{ left: at(max, 1) }} />
-          <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: at(max, 1) }}>
+          <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: pct(f.maxX + 0.5) }}>
             Max
           </span>
-        </>
+        </div>
       )}
-      <span data-now={now} className="absolute bottom-4 block h-7 w-0.5 bg-accent" style={{ left: at(now, 2) }} />
+      <svg viewBox="0 0 360 60" className="block h-auto w-full" data-scale-s={scaleS} data-filled={f.filled}>
+        {f.dots.map((d, i) =>
+          d.kind === "over" ? (
+            <circle key={i} cx={d.cx} cy={d.cy} r={1.25} fill="none" stroke="var(--text)" strokeWidth={1} />
+          ) : (
+            <circle key={i} cx={d.cx} cy={d.cy} r={1.5} fill={d.kind === "filled" ? "var(--text)" : "var(--border)"} />
+          ),
+        )}
+        {marks && f.minX !== null && f.maxX !== null && (
+          <>
+            <rect data-mark="min" x={f.minX} y={4} width={2} height={52} fill="var(--text)" />
+            <rect data-mark="max" x={f.maxX} y={4} width={1} height={52} fill="var(--text)" />
+          </>
+        )}
+        <rect data-now={f.tickX} x={f.tickX} y={0} width={2} height={60} fill="var(--accent)" />
+      </svg>
+      <div className="mt-1 flex justify-between font-mono text-12 leading-none text-text-muted">
+        <span>0</span>
+        <span>{endMinutes(scaleS)}</span>
+      </div>
     </div>
   );
 }
@@ -287,7 +290,7 @@ function WarmupClock({ seconds }: { readonly seconds: number }) {
   return (
     <>
       <RestTimer seconds={seconds} label="Opvarmning" />
-      <Scale scaleS={WARMUP_SCALE_S} now={Math.min(1, seconds / WARMUP_SCALE_S)} />
+      <Scale seconds={seconds} scaleS={WARMUP_SCALE_S} minS={null} maxS={null} />
     </>
   );
 }
@@ -333,7 +336,7 @@ export function Note({ text }: { readonly text: string }) {
   const long = text.length > NOTE_CLAMP_CHARS;
   return (
     <div className="flex flex-col items-start">
-      <p className={`font-grotesk text-16 text-text-muted [overflow-wrap:anywhere] ${long && !open ? "line-clamp-2" : ""}`}>Note: {text}</p>
+      <p className={`font-grotesk text-16 text-text-muted [overflow-wrap:anywhere] ${long && !open ? "line-clamp-3" : ""}`}>Note: {text}</p>
       {long && !open && (
         <button type="button" onClick={() => setOpen(true)} className={`-my-2.5 ${INK_LINK}`}>
           Hele noten

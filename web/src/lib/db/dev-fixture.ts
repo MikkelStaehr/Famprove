@@ -22,6 +22,9 @@
  *          a range exercise done, the next run's warm-up started, with a ramp and a 2-line note
  *          (Variant C, the fold's worst case). Ramps, rests and notes the real rows lack are
  *          illustrative, never real suggestions.
+ *   pause-rated / finished  (fokus-round4.md §5) as `pause`, the done set 3:40 ago and rated
+ *          Hårdere; every set tapped (2 skipped, warm-ups, reps_done on range sets, mixed ratings
+ *          incl. unrated, rests 1:30–5:00 and one > 6 min), logged kg for the first exercise only.
  *   feel   /analyse/styrke with two illustrative exercise_feel rows (Python's sentence form).
  *   midsession also gives planned rows an adjustment (+2,5, a capped +2,5, a hold) and a note.
  *   answers  real /analyse rows with illustrative analysis_summary rows, all three in `answer`
@@ -60,6 +63,8 @@ export type DevFixture =
   | "warmup"
   | "pause"
   | "exercise-end"
+  | "pause-rated"
+  | "finished"
   | "feel";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
@@ -73,14 +78,27 @@ const FIXTURES: readonly DevFixture[] = [
   "warmup",
   "pause",
   "exercise-end",
+  "pause-rated",
+  "finished",
   "feel",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
-export type PauseFixture = "warmup" | "pause" | "exercise-end";
+export type PauseFixture = "warmup" | "pause" | "exercise-end" | "pause-rated" | "finished";
 export function isPauseFixture(f: DevFixture | null): f is PauseFixture {
-  return f === "warmup" || f === "pause" || f === "exercise-end";
+  return f === "warmup" || f === "pause" || f === "exercise-end" || f === "pause-rated" || f === "finished";
 }
+
+/** DEV_FIXTURE=pause-rated: the done set's age (3:40, between the 3:00 MIN and the 5:00 MAX). */
+export const PAUSE_RATED_AGO_S = 220;
+/**
+ * DEV_FIXTURE=finished: the rest before each done tap (cycled; 1:30–5:00), one longer than 6 min
+ * (FINISHED_LONG_REST_AT), and the ratings (cycled, null = unrated). Illustrative, never real.
+ */
+export const FINISHED_RESTS_S = [90, 150, 210, 300, 120, 240, 180] as const;
+export const FINISHED_LONG_REST_AT = 5;
+export const FINISHED_LONG_REST_S = 400;
+export const FINISHED_FEELS = [0, -1, 0, 1, null, 0, 1] as const;
 
 const RANGE = /^\s*\d+\s*[-–]\s*\d+\s*$/;
 const NOTE_SHORT = "Palloff + GHD";
@@ -171,13 +189,30 @@ export function pauseFixture(
       if (main(order[0])) rampOn(order[0]);
       continue;
     }
-    if (fixture === "pause") {
-      // Set 1 of the first range row with 2+ sets (else the first set) done 2:10 ago.
+    if (fixture === "finished") {
+      finishedLog(order, rowOf, session, today, now, log);
+      // Logged kg for the first exercise only (the sheet synced at 05/12/20): the rest is unknown.
+      const first = rowOf(order[0])?.name.trim().toLowerCase();
+      for (let i = 0; i < outSets.length; i += 1) {
+        const x = outSets[i];
+        if (x.session !== session) continue;
+        const kg = x.name.trim().toLowerCase() === first ? (x.loggedKg !== null && x.loggedKg > 0 ? x.loggedKg : FIXTURE_RAMP_BASIS_KG) : null;
+        outSets[i] = { ...x, loggedKg: kg };
+      }
+      continue;
+    }
+    if (fixture === "pause" || fixture === "pause-rated") {
+      // Set 1 of the first range row with 2+ sets (else the first set) done 2:10 ago (pause-rated: 3:40, rated Hårdere).
       const i = order.findIndex((ref) => ref.set === 1 && RANGE.test(rowOf(ref)?.repsText ?? "") && byKey.has(setKey({ row: ref.row, set: 2 })));
       const at = i === -1 ? order.findIndex((ref) => ref.set === 1) : i;
-      doneUpTo(at + 1, 130);
+      const ago = fixture === "pause-rated" ? PAUSE_RATED_AGO_S : 130;
+      doneUpTo(at + 1, ago);
+      if (fixture === "pause-rated") {
+        const k = log.findIndex((l) => l.session === session && l.row === order[at].row && l.set === order[at].set);
+        if (k !== -1) log[k] = { ...log[k], feltRpe: 1 };
+      }
       const next = order[at + 1];
-      if (next !== undefined) startOpen(next, 130);
+      if (next !== undefined) startOpen(next, ago);
       const r = rowOf(order[at]);
       if (r !== undefined) {
         note(r, NOTE_SHORT);
@@ -200,6 +235,46 @@ export function pauseFixture(
     if (next !== undefined) note(next, NOTE_LONG);
   }
   return { sets: outSets, plannedSets: [...outPlanned.values()], setLog: log };
+}
+
+/**
+ * DEV_FIXTURE=finished's set log for one session: every item of `order` tapped, warm-ups done,
+ * the second set of the second run and the second-to-last set skipped (2 skips), reps_done on
+ * range sets (the low end + 1, else the top), FINISHED_FEELS cycled on done sets, FINISHED_RESTS_S
+ * between done taps (one FINISHED_LONG_REST_S), the last done 60 s before `now`. Written nowhere.
+ */
+function finishedLog(
+  order: readonly SetRef[],
+  rowOf: (ref: SetRef) => PrescribedSetRow | undefined,
+  session: number,
+  today: IsoDate,
+  now: Date,
+  log: SetLogRow[],
+): void {
+  const sets = order.map((ref, k) => [ref, k] as const).filter(([ref]) => ref.set > 0);
+  const secondRun = sets.filter(([ref]) => ref.set === 2)[1] ?? sets[1];
+  const skipAt = new Set([secondRun?.[1], sets.at(-2)?.[1]].filter((k): k is number => k !== undefined));
+  let done = 0;
+  const rests: number[] = order.map((_, k): number => (k === 0 || skipAt.has(k) ? 0 : k === FINISHED_LONG_REST_AT ? FINISHED_LONG_REST_S : FINISHED_RESTS_S[k % FINISHED_RESTS_S.length]));
+  const totalS = rests.reduce((a, b) => a + b, 0);
+  let clock = now.getTime() - (60 + totalS) * 1000;
+  let previous = new Date(clock - 60_000).toISOString();
+  order.forEach((ref, k) => {
+    clock += rests[k] * 1000;
+    const at = new Date(clock).toISOString();
+    const start = previous;
+    previous = at;
+    if (skipAt.has(k)) {
+      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: null, endedAt: null, skipped: true, updatedAt: at, feltRpe: null, repsDone: null });
+      return;
+    }
+    const r = rowOf(ref);
+    const range = RANGE.test(r?.repsText ?? "") ? (r?.repsText ?? "").split(/[-–]/).map((x) => Number(x.trim())) : null;
+    const repsDone = ref.set === 0 || range === null ? null : done % 2 === 0 ? range[1] : range[0] + 1;
+    const feltRpe = ref.set === 0 ? null : FINISHED_FEELS[done % FINISHED_FEELS.length];
+    if (ref.set > 0) done += 1;
+    log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: start, endedAt: at, skipped: false, updatedAt: at, feltRpe, repsDone });
+  });
 }
 
 /**

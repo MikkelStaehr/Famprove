@@ -18,7 +18,8 @@ import {
   lastTapText,
   lastWeekLine,
   pauseSentence,
-  repsWord,
+  prescribedCell,
+  rangeFigure,
   type SetInContext,
   setInContext,
   setOneOf,
@@ -33,6 +34,7 @@ import {
   rampState,
 } from "@/lib/fokus-view";
 import { adjustmentLine } from "@/lib/training-view";
+import { type DotRow as DotRowMarks, dotRow, type Signature, signature } from "@/lib/fokus-marks";
 import {
   applyTap,
   isWarmup,
@@ -47,7 +49,8 @@ import {
 } from "@/lib/set-taps";
 
 import { FokusProgress } from "./FokusProgress";
-import { CheckIcon, FokusWarning as WarningLine, INK_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { CheckIcon, FokusWarning as WarningLine, INK_LINK, MUTED_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { SessionSignature } from "./SessionSignature";
 import { FeelBlock, Footer, NextSetCard, Note, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
 
@@ -249,6 +252,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           key={`set-${setKey(view.current)}`}
           current={at(view.current)}
           week={session.week}
+          dots={dotRow(session.exercises, session.order, log)}
           primary={primary}
           onDone={onDone}
           onSkip={onSkip}
@@ -285,6 +289,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         <FinishedView
           session={session.session}
           card={finishCard(session.session, p, log)}
+          marks={signature(session.exercises, session.order, log)}
           primary={primary}
           flush={flush}
           feel={view.feel === null ? null : at(view.feel)}
@@ -299,16 +304,22 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
-/** §4.2: the current set (no card, fokus-instrument.md §2), Udført as the one fill, Spring over below. */
+/**
+ * §4.2 + round 4 §2: the current set. One value row (REPS · RPE/PROCENT · FORSLAG/SIDSTE UGE, the
+ * unit once), then the dot row, the adjustment, the coach note; Spring over as a muted link; Udført
+ * the one ink slab.
+ */
 function SetView({
   current,
   week,
+  dots,
   primary,
   onDone,
   onSkip,
 }: {
   readonly current: SetInContext | null;
   readonly week: number;
+  readonly dots: DotRowMarks;
   readonly primary: PrimaryRef;
   readonly onDone: (s: SetInContext) => void;
   readonly onSkip: (s: SetInContext) => void;
@@ -319,7 +330,7 @@ function SetView({
   const adjustment = adjustmentLine(e);
   const note = e.notes === null ? "" : e.notes.trim();
   const lastWeek = lastWeekLine(e, week);
-  const word = e.repsText === null ? null : repsWord(e.repsText);
+  const cell = prescribedCell(e.prescribed);
   return (
     <div className={`flex flex-col ${FADE_IN}`}>
       <section aria-labelledby="fokus-set" className="mt-4 flex flex-col">
@@ -328,81 +339,82 @@ function SetView({
         </h2>
         <p className="caption mt-3">{setTitle(current)}</p>
 
-        {/* The figures: reps and the sheet's prescription, then kg (one group, 12px inside). */}
-        <div className="mt-10 flex flex-col gap-3">
-          {(e.repsText !== null || e.prescribed !== null) && (
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
-              {e.repsText !== null && (
-                <p className="flex flex-col [overflow-wrap:anywhere]">
-                  <span className="caption">Reps</span>
-                  <span>
-                    <span className="text-56 leading-none">{e.repsText}</span>
-                    {word !== null && <span className="text-24 text-text-muted"> {word}</span>}
-                  </span>
-                </p>
-              )}
-              {e.prescribed !== null && (
-                <p className="flex flex-col">
-                  <span className="caption">Arket</span>
-                  <span className="text-32">{e.prescribed}</span>
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Neither a suggestion nor last week's kg: no kg block (round 3, never "intet forslag"). */}
-          {kg !== null && (
-          <div className="flex flex-col">
-            <p className="caption">{kg.label}</p>
-            {kg.kind === "suggestion" && (
-              <p className="[overflow-wrap:anywhere]">
-                <span className="text-56 leading-none">{kg.figure}</span>
-                <span className="text-24 text-text-muted">{" "}kg</span>
+        {/* One value row; below 21rem the kg column takes its own line (200 % text). */}
+        <div className="@container mt-10">
+          <div className="grid grid-cols-[auto_auto] gap-x-6 gap-y-3 @min-[21rem]:grid-cols-[auto_auto_1fr]">
+            {e.repsText !== null && (
+              <p className="flex flex-col [overflow-wrap:anywhere]">
+                <span className="caption">Reps</span>
+                <span className="text-44">{rangeFigure(e.repsText)}</span>
               </p>
             )}
-            {kg.kind === "suggestion" && adjustment !== null && (
-              <p className="mt-1 text-16 text-text-muted">
-                {adjustment.signed !== "" && <span className="font-medium text-text">{adjustment.signed}</span>}
-                {adjustment.rest}
+            {cell !== null && (
+              <p className="flex flex-col [overflow-wrap:anywhere]">
+                <span className="caption">{cell.caption ?? "\u00a0"}</span>
+                <span>
+                  <span className="text-44">{cell.value}</span>
+                  {cell.unit !== null && <span className="text-20 text-text-muted">{cell.unit}</span>}
+                </span>
               </p>
             )}
-            {kg.kind === "last_week" && (
-              <p className="[overflow-wrap:anywhere]">
-                <FigureWithWords figure={kg.figure} />
-                {kg.unit !== null && <span className="text-24 text-text-muted">{" "}kg</span>}
+            {kg !== null && (
+              <p className="col-span-2 flex flex-col [overflow-wrap:anywhere] @min-[21rem]:col-span-1">
+                <span className="caption">{kg.label}</span>
+                <span>
+                  {kg.kind === "suggestion" ? <span className="text-44">{kg.figure}</span> : <FigureWithWords figure={kg.figure} />}
+                  {kg.unit !== null && <span className="text-20 text-text-muted">{"\u00a0"}kg</span>}
+                </span>
               </p>
             )}
           </div>
-          )}
+        </div>
 
-          {lastWeek !== null && (
-            <p className="flex flex-wrap items-baseline gap-x-2">
-              {lastWeek.kind === "kg" ? (
-                <>
-                  <span className="caption">Sidste uge</span>
-                  <span className="text-24">{lastWeek.text}</span>
-                </>
-              ) : (
-                <span className="text-16 text-text-muted">{lastWeek.text}</span>
-              )}
+        <div className="mt-3 flex flex-col gap-3">
+          <DotRow dots={dots} />
+          {kg?.kind === "suggestion" && adjustment !== null && (
+            <p className="text-16 text-text-muted">
+              {adjustment.signed !== "" && <span className="font-medium text-text">{adjustment.signed}</span>}
+              {adjustment.rest}
             </p>
           )}
-
+          {lastWeek !== null && (
+            <p className="text-16 text-text-muted">{lastWeek.kind === "kg" ? `Sidste uge ${lastWeek.text}` : lastWeek.text}</p>
+          )}
           {note !== "" && <Note text={note} />}
         </div>
 
         {/* Secondary action above the primary: nothing sits below Udført (round 2). */}
-        <button type="button" onClick={() => onSkip(current)} className={`mt-10 min-h-12 self-center px-6 ${OUTLINED}`}>
+        <button type="button" onClick={() => onSkip(current)} className={`mt-10 self-center ${MUTED_LINK}`}>
           Spring over
         </button>
 
-        <div className={`mt-10 ${PRIMARY_DOCK}`}>
+        <div className={`mt-6 ${PRIMARY_DOCK}`}>
           <button ref={primary} type="button" onClick={() => onDone(current)} className={PRIMARY_BOX}>
             <CheckIcon className="size-6" />
             Udført
           </button>
         </div>
       </section>
+    </div>
+  );
+}
+
+/** Round 4 §3.2: sets tapped today, filled = done, ring = skipped; the 8px row is reserved when empty. */
+function DotRow({ dots }: { readonly dots: DotRowMarks }) {
+  return (
+    <div className="flex min-h-2 flex-wrap gap-x-2 gap-y-1">
+      {dots.groups.map((g) => (
+        <svg key={g.key} aria-hidden="true" width={g.width} height={8} viewBox={`0 0 ${g.width} 8`} className="block shrink-0">
+          {g.dots.map((d) =>
+            d.kind === "done" ? (
+              <circle key={d.cx} cx={d.cx} cy={4} r={3} fill="var(--text)" />
+            ) : (
+              <circle key={d.cx} cx={d.cx} cy={4} r={2.5} fill="none" stroke="var(--text)" strokeWidth={1.5} />
+            ),
+          )}
+        </svg>
+      ))}
+      <span className="sr-only">{dots.sentence}</span>
     </div>
   );
 }
@@ -483,6 +495,7 @@ function WarmupView({
 function FinishedView({
   session,
   card,
+  marks,
   primary,
   flush,
   feel,
@@ -492,6 +505,7 @@ function FinishedView({
 }: {
   readonly session: number;
   readonly card: ReturnType<typeof finishCard>;
+  readonly marks: Signature;
   readonly primary: PrimaryRef;
   readonly flush: () => Promise<void>;
   readonly feel: SetInContext | null;
@@ -509,6 +523,7 @@ function FinishedView({
         </h2>
         <div className="mt-10 flex flex-col gap-3">
           <CountsFigure text={card.counts} />
+          <SessionSignature marks={marks} />
           {card.times !== null && <p className="caption">{card.times}</p>}
           {footer}
         </div>
@@ -538,15 +553,15 @@ function CountsFigure({ text }: { readonly text: string }) {
 
 /**
  * A kg figure that may start with words ("kropsvægt + 10"): the words in text-24 so only the
- * number is 56px and the line doesn't wrap at 390 (round 3); a plain number is all 56px.
+ * number is 44px and the line doesn't wrap at 390 (round 4); a plain number is all 44px.
  */
 function FigureWithWords({ figure }: { readonly figure: string }) {
   const m = /^(\D+?)\s*(\d[\d,.]*)$/.exec(figure);
-  if (m === null) return <span className="text-56 leading-none">{figure}</span>;
+  if (m === null) return <span className="text-44">{figure}</span>;
   return (
     <>
       <span className="text-24">{m[1]} </span>
-      <span className="text-56 leading-none">{m[2]}</span>
+      <span className="text-44">{m[2]}</span>
     </>
   );
 }

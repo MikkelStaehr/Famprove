@@ -15,7 +15,7 @@ const mono = Chivo_Mono({
 /** The Instrument scope (design/specs/fokus-instrument.md §0): its tokens apply inside this root only. */
 export default function FokusLayout({ children }: LayoutProps<"/fokus">) {
   return (
-    <div data-direction="instrument" className={`${inter.variable} ${mono.variable} flex flex-col font-grotesk font-normal text-text tabular-nums`}>
+    <div data-direction="instrument" className={`bg-bg ${inter.variable} ${mono.variable} flex flex-col font-grotesk font-normal text-text tabular-nums`}>
       {children}
     </div>
   );

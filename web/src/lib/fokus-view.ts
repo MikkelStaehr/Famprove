@@ -46,7 +46,10 @@ export type FokusExercise = Pick<
   | "ramp"
   | "notes"
   | "sets"
->;
+> & {
+  /** This week's sheet kg (ExerciseView.kg): never shown (D3); only the finished signature's bar height reads it. */
+  readonly kg?: number | null;
+};
 
 /**
  * The view states (traening.md §4.5, fokus-pause.md §2–§4):
@@ -537,3 +540,24 @@ export function durationText(minutes: number): string {
 
 /** Notes up to this many characters show in full; longer ones clamp to 2 lines with "Hele noten". */
 export const NOTE_CLAMP_CHARS = 60;
+
+/** A range as one figure (round 4): "8 - 12" -> "8–12" (en dash, no spaces); a leading minus stays. */
+export function rangeFigure(text: string): string {
+  return text.trim().replace(/(\d)\s*[-–]\s*(?=\d)/g, "$1–");
+}
+
+/**
+ * The set view's middle column (fokus-round4.md §2): "RPE 7-8" -> RPE "7–8"; "-12.5%" -> PROCENT
+ * "-12.5" + a small "%", as written. No cell: null (the column is absent). Any other text is shown
+ * as written under no caption (never relabelled as an RPE).
+ */
+export type PrescribedCell = { readonly caption: "RPE" | "Procent" | null; readonly value: string; readonly unit: "%" | null };
+
+export function prescribedCell(prescribed: string | null): PrescribedCell | null {
+  if (prescribed === null || prescribed.trim() === "") return null;
+  const rpe = /^\s*RPE\s*(.+?)\s*$/i.exec(prescribed);
+  if (rpe !== null) return { caption: "RPE", value: rangeFigure(rpe[1]), unit: null };
+  const pct = /^\s*(.+?)\s*%\s*$/.exec(prescribed);
+  if (pct !== null) return { caption: "Procent", value: rangeFigure(pct[1]), unit: "%" };
+  return { caption: null, value: prescribed.trim(), unit: null };
+}

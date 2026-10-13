@@ -3,18 +3,22 @@ import type { ReactNode } from "react";
 /** Instrument parts shared by the Fokus views (DESIGN.md Part B, design/specs/fokus-instrument.md). */
 
 /**
- * The view's one primary action (round 3, "a real button"): a full-width box, 56px tall, a 1px
- * --accent border on all four sides, no fill, the label in Inter 500 24px --accent, centred. With
- * the rest scale's "now" tick, the only red. Focus: the global 3px --focus ring, offset 3px.
+ * The view's one primary action (round 4, "an ink slab"): full width, 56px, radius 0, no border,
+ * filled --text with the label in --bg, Inter 500 24px. It is the view's one filled element; red
+ * is only the rest scale's tick. Focus: 3px --focus ring, offset 3px (a second ring after a bg gap).
  */
 export const PRIMARY_BOX =
-  "flex min-h-14 w-full items-center justify-center gap-3 border border-accent bg-transparent px-4 font-grotesk text-24 font-medium text-accent active:opacity-70";
+  "flex min-h-14 w-full items-center justify-center gap-3 border-0 bg-text px-4 font-grotesk text-24 font-medium text-bg active:opacity-80";
 // Its dock: pinned to the bottom of the screen while the view is taller than it (the one action
 // stays reachable at 390 x 844 without scrolling); in place when the view is short. The page colour
 // behind it hides content scrolling under the box; the safe-area inset clears the home indicator.
-export const PRIMARY_DOCK = "sticky bottom-0 z-10 bg-bg pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]";
+// `fokus-dock` carries the grain over its page colour (globals.css), so the bar shows no seam.
+export const PRIMARY_DOCK = "fokus-dock sticky bottom-0 z-10 bg-bg pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]";
 /** An outlined control ([A5]): 1px --text-muted, Inter 500. */
 export const OUTLINED = "border border-text-muted font-grotesk text-16 font-medium text-text";
+/** Spring over (round 4): a centred muted underlined text link, 44px target, no box. */
+export const MUTED_LINK =
+  "min-h-11 px-4 font-grotesk text-16 font-normal text-text-muted underline decoration-1 underline-offset-4";
 /** An ink text action (Afslut, Fortryd, Hele noten): Inter 500, underlined 1px at 4px. */
 export const INK_LINK = "min-h-11 font-grotesk text-16 font-medium text-text underline decoration-1 underline-offset-4";
 

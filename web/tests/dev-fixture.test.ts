@@ -16,7 +16,7 @@ import { PostgrestError } from "../src/lib/db/postgrest.ts";
 import { freshness } from "../src/lib/dashboard-view.ts";
 
 test("DEV_FIXTURE only switches under next dev, and only to known states", () => {
-  for (const state of ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers", "warmup", "pause", "exercise-end", "feel"] as const) {
+  for (const state of ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers", "warmup", "pause", "exercise-end", "pause-rated", "finished", "feel"] as const) {
     assert.equal(devFixture({ DEV_FIXTURE: state }, "development"), state);
     assert.equal(devFixture({ DEV_FIXTURE: state }, "production"), null);
     assert.equal(devFixture({ DEV_FIXTURE: state }, "test"), null);
@@ -31,7 +31,7 @@ test("DEV_FIXTURE only switches under next dev, and only to known states", () =>
   } finally {
     console.warn = warn;
   }
-  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, feel"]);
+  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, pause-rated, finished, feel"]);
   assert.equal(devFixture({}, "development"), null);
 });
 
@@ -114,4 +114,54 @@ test("DEV_FIXTURE=midsession: adjustments (+2,5, capped, hold) and a note, illus
   const out = midsessionPlanned([row(1), row(2), row(3), row(4)], []);
   assert.deepEqual(out.plannedSets.map((p) => [p.sheetRow, p.adjustmentKg, p.uncappedKg !== null]), [[1, 2.5, false], [2, 2.5, true], [3, 0, false]]);
   assert.deepEqual(out.sets.filter((s) => s.notes !== null).map((s) => s.sheetRow), [4]);
+});
+
+test("DEV_FIXTURE pause-rated / finished (fokus-round4.md §5): pure, nothing is written", () => {
+  const row = (sheetRow: number, setNo: number, name: string, repsText: string, loggedKg: number | null = 60) => ({
+    weekStart: "2026-10-12",
+    session: 1,
+    block: "B",
+    week: 3,
+    sheetRow,
+    setNo,
+    name,
+    type: "X",
+    setsText: "3",
+    repsText,
+    prescribed: "RPE 7",
+    loggedKg,
+    bodyweight: false,
+    notes: null,
+  });
+  const sets = [
+    row(5, 1, "Dips", "6 - 10"), row(5, 2, "Dips", "6 - 10"), row(5, 3, "Dips", "6 - 10"),
+    row(6, 1, "Squat", "5"), row(6, 2, "Squat", "5"), row(6, 3, "Squat", "5"),
+    row(7, 1, "Curl", "8 - 12"), row(7, 2, "Curl", "8 - 12"),
+  ];
+  const order = sessionOrderWithWarmups(sets.map((s) => ({ ref: { row: s.sheetRow, set: s.setNo }, name: s.name })));
+  const now = new Date("2026-10-12T16:00:00Z");
+  const viewOf = (f: "pause-rated" | "finished") => {
+    const out = pauseFixture(f, sets, [], "2026-10-12", now);
+    return { out, view: fokusView(order, new Map<string, LoggedSet>(out.setLog.map((l) => [setKey(l), l])), null) };
+  };
+  const rated = viewOf("pause-rated");
+  assert.equal(rated.view.kind, "pause");
+  const doneSet = rated.out.setLog.find((l) => l.row === 5 && l.set === 1);
+  assert.equal(doneSet?.feltRpe, 1);
+  assert.equal(doneSet?.endedAt, new Date(now.getTime() - 220_000).toISOString()); // 3:40, between MIN 3:00 and MAX 5:00
+  const fin = viewOf("finished");
+  assert.equal(fin.view.kind, "finished");
+  const log = fin.out.setLog;
+  assert.equal(log.length, order.length); // every item tapped, warm-ups included
+  assert.equal(log.filter((l) => l.skipped).length, 2);
+  assert.ok(log.some((l) => l.set > 0 && !l.skipped && l.feltRpe === null)); // unrated
+  assert.ok(new Set(log.map((l) => l.feltRpe)).size >= 3);
+  assert.ok(log.filter((l) => l.row !== 6 && l.set > 0 && !l.skipped).every((l) => l.repsDone !== null)); // range rows
+  // Logged kg for the first exercise only.
+  assert.deepEqual([...new Set(fin.out.sets.filter((s) => s.loggedKg !== null).map((s) => s.name))], ["Dips"]);
+  // Rests between done taps: 1:30–5:00 and one > 6 min.
+  const ends = log.filter((l) => l.endedAt !== null).map((l) => Date.parse(l.endedAt ?? "")).toSorted((a, b) => a - b);
+  const rests = ends.slice(1).map((e, i) => (e - ends[i]) / 1000);
+  assert.ok(rests.some((r) => r > 360));
+  assert.ok(rests.filter((r) => r <= 360).every((r) => r >= 90 && r <= 300));
 });
