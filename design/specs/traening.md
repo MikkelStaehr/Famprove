@@ -17,7 +17,7 @@ Owner: design-lead · 2026-10-12, replaces `today.md` (Today / "I dag", 2026-09-
 ## 2. Routes, nav, titles
 - `/` renders Træning on every date. "Today" = the Europe/Copenhagen date at request time.
 - `/fokus` renders Fokus for the next undone strength session (session k + 1 of N, the same session Træning shows). Not a nav tab. Reached by Begynd/Fortsæt; a reload or a direct visit stays in Fokus.
-- **`ScreenNav`** (root layout, `<header>` before `<main>`, 12px from the top, not sticky): `<nav aria-label="Hovedmenu">` with **Træning** → `/`, **Belastning** → `/load`, **Analyse** → `/analyse`. Look unchanged (Part B). **Not rendered on `/fokus`**: Fokus is a full-screen mode whose only exit is "Afslut" (a route group or layout split is `ui`'s call).
+- **`ScreenNav`** (root layout, `<header>` before `<main>`; since 2026-10-13 a fixed **bottom bar on phone** and a static top bar from `lg`, DESIGN.md Part A "Layout: phone and desktop"; the title now sits 12px from the top on phone): `<nav aria-label="Hovedmenu">` with **Træning** → `/`, **Belastning** → `/load`, **Analyse** → `/analyse`. Look unchanged (Part B). **Not rendered on `/fokus`**: Fokus is a full-screen mode whose only exit is "Afslut" (a route group or layout split is `ui`'s call).
 - Document titles: `Træning` on `/`, `Fokus · Træning` on `/fokus`, `Belastning` on `/load` (unchanged).
 
 ## 3. Træning (`/`) at 390px, top to bottom
@@ -80,7 +80,8 @@ Unchanged from `today.md` (moved here verbatim in §8).
 
 ### 3.5 Above the fold at 390 × 844 (and 390 × 660, real iPhone Safari)
 Nav ends ≈ 56 · title ≈ 72–116 · updated line ≈ 120–140 · form row ≈ 152–208 (flag 32 + wrapped hint 24) · session block ≈ 224–274 · **button ≈ 286–342** · first card ≈ 358.
-- **Guarantee:** the primary button is fully visible at 390 × 660 on every day with an open session, including ride days (it is above the ride card).
+- **Guarantee:** the primary button is fully visible at 390 × 660 on every day with an open session, including ride days (it is above the ride card). Since the bottom bar (2026-10-13) the limit is 660 − `--bottom-bar` = 592px; the top strip's 68px is gone, so the button ends ≈ 274px.
+- **Desktop (from `lg`):** the page is one column of `max-w-phone` (560px), left-aligned with the top bar; Fokus is the same width, centred. Nothing else changes.
 - Strength-only day: the card head + progress end ≈ 430; the first set group (NÆSTE, ≈ 200px for 2 sets) ends ≈ 650 at 844. The rest scrolls; that is accepted, because the gym view is now Fokus.
 - If a build misses the button guarantee, cut in this order: title→date gap, form row gap-y; never shrink the button or the prescriptions.
 

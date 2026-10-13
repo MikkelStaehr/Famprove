@@ -245,3 +245,18 @@ Lines wrap inside the tooltip (`max-w-72`); never truncated, also at 200% text.
 4. Tooltips follow §10c verbatim for: a plan day (incl. `unscored` > 0), a recent day with a range (incl. negative TSB with U+2212 and `til`), `recent_weeks = 1`, each of the three reasons, and an unknown reason.
 5. The open disclosure shows the rewritten `Prognose (anslået)` text and the `Spænd efter blokken` term verbatim; the sr text matches §10d (range in "mellem … og …", and the extra sentence in the §10b case).
 6. At 200% text the tooltip lines and the §10b note wrap without clipping or overlap, in light and dark; nothing animates under `prefers-reduced-motion: reduce`.
+
+## 11. Desktop layout and phone fold with the bottom bar (added 2026-10-13, design pass)
+### 11a. Desktop (from `lg`; DESIGN.md Part A "Layout: phone and desktop")
+- **Header row** (full 1200px): h1, `UpdatedLine`, the `app_notices` lines.
+- **Grid** `lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start`, DOM order hero → chart card → week card:
+  - **Hero** `lg:col-span-4 lg:col-start-1 lg:row-start-1`: the zone bar at 384px (it is designed for 366), reading, delta, CTL/ATL line. Top-left, never centred.
+  - **Chart card** `lg:col-span-8 lg:col-start-5 lg:row-start-1 lg:row-span-2`: 792px wide, plot at `--chart-height` 320px.
+  - **Week card** `lg:col-span-4 lg:col-start-1 lg:row-start-2`: the row grid has room for day + three 64px columns (352px inside the card).
+- Block labels in the chart read `Blok 11` from 640px (as on Styrke); `B11` stays below 640.
+- **Loading:** `app/load/loading.tsx` uses the same grid and placement classes.
+- **Fold at 1280 × 800:** hero fully visible; the plot including x labels ends ≤ 800px; the week card starts ≤ 800px.
+### 11b. Phone fold with the bottom bar (replaces §9f.1's limit)
+- The visible height is now 844 − `--bottom-bar` (68px in a browser tab) = **776px**. Measured before this pass, the x labels already ended ≈ 905px, because the FTP notice and the two-line honesty note were added after §9f.
+- To fit: (1) the honesty note (`Styrke-TSS er et skøn (K ukalibreret). Zonerne er grove ved lav fitness.`) moves from the hero to the chart card's foot, after the typical-rides note (`text-14` muted, 60ch). (2) The `Hvad betyder det?` disclosure (§8b, look unchanged) moves from above the plot to **under the x labels**, before the notes. (3) The top nav's 68px is gone (bottom bar).
+- **§9f.1 now reads:** at 390 × 844 (disclosure closed, 2-line zone sentence, one notice line, light and dark) the plot including the x labels ends ≤ 776px. Owner computes the actual value at render time.

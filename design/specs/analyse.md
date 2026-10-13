@@ -14,7 +14,7 @@ Data: `ride_metrics` and `cycling_weeks`, read server-side through `web/src/lib/
 - **ScreenNav gets a third link**, `Analyse` → `/analyse` (`Træning` · `Belastning` · `Analyse`; was `I dag` until 2026-10-12). The look is unchanged. The grid becomes `repeat(auto-fit, minmax(min(100%, 6.5rem), 1fr))`, so all three fit on one row at 390px ("Belastning" ≈ 110px in a ≈ 116px column) and they stack at 200% text without horizontal scroll.
 - **Section heading (superseded by e2, 2026-10-01):** the visible h2 "Cykel" is replaced by the section tabs `Cykel` · `Styrke` (link tabs, no tab roles), specified in [`analyse-styrke.md`](analyse-styrke.md) §2. The panel keeps an `sr-only` h2 `Cykel`. The `UpdatedLine` moves under the tabs (8px). Nothing else on Cykel changes.
 
-## 3. Layout (390px first; 1280 = the same single column, max 720px, Part B)
+## 3. Layout (390px first; desktop from `lg` in §11)
 1. Nav, h1 `Analyse` (`text-44` display, date not shown, from `app/analyse/layout.tsx`).
 2. Section tabs (§2, `analyse-styrke.md` §2), then `UpdatedLine` 8px under them.
 3. **Hero: eFTP key figure**, 12px under the h2, directly on `--bg` (no card, as the `/load` hero):
@@ -168,3 +168,11 @@ Picking the latest `eftp_ok` row is selection, not arithmetic; the delta is show
 8. **EF:** with `DEV_FIXTURE=ef-few` the too-few block shows `Der er kun 3 …` plus 3 list rows, with no axes. With ≥ 5 points the chart shows dots and a broken trend line.
 9. **Weekly:** every `cycling_weeks` row has a bar or a zero tick in both strips (except a null load); the current week is `--slab`; the Oct 2025–Feb 2026 gap reads as a dotted baseline; the sr table has one row per week.
 10. **States:** `empty`, `error`, `stale`, `ef-few`, 1280, dark and 200% text screenshots via `run-web`, with every §6 string verbatim and no English UI string.
+
+## 11. Desktop layout (from `lg`, added 2026-10-13; DESIGN.md Part A "Layout: phone and desktop")
+- **Decision: keep the section tabs**, no Cykel | Styrke columns. Reasons: (1) the two sections have different time axes (Cykel since Jan 2025, quarterly; Styrke weeks since blok 11), so side-by-side charts invite a comparison the axes don't support; that comparison is Samlet's job (M3) on one axis. (2) Two hero figures side by side would break "one primary purpose per screen". (3) Columns would make each chart narrower (≈ 588px) than the tab layout's 792px. (4) The routes and their loading states already exist.
+- **Header row** (full 1200px): h1 `Analyse`, the tabs, `UpdatedLine`, as on phone.
+- **Grid** (`lg:grid-cols-12 lg:gap-6 lg:items-start`): **rail** cols 1–4 = the hero (eFTP figure with its label line, delta, detail and honesty note), `lg:sticky lg:top-6`, so the figure stays in view while the charts scroll; **main** cols 5–12 = the three chart cards and the excluded-rides card, stacked 24px apart. All three charts share the main column's width, so the `Ingen ture` seams sit at identical x (§10.6 holds at 1280 as long as no chart gets its own width).
+- Charts: eFTP and EF at `--chart-height` (320px from `lg`); the weekly strips keep their height. Ticks as §4 (quarterly from 640).
+- **Excluded rides from `lg`:** opened, the list is a `<table>` (caption sr-only `Udeladte ture`) with columns **Dato** · **Årsag** · **Forklaring** · **Fakta** (`text-14`, Fakta tabular muted, header row `text-14` 700). Same rows, newest first, same strings as §5e split into cells; a null fact stays dropped. Below `lg` it stays the §5e list.
+- Fold at 1280 × 800: the hero and the eFTP plot including its x labels are visible.

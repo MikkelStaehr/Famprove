@@ -17,7 +17,7 @@ Owner: design-lead · 2026-10-01 · task e2 (L, no migration) · for `ui`. Contr
   - Each link has min-height 44px (32 text + 4 gap + 4 bar + 4 padding) and a focus ring of 3px `--focus`, offset 3px, `rounded-control`. At 200% text the words wrap onto two lines with no horizontal scroll.
 - **Cykel changes only here:** the `UpdatedLine` moves from under the h1 to **8px under the tab strip** on both routes, because each section has its own source and freshness. The Cykel hero stays 12px under it.
 
-## 3. Layout (390 first; 1280 = the same single column, max 720px)
+## 3. Layout (390 first; desktop from `lg`: `analyse.md` §11)
 1. Nav, h1 `Analyse`, tabs (`Styrke` current), `UpdatedLine` 8px under them.
 2. **Hero: the lift board** (§4), 12px under the updated line, directly on `--bg` (no card).
 3. **Card `Estimeret 1RM pr. uge`** (§5a): legend, block ruler, three panels (Squat, Bænkpres, Dødløft), x labels, then notes.
@@ -131,3 +131,6 @@ No chart. While no row has `e1rm_rpe_source = 'logged'`, one line follows the to
 5. **Tonnage:** every week × lift has a bar or a zero tick, including the two gap weeks. The current week is `--slab` and is the only slab on the page. The deload weeks are hatched.
 6. **Honesty:** notes 1–4 appear as specified. The `pre_log` weeks look identical to `lifted` weeks apart from text. The RPE line is present today and gone under `lsrpe`.
 7. **States:** `empty`, `error`, `stale` and `lsrpe`, plus 1280, dark and 200% text, screenshotted via `run-web`. Every §4–6 string is verbatim, with no English UI string apart from the lift name `Squat`.
+
+## 11. Desktop layout (from `lg`, added 2026-10-13)
+As `analyse.md` §11: tabs stay; header row full width; **rail** cols 1–4 = the lift board (§4) with its note, `lg:sticky lg:top-6` (the board fits 384px: name and top set left, `text-56` value right, as at 390); **main** cols 5–12 = `Estimeret 1RM pr. uge`, `Tonnage pr. uge`, then the RPE line, all one width so the block ruler and week columns align across both cards. Panel and strip heights unchanged. Fold at 1280 × 800: the board and the Squat panel are visible.

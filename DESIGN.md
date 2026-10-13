@@ -41,10 +41,43 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - Semantic colours carry meaning only with a label, icon or shape – never colour alone.
 - Tokens only: no magic values in components. Tailwind's default colour, text-size and radius scales stay removed.
 
-## Layout
-- Max content width 720px on desktop; single column on mobile.
-- Hero block at top of `/load`: key figure + one-line status. Everything else below.
-- Sticky header only if there is navigation; otherwise none (overridden for `ScreenNav`, see "Træning").
+## Layout: phone and desktop (decided 2026-10-13)
+Two usage modes, two layouts. **Phone** (390px): in the gym and on the bike; Træning and Fokus live here. **Desktop** (1280px+): at the desk; Belastning and Analyse become real desktop screens, not a stretched phone.
+
+**Breakpoints** (Tailwind's own, no custom ones):
+- **Phone layout below `lg` (1024px)**, including tablets: one column, mobile first. `sm` (640px) only switches chart details (`--chart-height` 240, more x ticks).
+- **Desktop = `lg` (≥ 1024px).** Every desktop rule below is an `lg:` class. Review widths: 390 and 1280.
+
+**Frame.** One centred container for every screen and the nav, never full-bleed:
+- Below `lg`: `max-w-content` (720px) with 12px gutters (`px-3`), as before.
+- From `lg`: `--container-wide` = 79rem (1264px) with 32px gutters (`lg:px-8`), so content is **max 1200px**, centred. At 1280 the content box starts 40px from the window edge.
+- Safe areas: the viewport is `viewport-fit=cover`. Gutters are `max(12px, env(safe-area-inset-left/right))`; the top padding is `max(12px, env(safe-area-inset-top))`.
+
+**Two kinds of screen:**
+| | Below `lg` | From `lg` |
+|---|---|---|
+| **Phone-first:** Træning `/`, Fokus `/fokus` | one column, full frame width | the same single column, `max-w-phone` (35rem = 560px). **Træning is left-aligned** (it shares the left edge with the top bar and every other screen's h1). **Fokus is centred** (no nav, a focus mode with no edge to hang from). Nothing reflows, nothing gets bigger. |
+| **Desktop:** Belastning `/load`, Analyse `/analyse`, `/analyse/styrke` | one column, phone order | **header row + 12-column grid**: header row (h1, tabs, updated line, notices) spans the full 1200px; under it a grid `lg:grid-cols-12 lg:gap-6 lg:items-start`, columns 78px, gutter 24px. **Rail** = columns 1–4 (384px). **Main** = columns 5–12 (792px). |
+
+**The desktop rule in one line:** the key figure sits top-left in the rail; charts sit in the main column; secondary lists sit in the rail under the key figure. DOM order is always the phone order (key figure → chart → list), so reading and tab order don't change with the width; grid placement does the rest.
+- **Belastning:** rail row 1 = hero (zone bar, zone reading, fitness delta, CTL/ATL line); main rows 1–2 = chart card (`lg:col-start-5 lg:col-span-8 lg:row-start-1 lg:row-span-2`); rail row 2 = week card (`lg:col-start-1 lg:col-span-4 lg:row-start-2`). Chart and week card sit side by side; the chart gets 792px. Spec `design/specs/load.md` §11.
+- **Analyse:** the section tabs stay (decided 2026-10-13, see `design/specs/analyse.md` §11): rail = the section's hero (Cykel: eFTP figure; Styrke: lift board), `lg:sticky lg:top-6`; main = the section's cards stacked, all the same width so the shared time axis and the `Ingen ture` seams stay aligned across charts.
+- **Chart height:** `--chart-height` is 224px below 640, 240px from 640, **320px from `lg`**. Small multiples with their own fixed heights (Analyse's weekly strips, Styrke's lift panels) keep them.
+- **Tables from `lg`:** a list that is a table in disguise becomes a real `<table>` in the main column (Cykel's excluded rides: Dato · Årsag · Forklaring · Fakta). Below `lg` it stays the stacked list.
+- **States on desktop:** skeletons use the same grid classes as the page (no jump when data arrives). `ErrorState` and `EmptyState` replace the whole grid, span the full width under the header row, text capped at 60ch.
+
+**Navigation (`ScreenNav`):**
+- **Phone (below `lg`): bottom bar.** `fixed inset-x-0 bottom-0`, full window width, `--bg` with a 1px `--border` top hairline (decorative). Inside, the frame's gutters and the same `--track` pill with three equal tabs (44px high). Padding 8px top, `max(8px, env(safe-area-inset-bottom))` bottom. Bar height `--bottom-bar` = `calc(4.25rem + env(safe-area-inset-bottom))` (68px + inset). `main` gets `padding-bottom: calc(var(--bottom-bar) + 48px)` and `html` gets `scroll-padding-bottom: var(--bottom-bar)` so a focused element is never hidden under the bar (WCAG 2.4.11).
+- **Large text:** when the tabs would wrap (the existing `@max-[20.5rem]` container query on the nav), the bar is **not fixed**: it falls back to the static strip at the top of the page (today's look), so it never covers a third of the screen at 200% text.
+- **Desktop (`lg`): top bar.** Static (not sticky), in the frame, 16px from the top; the pill is auto-width and left-aligned (tabs `min-w-32`, `px-5`), 24px above the h1.
+- **Fokus has no nav** at any width (unchanged).
+- **Current tab** (every width): `aria-current="page"`, `--text` fill, `--bg` text, weight 700; the others 600 `--text` on `--track`. Fill + weight, never colour alone, never `--slab`. `/analyse/styrke` marks Analyse.
+- DOM: one `<header><nav aria-label="Hovedmenu">` before `<main>` on every width, so keyboard users meet the nav first; only its position changes.
+
+**Spacing and type on desktop:** the type scale is the same at every width (no desktop sizes; `text-56` stays the largest element). From `lg`: `main` stack gap 24px; card padding 24px on all sides; header row → grid 24px; prose capped at 60ch. Everything stays on the 4-point scale.
+
+- Hero block at the top of `/load`: key figure + one-line status (top-left in the rail on desktop).
+- Sticky elements: the phone bottom bar (fixed) and the Analyse rail (desktop). No sticky header.
 
 ## Components (minimum set)
 - `KeyFigure` – label, value, delta (with direction), status colour.
@@ -53,7 +86,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - `StatusBadge` – text + semantic colour.
 - `EmptyState` – icon, one sentence, optional action.
 - `ErrorState` – what failed, when, retry.
-- `ScreenNav` – tab strip (three links: Træning · Belastning · Analyse; absent on `/fokus`) in the root layout; current tab = `aria-current="page"`, marked by weight **and** a bar or fill, never colour alone.
+- `ScreenNav` – tab strip (three links: Træning · Belastning · Analyse; absent on `/fokus`) in the root layout: bottom bar on phone, top bar on desktop ("Layout: phone and desktop"); current tab = `aria-current="page"`, marked by weight **and** a bar or fill, never colour alone.
 
 ## Interaction
 - Touch targets ≥ 44×44px. Tap, not hover, for anything essential.
@@ -108,7 +141,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - Days are a list of rows, not a table: native `<details>/<summary>` (keyboard and screen reader without JS), a 16px chevron that rotates without transition. Rest days (no ride and no strength activity) are a plain row reading "Hvile". Strength sits on its matched activity's date; planned-but-undone sessions are not shown (spec `design/specs/traening.md` §8). Column heads are visual only; each row speaks "cykling N TSS, …".
 - Row grid: day + three 64px TSS columns when the list is ≥ 20rem wide (Tailwind `@xs` container query, so it tracks text size); narrower, e.g. at 200% text, the day moves above the numbers instead of scrolling sideways.
 - Missing values show "–", spoken as "ikke registreret". A blank kg on a weighted exercise reads "intet kg logget", never "0 kg". Score/set is labelled as the raw score before the strength factor.
-- Power data badge (added 2026-10-13): under a ride's name, "Tjek effektdata" in `text-14` 600 `--warning` with the `WarningLine` triangle (never colour alone), a native `<details>` summary (44px target): tapping it shows Python's message (which rule fired) in `--text-muted`, since a tooltip doesn't show on a phone; `title` gives the same text on hover. /load shows each `app_notices` row (e.g. "FTP er sat til 230 W, men dine ture peger på 183 W") as a `WarningLine` under the "Opdateret" line.
+- Power data badge (added 2026-10-13): under a ride's name, "Tjek effektdata" in `text-14` 600 `--warning` with the `WarningLine` triangle (never colour alone), a native `<details>` summary (44px target): tapping it shows Python's message (which rule fired) in `--text-muted`, since a tooltip doesn't show on a phone; `title` gives the same text on hover. A 16px chevron after the label (the day rows' chevron, `aria-hidden`, rotates without transition when open) shows that it opens; the opened text sits 4px under it, max 60ch. /load shows each `app_notices` row (e.g. "FTP er sat til 230 W, men dine ture peger på 183 W") as a `WarningLine` under the "Opdateret" line: data-quality status belongs with freshness, above the hero and smaller than it. The FTP notice ends with why and what next (review 2026-10-13), keyed by the notice kind, as a second sentence in the same line: "Cykel-TSS regnes ud fra FTP, så ret den i intervals.icu." (true in both directions, so it never guesses whether TSS is too high or too low).
 - VI (added 2026-10-12): after NP and IF on a ride, "VI 1,18" (Python's ride_metrics.vi, 2 decimals). The term "VI" is an `<abbr>` with the tooltip "Jævnhed – 1.0 = konstant effekt" (supplementary: hover only, so nothing essential depends on it). When Python flags it (VI > 1.15 on a Z2 day: a planned session or the ride named "Z2"), the value is `--warning` with the triangle from `WarningLine` and sr-only ", ujævn effekt på en Z2-dag": never colour alone. A ride without VI (no NP or no average power) shows no VI item.
 - Effective kg (added 2026-10-12): on a bodyweight exercise whose effective kg (Python: logged + BODYWEIGHT × the exercise's bodyweight fraction) differs from the logged kg, the load line adds "· 95 kg effektivt" in `--text-muted`, spoken ", effektivt 95 kg". The logged kg stays as written; nothing is shown where the two are the same.
 
@@ -144,7 +177,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - **Freshness:**
   - The same "updated" line as `/load`. The stale sentence names the consequence: "Form og styrkeprogrammet kan være forældet." Fokus shows staleness only when stale, as a `WarningLine`.
   - A failed plan read is an ErrorState, never a rest day.
-- **Nav:** `ScreenNav` is a three-tab strip ("Træning" · "Belastning" · "Analyse") on every screen except `/fokus`. **Not sticky**, which overrides "Sticky header only if there is navigation": in the gym the 44px goes to the session, and the nav is used rarely.
+- **Nav:** `ScreenNav` is a three-tab strip ("Træning" · "Belastning" · "Analyse") on every screen except `/fokus`: a fixed **bottom bar** on phone, a static top bar on desktop (Part A "Layout: phone and desktop", changed 2026-10-13 at the user's request; it was a static top strip). The bar replaces the top strip's 68px, so the session block moves up by the same amount; `traening.md` §3.5 keeps its button guarantee against the viewport minus `--bottom-bar`.
 
 ---
 
@@ -187,7 +220,7 @@ Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the
 | `--zone-fresh` | `#b9d4ec` | `#234159` | as above |
 | `--zone-transition` | `#f0d9a0` | `#514525` | as above |
 | `--shadow-card` | `0 1px 0 rgb(0 0 0 / .05), 0 12px 28px -18px rgb(0 0 0 / .35)` | `none` | light cards lift off the warm grey; dark uses tone |
-| `--chart-height` | 224px below 640px, 240px from 640px | same | keeps hero + chart above the fold at 390 × 844 (load.md §9a) |
+| `--chart-height` | 224px below 640px, 240px from 640px, 320px from 1024px (`lg`) | same | keeps hero + chart above the fold at 390 × 844 (load.md §9a); 320 gives the desktop main column (792px) a readable 2.5 : 1 plot |
 
 - **Links** (e.g. "Tilbage til denne uge"): `--text`, weight 600, underline 1px offset 3px. Volt is never a link colour.
 - **Nav current tab:** `--text` fill with `--bg` text, weight 700 (fill + weight, not colour alone). It deliberately does not use `--slab`.
@@ -233,10 +266,10 @@ Every compared or mid-set number uses `font-variant-numeric: tabular-nums`, incl
 
 ## Space and density
 Balanced: big type, tight rows. All values are on the Part A 4-point scale.
-- Page gutter 12px (content 366px at 390). Max width 720px, single column at every width.
-- Header: nav 12px from the top; the title 16px below the nav; "Opdateret …" 4px under the title; the zone bar 12px under that.
-- `main` stack gap 16px, bottom padding 48px.
-- Card padding 24px top, 16px sides and bottom. Inside a card: progress bar 12px under the head, done list 16px, session line 12px, list 12px.
+- Page gutter 12px (content 366px at 390). Widths and the desktop grid: Part A "Layout: phone and desktop" (720px single column below `lg`; 1200px frame from `lg`; Træning/Fokus 560px).
+- Header (phone): the title 12px from the top (the nav is the bottom bar); "Opdateret …" 4px under the title; the zone bar 12px under that. Desktop: top bar 16px from the top, the title 24px under it.
+- `main` stack gap 16px (24px from `lg`), bottom padding 48px plus `--bottom-bar` on phone.
+- Card padding 24px top, 16px sides and bottom (24px all round from `lg`). Inside a card: progress bar 12px under the head, done list 16px, session line 12px, list 12px.
 - Tick row: min-height 44px, padding 8px 4px, grid `28px 1fr` with a 12px gap; the check aligns to the prescription line (bottom, 4px up).
 - `/load` keeps its week-card layout (Part A) with these tokens.
 
