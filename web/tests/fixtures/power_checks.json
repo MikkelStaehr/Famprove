@@ -1,0 +1,25 @@
+{
+  "activity": {
+    "id": "i500",
+    "start_date_local": "2026-10-11T09:00:00",
+    "type": "Ride",
+    "name": "Morning Ride",
+    "training_load": 139,
+    "weighted_avg_watts": 206,
+    "intensity_pct": 89.6,
+    "ftp": 230,
+    "moving_time_s": 6240,
+    "elapsed_time_s": 6500,
+    "power_load": 139,
+    "hr_load": null,
+    "device_name": "HAMMERHEAD Karoo",
+    "data_warning": "Maks 1.650 W er over 1,3 × din ePmax (1.210 W); Ét sample på 1.650 W ligger 900 W over begge naboer efter 1:02:05.",
+    "raw": null
+  },
+  "notice": {
+    "kind": "ftp_mismatch",
+    "date": "2026-10-13",
+    "message": "FTP er sat til 230 W, men dine ture peger på 183 W",
+    "updated_at": "2026-10-13T06:00:00+00:00"
+  }
+}

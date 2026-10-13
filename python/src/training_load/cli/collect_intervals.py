@@ -8,10 +8,12 @@ Default window: today - 14 days .. today (Europe/Copenhagen). Backfill: --since 
 import argparse
 import logging
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final
+
+import requests
 
 from training_load.config import (
     ConfigError,
@@ -21,7 +23,7 @@ from training_load.config import (
     mask_in_ci,
 )
 from training_load.db import strength_activities
-from training_load.db.activities import delete_ids, ids_between, upsert_activities
+from training_load.db.activities import delete_ids, ids_between, stored_warnings, upsert_activities
 from training_load.db.client import Postgrest
 from training_load.domain.cycling import CyclingActivity
 from training_load.domain.dates import ANALYSIS_START, today_local
@@ -46,36 +48,76 @@ class IntervalsRunSummary:
     missing_load: int
     data_warnings: int = 0  # rides with a power-data warning (domain.power_check)
     streams_read: int = 0  # power streams fetched for the single-sample rule
-    streams_unread: int = 0  # stream fetches that failed: those rides were checked on the peak only
+    streams_unread: int = (
+        0  # streams that failed or had no watts: the ride keeps its stored warning
+    )
+    power_unreadable: int = 0  # rides whose max power or ePmax couldn't be read
+
+
+MAX_POWER_UNREADABLE_SHARE: Final = 0.1
+"""Fail the run when more than this share of the rides has an unreadable max power or ePmax:
+the API's shape has probably changed, and the warnings would silently stop."""
+
+
+class PowerDataError(RuntimeError):
+    """Too many rides had unreadable power fields; the rides were written, the run fails."""
+
+
+@dataclass(frozen=True, slots=True)
+class PowerChecks:
+    rides: list[CyclingActivity]
+    read: int  # streams fetched and checked
+    unread: int  # streams that failed or had no watts: those rides keep their stored warning
+    unreadable: int  # rides whose max power or ePmax couldn't be read
+
+
+def _read[T](
+    raw: Mapping[str, object], key: str, narrow: Callable[[Mapping[str, object], str], T | None]
+) -> tuple[T | None, bool]:
+    """(value, unreadable): a wrongly typed field is None and counted, never a silent default."""
+    try:
+        return narrow(raw, key), False
+    except ValueError:
+        return None, True
 
 
 def with_power_checks(
-    rides: Sequence[CyclingActivity], *, send: HttpSend, api_key: str
-) -> tuple[list[CyclingActivity], int, int]:
+    rides: Sequence[CyclingActivity],
+    *,
+    send: HttpSend,
+    api_key: str,
+    stored: Mapping[str, str | None] | None = None,
+) -> PowerChecks:
     """Each ride with its data_warning (domain.power_check). The power stream is fetched only
-    where the max power is above 2 x the ride's FTP; a fetch that fails is counted, and that
-    ride is judged on the peak rule alone (never silently "no spike"). Returns (rides, read,
-    unread)."""
+    where the max power is above 2 x the ride's FTP. A stream that fails, or has no watts, is
+    counted as unread and the ride keeps its ``stored`` warning (it may hold a single-sample
+    finding); without one it is judged on the peak rule. Unreadable power fields are counted."""
+    stored = stored or {}
     out: list[CyclingActivity] = []
-    read = unread = 0
+    read = unread = unreadable = 0
     for a in rides:
         raw = a.raw or {}
-        try:
-            max_w = opt_int(raw, "icu_pm_p_max")
-            epmax = opt_float(raw, "icu_rolling_p_max")
-        except ValueError:
-            max_w, epmax = None, None  # unreadable raw: counted by compute's ride analysis
+        max_w, bad_max = _read(raw, "icu_pm_p_max", opt_int)
+        epmax, bad_epmax = _read(raw, "icu_rolling_p_max", opt_float)
+        unreadable += bad_max or bad_epmax
         spike = None
+        stream_unread = False
         if needs_stream(max_w, a.ftp):
             try:
                 stream = fetch_power_stream(send, api_key=api_key, activity_id=a.id)
-                read += 1
-                if stream is not None:
-                    spike = largest_spike(stream[0], stream[1])
-            except HttpError, ValueError:
+            except HttpError, ValueError, requests.RequestException:
+                stream = None
+            if stream is None:
+                stream_unread = True
                 unread += 1
-        out.append(replace(a, data_warning=data_warning(max_w, epmax, spike)))
-    return out, read, unread
+            else:
+                read += 1
+                spike = largest_spike(stream[0], stream[1])
+        warning = data_warning(max_w, epmax, spike)
+        if stream_unread and stored.get(a.id) is not None:
+            warning = stored[a.id]
+        out.append(replace(a, data_warning=warning))
+    return PowerChecks(rides=out, read=read, unread=unread, unreadable=unreadable)
 
 
 def parse_since(argv: Sequence[str] | None, today: date) -> date:
@@ -128,14 +170,21 @@ def run(
     if parsed.missing_load_ids:
         log.warning("%d rides have no training load; counted as 0", len(parsed.missing_load_ids))
 
-    rides, streams_read, streams_unread = with_power_checks(
-        parsed.cycling, send=send, api_key=intervals.api_key
+    checks = with_power_checks(
+        parsed.cycling,
+        send=send,
+        api_key=intervals.api_key,
+        stored=stored_warnings(db, since, today),
     )
-    if streams_unread:
+    rides = checks.rides
+    # Counts only (public logs).
+    if checks.unread:
         log.warning(
-            "%d power streams could not be read: those rides were checked on max power only",
-            streams_unread,
+            "%d power streams could not be read: those rides keep their stored power warning",
+            checks.unread,
         )
+    if checks.unreadable:
+        log.warning("%d rides have an unreadable max power or ePmax", checks.unreadable)
     upsert_activities(db, rides)
     strength_activities.upsert_strength_activities(db, parsed.strength)
     stubs = set(parsed.stub_ids)
@@ -146,7 +195,7 @@ def run(
     )
     strength_activities.delete_ids(db, stale_strength)
 
-    return IntervalsRunSummary(
+    summary = IntervalsRunSummary(
         fetched=len(raw),
         upserted=len(parsed.cycling),
         strength_upserted=len(parsed.strength),
@@ -155,9 +204,16 @@ def run(
         excluded=sum(parsed.excluded_types.values()),
         missing_load=len(parsed.missing_load_ids),
         data_warnings=sum(1 for a in rides if a.data_warning is not None),
-        streams_read=streams_read,
-        streams_unread=streams_unread,
+        streams_read=checks.read,
+        streams_unread=checks.unread,
+        power_unreadable=checks.unreadable,
     )
+    if rides and checks.unreadable > MAX_POWER_UNREADABLE_SHARE * len(rides):
+        raise PowerDataError(
+            f"{checks.unreadable} of {len(rides)} rides have an unreadable max power or ePmax "
+            "(intervals.icu fields icu_pm_p_max / icu_rolling_p_max): the power check is off"
+        )
+    return summary
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -79,7 +79,8 @@ def data_warning(max_w: int | None, epmax_w: float | None, spike: Spike | None) 
         and epmax_w > 0
         and max_w > MAX_OVER_EPMAX * epmax_w
     ):
-        parts.append(f"Maks {_w(max_w)} er over 1,3 × din ePmax ({_w(epmax_w)})")  # noqa: RUF001  # Danish UI text
+        factor = f"{MAX_OVER_EPMAX:g}".replace(".", ",")
+        parts.append(f"Maks {_w(max_w)} er over {factor} × din ePmax ({_w(epmax_w)})")  # noqa: RUF001  # Danish UI text
     if spike is not None:
         when = "" if spike.at_s is None else f" efter {_clock(spike.at_s)}"
         parts.append(

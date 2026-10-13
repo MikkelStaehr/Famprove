@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { dayDetails, selectWeek, weekParam, weekView } from "../src/lib/dashboard-view.ts";
@@ -302,4 +303,18 @@ test("app_notices rows parse; a notice without a message is rejected", () => {
   const row = { kind: "ftp_mismatch", date: "2026-10-13", message: "FTP er sat til 230 W, men dine ture peger på 183 W" };
   assert.deepEqual(parseAppNoticeRow(row), row);
   assert.throws(() => parseAppNoticeRow({ ...row, message: null }), RowError);
+});
+
+test("contract: the power-check rows Python writes parse (fixtures/power_checks.json)", () => {
+  const rows = JSON.parse(readFileSync(new URL("./fixtures/power_checks.json", import.meta.url), "utf-8")) as {
+    activity: unknown;
+    notice: unknown;
+  };
+  const ride = parseActivityRow(rows.activity);
+  assert.match(ride.dataWarning ?? "", /^Maks 1\.650 W er over 1,3 × din ePmax \(1\.210 W\); Ét sample/);
+  assert.deepEqual(parseAppNoticeRow(rows.notice), {
+    kind: "ftp_mismatch",
+    date: "2026-10-13",
+    message: "FTP er sat til 230 W, men dine ture peger på 183 W",
+  });
 });

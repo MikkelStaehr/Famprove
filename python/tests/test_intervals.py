@@ -107,9 +107,21 @@ def test_run_upserts_and_mirrors_deletions_only_inside_window(
     db: InMemoryPostgrest, caplog: pytest.LogCaptureFixture
 ) -> None:
     db.tables["activities"] = [
-        {"id": "i_old", "start_date_local": "2026-02-01T07:00:00"},  # outside window: kept
-        {"id": "i_gone", "start_date_local": "2026-03-05T07:00:00"},  # deleted upstream
-        {"id": "12345678", "start_date_local": "2026-03-10T07:00:00"},  # stub id: never deleted
+        {
+            "id": "i_old",
+            "start_date_local": "2026-02-01T07:00:00",
+            "data_warning": None,
+        },  # outside window: kept
+        {
+            "id": "i_gone",
+            "start_date_local": "2026-03-05T07:00:00",
+            "data_warning": None,
+        },  # deleted upstream
+        {
+            "id": "12345678",
+            "start_date_local": "2026-03-10T07:00:00",
+            "data_warning": None,
+        },  # stub id: never deleted
     ]
     db.tables["strength_activities"] = [
         {"id": "i_lift_old", "start_date_local": "2026-02-01T07:00:00"},  # outside window: kept

@@ -89,6 +89,20 @@ def upsert_activities(db: Postgrest, activities: Sequence[CyclingActivity]) -> N
         db.upsert(TABLE, [to_row(a) for a in activities], on_conflict="id")
 
 
+def stored_warnings(db: Postgrest, first_day: date, last_day: date) -> dict[str, str | None]:
+    """data_warning per ride id with first_day <= start_date_local.date() <= last_day."""
+    rows = db.select(
+        TABLE,
+        columns="id,data_warning",
+        order="id",
+        filters=[
+            ("start_date_local", f"gte.{first_day.isoformat()}T00:00:00"),
+            ("start_date_local", f"lt.{(last_day + timedelta(days=1)).isoformat()}T00:00:00"),
+        ],
+    )
+    return {req_str(r, "id"): opt_str(r, "data_warning") for r in rows}
+
+
 def ids_between(db: Postgrest, first_day: date, last_day: date, *, table: str = TABLE) -> set[str]:
     """Ids with first_day <= start_date_local.date() <= last_day, in ``table`` (activities or
     strength_activities: same id and start_date_local columns).

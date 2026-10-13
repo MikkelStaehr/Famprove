@@ -16,6 +16,12 @@ class AppNoticeRow(TypedDict):
     updated_at: str  # ISO timestamptz of the write
 
 
+def notice_row(kind: str, message: str, *, today: date, now: datetime) -> AppNoticeRow:
+    return AppNoticeRow(
+        kind=kind, date=today.isoformat(), message=message, updated_at=now.isoformat()
+    )
+
+
 def set_notice(
     db: Postgrest, kind: str, message: str | None, *, today: date, now: datetime
 ) -> None:
@@ -23,7 +29,4 @@ def set_notice(
     if message is None:
         db.delete(TABLE, [("kind", f"eq.{kind}")])
         return
-    row = AppNoticeRow(
-        kind=kind, date=today.isoformat(), message=message, updated_at=now.isoformat()
-    )
-    db.upsert(TABLE, [row], on_conflict="kind")
+    db.upsert(TABLE, [notice_row(kind, message, today=today, now=now)], on_conflict="kind")

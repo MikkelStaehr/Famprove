@@ -131,8 +131,9 @@ def test_collect_checks_every_ride_and_fetches_streams_only_for_candidates() -> 
         "i3": [{"type": "time", "data": [0, 1, 2]}, {"type": "watts", "data": [250, 981, 260]}],
     }
     send = stream_send(streams)
-    checked, read, unread = with_power_checks(rides, send=send, api_key="k")
-    assert (read, unread) == (2, 0)
+    result = with_power_checks(rides, send=send, api_key="k")
+    checked = result.rides
+    assert (result.read, result.unread, result.unreadable) == (2, 0, 0)
     assert [len(send.calls)] == [2]
     assert checked[0].data_warning is None
     assert checked[1].data_warning == "Maks 1.700 W er over 1,3 × din ePmax (1.210 W)."  # noqa: RUF001
@@ -141,15 +142,39 @@ def test_collect_checks_every_ride_and_fetches_streams_only_for_candidates() -> 
     )
 
 
-def test_a_stream_that_cannot_be_read_is_counted_and_the_peak_rule_still_applies() -> None:
-    rides = [ride("i2", ftp=230, pmax=1700, epmax=1210.0)]
-    checked, read, unread = with_power_checks(
-        rides, send=stream_send({}, fail=frozenset({"i2"})), api_key="k"
-    )
-    assert (read, unread) == (0, 1)
-    assert checked[0].data_warning is not None and checked[0].data_warning.startswith(
+def test_a_stream_that_cannot_be_read_is_counted_and_the_stored_warning_kept() -> None:
+    rides = [
+        ride("i2", ftp=230, pmax=1700, epmax=1210.0),
+        ride("i3", ftp=230, pmax=981, epmax=1210.0),
+    ]
+    stored = {"i3": "Ét sample på 981 W ligger 721 W over begge naboer efter 0:01."}
+    send = stream_send({}, fail=frozenset({"i2", "i3"}))
+    result = with_power_checks(rides, send=send, api_key="k", stored=stored)
+    assert (result.read, result.unread) == (0, 2)
+    # i2: no stored warning -> judged on the peak rule; i3: keeps its single-sample finding
+    assert result.rides[0].data_warning is not None and result.rides[0].data_warning.startswith(
         "Maks 1.700 W"
     )
+    assert result.rides[1].data_warning == stored["i3"]
+
+
+def test_a_stream_without_watts_counts_as_unread() -> None:
+    rides = [ride("i3", ftp=230, pmax=981, epmax=1210.0)]
+    send = stream_send({"i3": [{"type": "time", "data": [0, 1]}]})
+    result = with_power_checks(rides, send=send, api_key="k")
+    assert (result.read, result.unread, result.rides[0].data_warning) == (0, 1, None)
+
+
+def test_unreadable_power_fields_are_counted_never_silent() -> None:
+    bad = ride("i4", ftp=230, pmax=None, epmax=None)
+    bad = CyclingActivity(
+        **{
+            **{f: getattr(bad, f) for f in bad.__dataclass_fields__},
+            "raw": {"icu_pm_p_max": "x", "icu_rolling_p_max": 1210.0},
+        }
+    )
+    result = with_power_checks([bad], send=stream_send({}), api_key="k")
+    assert (result.unreadable, result.rides[0].data_warning) == (1, None)
 
 
 def test_the_ftp_notice_is_written_while_it_holds_and_cleared_after() -> None:

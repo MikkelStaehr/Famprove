@@ -61,6 +61,10 @@ def run(
     ftp = ftps.ftp
     # The FTP sanity check (domain.power_check): a notice on /load while FTP and eFTP disagree.
     notice = ftp_notice(ftps.ftp, ftps.eftp)
+    if ftps.ftp is None or ftps.eftp is None:
+        log.warning(
+            "FTP check skipped: intervals.icu has no %s", "FTP" if ftps.ftp is None else "eFTP"
+        )
     set_notice(
         db, FTP_NOTICE_KIND, notice, today=computed_at.astimezone(LOCAL_TZ).date(), now=computed_at
     )
