@@ -37,8 +37,10 @@ const xOf = (seconds: number, scaleS: number): number => Math.round(((Math.max(0
  * shape, not colour). `elapsedS` is whole seconds from the timer.
  */
 export function dotField(elapsedS: number, scaleS: number, minS: number | null, maxS: number | null): DotField {
-  const filled = Math.min(FIELD_DOTS, Math.max(0, Math.floor((elapsedS * FIELD_DOTS) / scaleS + 1e-9)));
-  const overFrom = maxS === null ? FIELD_DOTS : Math.ceil((maxS * FIELD_DOTS) / scaleS - 1e-9);
+  // A non-positive scale can't happen (rows.ts rejects such rest bands; the warm-up scale is fixed);
+  // if it ever did, the field stays empty rather than drawing NaN geometry.
+  const filled = scaleS > 0 ? Math.min(FIELD_DOTS, Math.max(0, Math.floor((elapsedS * FIELD_DOTS) / scaleS + 1e-9))) : 0;
+  const overFrom = maxS === null || scaleS <= 0 ? FIELD_DOTS : Math.ceil((maxS * FIELD_DOTS) / scaleS - 1e-9);
   const dots: FieldDot[] = [];
   for (let i = 0; i < FIELD_DOTS; i += 1) {
     const c = Math.floor(i / FIELD_ROWS);
@@ -198,10 +200,13 @@ export function signature(exercises: readonly SigExercise[], order: readonly Set
     if (it.kind === "stub") {
       stubs.push({ x: round(x), w: round(4 * s) });
     } else {
-      const load = it.kg !== null && it.reps !== null ? it.reps * it.kg : null;
-      const solid = load !== null && maxLoad > 0;
+      // Hollow means exactly "no kg in the sheet" (the legend's reminder says so). A set with kg
+      // but unreadable reps (e.g. "AMRAP") is solid at the minimum height, never hollow.
+      const solid = it.kg !== null && it.kg > 0;
       if (solid) kgKnown += 1;
-      const ratio = solid ? load / maxLoad : it.reps !== null && maxReps > 0 ? it.reps / maxReps : 0;
+      const load = solid && it.reps !== null ? it.reps * (it.kg ?? 0) : null;
+      const ratio =
+        load !== null && maxLoad > 0 ? load / maxLoad : !solid && it.reps !== null && maxReps > 0 ? it.reps / maxReps : 0;
       bars.push({ x: round(x), w: round(4 * s), h: round(BAR_MIN + (BAR_MAX - BAR_MIN) * ratio), hollow: !solid, muted: it.feel === -1, marker: markerOf(it.feel) });
     }
     x += 4 * s;

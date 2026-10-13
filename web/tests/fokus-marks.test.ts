@@ -109,6 +109,19 @@ test("signature legend: the kg reminder shows only when a bar is hollow", () => 
   assert.equal(showsKgReminder(signature(EX, ORDER, logOf([skip(4, 1, 0)]))), false); // skipped only: no bars
 });
 
+test("signature: kg in the sheet with unreadable reps (AMRAP) is solid at the minimum, and asks for no kg", () => {
+  const amrap = [{ name: "Squat", row: 4, repsText: "AMRAP", kg: 140 }];
+  const sig = signature(amrap, ORDER.slice(0, 2), logOf([done(4, 1, 10)]));
+  assert.deepEqual(sig.bars.map((b) => [b.hollow, b.h]), [[false, 8]]);
+  assert.equal(showsKgReminder(sig), false);
+  assert.match(sig.sentence, /Kg kendt for 1 sæt/);
+});
+
+test("dot field: a non-positive scale draws an empty field, never NaN", () => {
+  const field = dotField(90, 0, null, null);
+  assert.ok(field.dots.every((d) => d.kind === "empty" && Number.isFinite(d.cx) && Number.isFinite(d.cy)));
+});
+
 test("drawing reps: reps_done, else the prescription (a range's midpoint), else null", () => {
   assert.equal(drawingReps(EX[1], done(6, 1, 0, { repsDone: 11 })), 11);
   assert.equal(drawingReps(EX[1], done(6, 1, 0)), 10);
@@ -123,4 +136,28 @@ test("set view value row: ranges as one figure, RPE / PROCENT captions", () => {
   assert.deepEqual(prescribedCell("-12.5%"), { caption: "Procent", value: "-12.5", unit: "%" });
   assert.equal(prescribedCell(null), null);
   assert.deepEqual(prescribedCell("tung"), { caption: null, value: "tung", unit: null });
+});
+
+test("signature: a clock skew (an end before the previous end) or a missing end is a 2-unit gap, never negative", () => {
+  const log = logOf([done(4, 1, 500), done(4, 2, 100), done(4, 3, 280)]);
+  const sig = signature(EX, ORDER, log);
+  // Gaps 2 (first), 2 (Δ < 0), 2 + 14·180/360 = 9; total 25 → scale 2.
+  assert.deepEqual(sig.bars.map((b) => b.x), [4, 16, 42]);
+  const noEnd = signature(EX, ORDER, logOf([done(4, 1, 0, { endedAt: null }), done(4, 2, 180)]));
+  assert.ok([...noEnd.bars.map((b) => b.x), ...noEnd.bars.map((b) => b.h)].every(Number.isFinite));
+});
+
+test("all skipped: stubs and rings only, finite geometry, counts in the sentences", () => {
+  const log = logOf([skip(4, 1, 0), skip(4, 2, 10), skip(4, 3, 20)]);
+  const sig = signature(EX, ORDER, log);
+  assert.equal(sig.bars.length, 0);
+  assert.deepEqual(sig.stubs.map((s) => s.x), [4, 16, 28]);
+  assert.equal(showsKgReminder(sig), false);
+  assert.equal(
+    sig.sentence,
+    "Sessionens forløb, et sæt pr. søjle: 0 udført, 3 sprunget over. Kg kendt for 0 sæt; resten er tegnet efter reps. 0 lettere, 0 som ventet, 0 hårdere, 0 uden vurdering.",
+  );
+  const row = dotRow(EX, ORDER, log);
+  assert.deepEqual(row.groups.map((g) => g.dots.map((d) => d.kind)), [["skipped", "skipped", "skipped"]]);
+  assert.equal(row.sentence, "I dag: 0 sæt udført, 3 sprunget over.");
 });
