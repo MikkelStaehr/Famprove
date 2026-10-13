@@ -327,7 +327,19 @@ def test_rest_band_and_the_warm_up_ramp_on_a_main_lifts_first_set(sheet: Sheet) 
     assert by_key[(backoff.sheet_row, 1)].ramp is None  # the same exercise run
     assert by_key[(pull.sheet_row, 1)].ramp is None  # not a main lift
     assert (top.rest_min_s, top.rest_max_s) == (180, 300)  # 3 reps at RPE 7: heavy
-    assert (by_key[(backoff.sheet_row, 1)].rest_min_s, by_key[(pull.sheet_row, 1)].rest_max_s) == (
-        90,
-        120,
-    )
+    assert by_key[(backoff.sheet_row, 1)].rest_min_s == 180  # a main lift always rests 3-5 min
+    assert by_key[(pull.sheet_row, 1)].rest_max_s == 120
+
+
+def test_a_main_lift_or_its_variant_always_rests_3_to_5_minutes(sheet: Sheet) -> None:
+    light_squat = sheet.add(sheet_row=70, reps=5.0, prescribed="-10%")  # no RPE, 5 reps
+    tempo = sheet.add(sheet_row=71, reps=3.0, prescribed="RPE 5.5", name="3.0.0 Tempo squat")
+    accessory = sheet.add(sheet_row=72, reps=10.0, reps_text="8 - 12", prescribed="RPE 7 - 8",
+                          type="UPPER BACK", name="Facepulls")  # fmt: skip
+    heavy_accessory = sheet.add(sheet_row=73, reps=5.0, prescribed="RPE 8", type="UPPER BACK",
+                                name="Facepulls")  # fmt: skip
+    by_row = {p.sheet_row: (p.rest_min_s, p.rest_max_s) for p in sheet.plan()}
+    assert by_row[light_squat.sheet_row] == (180, 300)  # category main
+    assert by_row[tempo.sheet_row] == (180, 300)  # a variant: parent lift SQUAT
+    assert by_row[accessory.sheet_row] == (90, 120)
+    assert by_row[heavy_accessory.sheet_row] == (180, 300)  # reps <= 5 at RPE >= 7

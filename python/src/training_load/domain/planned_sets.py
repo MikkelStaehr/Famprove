@@ -38,7 +38,7 @@ from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final, Literal
 
-from training_load.domain.exercises import Catalog
+from training_load.domain.exercises import Catalog, Exercise
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.set_feedback import Progression
 from training_load.domain.strength import StrengthSet, iso_week_start
@@ -76,8 +76,9 @@ HEAVY_MAX_REPS: Final = 5
 HEAVY_MIN_RPE: Final = 7.0
 REST_HEAVY_S: Final = (180, 300)
 REST_OTHER_S: Final = (90, 120)
-"""Recommended rest after a set (user, 2026-10-13): 3-5 min after a heavy set (reps <= 5 at a
-prescribed RPE >= 7), else 1.5-2 min."""
+"""Recommended rest after a set (user, 2026-10-13): a main lift or its variant (catalogue
+category main, or a parent lift, e.g. "3.0.0 Tempo squat") always 3-5 min; any other set 3-5 min
+when heavy (reps <= 5 at a prescribed RPE >= 7), else 1.5-2 min."""
 RAMP: Final = ((40, 5), (60, 3), (80, 2))
 """The warm-up ramp before a main lift: (% of the first working set's kg, reps)."""
 
@@ -198,7 +199,17 @@ def _same_reps(a: StrengthSet, b: StrengthSet) -> bool:
     return a.reps == b.reps
 
 
-def rest_band(reps: float, rpe: float | None) -> tuple[int, int]:
+def is_main_lift(exercise: Exercise | None) -> bool:
+    """A main lift or one of its variants: category main, or a parent lift (tempo variants are
+    category accessory with a parent lift)."""
+    return exercise is not None and (
+        exercise.category == "main" or exercise.parent_lift is not None
+    )
+
+
+def rest_band(reps: float, rpe: float | None, *, main_lift: bool = False) -> tuple[int, int]:
+    if main_lift:
+        return REST_HEAVY_S
     heavy = reps <= HEAVY_MAX_REPS and rpe is not None and rpe >= HEAVY_MIN_RPE
     return REST_HEAVY_S if heavy else REST_OTHER_S
 
@@ -297,7 +308,7 @@ def planned_sets(
         uncapped = None
         if suggested is not None:
             suggested, uncapped = weekly_cap(suggested, anchor, step)
-        rest_min, rest_max = rest_band(s.reps, rpe)
+        rest_min, rest_max = rest_band(s.reps, rpe, main_lift=is_main_lift(exercise))
         out.append(
             PlannedSet(
                 sheet_id=s.sheet_id,

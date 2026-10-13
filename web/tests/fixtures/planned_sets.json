@@ -18,8 +18,8 @@
     "uncapped_kg": null,
     "adjustment_kg": null,
     "adjustment_reason": null,
-    "rest_min_s": 90,
-    "rest_max_s": 120,
+    "rest_min_s": 180,
+    "rest_max_s": 300,
     "ramp": [
       {
         "pct": 40,
@@ -82,8 +82,8 @@
     "uncapped_kg": null,
     "adjustment_kg": null,
     "adjustment_reason": null,
-    "rest_min_s": 90,
-    "rest_max_s": 120,
+    "rest_min_s": 180,
+    "rest_max_s": 300,
     "ramp": null,
     "computed_at": "2026-10-13T08:00:00+00:00"
   }
