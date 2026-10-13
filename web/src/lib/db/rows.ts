@@ -1174,3 +1174,31 @@ export function parseExerciseFeelRow(raw: unknown): ExerciseFeelRow {
   if (verdictText.trim() === "") throw new RowError("exercise_feel.verdict_text: expected a sentence");
   return { exerciseId: f.number("exercise_id"), name: embedded.string("name"), ratedN, verdictText };
 }
+
+/** public.exercises.category (schema check constraint; not null). */
+export type ExerciseCategory = "main" | "accessory" | "isolation" | "bodyweight" | "abs";
+const EXERCISE_CATEGORIES: readonly ExerciseCategory[] = ["main", "accessory", "isolation", "bodyweight", "abs"];
+
+/** public.exercises' name, aliases and category: Fokus tells a main lift's warm-up from an accessory's. */
+export type ExerciseCategoryRow = {
+  readonly name: string;
+  readonly aliases: readonly string[];
+  readonly category: ExerciseCategory;
+};
+
+export const EXERCISE_CATEGORY_SELECT = {
+  table: "exercises",
+  columns: "name,aliases,category",
+  order: "id",
+} as const;
+
+export function parseExerciseCategoryRow(raw: unknown): ExerciseCategoryRow {
+  const f = new Fields(EXERCISE_CATEGORY_SELECT.table, raw);
+  const aliases = f.array("aliases").map((a) => {
+    if (typeof a !== "string") throw new RowError("exercises.aliases: expected text values");
+    return a;
+  });
+  const category = oneOf(EXERCISE_CATEGORY_SELECT.table, "category", f.string("category"), EXERCISE_CATEGORIES);
+  if (category === null) throw new RowError("exercises.category: expected a category");
+  return { name: f.string("name"), aliases, category };
+}

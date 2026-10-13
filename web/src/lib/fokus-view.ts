@@ -6,7 +6,7 @@
  */
 import type { Freshness } from "./dashboard-view.ts";
 import { formatKg, formatSetLoad, formatTimeOfDay, formatUpdatedAt, spokenRange } from "./format.ts";
-import type { SuggestionBasis } from "./db/rows.ts";
+import type { ExerciseCategoryRow, SuggestionBasis } from "./db/rows.ts";
 import {
   firstOpen,
   isWarmup,
@@ -382,6 +382,44 @@ export function rampBasis(e: FokusExercise): string | null {
   if (e.suggestedKg !== null) return `Op mod forslaget ${formatKg(e.suggestedKg)} kg`;
   if (e.reference !== null) return `Op mod sidste uge ${referenceText(e.reference)}`;
   return null;
+}
+
+/** A catalogue key: trimmed, case-insensitive (as lib/db/set-log.ts and public.exercises' lower(btrim(name))). */
+function catalogueKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/**
+ * The name and alias keys of the catalogue's main lifts (category "main"), matched as the server
+ * matches: a canonical name wins over another exercise's alias. A failed read (null) is null.
+ */
+export function mainLiftKeys(rows: readonly Pick<ExerciseCategoryRow, "name" | "aliases" | "category">[] | null): string[] | null {
+  if (rows === null) return null;
+  const category = new Map<string, ExerciseCategoryRow["category"]>();
+  for (const r of rows) if (!category.has(catalogueKey(r.name))) category.set(catalogueKey(r.name), r.category);
+  for (const r of rows) for (const a of r.aliases) if (!category.has(catalogueKey(a))) category.set(catalogueKey(a), r.category);
+  return [...category].filter(([, c]) => c === "main").map(([k]) => k);
+}
+
+/**
+ * A main lift: a ramp is present, else the catalogue says category "main". An unknown name, or
+ * an unread catalogue (null), is not a main lift, so its warm-up shows the timer only.
+ */
+export function isMainLift(e: Pick<FokusExercise, "name" | "ramp">, mainKeys: readonly string[] | null): boolean {
+  if (e.ramp !== null) return true;
+  return mainKeys !== null && mainKeys.includes(catalogueKey(e.name));
+}
+
+/** The warm-up clock with no recorded start (§2.2): a static 0:00 and this line, never a timer from page load. */
+export const WARMUP_NOT_STARTED = "Opvarmningen er ikke startet.";
+
+/** Fortryd of "Begynd træning" goes back to Træning with this query (fokus-pause.md §6). */
+export const BEGIN_UNDONE_HREF = "/?fortrudt=begin";
+export const BEGIN_UNDONE_TEXT = "Fortrudt: træningen er ikke begyndt.";
+
+/** Træning was opened by Fortryd of "Begynd træning" (`location.search`). */
+export function beginUndone(search: string): boolean {
+  return new URLSearchParams(search).get("fortrudt") === "begin";
 }
 
 /** Main lifts get a ramp or its absence; accessories nothing (timer only). */

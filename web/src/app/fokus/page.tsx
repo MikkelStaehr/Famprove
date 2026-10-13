@@ -6,9 +6,9 @@ import { FokusError, NoSessionNote } from "@/components/fokus/FokusNotes";
 import { FokusScreen } from "@/components/fokus/FokusScreen";
 import { type DataError, isDataError } from "@/lib/data-error";
 import { devFixture } from "@/lib/db/dev-fixture";
-import { loadTrainingForm, loadTrainingPlan } from "@/lib/db/queries";
+import { loadExerciseCategories, loadTrainingForm, loadTrainingPlan } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
-import { fokusStaleNote, noSessionSentence } from "@/lib/fokus-view";
+import { fokusStaleNote, mainLiftKeys, noSessionSentence } from "@/lib/fokus-view";
 import { buildTrainingPlan, resolveToday, trainingHeader, type TrainingPlan } from "@/lib/training-view";
 
 export const metadata: Metadata = {
@@ -56,7 +56,12 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
   await connection(); // request time: "today" is the Copenhagen date now, never the build's
   const now = new Date();
   const today = resolveToday(now, process.env);
-  const [stale, state, params] = await Promise.all([staleNote(today, now), planState(today), searchParams]);
+  const [stale, state, params, catalogue] = await Promise.all([
+    staleNote(today, now),
+    planState(today),
+    searchParams,
+    loadExerciseCategories(), // a failed read is null: no main lift known, nothing breaks
+  ]);
   if (state.kind === "error") {
     return (
       <FokusColumn>
@@ -91,6 +96,7 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
         staleNote={stale}
         devSwitches={devSwitches}
         enteredFromTraening={params.view === "set"}
+        mainLifts={mainLiftKeys(catalogue)}
       />
     </FokusColumn>
   );

@@ -24,6 +24,12 @@ import {
   suggestionReason,
   undoSentence,
   unsavedText,
+  BEGIN_UNDONE_HREF,
+  BEGIN_UNDONE_TEXT,
+  beginUndone,
+  isMainLift,
+  mainLiftKeys,
+  WARMUP_NOT_STARTED,
 } from "../src/lib/fokus-view.ts";
 import { applyTap, type LoggedSet, progress, setKey, type SetRef } from "../src/lib/set-taps.ts";
 
@@ -420,4 +426,37 @@ test("suggestion line: added, range, hold, capped + added, cap only; never 0 kg"
   for (const e of [added, range, hold, cappedAdded, capOnly]) {
     assert.doesNotMatch(`${adjustmentBrackets(e, "long")} ${adjustmentLine(e)?.signed}`, /\b0 kg/);
   }
+});
+
+const rows = [
+  { name: "Squat", aliases: ["Back squat"], category: "main" as const },
+  { name: "Lat pulldowns", aliases: [], category: "accessory" as const },
+  { name: "Bench press", aliases: ["Squat"], category: "main" as const }, // an alias never beats a name
+  { name: "Pause squat", aliases: ["Bænkpres"], category: "accessory" as const },
+];
+const ex = (name: string, ramp: FokusExercise["ramp"] = null) => ({ name, ramp });
+
+test("polish: finds main lifts by name or alias, trimmed and case-insensitive", () => {
+  const keys = mainLiftKeys(rows);
+  assert.equal(isMainLift(ex("  squat "), keys), true);
+  assert.equal(isMainLift(ex("BACK SQUAT"), keys), true);
+  assert.equal(isMainLift(ex("Bench press"), keys), true);
+  assert.equal(isMainLift(ex("Lat pulldowns"), keys), false);
+  assert.equal(isMainLift(ex("bænkpres"), keys), false); // alias of an accessory
+});
+
+test("polish: an unknown name or an unread catalogue is not a main lift; a ramp always is", () => {
+  assert.equal(isMainLift(ex("Deadlift"), mainLiftKeys(rows)), false);
+  assert.equal(isMainLift(ex("Squat"), mainLiftKeys(null)), false);
+  assert.equal(mainLiftKeys(null), null);
+  assert.equal(isMainLift(ex("Lat pulldowns", [{ pct: 40, reps: 5, kg: 20 }]), null), true);
+});
+
+test("polish: Fortryd of Begynd goes to Træning with the query it reads", () => {
+  assert.equal(BEGIN_UNDONE_HREF, "/?fortrudt=begin");
+  assert.equal(beginUndone(new URL(BEGIN_UNDONE_HREF, "http://x").search), true);
+  assert.equal(beginUndone(""), false);
+  assert.equal(beginUndone("?fortrudt=other"), false);
+  assert.equal(BEGIN_UNDONE_TEXT, "Fortrudt: træningen er ikke begyndt.");
+  assert.equal(WARMUP_NOT_STARTED, "Opvarmningen er ikke startet.");
 });

@@ -95,13 +95,15 @@ test("DEV_FIXTURE warmup / pause / exercise-end: each gives its Fokus view (pure
     return { out, view: fokusView(order, log, null) };
   };
   assert.equal(viewOf("warmup").view.kind, "warmup");
-  assert.ok(viewOf("warmup").out.plannedSets.some((p) => p.ramp !== null));
+  // A ramp only ever on a main lift: Dips (first here) warms up on the timer only.
+  assert.ok(!viewOf("warmup").out.plannedSets.some((p) => p.ramp !== null));
   const pause = viewOf("pause");
   assert.equal(pause.view.kind, "pause");
   assert.ok(pause.out.sets.some((s) => s.notes !== null));
   assert.ok(pause.out.setLog.some((l) => l.repsDone === 10)); // the server's default at Udført
   const end = viewOf("exercise-end");
   assert.deepEqual(end.view, { kind: "warmup", warmup: { row: 6, set: 0 }, since: new Date(now.getTime() - 40_000).toISOString(), feel: { row: 5, set: 2 } });
+  assert.deepEqual([...new Set(end.out.plannedSets.filter((p) => p.ramp !== null).map((p) => p.sheetRow))], [6]); // Squat's ramp
 });
 
 test("DEV_FIXTURE=midsession: adjustments (+2,5, capped, hold) and a note, illustrative", () => {

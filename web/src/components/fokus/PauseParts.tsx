@@ -3,10 +3,10 @@
 import { type RefObject, useEffect, useId, useRef, useState } from "react";
 
 import {
-  exerciseName,
   FEEL_OPTIONS,
   feelQuestion,
   footerText,
+  formatTimer,
   type FokusExercise,
   lastWeekLine,
   nextFeel,
@@ -23,6 +23,7 @@ import {
   stepperBounds,
   stepperValue,
   warmupTitle,
+  WARMUP_NOT_STARTED,
 } from "@/lib/fokus-view";
 import type { LoggedSet, SetRef } from "@/lib/set-taps";
 import { formatKg } from "@/lib/format";
@@ -217,8 +218,7 @@ export function PauseCard({ since, exercise, onAnnounce }: { readonly since: str
 }
 
 /** §2: the warm-up of `exercise`, with Python's ramp on a main lift. */
-export function WarmupCard({ since, exercise, mainLift }: { readonly since: string; readonly exercise: FokusExercise; readonly mainLift: boolean }) {
-  const seconds = useElapsed(since);
+export function WarmupCard({ since, exercise, mainLift }: { readonly since: string | null; readonly exercise: FokusExercise; readonly mainLift: boolean }) {
   const ramp = rampState(exercise, mainLift);
   const basis = rampBasis(exercise);
   return (
@@ -227,7 +227,17 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
         {warmupTitle(exercise)}
       </h2>
       <div className="mt-2">
-        <RestTimer seconds={seconds} label="Opvarmning" />
+        {since === null ? (
+          <>
+            {/* No recorded start (§2.2): a static clock, never one running from page load. */}
+            <p role="timer" aria-live="off" aria-label="Opvarmning" className="font-display text-56 leading-none font-extrabold tabular-nums italic text-text-muted">
+              {formatTimer(0)}
+            </p>
+            <p className="mt-1 text-16 text-text-muted">{WARMUP_NOT_STARTED}</p>
+          </>
+        ) : (
+          <WarmupTimer since={since} />
+        )}
       </div>
       {ramp === "ramp" && exercise.ramp !== null && (
         <div className="mt-3 flex flex-col">
@@ -250,6 +260,10 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
       {ramp === "none" && <p className="mt-3 text-16 text-text-muted">Intet kg at regne opvarmningen ud fra.</p>}
     </section>
   );
+}
+
+function WarmupTimer({ since }: { readonly since: string }) {
+  return <RestTimer seconds={useElapsed(since)} label="Opvarmning" />;
 }
 
 /** §1.2: the next set, small (mini slab), with last week and the coach's note. */
@@ -312,8 +326,3 @@ export function Footer({ order, log }: { readonly order: readonly SetRef[]; read
   );
 }
 
-/** A main lift (squat, bench, deadlift as the competition lift): its warm-up names a missing ramp. */
-export function isMainLift(e: FokusExercise): boolean {
-  const first = exerciseName(e).toLowerCase().split(/\s+/)[0] ?? "";
-  return e.ramp !== null || ["squat", "bench", "bænkpres", "deadlift", "dødløft"].includes(first);
-}

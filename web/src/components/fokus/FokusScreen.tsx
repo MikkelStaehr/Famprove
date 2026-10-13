@@ -8,6 +8,7 @@ import { HomeLink } from "./HomeLink";
 import { WarningLine } from "@/components/WarningLine";
 import {
   begunText,
+  BEGIN_UNDONE_HREF,
   begunWarmup,
   exerciseName,
   FINISHED_SENTENCE,
@@ -29,6 +30,7 @@ import {
   undoSentence,
   unsavedText,
   warmupSentence,
+  isMainLift,
 } from "@/lib/fokus-view";
 import { adjustmentLine } from "@/lib/training-view";
 import {
@@ -45,7 +47,7 @@ import {
 } from "@/lib/set-taps";
 
 import { FokusProgress } from "./FokusProgress";
-import { FeelBlock, Footer, isMainLift, NextSetCard, PauseCard, PRIMARY_INK, PrimaryButton, WarmupCard } from "./PauseParts";
+import { FeelBlock, Footer, NextSetCard, PauseCard, PRIMARY_INK, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
 
 export type FokusSession = {
@@ -65,6 +67,8 @@ type FokusScreenProps = {
   readonly devSwitches: boolean;
   /** Entered from Træning (Begynd / Fortsæt): open the set view even mid-rest (§4.5). */
   readonly enteredFromTraening: boolean;
+  /** The catalogue's main-lift name and alias keys (lib/fokus-view mainLiftKeys); null when unread. */
+  readonly mainLifts: readonly string[] | null;
 };
 
 const PRESS =
@@ -79,7 +83,7 @@ const FADE_IN = "transition-opacity duration-180 ease-out starting:opacity-0 mot
  * (Tilbage til Træning). Taps go through useSetLog (optimistic, saved in order). "Til næste
  * sæt" writes nothing: it only dismisses the current rest.
  */
-export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening }: FokusScreenProps) {
+export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts }: FokusScreenProps) {
   const { log, tap, unsaved, retry, rejected, dev, flush } = useSetLog(session.log, session.order, date, session.session);
   const [dismissed, setDismissed] = useState<string | null>(() =>
     enteredFromTraening ? restStart(new Map(session.log.map((l) => [setKey(l), l]))) : null,
@@ -88,8 +92,6 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const [focusRequest, setFocusRequest] = useState(0);
   const primary = useRef<HTMLButtonElement & HTMLAnchorElement>(null);
   const router = useRouter();
-  // The warm-up timer's fallback when a warm-up has no start in the log (e.g. after overview ticks).
-  const [mountedAt] = useState(() => new Date().toISOString());
 
   useWakeLock();
 
@@ -163,7 +165,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       // Fortryd of "Begynd træning" (§6): the warm-up row goes, and Træning shows Begynd again.
       if (begun === null) return;
       tap("undo", begun.ref);
-      void settle(flush).then(() => router.push("/"));
+      void settle(flush).then(() => router.push(BEGIN_UNDONE_HREF)); // Træning focuses Begynd and says so
       return;
     }
     const undone = at(latest.ref);
@@ -264,7 +266,8 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       {view.kind === "warmup" && (
         <WarmupView
           key={`warmup-${setKey(view.warmup)}`}
-          since={view.since ?? mountedAt}
+          since={view.since}
+          mainLifts={mainLifts}
           warmup={view.warmup}
           setOne={at(setOneOf(view.warmup))}
           feel={view.feel === null ? null : at(view.feel)}
@@ -449,6 +452,7 @@ function PauseView({
 /** fokus-pause.md §2 and §4 (Variants A and C): the warm-up, after the feel of the set before. */
 function WarmupView({
   since,
+  mainLifts,
   warmup,
   setOne,
   feel,
@@ -458,7 +462,8 @@ function WarmupView({
   onWarmupEnd,
   onTap,
 }: {
-  readonly since: string;
+  readonly since: string | null; // null: no recorded start (§2.2), a static 0:00
+  readonly mainLifts: readonly string[] | null;
   readonly warmup: SetRef;
   readonly setOne: SetInContext | null;
   readonly feel: SetInContext | null;
@@ -473,7 +478,7 @@ function WarmupView({
     <div className={`flex flex-col ${FADE_IN}`}>
       {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
       <div className={feel !== null ? "mt-1" : undefined}>
-        <WarmupCard since={since} exercise={setOne.exercise} mainLift={isMainLift(setOne.exercise)} />
+        <WarmupCard since={since} exercise={setOne.exercise} mainLift={isMainLift(setOne.exercise, mainLifts)} />
       </div>
       <NextSetCard next={setOne} week={week} inWarmup />
       <PrimaryButton primary={primary} onClick={() => onWarmupEnd(warmup)}>

@@ -164,9 +164,11 @@ export function pauseFixture(
     };
     const startOpen = (ref: SetRef, ago: number) =>
       log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: t(ago), endedAt: null, skipped: false, updatedAt: t(ago), feltRpe: null, repsDone: null });
+    // Dev only: the competition lifts by name (the screen itself reads exercises.category).
+    const main = (ref: SetRef) => /^(squat|bench|bænkpres|deadlift|dødløft)\b/i.test(rowOf(ref)?.name.trim() ?? "");
     if (fixture === "warmup") {
       startOpen(order[0], 40);
-      rampOn(order[0]);
+      if (main(order[0])) rampOn(order[0]);
       continue;
     }
     if (fixture === "pause") {
@@ -187,14 +189,13 @@ export function pauseFixture(
     }
     // exercise-end: the last set before a later warm-up whose row is a range row, else any.
     const warmups = order.map((ref, k) => [ref, k] as const).filter(([ref, k]) => ref.set === 0 && k > 0);
-    const main = (ref: SetRef) => /^(squat|bench|bænkpres|deadlift|dødløft)\b/i.test(rowOf(ref)?.name.trim() ?? "");
     const ranged = warmups.filter(([, k]) => RANGE.test(rowOf(order[k - 1])?.repsText ?? ""));
     const pick = ranged.find(([ref]) => main(ref)) ?? ranged[0] ?? warmups[0];
     if (pick === undefined) continue;
     const [warm, k] = pick;
     doneUpTo(k, 40);
     startOpen(warm, 40);
-    rampOn(warm);
+    if (main(warm)) rampOn(warm); // a ramp only ever on a main lift: an accessory's warm-up is timer only
     const next = rowOf(warm);
     if (next !== undefined) note(next, NOTE_LONG);
   }

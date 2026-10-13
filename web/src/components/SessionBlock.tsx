@@ -1,7 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 
+import { BEGIN_UNDONE_TEXT, beginUndone } from "@/lib/fokus-view";
 import { setKey } from "@/lib/set-taps";
 
 import { useSession } from "./SetLogProvider";
@@ -16,6 +18,15 @@ import { settle } from "./useSetLog";
 export function SessionBlock() {
   const { session, setLog, view } = useSession();
   const router = useRouter();
+  const button = useRef<HTMLButtonElement>(null);
+  const status = useRef<HTMLParagraphElement>(null);
+  // Back from Fortryd of "Begynd træning" (fokus-pause.md §6): say so, focus Begynd once, drop the query.
+  useEffect(() => {
+    if (!beginUndone(window.location.search)) return;
+    if (status.current !== null) status.current.textContent = BEGIN_UNDONE_TEXT; // once, no re-render
+    button.current?.focus();
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
   const begin = () => {
     const first = view.first;
     if (first === null) return;
@@ -30,6 +41,7 @@ export function SessionBlock() {
       <p className="text-16">
         {session.block} · uge {session.week}
       </p>
+      <p ref={status} className="sr-only" role="status" />
       {view.primary === "finished" ? (
         <div className="mt-3 flex flex-col">
           <p className="text-20 font-bold">Alle sæt er klaret.</p>
@@ -37,6 +49,7 @@ export function SessionBlock() {
         </div>
       ) : (
         <button
+          ref={button}
           type="button"
           onClick={begin}
           className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-pill bg-text px-6 py-2 font-display text-24 font-extrabold text-bg uppercase italic"

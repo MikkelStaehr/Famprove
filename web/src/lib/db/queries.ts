@@ -38,6 +38,8 @@ import {
   parseSetLogRow,
   parseExerciseFeelRow,
   EXERCISE_FEEL_SELECT,
+  EXERCISE_CATEGORY_SELECT,
+  parseExerciseCategoryRow,
   PLANNED_SETS_SELECT,
   PLANNED_TARGETS_SELECT,
   PRESCRIBED_SETS_SELECT,
@@ -70,6 +72,7 @@ import type {
   StrengthAnalysisData,
   DashboardData,
   DailyLoadRow,
+  ExerciseCategoryRow,
   ExerciseFeelRow,
   IsoDate,
   PlannedSetRow,
@@ -414,6 +417,25 @@ export async function loadExerciseFeel(): Promise<readonly ExerciseFeelRow[] | n
   } catch (error: unknown) {
     if (!isDataError(error)) throw error;
     console.error("analyse/styrke: reading exercise_feel failed", error);
+    return null;
+  }
+}
+
+/**
+ * Fokus's catalogue read (fokus-pause.md §1.1): name, aliases and category of public.exercises,
+ * to tell a main lift's warm-up from an accessory's. A secondary read: a failure returns null
+ * (no main lift known, so no "Intet kg ..." line), never breaks the page.
+ */
+export async function loadExerciseCategories(): Promise<readonly ExerciseCategoryRow[] | null> {
+  await connection();
+  const fixture = devFixture();
+  if (fixture === "empty") return [];
+  if (fixture === "error") return null;
+  try {
+    return await selectAll(client(), EXERCISE_CATEGORY_SELECT.table, EXERCISE_CATEGORY_SELECT, parseExerciseCategoryRow);
+  } catch (error: unknown) {
+    if (!isDataError(error)) throw error;
+    console.error("fokus: reading exercises failed", error);
     return null;
   }
 }
