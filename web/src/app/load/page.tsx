@@ -95,9 +95,7 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
   return (
     <>
       <header className="flex flex-col">
-        <h1 className="font-display text-44 font-extrabold tracking-[-0.01em] break-words hyphens-auto uppercase italic">
-          Belast&shy;ning
-        </h1>
+        <h1 className="font-sans text-32 font-normal break-words hyphens-auto">Belast&shy;ning</h1>
         {state.kind === "ready" && (
           <div className="mt-1">
             <UpdatedLine
@@ -138,7 +136,7 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
 }
 
 /**
- * DESIGN.md Part B › Zone bar, hero size, on --bg (no card); then the zone reading (load.md §8a,
+ * The zone ruler (instrument-load.md §2), hero size, on --bg; then the zone reading (load.md §8a,
  * from form_zone, never from TSB), the fitness delta and the detail line.
  */
 function Hero({ view }: { readonly view: ReadyView }) {
@@ -152,7 +150,7 @@ function Hero({ view }: { readonly view: ReadyView }) {
         size="hero"
       />
       <p className="mt-3 max-w-[60ch] text-16 text-text">{zoneReading(hero.zone?.key ?? null)}</p>
-      <p className="mt-2 flex items-center gap-1.5 text-16 font-semibold">
+      <p className="mt-2 flex items-center gap-1.5 text-16 text-text">
         {delta.direction !== null && <DirectionIcon direction={delta.direction} />}
         {delta.text}
       </p>

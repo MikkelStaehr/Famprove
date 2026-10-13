@@ -8,8 +8,9 @@ export function weekHref(param: string): string {
   return `/load?week=${param}`;
 }
 
+/** Revision 5: a 44×44 step with a 1px --text-muted outline ([A5]), radius 0, no fill. */
 const STEP_CLASS =
-  "inline-flex size-11 shrink-0 items-center justify-center rounded-pill bg-track text-text";
+  "inline-flex size-11 shrink-0 items-center justify-center border border-text-muted text-text";
 
 /**
  * Previous / next ISO week as real links (server-rendered, no JS needed). When the card is
@@ -29,7 +30,7 @@ export function WeekSwitcher({ nav }: { readonly nav: WeekNav }) {
           <Step target={nav.prev} direction="prev" year={week.isoYear} />
         </span>
         <p className="col-span-2 row-start-1 flex min-w-0 flex-col items-center text-center @xs:col-span-1 @xs:col-start-2">
-          <span className="text-14 font-semibold tabular-nums">{formatDateRange(week.weekStart, week.weekEnd)}</span>
+          <span className="text-14 font-medium tabular-nums">{formatDateRange(week.weekStart, week.weekEnd)}</span>
           <span className="text-14 text-text-muted tabular-nums">
             {nav.param}
             {note}
@@ -77,7 +78,7 @@ export function LatestWeekLink() {
     <Link
       href="/load"
       scroll={false}
-      className="inline-flex min-h-11 items-center text-14 font-semibold text-text underline decoration-1 underline-offset-3"
+      className="inline-flex min-h-11 items-center text-14 font-medium text-text underline decoration-1 underline-offset-3"
     >
       Tilbage til denne uge
     </Link>

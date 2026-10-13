@@ -9,7 +9,7 @@ export default function Loading() {
   return (
     <>
       <header className="flex flex-col">
-        <h1 className="font-display text-44 font-extrabold tracking-[-0.01em] break-words hyphens-auto uppercase italic">Belastning</h1>
+        <h1 className="font-sans text-32 font-normal break-words hyphens-auto">Belast&shy;ning</h1>
         <div aria-hidden="true" className="mt-1">
           <Bar className="w-1/3 text-14" />
         </div>
@@ -30,9 +30,10 @@ export default function Loading() {
 
         <Card id="trend" variant="calm" title="Fitness, træthed og form" className={LOAD_PLACE.chart}>
           <div aria-hidden="true" className="flex flex-col gap-2">
-            <Bar className="w-3/4 text-12" />
+            {/* Legend row, the TSS/dag unit, then the plot block (spec §5). */}
+            <Bar className="w-3/4 text-14" />
             <Bar className="w-12 text-12" />
-            <div className="h-(--chart-height) w-full rounded-control bg-track motion-safe:animate-pulse" />
+            <div className="h-(--chart-height) w-full bg-surface motion-safe:animate-pulse" />
             {/* "Hvad betyder det?" summary row under the plot (load.md §8b, §11b), so nothing jumps. */}
             <div className="flex min-h-11 items-center">
               <Bar className="w-1/3 text-16" />
@@ -48,7 +49,7 @@ export default function Loading() {
         <Card id="week" variant="calm" title="Denne uge" className={LOAD_PLACE.week}>
           {/* Week switcher: two 44px step links around the date range. */}
           <div aria-hidden="true" className="flex items-center gap-2">
-            <span className="size-11 shrink-0 rounded-pill bg-track motion-safe:animate-pulse" />
+            <span className="size-11 shrink-0 border border-text-muted" />
             <span className="flex flex-1 flex-col items-center">
               <Bar className="w-2/3 text-14" />
               <Bar className="w-1/3 text-12" />

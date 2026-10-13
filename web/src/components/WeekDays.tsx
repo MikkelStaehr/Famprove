@@ -19,8 +19,10 @@ import {
   formatWatts,
 } from "@/lib/format";
 
+import { DayBarcode } from "./DayBarcode";
 import { ActivityWords, hasActivityWords } from "./MovingTime";
 import { SkeletonBar } from "./Skeleton";
+import { DiamondIcon } from "./WarningLine";
 
 /**
  * The selected week's days (daily_load rows) with per-day sessions behind native
@@ -29,7 +31,8 @@ import { SkeletonBar } from "./Skeleton";
  *
  * Layout per row: day + three 64px TSS columns when the list is at least 20rem wide (390px
  * phones). Narrower, e.g. at 200% text, the day moves onto its own line above the numbers
- * instead of scrolling sideways.
+ * instead of scrolling sideways. The day barcode (instrument-load.md §4) sits under the day label
+ * in the day cell: the cell is the row's 1fr, so the barcodes line up across rows.
  */
 const ROW = "grid grid-cols-3 gap-x-2 @xs:grid-cols-[minmax(0,1fr)_repeat(3,4rem)]";
 const DAY_CELL = "col-span-3 @xs:col-span-1";
@@ -52,7 +55,7 @@ export function WeekDays({ week, days }: WeekDaysProps) {
           </li>
         ))}
       </ul>
-      <p className={`${ROW} items-center pt-2 text-14 font-semibold`}>
+      <p className={`${ROW} items-center pt-2 text-14 font-medium`}>
         {/* Flush left (no chevron indent) so "Uge NN i alt" fits one line at 390px. */}
         <span className={DAY_CELL}>Uge {week.isoWeek} i alt</span>
         <Tss label="cykling" value={week.cyclingTss} />
@@ -68,7 +71,7 @@ function ColumnHeads() {
   return (
     <div
       aria-hidden="true"
-      className={`${ROW} border-b border-border py-2 text-14 font-semibold text-text-muted`}
+      className={`${ROW} border-b border-border py-2 text-14 font-medium text-text-muted`}
     >
       <span className={`hidden @xs:block ${DAY_INDENT}`}>Dag</span>
       {["Cykel", "Styrke", "I alt"].map((label) => (
@@ -106,7 +109,10 @@ function DayRow({ day }: { readonly day: DayDetail }) {
     const load = formatLoad(day.totalTss) !== "0";
     return (
       <div className={`${ROW} min-h-11 items-center py-2 text-14`}>
-        <span className={`${DAY_CELL} ${DAY_INDENT}`}>{formatDay(day.date)}</span>
+        <span className={`${DAY_CELL} ${DAY_INDENT} flex flex-col gap-1`}>
+          {formatDay(day.date)}
+          {load && <DayBarcode cycling={day.cyclingTss} strength={day.strengthTss} />}
+        </span>
         {load ? numbers : <span className="col-span-3 text-right text-text-muted">Hvile</span>}
       </div>
     );
@@ -114,7 +120,8 @@ function DayRow({ day }: { readonly day: DayDetail }) {
   return (
     <details className="group">
       <summary className={`${ROW} min-h-11 cursor-pointer list-none items-center py-2 text-14`}>
-        <span className={`${DAY_CELL} flex items-center gap-2`}>
+        <span className={`${DAY_CELL} flex flex-col gap-1`}>
+          <span className="flex items-center gap-2">
           <svg
             aria-hidden="true"
             viewBox="0 0 16 16"
@@ -128,6 +135,10 @@ function DayRow({ day }: { readonly day: DayDetail }) {
             <path d="m6 3 5 5-5 5" />
           </svg>
           {formatDay(day.date)}
+          </span>
+          <span className={`block ${DAY_INDENT}`}>
+            <DayBarcode cycling={day.cyclingTss} strength={day.strengthTss} />
+          </span>
         </span>
         {numbers}
       </summary>
@@ -141,7 +152,7 @@ function DayRow({ day }: { readonly day: DayDetail }) {
 
 function SectionHeading({ title, tss }: { readonly title: string; readonly tss: number }) {
   return (
-    <h3 className="flex items-baseline justify-between gap-2 text-14 font-semibold">
+    <h3 className="flex items-baseline justify-between gap-2 text-14 font-medium">
       <span>{title}</span>
       <span className="tabular-nums">{formatLoad(tss)} TSS</span>
     </h3>
@@ -162,7 +173,7 @@ function Cycling({ date, tss, rides }: CyclingProps) {
         {rides.map((ride) => (
           <li key={ride.id} className="flex flex-col gap-1 border-t border-border py-2 first:border-t-0">
             <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14">
-              <span className="font-semibold">{ride.name ?? "Tur uden navn"}</span>
+              <span className="font-medium">{ride.name ?? "Tur uden navn"}</span>
               <span className="text-14 text-text-muted">
                 Start kl. <time dateTime={`${date}T${ride.startTime}`}>{ride.startTime.replace(":", ".")}</time>
               </span>
@@ -187,8 +198,8 @@ function Cycling({ date, tss, rides }: CyclingProps) {
 }
 
 /**
- * Python flagged the ride's power data (spike rules, domain.power_check): a small --warning badge
- * with a triangle (never colour alone). Tapping it shows which rule fired (a tooltip doesn't show
+ * Python flagged the ride's power data (spike rules, domain.power_check): a ◆ and words
+ * (Revision 5 [A1], never colour alone). Tapping it shows which rule fired (a tooltip doesn't show
  * on a phone); the title gives the same text on hover.
  */
 function DataWarning({ warning }: { readonly warning: string }) {
@@ -197,11 +208,9 @@ function DataWarning({ warning }: { readonly warning: string }) {
     <details className="group/data text-14">
       <summary
         title={warning}
-        className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 font-semibold text-warning"
+        className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 font-medium text-warning"
       >
-        <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="currentColor">
-          <path d="M6 1 11 11H1Z" />
-        </svg>
+        <DiamondIcon />
         Tjek effektdata
         {/* The day rows' 16px chevron, pointing down; it flips without transition when open. */}
         <svg
@@ -241,7 +250,7 @@ function Metric({ term, value }: { readonly term: string; readonly value: string
 
 /**
  * VI (Python: NP / average power) next to NP and IF. The term carries the explanation as a
- * tooltip. A warning (Python: VI > 1.15 on a Z2 day) is --warning with a triangle and words for
+ * tooltip. A warning (Python: VI > 1.15 on a Z2 day) is --warning with a ◆ and words for
  * screen readers, never colour alone. A ride without VI shows nothing (an HR-only ride has no NP).
  */
 function ViMetric({ vi, warning }: { readonly vi: number | null; readonly warning: boolean }) {
@@ -254,11 +263,7 @@ function ViMetric({ vi, warning }: { readonly vi: number | null; readonly warnin
         </abbr>
       </dt>
       <dd className={warning ? "flex items-center gap-1 text-warning" : undefined}>
-        {warning && (
-          <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="currentColor">
-            <path d="M6 1 11 11H1Z" />
-          </svg>
-        )}
+        {warning && <DiamondIcon />}
         {formatVi(vi)}
         {warning && <span className="sr-only">, ujævn effekt på en Z2-dag</span>}
       </dd>
@@ -293,7 +298,7 @@ function StrengthSession({ session: s }: { readonly session: SessionDetail }) {
       : `Session ${s.session} · ${s.block}${s.week === null ? "" : ` · uge ${s.week}`}`;
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-16 font-semibold">{title}</h3>
+      <h3 className="text-16 font-medium">{title}</h3>
       <p className="text-14 text-text-muted">
         {hasActivityWords(s.activityName, s.movingTimeS) && (
           <>
@@ -320,7 +325,7 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
   return (
     <li className="flex flex-col border-t border-border py-2 first:border-t-0">
       <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14">
-        <span className="font-semibold">{e.name}</span>
+        <span className="font-medium">{e.name}</span>
         {e.prescribed !== null && (
           <span className="text-14 text-text-muted">Foreskrevet {e.prescribed}</span>
         )}

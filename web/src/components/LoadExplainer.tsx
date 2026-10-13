@@ -1,6 +1,6 @@
 import { FORM_ZONE_DISPLAY } from "@/lib/dashboard-view";
 import { BAND_LABEL, BAND_TEXT, PROGNOSE_TEXT } from "@/lib/prognose-text";
-import { ZONE_FILL, ZONE_RANGE, type ZoneKey } from "@/lib/zone-scale";
+import { BANDS, ZONE_RANGE, type ZoneKey } from "@/lib/zone-scale";
 
 import { BandSwatch, LineSample, PROGNOSE_LABEL, PrognoseSwatch, SERIES, type SeriesKey } from "./ChartSeries";
 
@@ -31,7 +31,7 @@ const ZONE_TEXT: readonly (readonly [ZoneKey, string])[] = [
 const ZONES = ZONE_TEXT.map(([key, text]) => ({
   key,
   name: FORM_ZONE_DISPLAY[key]?.label ?? key,
-  swatch: ZONE_FILL[key],
+  span: BANDS.find((b) => b.key === key) ?? null,
   range: ZONE_RANGE[key].visible,
   spoken: ZONE_RANGE[key].spoken,
   text,
@@ -40,7 +40,7 @@ const ZONES = ZONE_TEXT.map(([key, text]) => ({
 export function LoadExplainer() {
   return (
     <details className="group">
-      <summary className="flex min-h-11 w-full cursor-pointer list-none items-center gap-2 rounded-control text-16 font-semibold text-text">
+      <summary className="flex min-h-11 w-full cursor-pointer list-none items-center gap-2 text-16 font-medium text-text">
         <span>
           Hvad betyder det?<span className="sr-only"> Forklaring af fitness, træthed, form og formzoner</span>
         </span>
@@ -62,7 +62,7 @@ export function LoadExplainer() {
           <dl className="flex flex-col gap-3">
             {SERIES.map((s) => (
               <div key={s.key}>
-                <dt className="flex items-center gap-2 text-16 font-bold">
+                <dt className="flex items-center gap-2 text-16 font-medium">
                   <LineSample series={s} />
                   {s.label}
                 </dt>
@@ -70,14 +70,14 @@ export function LoadExplainer() {
               </div>
             ))}
             <div>
-              <dt className="flex items-center gap-2 text-16 font-bold">
+              <dt className="flex items-center gap-2 text-16 font-medium">
                 <PrognoseSwatch />
                 {PROGNOSE_LABEL}
               </dt>
               <dd className="mt-1 text-16 text-text">{PROGNOSE_TEXT}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-2 text-16 font-bold">
+              <dt className="flex items-center gap-2 text-16 font-medium">
                 <BandSwatch />
                 {BAND_LABEL}
               </dt>
@@ -87,17 +87,14 @@ export function LoadExplainer() {
           <p className="text-14 text-text-muted">{METHOD_NOTE}</p>
         </div>
         <div className="flex flex-col gap-3">
-          <h3 className="text-14 font-bold tracking-[0.04em] uppercase">Formzoner</h3>
+          <h3 className="caption">Formzoner</h3>
           <dl className="flex flex-col gap-3">
             {ZONES.map((z) => (
               <div key={z.key}>
                 <dt className="flex flex-wrap items-center gap-x-2">
-                  <span
-                    aria-hidden="true"
-                    className={`size-3 shrink-0 rounded-mark ring-1 ring-text-muted ${z.swatch}`}
-                  />
-                  <span className="text-16 font-bold">{z.name}</span>
-                  <span className="text-14 font-semibold text-text-muted tabular-nums">
+                  <ZoneSpanSwatch span={z.span} />
+                  <span className="text-16 font-medium">{z.name}</span>
+                  <span className="font-mono text-14 text-text-muted">
                     <span aria-hidden="true">{z.range}</span>
                     <span className="sr-only">{z.spoken}</span>
                   </span>
@@ -109,5 +106,19 @@ export function LoadExplainer() {
         </div>
       </div>
     </details>
+  );
+}
+
+/**
+ * The zone's span on a miniature of the hero's zone ruler (instrument-load.md §2): a 1px muted
+ * baseline with the zone drawn as the 3px ink bar. No colour; the name beside it says which zone.
+ */
+function ZoneSpanSwatch({ span }: { readonly span: { readonly start: number; readonly end: number } | null }) {
+  const w = 32;
+  return (
+    <svg aria-hidden="true" viewBox={`0 0 ${w} 12`} className="h-3 w-8 shrink-0">
+      <line x1="0" x2={w} y1="8.5" y2="8.5" stroke="var(--chart-mark)" strokeWidth="1" />
+      {span !== null && <rect x={span.start * w} y="6" width={(span.end - span.start) * w} height="3" fill="var(--text)" />}
+    </svg>
   );
 }

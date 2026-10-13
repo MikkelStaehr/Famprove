@@ -56,18 +56,6 @@ export const BANDS: readonly Band[] = LOWERS.map(([key, lower], i) => {
 export const THRESHOLDS: readonly number[] = BANDS.flatMap((b) => (b.lower === null ? [] : [b.lower]));
 
 /**
- * @deprecated Revision 5 retires the --zone-* tints (zones are words + the ruler's thicker span).
- * Kept only until LoadExplainer stops reading it (Belastning restyle); then delete it.
- */
-export const ZONE_FILL: Readonly<Record<ZoneKey, string>> = {
-  high_risk: "bg-zone-risk",
-  optimal: "bg-zone-optimal",
-  grey_zone: "bg-zone-grey",
-  fresh: "bg-zone-fresh",
-  transition: "bg-zone-transition",
-};
-
-/**
  * Each zone's range in words, built from THRESHOLDS so it can't drift from form.py (the sync
  * test guards THRESHOLDS). Inclusivity as form.py: −30 and −10 belong to the lower zone, 5 and
  * 20 to the higher. `visible` uses U+2212; `spoken` writes "minus" out for screen readers.
