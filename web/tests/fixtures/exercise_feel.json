@@ -1,0 +1,38 @@
+[
+  {
+    "exercise_id": 2,
+    "rated_n": 4,
+    "lighter_n": 3,
+    "expected_n": 1,
+    "harder_n": 0,
+    "verdict_text": "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE.",
+    "computed_at": "2026-10-13T18:00:00+00:00",
+    "exercises": {
+      "name": "Bænk"
+    }
+  },
+  {
+    "exercise_id": 8,
+    "rated_n": 4,
+    "lighter_n": 0,
+    "expected_n": 3,
+    "harder_n": 1,
+    "verdict_text": "Du melder oftest som foreskrevet.",
+    "computed_at": "2026-10-13T18:00:00+00:00",
+    "exercises": {
+      "name": "Low incline DB press"
+    }
+  },
+  {
+    "exercise_id": 9,
+    "rated_n": 4,
+    "lighter_n": 0,
+    "expected_n": 0,
+    "harder_n": 4,
+    "verdict_text": "Du melder oftest hårdere end foreskrevet – forslaget ligger 2,5 kg under trænerens RPE.",
+    "computed_at": "2026-10-13T18:00:00+00:00",
+    "exercises": {
+      "name": "Lat pulldowns"
+    }
+  }
+]
