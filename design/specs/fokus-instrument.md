@@ -1,5 +1,7 @@
 # Spec – Fokus in Instrument (pilot, 2026-10-13)
 
+> **Revision 3 (user, 2026-10-13)** overrides Revisions 1–2 where they differ: the pause is four things (rating, timer with scale, next set, button); see DESIGN.md Part B "Revision 3".
+>
 > **Revision 2 (user, 2026-10-13)** overrides this spec where they differ: air first (40px between groups, 12px inside, 56px around the timer, nothing below the primary), Inter with tabular figures for big numbers, headings and buttons (mono only for captions ≤ 14px, scale labels, small numbers; no slashed or dotted zero), warm-grey muted and Barley Corn only for captions, the primary as a red rule + red Inter label (no fill), ink lamp and ink progress tick, and the warm-up timer with its own scale. See DESIGN.md Part B "Revision 2".
 
 Restyles `/fokus` only. **Look** comes from DESIGN.md Part B (Instrument); **structure, copy, flow, writes, states, focus and sr text** stay exactly as `traening.md` §4 + `fokus-pause.md`. Nothing here changes behaviour or data.

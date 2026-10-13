@@ -20,7 +20,6 @@ import {
   stateOf,
 } from "./set-taps.ts";
 import {
-  adjustmentBrackets,
   CAPPED_WORD,
   type ExerciseView,
   type Reference,
@@ -139,8 +138,8 @@ export function referenceText(reference: Reference): string {
  * The set card's kg block (§4.2.4). `figure` is the 56px part, `unit` the 32px " kg" after it
  * (null when the figure carries no kg, e.g. "kropsvægt"). italic = computed by the app.
  *   suggestion  label Forslag, the suggestion, italic
- *   last_week   no suggestion: label Sidste uge, last week's kg upright, + the reason
- *   none        label Kg, "Intet forslag", + the reason
+ *   last_week   no suggestion: label Sidste uge, last week's kg upright
+ * Neither: null, and the block is not shown (round 3: "intet forslag" shows nothing).
  */
 export type KgBlock =
   | {
@@ -155,15 +154,12 @@ export type KgBlock =
       readonly label: "Sidste uge";
       readonly figure: string;
       readonly unit: "kg" | null;
-      readonly reason: string | null;
-    }
-  | { readonly kind: "none"; readonly label: "Kg"; readonly text: "Intet forslag"; readonly reason: string | null };
+    };
 
-export function kgBlock(e: FokusExercise): KgBlock {
+export function kgBlock(e: FokusExercise): KgBlock | null {
   if (e.suggestedKg !== null) {
     return { kind: "suggestion", label: "Forslag", figure: formatKg(e.suggestedKg), unit: "kg", capped: e.suggestionCapped };
   }
-  const reason = suggestionReason(e.suggestionBasis);
   if (e.reference !== null) {
     const words = referenceText(e.reference);
     const withKg = words.endsWith(" kg");
@@ -172,10 +168,9 @@ export function kgBlock(e: FokusExercise): KgBlock {
       label: "Sidste uge",
       figure: withKg ? words.slice(0, -" kg".length) : words,
       unit: withKg ? "kg" : null,
-      reason,
     };
   }
-  return { kind: "none", label: "Kg", text: "Intet forslag", reason };
+  return null;
 }
 
 /**
@@ -219,15 +214,15 @@ export function skippedText(p: Progress): string | null {
   return p.skipped > 0 ? `· ${p.skipped} sprunget over` : null;
 }
 
-/** "Squat · sæt 1 udført kl. 18.42" / "Squat · sæt 2 sprunget over". */
+/** Fortryd's spoken context (round 3, sr-only): "Squat, sæt 1 udført kl. 18.42" / "Squat, sæt 2 sprunget over". */
 export function lastTapText(exercises: readonly FokusExercise[], tap: LastTap): string | null {
   const s = setInContext(exercises, tap.ref);
   if (s === null) return null;
   const name = exerciseName(s.exercise);
-  if (isWarmup(tap.ref)) return `${name} · opvarmning færdig kl. ${clockTime(tap.at)}`;
+  if (isWarmup(tap.ref)) return `${name}, opvarmning færdig kl. ${clockTime(tap.at)}`;
   return tap.kind === "done"
-    ? `${name} · sæt ${s.number} udført kl. ${clockTime(tap.at)}`
-    : `${name} · sæt ${s.number} sprunget over`;
+    ? `${name}, sæt ${s.number} udført kl. ${clockTime(tap.at)}`
+    : `${name}, sæt ${s.number} sprunget over`;
 }
 
 /** Save failed (§6): "1 sæt er ikke gemt." / "3 sæt er ikke gemt." */
@@ -235,24 +230,23 @@ export function unsavedText(n: number): string {
   return `${n} sæt er ikke gemt.`;
 }
 
-/**
- * "forslag 82,5 kg", "forslag 75 kg (begrænset)" or "intet forslag". `space` goes before "kg":
- * a no-break space on screen, a plain one in the spoken sentence.
- */
-function suggestionWords(e: FokusExercise, space: "\u00a0" | " "): string {
+/** The spoken suggestion: "forslag 82,5 kg (begrænset) …" or "intet forslag" (status sentences only). */
+function suggestionWords(e: FokusExercise): string {
   if (e.suggestedKg === null) return "intet forslag";
-  if (space === " ") {
-    return `forslag ${formatKg(e.suggestedKg)} kg${e.suggestionCapped ? ` ${CAPPED_WORD}` : ""}${spokenAdjustment(e)}`;
-  }
-  const brackets = adjustmentBrackets(e, "short");
-  return `forslag ${formatKg(e.suggestedKg)}${space}kg${brackets === null ? "" : ` ${brackets}`}`;
+  return `forslag ${formatKg(e.suggestedKg)} kg${e.suggestionCapped ? ` ${CAPPED_WORD}` : ""}${spokenAdjustment(e)}`;
 }
 
 /**
- * The next-set card (fokus-pause.md §1.2): "Squat · sæt 2 af 2" (in a warm-up, whose heading
- * names the exercise: "Sæt 1 af 4") and "5 reps · RPE 7 · forslag 142,5 kg (+2,5)".
+ * The next-set block (round 3): line 1 "Squat · sæt 2 af 2" (in a warm-up, whose heading names
+ * the exercise: "Sæt 1 af 4"); line 2 "5 reps · RPE 7" and `kg`: the suggestion, else last week's
+ * logged kg ("kropsvægt + 10 kg"), else null (nothing shown). `kg.source` is its sr-only prefix.
  */
-export function nextSetSummary(s: SetInContext, inWarmup = false): { readonly title: string; readonly line: string } {
+export type NextKg = { readonly source: "forslag" | "sidste uge"; readonly text: string };
+
+export function nextSetSummary(
+  s: SetInContext,
+  inWarmup = false,
+): { readonly title: string; readonly line: string; readonly kg: NextKg | null } {
   const e = s.exercise;
   const parts: string[] = [];
   if (e.repsText !== null) {
@@ -260,9 +254,14 @@ export function nextSetSummary(s: SetInContext, inWarmup = false): { readonly ti
     parts.push(word === null ? e.repsText : `${e.repsText} ${word}`);
   }
   if (e.prescribed !== null) parts.push(e.prescribed);
-  parts.push(suggestionWords(e, "\u00a0"));
+  const kg: NextKg | null =
+    e.suggestedKg !== null
+      ? { source: "forslag", text: `${formatKg(e.suggestedKg)}\u00a0kg` }
+      : e.reference !== null
+        ? { source: "sidste uge", text: referenceText(e.reference).replace(/ kg$/, "\u00a0kg") }
+        : null;
   const title = inWarmup ? `Sæt ${s.number} af ${s.count}` : `${exerciseName(e)} · sæt ${s.number} af ${s.count}`;
-  return { title, line: parts.join(" · ") };
+  return { title, line: parts.join(" · "), kg };
 }
 
 /**
@@ -277,7 +276,7 @@ export function setSentence(s: SetInContext, week: number): string {
   const what = reps !== null && load !== null ? `${reps} ved ${load}` : (reps ?? load);
   const parts: string[] = [];
   if (what !== null) parts.push(what);
-  parts.push(suggestionWords(e, " "));
+  parts.push(suggestionWords(e));
   if (week > 1) parts.push(e.reference === null ? "intet logget sidste uge" : `sidste uge ${referenceText(e.reference)}`);
   return `${exerciseName(e)}, ${setTitle(s).toLowerCase()}: ${parts.join(", ")}.`;
 }
@@ -459,24 +458,14 @@ export function restMinutes(seconds: number): string {
   return whole === 0 ? "½" : `${whole}½`;
 }
 
-/** "Anbefalet 3–5 min"; null without a recommendation (§3.1). */
-export function restLabel(minS: number | null, maxS: number | null): string | null {
-  if (minS === null || maxS === null) return null;
-  return `Anbefalet ${restMinutes(minS)}–${restMinutes(maxS)} min`;
-}
-
-/** The pause's state against the recommended rest (§3.4). The text carries it, never colour alone. */
-export type RestBand =
-  | { readonly kind: "none" }
-  | { readonly kind: "before"; readonly text: string }
-  | { readonly kind: "ready"; readonly text: "Klar til næste sæt" }
-  | { readonly kind: "over"; readonly text: string };
+/** The pause's state against the recommended rest (§3.4): announced once at min and at max (round 3: no visible line). */
+export type RestBand = { readonly kind: "none" | "before" | "ready" | "over" };
 
 export function restBand(seconds: number, minS: number | null, maxS: number | null): RestBand {
   if (minS === null || maxS === null) return { kind: "none" };
-  if (seconds < minS) return { kind: "before", text: `Hvil mindst ${formatTimer(minS)}` };
-  if (seconds <= maxS) return { kind: "ready", text: "Klar til næste sæt" };
-  return { kind: "over", text: `Klar · over ${restMinutes(maxS)} min pause` };
+  if (seconds < minS) return { kind: "before" };
+  if (seconds <= maxS) return { kind: "ready" };
+  return { kind: "over" };
 }
 
 /** The rest rail (§3.3): the scale runs to 1.2 × max; fill, min tick and max tick as fractions. */

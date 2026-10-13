@@ -262,6 +262,16 @@ Supersedes the lines above and the tables and sections below where they differ:
 - **Mono face: Chivo Mono** (plain oval zero). JetBrains Mono's zero is dotted, DM Mono's and Red Hat Mono's slashed, Space Mono's and Spline Sans Mono's dotted (checked by rendering, 2026-10-13).
 - **Timer.** Inter 56px, `--text`, tabular, with the red-tick scale directly under it. The warm-up has the same timer and scale (0–10 min, no MIN/MAX band); an unstarted warm-up shows 0:00 with the tick at 0 (no "not started" sentence).
 
+### Revision 3 (user, 2026-10-13: "less on screen, and a real button")
+Supersedes Revision 2 and everything above it where they differ. **Target: the pause screen is four things: the rating, the timer with its scale, the next set, the button** (plus the top bar).
+- **Removed:** the pause's "Hvil mindst 3:00" and "ANBEFALET 3–5 MIN" lines (the scale's MIN/MAX say it); "Tid brugt" everywhere except the finished view; the "Begyndt kl." / "… udført kl." line (Fortryd stands alone on its row); the words "intet forslag" (nothing is shown instead).
+- **Scale labels** only at 0, MIN, MAX and the end (minute ticks stay, unlabelled). The warm-up scale (no band) labels 0 and its end.
+- **Header:** the count is "0/19" beside the progress bar.
+- **Next-set block:** line 1 "exercise · sæt n af m", line 2 "reps · RPE · kg", the kg being the suggestion, else last week's kg, else nothing. Nothing else in the block; the coach's note moves to the set view (main session reading: it isn't dropped).
+- **Warm-up:** the same trims; the ramp stays.
+- **Primary action:** a full-width 1px `--accent` outlined box, 56px tall, red Inter medium label (≥ 24px) centred, no fill, for Udført, Til sæt 1, Til næste sæt and Tilbage til Træning. Still the only red besides the rest scale's tick (the 1px box is ≥ 3:1: 4.15 dark, 3.40 light). Still pinned to the bottom on a view taller than the screen.
+- **Screen readers keep what the eye loses** (main session): Fortryd's accessible name starts "Fortryd" and adds what it undoes ("Fortryd: Dips, sæt 1 udført kl. 21.09"); "0/19" reads "0 af 19 sæt udført"; the next set's kg names its source; the rest band's minimum/maximum announcements stay in the live region.
+
 ### Single filled accent per Fokus view (design-lead decision, 2026-10-13; the fill is retired by Revision 2: the same element is the view's one red, as a rule + red label)
 | View | The one filled accent | Everything else |
 |---|---|---|

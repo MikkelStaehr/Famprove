@@ -3,7 +3,7 @@ import Link from "next/link";
 import { type DataError, describeDataError } from "@/lib/data-error";
 import { formatUpdatedAt } from "@/lib/format";
 
-import { Hairline, INK_LINK, OUTLINED, PRIMARY_FILL } from "./Instrument";
+import { Hairline, INK_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 
 /** No session to train (§5 states c/d/e, DEV_FIXTURE=empty): a note and the way back (the view's one fill). */
 export function NoSessionNote({ sentence, devSwitches }: { readonly sentence: string; readonly devSwitches: boolean }) {
@@ -17,9 +17,11 @@ export function NoSessionNote({ sentence, devSwitches }: { readonly sentence: st
         </h2>
         <Hairline />
         <p className="text-16">{sentence}</p>
-        <Link href="/" className={`mt-7 ${PRIMARY_FILL}`}>
-          Til Træning
-        </Link>
+        <div className={`mt-4 ${PRIMARY_DOCK}`}>
+          <Link href="/" className={PRIMARY_BOX}>
+            Til Træning
+          </Link>
+        </div>
       </section>
     </div>
   );

@@ -7,7 +7,6 @@ import {
   feelQuestion,
   footerText,
   type FokusExercise,
-  lastWeekLine,
   nextFeel,
   nextSetSummary,
   NOTE_CLAMP_CHARS,
@@ -15,7 +14,6 @@ import {
   rampState,
   repsRange,
   restBand,
-  restLabel,
   restRail,
   restSentence,
   type SetInContext,
@@ -26,17 +24,19 @@ import {
 import type { LoggedSet, SetRef } from "@/lib/set-taps";
 import { formatKg } from "@/lib/format";
 
-import { ArrowIcon, CheckIcon, Hairline, INK_LINK, PRIMARY_FILL } from "./Instrument";
+import { ArrowIcon, INK_LINK, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
 export function PrimaryButton({ primary, onClick, children }: { readonly primary: PrimaryRef; readonly onClick: () => void; readonly children: string }) {
   return (
-    <button ref={primary} type="button" onClick={onClick} className={`mt-10 ${PRIMARY_FILL}`}>
-      {children}
-      <ArrowIcon />
-    </button>
+    <div className={`mt-10 ${PRIMARY_DOCK}`}>
+      <button ref={primary} type="button" onClick={onClick} className={PRIMARY_BOX}>
+        {children}
+        <ArrowIcon />
+      </button>
+    </div>
   );
 }
 
@@ -161,11 +161,10 @@ function RepsStepper({
   );
 }
 
-/** §3: the pause between sets of one exercise, with the recommended-rest band. */
+/** §3: the pause between sets of one exercise; the scale's MIN and MAX carry the recommended rest (round 3). */
 export function PauseCard({ since, exercise, onAnnounce }: { readonly since: string; readonly exercise: FokusExercise; readonly onAnnounce: (s: string) => void }) {
   const seconds = useElapsed(since);
   const band = restBand(seconds, exercise.restMinS, exercise.restMaxS);
-  const label = restLabel(exercise.restMinS, exercise.restMaxS);
   const said = useRef<string | null>(null);
   useEffect(() => {
     // Once at the minimum and once at the maximum, never the timer itself (§9).
@@ -176,24 +175,14 @@ export function PauseCard({ since, exercise, onAnnounce }: { readonly since: str
     said.current = band.kind;
   }, [band, exercise.restMinS, exercise.restMaxS, onAnnounce]);
   const rail = exercise.restMinS !== null && exercise.restMaxS !== null ? restRail(seconds, exercise.restMinS, exercise.restMaxS) : null;
-  const ok = band.kind === "ready" || band.kind === "over";
   return (
-    <section aria-label="Pause" className="mt-14 flex flex-col">
-      <p className="flex items-baseline justify-between gap-2">
-        <span className="caption">Pause</span>
-        {label !== null && <span className="caption">{label}</span>}
-      </p>
+    <section aria-label="Pause" className="mt-10 flex flex-col">
+      <p className="caption">Pause</p>
       <div className="mt-3">
         <RestTimer seconds={seconds} label="Pause" />
       </div>
       {rail !== null && exercise.restMaxS !== null && (
         <Scale scaleS={1.2 * exercise.restMaxS} now={rail.fill} min={rail.min} max={rail.max} />
-      )}
-      {band.kind !== "none" && (
-        <p className={`mt-3 flex items-center gap-2 text-16 ${ok ? "text-text" : "text-text-muted"}`}>
-          {ok && <CheckIcon className="size-4 text-text" />}
-          {band.text}
-        </p>
       )}
     </section>
   );
@@ -204,11 +193,16 @@ function at(fraction: number, width: number): string {
   return `calc(${Math.min(1, Math.max(0, fraction))} * (100% - ${width}px))`;
 }
 
+/** The scale's end value in minutes: 360 -> "6", 600 -> "10", 144 -> "2,4". */
+function endMinutes(scaleS: number): string {
+  return (Math.round((scaleS / 60) * 10) / 10).toString().replace(".", ",");
+}
+
 /**
  * The timer's scale (fokus-instrument.md §4.4), directly under the clock: 0 … `scaleS`, ticks every
- * 30 s, labelled minutes, the red "now" tick, which jumps once a second (no transition) and stays
- * pinned at the right end past the scale. The pause adds its MIN and MAX marks; the warm-up has none
- * (no recommended rest).
+ * 30 s (taller on the minute, unlabelled), the red "now" tick, which jumps once a second (no
+ * transition) and stays pinned at the right end past the scale. Labels only at 0, MIN, MAX and the
+ * end (round 3). The pause adds its MIN and MAX marks; the warm-up has none (no recommended rest).
  */
 function Scale({ scaleS, now, min, max }: { readonly scaleS: number; readonly now: number; readonly min?: number; readonly max?: number }) {
   const ticks: number[] = [];
@@ -217,18 +211,15 @@ function Scale({ scaleS, now, min, max }: { readonly scaleS: number; readonly no
   return (
     <div aria-hidden="true" data-scale-s={scaleS} className={`relative mt-3 w-full ${marks ? "h-17" : "h-11"}`}>
       <span className="absolute inset-x-0 bottom-4 block h-px bg-text-muted" />
-      {ticks.map((t) =>
-        t % 60 === 0 ? (
-          <span key={t}>
-            <span className="absolute bottom-4 block h-3 w-px bg-text" style={{ left: at(t / scaleS, 1) }} />
-            <span className="absolute bottom-0 -translate-x-1/2 font-mono text-12 leading-none text-text-muted" style={{ left: at(t / scaleS, 1) }}>
-              {t / 60}
-            </span>
-          </span>
-        ) : (
-          <span key={t} className="absolute bottom-4 block h-1.5 w-px bg-text-muted" style={{ left: at(t / scaleS, 1) }} />
-        ),
-      )}
+      {ticks.map((t) => (
+        <span
+          key={t}
+          className={`absolute bottom-4 block w-px ${t % 60 === 0 ? "h-3 bg-text" : "h-1.5 bg-text-muted"}`}
+          style={{ left: at(t / scaleS, 1) }}
+        />
+      ))}
+      <span className="absolute bottom-0 left-0 font-mono text-12 leading-none text-text-muted">0</span>
+      <span className="absolute right-0 bottom-0 font-mono text-12 leading-none text-text-muted">{endMinutes(scaleS)}</span>
       {marks && (
         <>
           <span className="absolute bottom-4 block h-6 w-0.5 bg-text" style={{ left: at(min, 2) }} />
@@ -301,50 +292,48 @@ function WarmupClock({ seconds }: { readonly seconds: number }) {
   );
 }
 
-/** §1.2: the next set without a background (Part B): caption + title, a hairline, mono values. */
+/**
+ * §1.2, round 3: the next set in two lines, nothing else. Line 1 "Squat · sæt 2 af 2"; line 2
+ * "5 reps · RPE 7 · 142,5 kg", the kg's source (forslag / sidste uge) spoken, not shown.
+ */
 export function NextSetCard({
   next,
-  week,
   inWarmup,
   afterTimer,
 }: {
   readonly next: SetInContext;
-  readonly week: number;
   readonly inWarmup: boolean;
   /** Straight under the timer group (56px of air), else after another group (40px). */
   readonly afterTimer: boolean;
 }) {
   const summary = nextSetSummary(next, inWarmup);
-  const e = next.exercise;
-  // The card always has a last-week line (§1.2.3), suggestion or not.
-  const lastWeek = lastWeekLine({ ...e, suggestedKg: e.suggestedKg ?? 0 }, week);
+  const kg = summary.kg;
   return (
-    <div className={`${afterTimer ? "mt-14" : "mt-10"} flex flex-col gap-1`}>
-      <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="caption">Næste</span>
-        <span className="font-grotesk text-20">{summary.title}</span>
-      </p>
-      <Hairline className="my-2" />
-      <p className="text-16">{summary.line}</p>
-      {lastWeek !== null &&
-        (lastWeek.kind === "kg" ? (
-          <p className="flex flex-wrap items-baseline gap-x-2">
-            <span className="caption">Sidste uge</span> <span className="text-16">{lastWeek.text}</span>
-          </p>
-        ) : (
-          <p className="text-16 text-text-muted">{lastWeek.text}</p>
-        ))}
-      {e.notes !== null && e.notes.trim() !== "" && <Note text={e.notes.trim()} />}
-    </div>
+    <section aria-label="Næste sæt" className={`${afterTimer ? "mt-14" : "mt-10"} flex flex-col gap-1`}>
+      <p className="font-grotesk text-20 [overflow-wrap:anywhere]">{summary.title}</p>
+      {(summary.line !== "" || kg !== null) && (
+        <p className="text-16 [overflow-wrap:anywhere]">
+          {summary.line}
+          {kg !== null && (
+            <>
+              {summary.line !== "" && " · "}
+              <span className="sr-only">{kg.source} </span>
+              {kg.text}
+            </>
+          )}
+        </p>
+      )}
+    </section>
   );
 }
 
-function Note({ text }: { readonly text: string }) {
+/** The coach's note (round 3: in the set view, under the figures): a quiet muted line, long ones clamped. */
+export function Note({ text }: { readonly text: string }) {
   const [open, setOpen] = useState(false);
   const long = text.length > NOTE_CLAMP_CHARS;
   return (
     <div className="flex flex-col items-start">
-      <p className={`text-16 [overflow-wrap:anywhere] ${long && !open ? "line-clamp-2" : ""}`}>Note: {text}</p>
+      <p className={`font-grotesk text-16 text-text-muted [overflow-wrap:anywhere] ${long && !open ? "line-clamp-2" : ""}`}>Note: {text}</p>
       {long && !open && (
         <button type="button" onClick={() => setOpen(true)} className={`-my-2.5 ${INK_LINK}`}>
           Hele noten

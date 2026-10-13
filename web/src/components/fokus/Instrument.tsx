@@ -3,14 +3,16 @@ import type { ReactNode } from "react";
 /** Instrument parts shared by the Fokus views (DESIGN.md Part B, design/specs/fokus-instrument.md). */
 
 /**
- * The view's one primary action (Part B single-accent, round 2): no fill, a 1px --accent rule
- * above, the label in Inter 500 24px --accent. With the rest scale's "now" tick, the only red.
+ * The view's one primary action (round 3, "a real button"): a full-width box, 56px tall, a 1px
+ * --accent border on all four sides, no fill, the label in Inter 500 24px --accent, centred. With
+ * the rest scale's "now" tick, the only red. Focus: the global 3px --focus ring, offset 3px.
  */
-// Pinned to the bottom of the screen while the view is taller than it (Revision 2: air first, and
-// the one action stays reachable at 390 x 844 without scrolling); in place when the view is short.
-// The page colour behind it hides content scrolling under the red rule.
-export const PRIMARY_FILL =
-  "sticky bottom-0 z-10 flex min-h-16 w-full items-center justify-center gap-3 border-t border-accent bg-bg px-4 pb-[env(safe-area-inset-bottom)] font-grotesk text-24 font-medium text-accent active:opacity-70";
+export const PRIMARY_BOX =
+  "flex min-h-14 w-full items-center justify-center gap-3 border border-accent bg-transparent px-4 font-grotesk text-24 font-medium text-accent active:opacity-70";
+// Its dock: pinned to the bottom of the screen while the view is taller than it (the one action
+// stays reachable at 390 x 844 without scrolling); in place when the view is short. The page colour
+// behind it hides content scrolling under the box; the safe-area inset clears the home indicator.
+export const PRIMARY_DOCK = "sticky bottom-0 z-10 bg-bg pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]";
 /** An outlined control ([A5]): 1px --text-muted, Inter 500. */
 export const OUTLINED = "border border-text-muted font-grotesk text-16 font-medium text-text";
 /** An ink text action (Afslut, Fortryd, Hele noten): Inter 500, underlined 1px at 4px. */

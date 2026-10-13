@@ -47,8 +47,8 @@ import {
 } from "@/lib/set-taps";
 
 import { FokusProgress } from "./FokusProgress";
-import { CheckIcon, FokusWarning as WarningLine, INK_LINK, OUTLINED, PRIMARY_FILL } from "./Instrument";
-import { FeelBlock, Footer, NextSetCard, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
+import { CheckIcon, FokusWarning as WarningLine, INK_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { FeelBlock, Footer, NextSetCard, Note, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
 
 export type FokusSession = {
@@ -199,21 +199,25 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         <HomeLink flush={flush} className={`inline-flex shrink-0 items-center ${INK_LINK}`}>
           Afslut
         </HomeLink>
-        <p className="flex flex-wrap items-baseline justify-end gap-x-1 text-right">
-          <span>
-            <span className="text-24">{p.done}</span>
-            <span className="text-14 text-text-muted"> af {p.total} sæt udført</span>
-          </span>
-          {skipped !== null && <span className="text-14 text-text-muted">{skipped}</span>}
-        </p>
       </div>
       {(devSwitches || dev) && <p className="text-14 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
-      <div className="mt-4">
-        <FokusProgress
-          order={session.order.filter((ref) => !isWarmup(ref))}
-          stateOf={(ref) => stateOf(log.get(setKey(ref)))}
-          current={now}
-        />
+      {/* The progress with its count beside it (round 3): "0/19" on screen, the full sentence spoken. */}
+      <div className="mt-2 flex items-end gap-3">
+        <div className="min-w-0 flex-1">
+          <FokusProgress
+            order={session.order.filter((ref) => !isWarmup(ref))}
+            stateOf={(ref) => stateOf(log.get(setKey(ref)))}
+            current={now}
+          />
+        </div>
+        <p className="shrink-0 font-mono text-16 leading-none tabular-nums">
+          <span aria-hidden="true">
+            {p.done}/{p.total}
+          </span>
+          <span className="sr-only">
+            {p.done} af {p.total} sæt udført{skipped !== null && ` ${skipped}`}
+          </span>
+        </p>
       </div>
       <div className="mt-2 flex min-h-11 flex-col justify-center">
         {staleNote !== null && <WarningLine>{staleNote}</WarningLine>}
@@ -230,17 +234,11 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           </WarningLine>
         )}
         {rejected && <WarningLine>Et tryk blev afvist. Genindlæs siden.</WarningLine>}
+        {/* Fortryd alone on its row (round 3); what it undoes is the sr-only rest of its name (WCAG 2.5.3: starts with the label). */}
         {lastLine !== null && (
-          <p className="flex items-center justify-between gap-x-4 text-14 text-text-muted">
-            <span className="min-w-0">
-              <KeepClock text={lastLine} />
-            </span>
-            <button
-              type="button"
-              onClick={onUndo}
-              className={`shrink-0 px-0 ${INK_LINK}`}
-            >
-              Fortryd
+          <p className="flex justify-end">
+            <button type="button" onClick={onUndo} className={`shrink-0 px-0 ${INK_LINK}`}>
+              Fortryd<span className="sr-only">: {lastLine}</span>
             </button>
           </p>
         )}
@@ -263,12 +261,10 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           done={at(view.done)}
           next={at(view.next)}
           logged={log.get(setKey(view.done))}
-          week={session.week}
           primary={primary}
           onNext={onNext}
           onTap={onFeelOrReps}
           onAnnounce={setAnnouncement}
-          footer={<Footer order={session.order} log={log} />}
         />
       )}
       {view.kind === "warmup" && (
@@ -280,11 +276,9 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           setOne={at(setOneOf(view.warmup))}
           feel={view.feel === null ? null : at(view.feel)}
           logged={view.feel === null ? undefined : log.get(setKey(view.feel))}
-          week={session.week}
           primary={primary}
           onWarmupEnd={onWarmupEnd}
           onTap={onFeelOrReps}
-          footer={<Footer order={session.order} log={log} />}
         />
       )}
       {view.kind === "finished" && (
@@ -296,6 +290,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           feel={view.feel === null ? null : at(view.feel)}
           logged={view.feel === null ? undefined : log.get(setKey(view.feel))}
           onTap={onFeelOrReps}
+          footer={<Footer order={session.order} log={log} />}
         />
       )}
     </div>
@@ -322,6 +317,7 @@ function SetView({
   const e = current.exercise;
   const kg = kgBlock(e);
   const adjustment = adjustmentLine(e);
+  const note = e.notes === null ? "" : e.notes.trim();
   const lastWeek = lastWeekLine(e, week);
   const word = e.repsText === null ? null : repsWord(e.repsText);
   return (
@@ -354,6 +350,8 @@ function SetView({
             </div>
           )}
 
+          {/* Neither a suggestion nor last week's kg: no kg block (round 3, never "intet forslag"). */}
+          {kg !== null && (
           <div className="flex flex-col">
             <p className="caption">{kg.label}</p>
             {kg.kind === "suggestion" && (
@@ -369,21 +367,13 @@ function SetView({
               </p>
             )}
             {kg.kind === "last_week" && (
-              <>
-                <p className="[overflow-wrap:anywhere]">
-                  <span className="text-56 leading-none">{kg.figure}</span>
-                  {kg.unit !== null && <span className="text-24 text-text-muted">{" "}kg</span>}
-                </p>
-                {kg.reason !== null && <p className="text-16 text-text-muted">{kg.reason}</p>}
-              </>
-            )}
-            {kg.kind === "none" && (
-              <>
-                <p className="text-24 text-text-muted">{kg.text}</p>
-                {kg.reason !== null && <p className="text-16 text-text-muted">{kg.reason}</p>}
-              </>
+              <p className="[overflow-wrap:anywhere]">
+                <FigureWithWords figure={kg.figure} />
+                {kg.unit !== null && <span className="text-24 text-text-muted">{" "}kg</span>}
+              </p>
             )}
           </div>
+          )}
 
           {lastWeek !== null && (
             <p className="flex flex-wrap items-baseline gap-x-2">
@@ -397,6 +387,8 @@ function SetView({
               )}
             </p>
           )}
+
+          {note !== "" && <Note text={note} />}
         </div>
 
         {/* Secondary action above the primary: nothing sits below Udført (round 2). */}
@@ -404,10 +396,12 @@ function SetView({
           Spring over
         </button>
 
-        <button ref={primary} type="button" onClick={() => onDone(current)} className={`mt-10 ${PRIMARY_FILL}`}>
-          <CheckIcon className="size-6" />
-          Udført
-        </button>
+        <div className={`mt-10 ${PRIMARY_DOCK}`}>
+          <button ref={primary} type="button" onClick={() => onDone(current)} className={PRIMARY_BOX}>
+            <CheckIcon className="size-6" />
+            Udført
+          </button>
+        </div>
       </section>
     </div>
   );
@@ -421,30 +415,25 @@ function PauseView({
   done,
   next,
   logged,
-  week,
   primary,
   onNext,
   onTap,
   onAnnounce,
-  footer,
 }: {
   readonly since: string;
   readonly done: SetInContext | null;
   readonly next: SetInContext | null;
   readonly logged: LoggedSet | undefined;
-  readonly week: number;
   readonly primary: PrimaryRef;
   readonly onNext: (since: string, next: SetInContext | null) => void;
   readonly onTap: FeelTap;
   readonly onAnnounce: (s: string) => void;
-  readonly footer: ReactNode;
 }) {
   return (
     <div className={`flex flex-col ${FADE_IN}`}>
       {done !== null && <FeelBlock set={done} logged={logged} named={false} onTap={onTap} />}
       {done !== null && <PauseCard since={since} exercise={done.exercise} onAnnounce={onAnnounce} />}
-      {next !== null && <NextSetCard next={next} week={week} inWarmup={false} afterTimer />}
-      {footer}
+      {next !== null && <NextSetCard next={next} inWarmup={false} afterTimer />}
       <PrimaryButton primary={primary} onClick={() => onNext(since, next)}>
         Til næste sæt
       </PrimaryButton>
@@ -460,11 +449,9 @@ function WarmupView({
   setOne,
   feel,
   logged,
-  week,
   primary,
   onWarmupEnd,
   onTap,
-  footer,
 }: {
   readonly since: string | null; // null: no recorded start (§2.2), a static 0:00
   readonly mainLifts: readonly string[] | null;
@@ -472,11 +459,9 @@ function WarmupView({
   readonly setOne: SetInContext | null;
   readonly feel: SetInContext | null;
   readonly logged: LoggedSet | undefined;
-  readonly week: number;
   readonly primary: PrimaryRef;
   readonly onWarmupEnd: (warmup: SetRef) => void;
   readonly onTap: FeelTap;
-  readonly footer: ReactNode;
 }) {
   if (setOne === null) return null; // the order and the rows come from the same sets: not reached
   const mainLift = isMainLift(setOne.exercise, mainLifts);
@@ -486,8 +471,7 @@ function WarmupView({
       <div className={feel !== null ? "mt-10" : "mt-4"}>
         <WarmupCard since={since} exercise={setOne.exercise} mainLift={mainLift} />
       </div>
-      <NextSetCard next={setOne} week={week} inWarmup afterTimer={rampState(setOne.exercise, mainLift) === "hidden"} />
-      {footer}
+      <NextSetCard next={setOne} inWarmup afterTimer={rampState(setOne.exercise, mainLift) === "hidden"} />
       <PrimaryButton primary={primary} onClick={() => onWarmupEnd(warmup)}>
         Til sæt 1
       </PrimaryButton>
@@ -504,6 +488,7 @@ function FinishedView({
   feel,
   logged,
   onTap,
+  footer,
 }: {
   readonly session: number;
   readonly card: ReturnType<typeof finishCard>;
@@ -512,6 +497,8 @@ function FinishedView({
   readonly feel: SetInContext | null;
   readonly logged: LoggedSet | undefined;
   readonly onTap: FeelTap;
+  /** "Tid brugt …": shown only here since round 3. */
+  readonly footer: ReactNode;
 }) {
   return (
     <div className={`flex flex-col ${FADE_IN}`}>
@@ -523,12 +510,15 @@ function FinishedView({
         <div className="mt-10 flex flex-col gap-3">
           <CountsFigure text={card.counts} />
           {card.times !== null && <p className="caption">{card.times}</p>}
+          {footer}
         </div>
         <p className="mt-10 text-20">Husk at logge kg i arket.</p>
       </section>
-      <HomeLink ref={primary} flush={flush} className={`mt-10 ${PRIMARY_FILL}`}>
-        Tilbage til Træning
-      </HomeLink>
+      <div className={`mt-10 ${PRIMARY_DOCK}`}>
+        <HomeLink ref={primary} flush={flush} className={PRIMARY_BOX}>
+          Tilbage til Træning
+        </HomeLink>
+      </div>
     </div>
   );
 }
@@ -546,18 +536,17 @@ function CountsFigure({ text }: { readonly text: string }) {
   );
 }
 
-const CLOCK = /(kl\. \d{1,2}\.\d{2})/;
-
-/** "kl. 18.42" kept on one line: at 200% text a break between "kl." and the time reads badly. */
-function KeepClock({ text }: { readonly text: string }) {
-  // split() with a capturing group puts the times at the odd indexes.
-  return text.split(CLOCK).map((part, i) =>
-    i % 2 === 1 ? (
-      <span key={i} className="whitespace-nowrap">
-        {part}
-      </span>
-    ) : (
-      part
-    ),
+/**
+ * A kg figure that may start with words ("kropsvægt + 10"): the words in text-24 so only the
+ * number is 56px and the line doesn't wrap at 390 (round 3); a plain number is all 56px.
+ */
+function FigureWithWords({ figure }: { readonly figure: string }) {
+  const m = /^(\D+?)\s*(\d[\d,.]*)$/.exec(figure);
+  if (m === null) return <span className="text-56 leading-none">{figure}</span>;
+  return (
+    <>
+      <span className="text-24">{m[1]} </span>
+      <span className="text-56 leading-none">{m[2]}</span>
+    </>
   );
 }
