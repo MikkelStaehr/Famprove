@@ -16,6 +16,27 @@
     "suggested_kg": 82.5,
     "basis": "rpe_e1rm",
     "uncapped_kg": null,
+    "adjustment_kg": null,
+    "adjustment_reason": null,
+    "rest_min_s": 90,
+    "rest_max_s": 120,
+    "ramp": [
+      {
+        "pct": 40,
+        "reps": 5,
+        "kg": 32.5
+      },
+      {
+        "pct": 60,
+        "reps": 3,
+        "kg": 50.0
+      },
+      {
+        "pct": 80,
+        "reps": 2,
+        "kg": 65.0
+      }
+    ],
     "computed_at": "2026-10-13T08:00:00+00:00"
   },
   "capped": {
@@ -35,6 +56,11 @@
     "suggested_kg": 82.5,
     "basis": "rpe_e1rm",
     "uncapped_kg": 85.0,
+    "adjustment_kg": null,
+    "adjustment_reason": null,
+    "rest_min_s": 180,
+    "rest_max_s": 300,
+    "ramp": null,
     "computed_at": "2026-10-13T08:00:00+00:00"
   },
   "none": {
@@ -54,6 +80,11 @@
     "suggested_kg": null,
     "basis": "not_rpe",
     "uncapped_kg": null,
+    "adjustment_kg": null,
+    "adjustment_reason": null,
+    "rest_min_s": 90,
+    "rest_max_s": 120,
+    "ramp": null,
     "computed_at": "2026-10-13T08:00:00+00:00"
   }
 }

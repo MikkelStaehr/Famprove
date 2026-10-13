@@ -1,0 +1,111 @@
+"""Felt RPE and reps done from the Fokus pause screen (domain.set_feedback, 2026-10-13)."""
+
+from collections.abc import Callable
+from datetime import date
+
+import pytest
+
+from training_load.domain.set_feedback import (
+    LoggedSet,
+    Progression,
+    exercise_feel,
+    progressions,
+    range_top,
+    with_reps_done,
+)
+from training_load.domain.strength import StrengthSet
+
+MakeSet = Callable[..., StrengthSet]
+MONDAY = date(2026, 10, 12)
+
+
+def entry(
+    row: int,
+    set_no: int = 1,
+    *,
+    day: date = MONDAY,
+    session: int = 1,
+    exercise_id: int = 8,
+    felt: int | None = None,
+    reps: float | None = None,
+    minute: int = 0,
+    skipped: bool = False,
+) -> LoggedSet:
+    ended = None if skipped else f"{day.isoformat()}T08:{minute:02d}:00+00:00"
+    return LoggedSet(day, session, row, set_no, exercise_id, ended, skipped, felt, reps)
+
+
+@pytest.mark.parametrize(
+    ("text", "top"),
+    [("8 - 12", 12.0), ("20 - 30", 30.0), ("6-10", 10.0), ("3", None), (None, None)],
+)
+def test_the_top_of_a_range(text: str | None, top: float | None) -> None:
+    assert range_top(text) == top
+
+
+def test_reps_done_replace_the_range_midpoint_and_the_set_is_scored_again(
+    make_set: MakeSet,
+) -> None:
+    accessory = make_set(
+        week_start=MONDAY, session=1, sheet_row=32, set_no=1, type="CHEST/SHOULDERS",
+        name="Low incline DB press", reps=8.0, reps_text="6 - 10", prescribed="RPE 7 - 8",
+        logged_kg=30.0, kg=30.0, muscle_factor=0.6, score=8 * 30 * 0.75**2 * 0.6,
+    )  # fmt: skip
+    fixed = make_set(week_start=MONDAY, session=1, sheet_row=25, set_no=1, reps=3.0, reps_text="3")
+    sets, applied = with_reps_done(
+        [accessory, fixed], [entry(32, reps=10.0), entry(25, reps=5.0), entry(32, 2, reps=9.0)]
+    )
+    assert applied == 1  # a fixed-rep set never takes reps done
+    assert sets[0].reps == 10.0
+    assert sets[0].score == pytest.approx(round(10 * 30 * 0.75**2 * 0.6, 1))  # the formula, 10 reps
+    assert sets[1] == fixed
+
+
+def test_two_lighter_in_a_row_step_up_and_two_harder_hold() -> None:
+    lighter = [entry(32, 1, felt=-1, minute=1), entry(32, 2, felt=-1, minute=5)]
+    assert progressions(lighter, []) == {8: Progression("step", "de sidste to var lettere")}
+    harder = [
+        entry(32, 1, felt=-1, minute=1),
+        entry(32, 2, felt=1, minute=5),
+        entry(32, 3, felt=1, minute=9),
+    ]
+    assert progressions(harder, []) == {8: Progression("hold", "de sidste to var hårdere")}
+    mixed = [entry(32, 1, felt=-1, minute=1), entry(32, 2, felt=0, minute=5)]
+    assert progressions(mixed, []) == {}
+    # A skipped set never counts; the order is by when the set ended.
+    late_first = [
+        entry(32, 2, felt=-1, minute=9),
+        entry(32, 1, felt=1, minute=1),
+        entry(32, 3, felt=-1, skipped=True),
+    ]
+    assert progressions(late_first, []) == {}
+
+
+def test_every_set_at_the_top_in_two_sessions_steps_up(make_set: MakeSet) -> None:
+    week = [
+        make_set(week_start=MONDAY, session=s, sheet_row=32, set_no=n, reps_text="6 - 10", reps=8.0)
+        for s in (1, 2)
+        for n in (1, 2)
+    ]
+    top = [entry(32, n, session=s, reps=10.0) for s in (1, 2) for n in (1, 2)]
+    assert progressions(top, week) == {8: Progression("step", "du ramte 10 reps to gange")}
+    one_short = [*top[:3], entry(32, 2, session=2, reps=9.0)]
+    assert progressions(one_short, week) == {}
+    assert progressions(top[:2], week) == {}  # one session is not two
+
+
+def test_the_feel_line_needs_four_rated_sets_and_names_the_offset() -> None:
+    three = [entry(32, n, felt=-1, minute=n) for n in (1, 2, 3)]
+    assert exercise_feel(three, {8: 5.0}) == []
+    four = [*three, entry(33, 1, felt=0, minute=4)]
+    [feel] = exercise_feel(four, {8: 5.0})
+    assert (feel.rated_n, feel.lighter_n, feel.expected_n, feel.harder_n) == (4, 3, 1, 0)
+    assert feel.verdict_text == (
+        "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE."  # noqa: RUF001
+    )
+    [as_rx] = exercise_feel([entry(32, n, felt=0, minute=n) for n in range(4)], {8: 0.0})
+    assert (
+        as_rx.verdict_text == "Du melder oftest som foreskrevet – forslaget følger trænerens RPE."  # noqa: RUF001
+    )
+    [harder] = exercise_feel([entry(32, n, felt=1, minute=n) for n in range(4)], {8: None})
+    assert harder.verdict_text == "Du melder oftest hårdere end foreskrevet."

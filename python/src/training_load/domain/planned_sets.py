@@ -34,12 +34,13 @@ Only the run day's ISO week and later get rows: past weeks were lifted with what
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final, Literal
 
 from training_load.domain.exercises import Catalog
 from training_load.domain.planned_load import prescribed_rpe
+from training_load.domain.set_feedback import Progression
 from training_load.domain.strength import StrengthSet, iso_week_start
 from training_load.domain.strength_analysis import (
     E1RM_BOUNDS_KG,
@@ -69,7 +70,23 @@ LOWER_BODY_WORDS: Final = (
 every other type (BENCH, CHEST/SHOULDERS, LATS/MIDDLE BACK, ...) is upper body."""
 ROUND_TO_KG: Final = 2.5
 
-type Basis = Literal["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift"]
+type Basis = Literal["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift", "progression"]
+
+HEAVY_MAX_REPS: Final = 5
+HEAVY_MIN_RPE: Final = 7.0
+REST_HEAVY_S: Final = (180, 300)
+REST_OTHER_S: Final = (90, 120)
+"""Recommended rest after a set (user, 2026-10-13): 3-5 min after a heavy set (reps <= 5 at a
+prescribed RPE >= 7), else 1.5-2 min."""
+RAMP: Final = ((40, 5), (60, 3), (80, 2))
+"""The warm-up ramp before a main lift: (% of the first working set's kg, reps)."""
+
+
+@dataclass(frozen=True, slots=True)
+class RampStep:
+    pct: int
+    reps: int
+    kg: float  # a multiple of ROUND_TO_KG, > 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +109,12 @@ class PlannedSet:
     suggested_kg: float | None  # a multiple of ROUND_TO_KG; None: no suggestion (see basis)
     basis: Basis
     uncapped_kg: float | None = None  # the suggestion before the weekly cap; None: not capped
+    adjustment_kg: float | None = None  # a progression step (2.5 / 5) or 0 for hold; None: none
+    adjustment_reason: str | None = None  # Danish; None exactly when adjustment_kg is None
+    rest_min_s: int | None = None  # recommended rest after this set
+    rest_max_s: int | None = None
+    ramp: tuple[RampStep, ...] | None = None  # main lifts, a run's first set; None: no ramp
+    rpe_kg: float | None = None  # the e1RM x RPE suggestion before adjustment and cap (not stored)
 
 
 def pct_of_e1rm(reps: float, rpe: float) -> float:
@@ -167,6 +190,26 @@ def _same_exercise(a: str, b: str) -> bool:
     return a.strip().casefold() == b.strip().casefold()
 
 
+def _same_reps(a: StrengthSet, b: StrengthSet) -> bool:
+    """The same prescribed reps: the sheet's text ("8 - 12"), since a done range set's reps are
+    the reps done (domain.set_feedback)."""
+    if a.reps_text is not None and b.reps_text is not None:
+        return a.reps_text.strip() == b.reps_text.strip()
+    return a.reps == b.reps
+
+
+def rest_band(reps: float, rpe: float | None) -> tuple[int, int]:
+    heavy = reps <= HEAVY_MAX_REPS and rpe is not None and rpe >= HEAVY_MIN_RPE
+    return REST_HEAVY_S if heavy else REST_OTHER_S
+
+
+def ramp_of(base_kg: float) -> tuple[RampStep, ...] | None:
+    """40/60/80 % of ``base_kg`` for 5/3/2 reps, rounded to ROUND_TO_KG; None when a step would
+    round to 0 (a base too light to ramp)."""
+    steps = tuple(RampStep(pct, reps, round_to_step(base_kg * pct / 100)) for pct, reps in RAMP)
+    return steps if all(step.kg > 0 for step in steps) else None
+
+
 def last_week_kg(
     sets: Iterable[StrengthSet], statuses: Mapping[SetKey, KgStatus]
 ) -> dict[tuple[str, int, date], StrengthSet]:
@@ -189,8 +232,13 @@ def planned_sets(
     statuses: Mapping[SetKey, KgStatus],
     *,
     today: date,
+    progressions: Mapping[int, Progression] | None = None,
 ) -> list[PlannedSet]:
-    """One PlannedSet per set of the run day's ISO week and later, in strength_sets order."""
+    """One PlannedSet per set of the run day's ISO week and later, in strength_sets order.
+    ``progressions`` (domain.set_feedback, by exercise id): a step up or a hold, applied before
+    the weekly cap. An exercise without an e1RM suggestion (no_lift, no_e1rm) gets last week's
+    kg plus the step (or held) as a "progression" suggestion when a rule fires."""
+    rules = progressions or {}
     run_week = iso_week_start(today)
     e1rms = {
         lift: rolling_e1rm(sets, statuses, lift, run_week)
@@ -198,6 +246,7 @@ def planned_sets(
     }
     logged = last_week_kg(sets, statuses)
     out: list[PlannedSet] = []
+    anchors: dict[SetKey, float] = {}
     for s in sets:
         if s.week_start < run_week:
             continue
@@ -221,14 +270,34 @@ def planned_sets(
             if basis == "rpe_e1rm" and e1rm_kg is not None and pct is not None
             else None
         )
+        if suggested is not None and suggested <= 0:
+            suggested = None
+        rpe_kg = suggested
+        before = logged.get((s.block, s.sheet_row, s.week_start - timedelta(days=7)))
+        same = before is not None and _same_exercise(before.name, s.name) and _same_reps(before, s)
+        anchor = before.logged_kg if same and before is not None else None
+        if anchor is not None:
+            anchors[set_key(s)] = anchor
+        step = cap_kg(s.type)
+        rule = rules.get(exercise.id) if exercise is not None else None
+        adjustment: float | None = None
+        if rule is not None and suggested is not None:
+            if rule.kind == "step":
+                suggested, adjustment = suggested + step, step
+            else:
+                adjustment = 0.0
+                if anchor is not None:
+                    suggested = min(suggested, _step_down(anchor))
+        elif rule is not None and basis in ("no_lift", "no_e1rm") and anchor is not None:
+            basis = "progression"
+            adjustment = step if rule.kind == "step" else 0.0
+            suggested = _step_down(anchor + adjustment)
+            if suggested <= 0:
+                suggested, adjustment, basis = None, None, "no_lift" if lift is None else "no_e1rm"
         uncapped = None
-        if suggested is not None and suggested > 0:
-            before = logged.get((s.block, s.sheet_row, s.week_start - timedelta(days=7)))
-            same = (
-                before is not None and _same_exercise(before.name, s.name) and before.reps == s.reps
-            )
-            anchor = before.logged_kg if same and before is not None else None
-            suggested, uncapped = weekly_cap(suggested, anchor, cap_kg(s.type))
+        if suggested is not None:
+            suggested, uncapped = weekly_cap(suggested, anchor, step)
+        rest_min, rest_max = rest_band(s.reps, rpe)
         out.append(
             PlannedSet(
                 sheet_id=s.sheet_id,
@@ -244,9 +313,60 @@ def planned_sets(
                 rpe=rpe,
                 reps=s.reps,
                 pct=pct,
-                suggested_kg=suggested if suggested is not None and suggested > 0 else None,
+                suggested_kg=suggested,
                 basis=basis,
                 uncapped_kg=uncapped,
+                adjustment_kg=adjustment,
+                adjustment_reason=rule.reason
+                if adjustment is not None and rule is not None
+                else None,
+                rest_min_s=rest_min,
+                rest_max_s=rest_max,
+                rpe_kg=rpe_kg,
             )
         )
+    return _with_ramps(out, sets, catalog, anchors)
+
+
+def _with_ramps(
+    planned: list[PlannedSet],
+    sets: Sequence[StrengthSet],
+    catalog: Catalog,
+    anchors: Mapping[SetKey, float],
+) -> list[PlannedSet]:
+    """The warm-up ramp on set 1 of the first row of each run of a main lift (consecutive rows
+    with the same exercise in a session), from its suggestion, else last week's logged kg."""
+    names = {set_key(s): s.name for s in sets}
+    by_session: dict[tuple[date, int], list[PlannedSet]] = {}
+    for p in planned:
+        by_session.setdefault((p.week_start, p.session), []).append(p)
+    ramps: dict[int, tuple[RampStep, ...]] = {}
+    index = {id(p): i for i, p in enumerate(planned)}
+    for rows in by_session.values():
+        previous: str | None = None
+        for p in sorted(rows, key=lambda p: (p.sheet_row, p.set_no)):
+            key = (p.sheet_id, p.block, p.sheet_row, p.week, p.set_no)
+            name = names[key].strip().casefold()
+            starts_run = p.set_no == 1 and name != previous
+            if p.set_no == 1:
+                previous = name
+            exercise = catalog.find(names[key])
+            if not starts_run or exercise is None or exercise.category != "main":
+                continue
+            base = p.suggested_kg if p.suggested_kg is not None else anchors.get(key)
+            ramp = ramp_of(base) if base is not None else None
+            if ramp is not None:
+                ramps[index[id(p)]] = ramp
+    return [replace(p, ramp=ramps[i]) if i in ramps else p for i, p in enumerate(planned)]
+
+
+def suggestion_offsets(planned: Sequence[PlannedSet]) -> dict[int, float | None]:
+    """Per exercise: how far its next suggestion lies from the kg the coach's RPE gives
+    (suggested - rpe_kg on its first RPE-based planned set); None when it has none."""
+    out: dict[int, float | None] = {}
+    for p in sorted(planned, key=lambda p: (p.week_start, p.session, p.sheet_row, p.set_no)):
+        if p.exercise_id is None or p.exercise_id in out:
+            continue
+        if p.suggested_kg is not None and p.rpe_kg is not None:
+            out[p.exercise_id] = round(p.suggested_kg - p.rpe_kg, 1)
     return out

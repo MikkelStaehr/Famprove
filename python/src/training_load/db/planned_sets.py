@@ -12,6 +12,12 @@ TABLE: Final = "planned_sets"
 KEY: Final = "sheet_id,block,sheet_row,week,set_no"  # the strength_sets key
 
 
+class RampRow(TypedDict):
+    pct: int
+    reps: int
+    kg: float
+
+
 class PlannedSetRow(TypedDict):
     sheet_id: str
     block: str
@@ -29,6 +35,11 @@ class PlannedSetRow(TypedDict):
     suggested_kg: float | None  # null: no suggestion (basis says why), never 0
     basis: Basis
     uncapped_kg: float | None  # the suggestion before the weekly cap; null: the cap didn't apply
+    adjustment_kg: float | None  # a progression step (2.5 / 5) or 0 for hold; null: no rule fired
+    adjustment_reason: str | None  # Danish, lowercase; null exactly when adjustment_kg is null
+    rest_min_s: int | None  # recommended rest after the set
+    rest_max_s: int | None
+    ramp: list[RampRow] | None  # a main lift's warm-up ramp on a run's first set; null: none
     computed_at: str  # ISO timestamptz (UTC), the same on every row of one compute run
 
 
@@ -50,6 +61,11 @@ def to_row(p: PlannedSet, computed_at: datetime) -> PlannedSetRow:
         suggested_kg=p.suggested_kg,
         basis=p.basis,
         uncapped_kg=p.uncapped_kg,
+        adjustment_kg=p.adjustment_kg,
+        adjustment_reason=p.adjustment_reason,
+        rest_min_s=p.rest_min_s,
+        rest_max_s=p.rest_max_s,
+        ramp=None if p.ramp is None else [RampRow(pct=s.pct, reps=s.reps, kg=s.kg) for s in p.ramp],
         computed_at=computed_at.isoformat(),
     )
 

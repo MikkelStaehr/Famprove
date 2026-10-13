@@ -20,11 +20,13 @@ from training_load.db.blocks import sync_blocks
 from training_load.db.client import Postgrest
 from training_load.db.daily_load import sync_daily_load
 from training_load.db.daily_projection import sync_projection
+from training_load.db.exercise_feel import sync_exercise_feel
 from training_load.db.exercises import all_exercises
 from training_load.db.forecast_log import log_forecast
 from training_load.db.planned import all_sessions
 from training_load.db.planned_sets import sync_planned_sets
 from training_load.db.ride_metrics import sync_ride_metrics
+from training_load.db.set_log import all_logged_sets
 from training_load.db.strength_activities import all_strength_activities
 from training_load.db.strength_analysis import (
     all_kg_states,
@@ -40,7 +42,7 @@ from training_load.domain.dates import ANALYSIS_START, SERIES_START, today_local
 from training_load.domain.exercises import UNKNOWN_FACTOR, Catalog
 from training_load.domain.kg_history import gone_states, kg_keys, next_kg_state
 from training_load.domain.load import DECAY
-from training_load.domain.planned_sets import planned_sets
+from training_load.domain.planned_sets import planned_sets, suggestion_offsets
 from training_load.domain.projection import (
     MODEL_VERSION,
     PlannedRide,
@@ -56,6 +58,7 @@ from training_load.domain.ride_analysis import (
     weekly_totals,
 )
 from training_load.domain.sessions import daily_strength_tss, match_sessions
+from training_load.domain.set_feedback import exercise_feel, progressions, with_reps_done
 from training_load.domain.strength import derive_blocks, iso_week_start
 from training_load.domain.strength_analysis import (
     PHASES_CONFIRMED_TO,
@@ -119,7 +122,10 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
        raises RideDataError afterwards when too many rides lack raw or have unreadable fields
     """
     activities = all_activities(db)
-    sets = all_sets(db)
+    logged_sets = all_logged_sets(db)  # felt RPE and reps done from the Fokus pause screen
+    sets, reps_applied = with_reps_done(all_sets(db), logged_sets)
+    if reps_applied:
+        log.info("%d range sets scored with the reps done (exercise_set_log)", reps_applied)
     if legacy := sum(1 for s in sets if s.muscle_factor is None):
         log.warning(
             "%d strength sets have no muscle_factor (stored by older code): the prognose scores "
@@ -158,8 +164,19 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     analysis = strength_weeks(sets, statuses, blocks, today=today)
     sync_strength_weeks(db, analysis.weeks, computed_at=computed_at)
     # Træning: suggested kg per set of this week and later, from the rolling e1RM just computed.
-    suggestions = planned_sets(sets, Catalog(all_exercises(db)), statuses, today=today)
+    rules = progressions(logged_sets, sets)
+    suggestions = planned_sets(
+        sets, Catalog(all_exercises(db)), statuses, today=today, progressions=rules
+    )
     sync_planned_sets(db, suggestions, computed_at=computed_at)
+    feels = exercise_feel(logged_sets, suggestion_offsets(suggestions))
+    sync_exercise_feel(db, feels, computed_at=computed_at)
+    log.info(
+        "progression rules: %d exercises (%s); exercise_feel: %d lines",
+        len(rules),
+        dict(sorted(Counter(r.kind for r in rules.values()).items())),
+        len(feels),
+    )
     log.info(
         "planned_sets: %d sets from this week on, %d with a suggested kg (%s)",
         len(suggestions),

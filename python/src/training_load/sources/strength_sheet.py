@@ -89,6 +89,10 @@ def cell_text(cell: object) -> str | None:
     if isinstance(cell, (int, float)) and not isinstance(cell, bool): return f"{cell:g}"
     return str(cell).strip() or None
 
+def notes_text(raw: dict[str, object]) -> str | None:
+    """The coach's NOTES cell of a parsed set (raw["notes"]) as written; None when blank."""
+    return cell_text(raw.get("notes"))
+
 def prescribed_text(load: object) -> str | None:
     """Load-cellen som i arket: tekst uændret, procent-tal (-0.1) som '-10%', andre tal som tekst."""
     if load is None or load == "": return None

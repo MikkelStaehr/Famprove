@@ -68,6 +68,7 @@ class StrengthSet:
     # public.exercises' factor at collect time; scores planned sets without kg. None: a row
     # stored by code from before the catalogue (2026-10-12).
     muscle_factor: float | None = None
+    notes: str | None = None  # the coach's NOTES cell as written; None = blank
     raw: Mapping[str, object] | None = field(default=None, compare=False)
     """The week's cells as written (sets .. mean_weight); None for rows stored before raw."""
 

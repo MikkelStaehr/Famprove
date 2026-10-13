@@ -37,6 +37,7 @@ from training_load.sources.strength_sheet import (
     LSRPE_NOT_HALF,
     RPE_NOT_HALF,
     ParsedSet,
+    notes_text,
     parse_all,
 )
 
@@ -124,6 +125,7 @@ def to_domain(parsed: ParsedSet, sheet_id: str, slot: SessionSlot) -> StrengthSe
         raw=parsed["raw"],
         logged_rpe=parsed["logged_rpe"],
         muscle_factor=parsed["muscle_factor"],
+        notes=notes_text(parsed["raw"]),
     )
 
 

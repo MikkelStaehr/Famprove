@@ -17,6 +17,7 @@ from training_load.domain.planned_sets import (
     round_to_step,
     weekly_cap,
 )
+from training_load.domain.set_feedback import Progression
 from training_load.domain.strength import StrengthSet
 from training_load.domain.strength_analysis import KgStatus, SetKey, e1rm, set_key
 
@@ -258,3 +259,75 @@ def test_no_cap_in_week_1_of_a_new_block_or_after_a_missed_session(sheet: Sheet)
 def test_an_implausible_e1rm_is_left_out(sheet: Sheet) -> None:
     sheet.add(week_start=LAST_WEEK, reps=3.0, prescribed="RPE 7", logged_kg=900.0)  # a typo
     assert rolling_e1rm(sheet.sets, sheet.statuses, "SQUAT", RUN_WEEK) is None
+
+
+def test_a_step_up_adds_the_region_step_inside_the_cap(sheet: Sheet) -> None:
+    sheet.add(week_start=LAST_WEEK, reps=3.0, prescribed="RPE 7", logged_kg=145.0, type="BENCH",
+              name="Bænk")  # e1RM 174  # fmt: skip
+    sheet.add(week_start=LAST_WEEK, sheet_row=40, reps=3.0, prescribed="RPE 6", logged_kg=140.0,
+              type="BENCH", name="Bænk")  # fmt: skip
+    s = sheet.add(sheet_row=40, reps=3.0, prescribed="RPE 6", type="BENCH", name="Bænk")
+    rules = {3: Progression("step", "de sidste to var lettere")}
+    [p] = [
+        p
+        for p in planned_sets(sheet.sets, CATALOG, sheet.statuses, today=TODAY, progressions=rules)
+        if p.sheet_row == s.sheet_row
+    ]
+    # e1RM 174 x 0.811 = 141 -> 140, + 2.5 (upper body) = 142.5, inside the cap (140 + 2.5)
+    assert (p.suggested_kg, p.adjustment_kg, p.adjustment_reason) == (
+        142.5,
+        2.5,
+        "de sidste to var lettere",
+    )
+    assert (p.rpe_kg, p.uncapped_kg) == (140.0, None)
+
+
+def test_hold_keeps_last_weeks_kg_and_an_accessory_progresses_from_it(sheet: Sheet) -> None:
+    sheet.add(week_start=LAST_WEEK, reps=3.0, prescribed="RPE 7", logged_kg=150.0)  # squat e1RM 180
+    sheet.add(week_start=LAST_WEEK, sheet_row=40, reps=3.0, prescribed="RPE 6", logged_kg=140.0)
+    held = sheet.add(sheet_row=40, reps=3.0, prescribed="RPE 6")
+    sheet.add(week_start=LAST_WEEK, sheet_row=41, reps=8.0, reps_text="8 - 12",
+              prescribed="RPE 7 - 8", logged_kg=22.0, type="CHEST/SHOULDERS",
+              name="Facepulls")  # fmt: skip
+    accessory = sheet.add(sheet_row=41, reps=10.0, reps_text="8 - 12", prescribed="RPE 7 - 8",
+                          type="CHEST/SHOULDERS", name="Facepulls")  # fmt: skip
+    rules = {1: Progression("hold", "de sidste to var hårdere"),
+             4: Progression("step", "du ramte 12 reps to gange")}  # fmt: skip
+    by_row = {
+        p.sheet_row: p
+        for p in planned_sets(sheet.sets, CATALOG, sheet.statuses, today=TODAY, progressions=rules)
+    }
+    h, a = by_row[held.sheet_row], by_row[accessory.sheet_row]
+    assert (h.suggested_kg, h.adjustment_kg, h.adjustment_reason) == (
+        140.0,
+        0.0,
+        "de sidste to var hårdere",
+    )
+    # 22 kg + 2.5 = 24.5, on the 2.5 grid: 22.5 (rounded down, never above the cap)
+    assert (a.basis, a.suggested_kg, a.adjustment_kg) == ("progression", 22.5, 2.5)
+    assert (a.e1rm_kg, a.e1rm_lift) == (None, None)
+
+
+def test_rest_band_and_the_warm_up_ramp_on_a_main_lifts_first_set(sheet: Sheet) -> None:
+    sheet.add(week_start=LAST_WEEK, reps=3.0, prescribed="RPE 7", logged_kg=150.0)  # e1RM 180
+    first = sheet.add(sheet_row=60, set_no=1, reps=3.0, prescribed="RPE 7")
+    second = sheet.add(sheet_row=60, set_no=2, reps=3.0, prescribed="RPE 7")
+    backoff = sheet.add(sheet_row=61, set_no=1, reps=5.0, prescribed="RPE 6")  # same run
+    pull = sheet.add(sheet_row=62, set_no=1, reps=10.0, reps_text="8 - 12", prescribed="RPE 7 - 8",
+                     type="UPPER BACK", name="Facepulls")  # fmt: skip
+    by_key = {(p.sheet_row, p.set_no): p for p in sheet.plan()}
+    top = by_key[(first.sheet_row, 1)]
+    assert top.suggested_kg == 150.0  # 180 / 1.1998
+    assert [(s.pct, s.reps, s.kg) for s in top.ramp or ()] == [
+        (40, 5, 60.0),
+        (60, 3, 90.0),
+        (80, 2, 120.0),
+    ]
+    assert by_key[(second.sheet_row, 2)].ramp is None  # set 2
+    assert by_key[(backoff.sheet_row, 1)].ramp is None  # the same exercise run
+    assert by_key[(pull.sheet_row, 1)].ramp is None  # not a main lift
+    assert (top.rest_min_s, top.rest_max_s) == (180, 300)  # 3 reps at RPE 7: heavy
+    assert (by_key[(backoff.sheet_row, 1)].rest_min_s, by_key[(pull.sheet_row, 1)].rest_max_s) == (
+        90,
+        120,
+    )

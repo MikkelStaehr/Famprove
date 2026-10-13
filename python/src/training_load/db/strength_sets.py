@@ -46,6 +46,7 @@ class StrengthSetRow(TypedDict):
     e1rm: float | None
     logged_rpe: float | None
     muscle_factor: float | None  # public.exercises at collect time; null on older rows
+    notes: str | None  # the coach's NOTES cell; null = blank
     raw: JsonRow | None  # the week's cells as written
 
 
@@ -75,6 +76,7 @@ def to_row(s: StrengthSet) -> StrengthSetRow:
         e1rm=s.e1rm,
         logged_rpe=s.logged_rpe,
         muscle_factor=s.muscle_factor,
+        notes=s.notes,
         raw=dict(s.raw) if s.raw is not None else None,
     )
 
@@ -103,6 +105,7 @@ def from_row(row: JsonRow) -> StrengthSet:
         e1rm=opt_float(row, "e1rm"),
         logged_rpe=opt_float(row, "logged_rpe"),
         muscle_factor=opt_float(row, "muscle_factor"),
+        notes=opt_str(row, "notes"),
         raw=opt_object(row, "raw"),
     )
 
