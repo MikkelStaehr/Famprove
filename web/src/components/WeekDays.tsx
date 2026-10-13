@@ -193,7 +193,7 @@ function Cycling({ date, tss, rides }: CyclingProps) {
  */
 function DataWarning({ warning }: { readonly warning: string }) {
   return (
-    <details className="group/warning text-14">
+    <details className="text-14">
       <summary
         title={warning}
         className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 font-semibold text-warning"
