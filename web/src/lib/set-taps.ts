@@ -24,6 +24,7 @@
  *   feel   set k   -> k.felt_rpe = value (-1/0/+1, null clears); only on a done set
  *   reps   set k   -> k.reps_done = value; only on a done set with a range prescription (the done
  *                     tap itself writes the top of the range when reps_done is empty)
+ * An undo of a done also clears the set's rating and reps done (the set is open again).
  * Python reads felt_rpe and reps_done; logging kg stays in the coach's sheet (the app never writes kg).
  */
 
@@ -268,7 +269,7 @@ export function applyTap(
         if (t !== null) clearStarts(next, t, at);
       } else if (own.endedAt !== null) {
         const t = own.endedAt;
-        put(next, target, { endedAt: null }, at);
+        put(next, target, { endedAt: null, feltRpe: null, repsDone: null }, at); // open again: no rating
         clearStarts(next, t, at);
       } else if (own.startedAt !== null && !startFromAnotherTap(log, target, own.startedAt)) {
         put(next, target, { startedAt: null }, at); // a begin

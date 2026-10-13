@@ -5,7 +5,7 @@ Extends `traening.md` §4 (Fokus). Replaces §4.3 (rest view); amends §4.1 (las
 **Readings taken (user away, "most reasonable reading"):**
 - R1 Separate file, linked from `traening.md` §4, so §4 stays readable.
 - R2 **Reps stepper default:** the top of the range is shown, and written as `reps` when the pause is left (Til næste sæt / Til sæt 1 / Tilbage til Træning) if no `reps` tap was sent. The value is on screen the whole time, so it is a visible pre-fill, not a silent default. Leaving by Afslut or reload writes nothing (`reps_done` stays null). **Open decision:** see the end of the file.
-- R3 Fortryd (top bar) walks **progress taps** only: done, skip, warmup_end, begin. Feel and reps are corrected in place (§4). Fortryd of a done keeps that set's felt_rpe / reps_done. Python counts them only on rows with `ended_at` set and `skipped = false`.
+- R3 Fortryd (top bar) walks **progress taps** only: done, skip, warmup_end, begin. Feel and reps are corrected in place (§4). Fortryd of a done clears that set's felt_rpe / reps_done with its end (reviewer, 2026-10-13: the set is open again, and a new done writes the top of the range afresh). Python counts them only on rows with `ended_at` set and `skipped = false`.
 - R4 The last set of the session gets its feel block on the finished view (otherwise it could never be rated).
 - R5 Spring over shows no feel block. A skip that ends an exercise opens the next exercise's warm-up.
 - R6 Fortryd of "Begynd træning" (no set done or skipped) removes the warm-up row and returns to `/`, the screen the tap came from.

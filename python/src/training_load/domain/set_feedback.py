@@ -23,7 +23,7 @@ from datetime import date
 from typing import Final, Literal
 
 from training_load.domain.strength import StrengthSet, iso_week_start
-from training_load.sources.strength_sheet import decimal_dots, set_score
+from training_load.sources.strength_sheet import decimal_dots, rpe_readable, set_score
 
 MIN_RATED: Final = 4
 COACH_RPE: Final = "trænerens RPE"
@@ -105,7 +105,9 @@ def _rescore(s: StrengthSet, reps: float, factor: float) -> tuple[float | None, 
     """(rpe, score) of ``s`` at ``reps`` with the sheet formula, unchanged. s.kg is already the
     effective kg (bodyweight included), so no bodyweight is added again. A typed wrapper around
     the untyped legacy module, as domain.planned_load does."""
-    load = decimal_dots(s.prescribed) if s.prescribed is not None else None
+    # An unreadable RPE cell ("RPE 7,8") is never used, as in the parser: RPE unknown.
+    readable = s.prescribed is not None and rpe_readable(s.prescribed)
+    load = decimal_dots(s.prescribed) if readable else None
     e1rm = {s.type: s.e1rm} if s.e1rm is not None else {}
     result: object = set_score(s.type, s.name, reps, s.kg, load, None, factor, e1rm)  # type: ignore[no-untyped-call]  # untyped legacy module
     assert isinstance(result, tuple)

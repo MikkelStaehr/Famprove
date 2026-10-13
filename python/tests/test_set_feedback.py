@@ -61,6 +61,18 @@ def test_reps_done_replace_the_range_midpoint_and_the_set_is_scored_again(
     assert sets[1] == fixed
 
 
+def test_an_unreadable_rpe_cell_is_not_used_when_scored_again(make_set: MakeSet) -> None:
+    # The parser scores "RPE 7,8" as RPE unknown (6.0); the rescore must too.
+    s = make_set(
+        week_start=MONDAY, session=1, sheet_row=32, set_no=1, type="CHEST/SHOULDERS",
+        name="Low incline DB press", reps=8.0, reps_text="6 - 10", prescribed="RPE 7,8",
+        logged_kg=30.0, kg=30.0, muscle_factor=0.6, score=8 * 30 * 0.6**2 * 0.6,
+    )  # fmt: skip
+    sets, applied = with_reps_done([s], [entry(32, reps=10.0)])
+    assert applied == 1
+    assert sets[0].score == pytest.approx(round(10 * 30 * 0.6**2 * 0.6, 1))
+
+
 def test_two_lighter_in_a_row_step_up_and_two_harder_hold() -> None:
     lighter = [entry(32, 1, felt=-1, minute=1), entry(32, 2, felt=-1, minute=5)]
     assert progressions(lighter, []) == {8: Progression("step", "de sidste to var lettere")}

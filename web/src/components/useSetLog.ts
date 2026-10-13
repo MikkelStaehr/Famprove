@@ -58,6 +58,10 @@ export function useSetLog(
   const [rejected, setRejected] = useState(false);
   const [dev, setDev] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
+  // Each set's latest done / skip / undo, updated in the tap itself (not in render): a feel or
+  // reps tap from a stale closure (the reps stepper's flush as the pause unmounts after Fortryd)
+  // must not reach a set that is no longer done.
+  const lastMark = useRef(new Map<string, SetTapKind>());
 
   const countFailed = useCallback(() => setUnsaved(new Set(failed.current.map((f) => setKey(f))).size), []);
 
@@ -80,6 +84,8 @@ export function useSetLog(
   const tap = useCallback(
     (kind: SetTapKind, ref: SetRef, value: number | null = null) => {
       if (refused(log, kind, ref)) return; // the server would refuse it too (skip of a done set)
+      if ((kind === "feel" || kind === "reps") && lastMark.current.get(setKey(ref)) === "undo") return;
+      if (kind === "done" || kind === "skip" || kind === "undo") lastMark.current.set(setKey(ref), kind);
       const undoes = kind === "undo" ? undoesOf(log, ref) : null;
       if (kind === "undo" && undoes === null) return; // nothing this set's taps wrote
       if (kind === "undo") {

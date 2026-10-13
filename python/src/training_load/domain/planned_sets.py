@@ -286,7 +286,7 @@ def planned_sets(
                 suggested, adjustment = suggested + step, step
             else:
                 adjustment = 0.0
-                if anchor is not None:
+                if anchor is not None and _step_down(anchor) > 0:  # never 0 (suggested_kg > 0)
                     suggested = min(suggested, _step_down(anchor))
         elif rule is not None and basis in ("no_lift", "no_e1rm") and anchor is not None:
             basis = "progression"

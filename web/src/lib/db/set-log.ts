@@ -69,8 +69,11 @@ function nameKey(name: string): string {
 
 /** The top of a range prescription ("8 - 12" -> 12); null for fixed reps ("3") or none. */
 export function rangeTop(repsText: string | null): number | null {
-  const m = repsText === null ? null : /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(repsText);
-  return m === null ? null : Math.max(Number(m[1]), Number(m[2]));
+  // As Python's domain.set_feedback.range_top: whole or decimal ends, comma or dot.
+  const m = repsText === null ? null : /^\s*(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*$/.exec(repsText);
+  if (m === null) return null;
+  const end = (s: string | undefined) => Number((s ?? "").replace(",", "."));
+  return Math.max(end(m[1]), end(m[2]));
 }
 
 /** The session's sets in the sheet (row, set, exercise name, reps as written). */
@@ -282,7 +285,8 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
           const t = logged.endedAt;
           await clearStarts(c, input.date, input.session, t, at); // on sets that aren't done
           await patch(c, own, [["started_at", `eq.${t}`], ["ended_at", `eq.${t}`]], { started_at: null, updated_at: at });
-          await patch(c, own, [["ended_at", `eq.${t}`]], { ended_at: null, updated_at: at });
+          // The set is open again: its rating and reps done go with its end (one request).
+          await patch(c, own, [["ended_at", `eq.${t}`]], { ended_at: null, felt_rpe: null, reps_done: null, updated_at: at });
         } else if (
           logged?.startedAt != null &&
           input.undoes === "begin" &&

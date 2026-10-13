@@ -56,8 +56,9 @@ const SHEET: Array<[number, number, string]> = [
   [12, 2, "Bænkpres"],
   [13, 1, "Squat"],
   [13, 2, "Squat"],
-  [14, 1, "Dip"],
+  [14, 1, "Dip"], // a range (6 - 10): its done also writes reps_done
 ];
+const REPS_TEXT: Readonly<Record<number, string>> = { 14: "6 - 10" };
 // Warm-ups (set 0) before rows 10 (Bænkpres), 13 (Squat) and 14 (Dip): the server's order.
 const ORDER = sessionOrderWithWarmups(SHEET.map(([row, set, name]) => ({ ref: { row, set }, name })));
 const SETS = ORDER.filter((ref) => ref.set > 0);
@@ -65,7 +66,14 @@ const SETS = ORDER.filter((ref) => ref.set > 0);
 function fakeDb(): FakeDb {
   return {
     tables: {
-      strength_sets: SHEET.map(([sheet_row, set_no, name]) => ({ week_start: "2026-10-12", session: 1, sheet_row, set_no, name })),
+      strength_sets: SHEET.map(([sheet_row, set_no, name]) => ({
+        week_start: "2026-10-12",
+        session: 1,
+        sheet_row,
+        set_no,
+        name,
+        reps_text: REPS_TEXT[sheet_row] ?? "3",
+      })),
       exercises: [
         { id: 1, name: "Bænkpres", aliases: [] },
         { id: 2, name: "Squat", aliases: [] },

@@ -306,6 +306,11 @@ test("recordSetTap: feel and reps on a done set; a range set's done writes the t
   assert.deepEqual(await recordSetTap(tap("reps", 25, 1, { value: 5 }), at(6), options(db)), refused); // not a range
   await recordSetTap(tap("feel", 25, 1, { value: null }), at(7), options(db)); // tapping it again clears
   assert.equal(row("25#1")?.felt_rpe, null);
+  await recordSetTap(tap("feel", 27, 1, { value: 1 }), at(8), options(db));
+  await recordSetTap(tap("undo", 27, 1), at(9), options(db)); // Fortryd of the done: open again
+  assert.deepEqual([row("27#1")?.ended_at ?? null, row("27#1")?.felt_rpe ?? null, row("27#1")?.reps_done ?? null], [null, null, null]);
+  await recordSetTap(tap("done", 27, 1), at(10), options(db)); // done again: the top, not the old 24
+  assert.equal(row("27#1")?.reps_done, 30);
   assert.ok(db.tables.exercise_set_log.every(valid));
 });
 
