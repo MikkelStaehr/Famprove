@@ -3,6 +3,7 @@
  * Every number is Python's (ride_metrics, cycling_weeks). Allowed here: sorting, filtering,
  * counting rows, date -> x position, choosing a y domain, and formatting. No deltas, no medians.
  */
+import { MISSING, type Readout, viCell } from "./chart-readout.ts";
 import { addDays, dayNumber, isoWeekNumber, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
 import type { DataError } from "./data-error.ts";
@@ -132,6 +133,7 @@ export type Mark = {
   readonly latest: boolean;
   readonly excluded: boolean;
   readonly tip: readonly string[]; // tooltip lines, first = date
+  readonly readout: Readout; // the chart's readout row / pointer tooltip (DESIGN.md "Charts: interaction")
 };
 
 export type LineChartView = {
@@ -150,6 +152,7 @@ export type WeekBar = {
   readonly zero: boolean;
   readonly current: boolean;
   readonly tip: readonly string[];
+  readonly readout: Readout;
   readonly srRow: readonly [string, string, string, string, string];
 };
 
@@ -249,6 +252,12 @@ function rideKind(type: string): string {
   return type === "VirtualRide" ? "Virtuel tur" : "Udendørs tur";
 }
 
+/** Excluded ride: line 1 `… · Udeladt: For kort`, facts as the tooltip's. */
+function excludedReadout(r: ExcludedRow, year: number): Readout {
+  const [day, reason, ...facts] = excludedTip(r, year);
+  return { head: `${day} · ${reason}`, cells: [], facts };
+}
+
 function excludedTip(r: ExcludedRow, year: number): string[] {
   const facts = exclusionFacts(r);
   return [dayText(r.date, year), `Udeladt: ${exclusionText(r.exclusion).short}`, ...(facts === "" ? [] : [facts])];
@@ -265,7 +274,7 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
   let prev: RideMetricsRow | null = null;
   for (const r of rows) {
     if (isExcluded(r) && exclusionText(r.exclusion).eftp) {
-      marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year) });
+      marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year), readout: excludedReadout(r, year) });
       continue;
     }
     if (!r.eftpOk || r.rollingFtpW === null) continue;
@@ -291,6 +300,17 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
           r.npW === null ? null : `NP ${formatWatts(r.npW)}`,
         ]),
       ],
+      readout: {
+        head: `${dayText(r.date, year)} · ${rideKind(r.type)}`,
+        cells: [
+          { key: "eftp", label: "eFTP", value: formatWatts(r.rollingFtpW) },
+          { key: "np", label: "NP", value: r.npW === null ? MISSING : formatWatts(r.npW) },
+          viCell(r.vi, r.viWarning),
+        ],
+        facts: [join([r.movingS === null ? null : formatHours(r.movingS), r.distanceM === null ? null : formatKm(r.distanceM)])].filter(
+          (l) => l !== "",
+        ),
+      },
     });
   }
   const values = points.map((p) => p.rollingFtpW);
@@ -354,7 +374,7 @@ function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView
   let open = false; // the current segment has a trend value
   for (const r of rows) {
     if (isExcluded(r) && exclusionText(r.exclusion).ef) {
-      marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year) });
+      marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year), readout: excludedReadout(r, year) });
       continue;
     }
     if (!isEfRow(r)) continue;
@@ -381,6 +401,20 @@ function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView
           r.movingS === null ? null : formatHours(r.movingS),
         ]),
       ],
+      readout: {
+        head: dayText(r.date, year),
+        cells: [
+          { key: "ef", label: "EF", value: formatEf(r.ef) },
+          { key: "trend", label: "Trend", value: trend === null ? MISSING : formatEf(trend) },
+        ],
+        facts: [
+          join([
+            r.npW === null ? null : `NP ${formatWatts(r.npW)}`,
+            r.avgHr === null ? null : `puls ${formatLoad(r.avgHr)}`,
+            r.movingS === null ? null : formatHours(r.movingS),
+          ]),
+        ].filter((l) => l !== ""),
+      },
     });
   }
   const trends = points.flatMap((p) => {
@@ -463,6 +497,18 @@ export function weekBars(weeks: readonly CyclingWeekRow[], today: IsoDate, lo: n
       zero: w.rides === 0,
       current: isCurrent,
       tip,
+      readout:
+        w.rides === 0
+          ? { head: tip[0], cells: [], facts: ["Ingen ture"] }
+          : {
+              head: tip[0],
+              cells: [
+                { key: "hours", label: "Timer", value: formatHours(w.movingS) },
+                { key: "load", label: "Belastning", value: `${formatLoad(w.load)} TSS` },
+                { key: "rides", label: "Ture", value: String(w.rides) },
+              ],
+              facts: w.excluded > 0 ? [`${w.excluded} udeladt fra trends`] : [],
+            },
       srRow: [
         head,
         String(w.rides),

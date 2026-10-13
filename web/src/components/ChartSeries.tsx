@@ -9,6 +9,7 @@ export type SeriesKey = "ctl" | "atl" | "tsb";
 export type Series = {
   readonly key: SeriesKey;
   readonly label: string;
+  readonly short: string; // the readout cell's label (DESIGN.md "Charts: interaction")
   readonly color: string;
   readonly dash: string | undefined; // stroke pattern: lines never differ by colour alone
   readonly width: number;
@@ -17,9 +18,9 @@ export type Series = {
 
 /** Legend and tooltip order. Part B: CTL ink solid 2.5px, ATL dashed 2px (6 4), TSB dotted 2px (round caps). */
 export const SERIES: readonly Series[] = [
-  { key: "ctl", label: "Fitness (CTL)", color: "var(--series-ctl)", dash: undefined, width: 2.5, format: formatLoad },
-  { key: "atl", label: "Træthed (ATL)", color: "var(--series-atl)", dash: "6 4", width: 2, format: formatLoad },
-  { key: "tsb", label: "Form (TSB)", color: "var(--series-tsb)", dash: "0.5 4", width: 2, format: formatSigned },
+  { key: "ctl", label: "Fitness (CTL)", short: "Fitness", color: "var(--series-ctl)", dash: undefined, width: 2.5, format: formatLoad },
+  { key: "atl", label: "Træthed (ATL)", short: "Træthed", color: "var(--series-atl)", dash: "6 4", width: 2, format: formatLoad },
+  { key: "tsb", label: "Form (TSB)", short: "Form", color: "var(--series-tsb)", dash: "0.5 4", width: 2, format: formatSigned },
 ];
 
 /** Stroke sample in the series' colour and dash pattern, 24px wide (decorative; the label names it). */

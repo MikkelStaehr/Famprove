@@ -255,6 +255,8 @@ export type RideMetricsRow = {
   readonly eftpYearAgoDate: IsoDate | null; // the comparison point a year earlier (eFTP points)
   readonly eftpYearAgoW: number | null;
   readonly eftpDeltaW: number | null; // rollingFtpW - eftpYearAgoW
+  readonly vi: number | null; // NP / average power, 2 dp; null = missing or implausible
+  readonly viWarning: boolean | null; // VI > 1.15 on a Z2 day; null exactly when vi is null
   readonly computedAt: string; // ISO timestamptz (UTC)
 };
 
@@ -280,7 +282,7 @@ export type CyclingAnalysisData = {
 export const RIDE_METRICS_SELECT = {
   table: "ride_metrics",
   columns:
-    "activity_id,date,type,moving_s,distance_m,load,np_w,avg_hr,device_watts,ftp_w,if_set,rolling_ftp_w,if_eftp,ef,exclusion,eftp_ok,eftp_gap_before,ef_ok,ef_trend,ef_gap_before,eftp_year_ago_date,eftp_year_ago_w,eftp_delta_w,computed_at",
+    "activity_id,date,type,moving_s,distance_m,load,np_w,avg_hr,device_watts,ftp_w,if_set,rolling_ftp_w,if_eftp,ef,exclusion,eftp_ok,eftp_gap_before,ef_ok,ef_trend,ef_gap_before,eftp_year_ago_date,eftp_year_ago_w,eftp_delta_w,vi,vi_warning,computed_at",
   order: "date,activity_id", // unique (includes the primary key)
 } as const;
 
@@ -523,6 +525,8 @@ export function parseRideMetricsRow(raw: unknown): RideMetricsRow {
     eftpYearAgoDate: f.dateOrNull("eftp_year_ago_date"),
     eftpYearAgoW: f.numberOrNull("eftp_year_ago_w"),
     eftpDeltaW: f.numberOrNull("eftp_delta_w"),
+    vi: f.numberOrNull("vi"),
+    viWarning: f.booleanOrNull("vi_warning"),
     computedAt: f.timestamp("computed_at"),
   };
 }

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { ComposedChart, CartesianGrid, Line, Tooltip, XAxis, YAxis } from "recharts";
+import { ComposedChart, CartesianGrid, Line, ReferenceDot, XAxis, YAxis } from "recharts";
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
-import { type AxisTick, type ChartRow, chartRows, formatEf, type LineChartView, marksAt, type Seam, type WeekBar } from "@/lib/analyse-view";
+import { type AxisTick, type ChartRow, chartRows, formatEf, type LineChartView, type Seam, type WeekBar } from "@/lib/analyse-view";
+import { nearestIndex, type Readout, restingReadout, xAtPointer } from "@/lib/chart-readout";
 import { formatLoad } from "@/lib/format";
 import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
+import { ChartReadout, Marker, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
 import { ChartBoundary, TICK, useHydrated, useWide } from "./TrendChart";
 
 /**
@@ -83,18 +84,6 @@ function DateTick({ x, y, payload, ticks, hi }: TickProps & { readonly ticks: re
   );
 }
 
-function TipBox({ lines }: { readonly lines: readonly string[] }) {
-  return (
-    <div className="flex max-w-72 flex-col gap-1 rounded-control border border-border bg-surface px-3 py-2 text-14 text-text shadow-card tabular-nums">
-      {lines.map((l, i) => (
-        <p key={i} className={i === 0 ? "font-semibold" : undefined}>
-          {l}
-        </p>
-      ))}
-    </div>
-  );
-}
-
 type DotProps = { readonly cx?: number; readonly cy?: number; readonly payload?: ChartRow; readonly value?: unknown };
 
 type LineChartProps = {
@@ -116,10 +105,33 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
   const format = variant === "eftp" ? formatLoad : formatEf;
   const hydrated = useHydrated();
   const wide = useWide();
-  if (!hydrated) return <Skeleton height="h-(--chart-height)" />;
-  const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
   // One row per mark (two rides on one day keep both); segment keys s0..sN carry the line.
   const rows = chartRows(chart, variant);
+  const xs = rows.map((r) => r.x);
+  const latestIndex = Math.max(rows.findLastIndex((r) => r.marks.some((m) => m.latest)), rows.findLastIndex((r) => r.marks.some((m) => !m.excluded)));
+  const { pick, plotProps } = useChartPick({
+    count: rows.length,
+    startIndex: latestIndex,
+    indexAt: (clientX, box) =>
+      nearestIndex(xs, xAtPointer(clientX, box, { left: Y_AXIS_WIDTH, right: MARGIN_RIGHT }, axis)),
+  });
+  if (!hydrated)
+    return (
+      <>
+        <Skeleton height="h-(--chart-height)" />
+        <ReadoutSpace lines={3} cells />
+      </>
+    );
+  const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
+  const picked = pick === null ? undefined : rows[pick.index];
+  const pickedMark = picked?.marks[0];
+  const latestMark = latestIndex < 0 ? undefined : rows[latestIndex]?.marks[0];
+  const markerX = picked === undefined ? null : xCss(axis, picked.x);
+  const readout: Readout =
+    pickedMark !== undefined && pick?.mode !== "mouse"
+      ? pickedMark.readout
+      : restingReadout(latestMark?.readout ?? null, "Tryk på grafen for at se en tur");
+  const ringY = pickedMark === undefined ? null : pickedMark.excluded ? chart.domain[0] : pickedMark.y;
   const segKeys = Array.from({ length: chart.segments }, (_, i) => `s${i}`);
 
   const pointDot = ({ cx, cy, payload, value }: DotProps) => {
@@ -145,13 +157,23 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
     );
 
   return (
-    <div className="relative h-(--chart-height) w-full">
+    <>
+    <div
+      {...plotProps}
+      aria-label={`${title}. Piletaster vælger en tur`}
+      className="relative h-(--chart-height) w-full rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus"
+    >
+      {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
+      {pickedMark !== undefined && markerX !== null && pick?.mode === "mouse" && (
+        <PointerTip readout={pickedMark.readout} left={markerX} rightInset={MARGIN_RIGHT} />
+      )}
       <ComposedChart
         responsive
         style={{ width: "100%", height: "100%" }}
         data={rows}
         margin={{ top: SEAM_ROOM, right: MARGIN_RIGHT, bottom: 0, left: 0 }}
         title={title}
+        accessibilityLayer={false}
       >
         <CartesianGrid vertical={false} stroke="var(--border)" />
         <XAxis
@@ -174,14 +196,6 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
           tickLine={false}
           axisLine={false}
         />
-        <Tooltip
-          isAnimationActive={false}
-          cursor={{ stroke: "var(--text-muted)", strokeWidth: 1 }}
-          content={({ active, label }) => {
-            const marks = active && typeof label === "number" ? marksAt(rows, label) : [];
-            return marks.length === 0 ? null : <TipBox lines={marks.flatMap((m) => m.tip)} />;
-          }}
-        />
         {variant === "ef" && (
           <Line dataKey="dots" stroke="none" dot={efDot} activeDot={false} isAnimationActive={false} legendType="none" />
         )}
@@ -200,9 +214,14 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
           />
         ))}
         <Line dataKey="excl" stroke="none" dot={hollow} activeDot={false} isAnimationActive={false} legendType="none" />
+        {picked !== undefined && ringY !== null && (
+          <ReferenceDot x={picked.x} y={ringY} r={4} fill="var(--text)" stroke="var(--surface)" strokeWidth={2} ifOverflow="visible" />
+        )}
       </ComposedChart>
       <SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />
     </div>
+    <ChartReadout readout={readout} lines={3} cells />
+    </>
   );
 }
 
@@ -229,7 +248,9 @@ function WeekGroup<W extends PickWeek>({
   axis,
   weeks,
   ticks,
-  tip,
+  readout,
+  lines,
+  cells,
   overlay,
   padTop = 0,
   children,
@@ -237,73 +258,63 @@ function WeekGroup<W extends PickWeek>({
   readonly axis: XDomain;
   readonly weeks: readonly W[];
   readonly ticks: readonly AxisTick[];
-  readonly tip: (w: W) => readonly string[];
+  readonly readout: (w: W) => Readout;
+  readonly lines: number;
+  readonly cells: boolean;
   readonly overlay: React.ReactNode;
   readonly padTop?: number;
   readonly children: (active: W | null) => React.ReactNode;
 }) {
-  const [active, setActive] = useState<W | null>(null);
-
-  const pick = (e: React.PointerEvent<HTMLDivElement>) => {
-    const box = e.currentTarget.getBoundingClientRect();
-    const f = (e.clientX - box.left - Y_AXIS_WIDTH) / (box.width - Y_AXIS_WIDTH - MARGIN_RIGHT);
-    const x = axis.lo + f * (axis.hi - axis.lo);
-    setActive(weeks.find((w) => w.x0 <= x && x < w.x1) ?? null);
-  };
-
-  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Escape") {
-      setActive(null);
-      return;
-    }
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    e.preventDefault();
-    if (active === null) {
-      setActive(weeks.find((w) => w.current) ?? weeks[weeks.length - 1] ?? null);
-      return;
-    }
-    const i = weeks.indexOf(active) + (e.key === "ArrowLeft" ? -1 : 1);
-    setActive(weeks[Math.max(0, Math.min(weeks.length - 1, i))] ?? null);
-  };
+  const currentIndex = weeks.findIndex((w) => w.current);
+  const latestIndex = currentIndex >= 0 ? currentIndex : weeks.length - 1;
+  const { pick, plotProps } = useChartPick({
+    count: weeks.length,
+    startIndex: latestIndex,
+    indexAt: (clientX, box) => {
+      const x = xAtPointer(clientX, box, { left: Y_AXIS_WIDTH, right: MARGIN_RIGHT }, axis);
+      const i = weeks.findIndex((w) => w.x0 <= x && x < w.x1);
+      return i < 0 ? null : i;
+    },
+  });
+  const active = pick === null ? null : (weeks[pick.index] ?? null);
+  const latest = latestIndex < 0 ? undefined : weeks[latestIndex];
+  const markerX = active === null ? null : xCss(axis, (active.x0 + active.x1) / 2);
+  const shown =
+    active !== null && pick?.mode !== "mouse"
+      ? readout(active)
+      : restingReadout(latest === undefined ? null : readout(latest), "Tryk på grafen for at se en uge");
 
   return (
-    <div
-      className="relative flex touch-pan-y flex-col gap-2 rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus"
-      style={padTop > 0 ? { paddingTop: padTop } : undefined}
-      tabIndex={0}
-      role="group"
-      aria-label="Uger. Piletaster vælger en uge"
-      onKeyDown={onKey}
-      onBlur={() => setActive(null)}
-      onPointerMove={pick}
-      onPointerDown={pick}
-      // Touch fires pointerleave right after the tap: only a mouse leaving clears (blur does on touch).
-      onPointerLeave={(e) => {
-        if (e.pointerType === "mouse") setActive(null);
-      }}
-    >
-      {overlay}
-      {children(active)}
-      <div className="relative h-[30px]" aria-hidden="true">
-        {ticks.map((t, i) => (
-          <span
-            key={t.x}
-            className="absolute top-1 font-medium whitespace-nowrap text-text-muted tabular-nums"
-            style={{
-              ...tickStyle,
-              left: xCss(axis, t.x),
-              transform: i === 0 ? undefined : axis.hi - t.x < 30 ? "translateX(-100%)" : "translateX(-50%)",
-            }}
-          >
-            {t.label}
-          </span>
-        ))}
-      </div>
-      {active !== null && (
-        <div className="pointer-events-none absolute top-6 left-10 z-10" role="status">
-          <TipBox lines={tip(active)} />
+    <div className="flex flex-col gap-2">
+      <div
+        {...plotProps}
+        className="relative flex flex-col gap-2 rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus"
+        style={{ ...plotProps.style, ...(padTop > 0 ? { paddingTop: padTop } : {}) }}
+        aria-label="Uger. Piletaster vælger en uge"
+      >
+        {overlay}
+        {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
+        {children(active)}
+        <div className="relative h-[30px]" aria-hidden="true">
+          {ticks.map((t, i) => (
+            <span
+              key={t.x}
+              className="absolute top-1 font-medium whitespace-nowrap text-text-muted tabular-nums"
+              style={{
+                ...tickStyle,
+                left: xCss(axis, t.x),
+                transform: i === 0 ? undefined : axis.hi - t.x < 30 ? "translateX(-100%)" : "translateX(-50%)",
+              }}
+            >
+              {t.label}
+            </span>
+          ))}
         </div>
-      )}
+        {active !== null && markerX !== null && pick?.mode === "mouse" && (
+          <PointerTip readout={readout(active)} left={markerX} rightInset={MARGIN_RIGHT} />
+        )}
+      </div>
+      <ChartReadout readout={shown} lines={lines} cells={cells} />
     </div>
   );
 }
@@ -393,7 +404,9 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
       axis={axis}
       weeks={weeks}
       ticks={ticks}
-      tip={(w) => w.tip}
+      readout={(w) => w.readout}
+      lines={3}
+      cells
       overlay={<SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />}
     >
       {(active) => (
@@ -458,15 +471,7 @@ function BlockOverlay({
 const PANEL = 120;
 const HEADROOM = 16; // room for the block-best labels
 
-function E1rmPlot({
-  axis,
-  panel,
-  active,
-}: {
-  readonly axis: XDomain;
-  readonly panel: E1rmPanel;
-  readonly active: StrengthWeek | null;
-}) {
+function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1rmPanel }) {
   const [d0, d1] = panel.domain;
   const f = (v: number) => (v - d0) / (d1 - d0);
   const top = (v: number) => `calc(${HEADROOM}px + (100% - ${HEADROOM}px) * ${1 - f(v)})`;
@@ -499,12 +504,6 @@ function E1rmPlot({
               </span>
             </div>
           ))}
-          {active !== null && (
-            <div
-              className="absolute w-px bg-text-muted"
-              style={{ left: xCss(axis, (active.x0 + active.x1) / 2), top: HEADROOM, bottom: 0 }}
-            />
-          )}
           {panel.sheet.map((s) => (
             <div key={s.x0}>
               <div
@@ -601,11 +600,13 @@ function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProp
       axis={axis}
       weeks={weeks}
       ticks={wide ? axis.ticksWide : axis.ticksNarrow}
-      tip={(w) => [w.head, ...w.e1rmTip]}
+      readout={(w) => ({ head: w.head, cells: [], facts: w.e1rmTip })}
+      lines={4}
+      cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
       padTop={BLOCK_ROOM}
     >
-      {(active) => panels.map((p) => <E1rmPlot key={p.lift} axis={axis} panel={p} active={active} />)}
+      {() => panels.map((p) => <E1rmPlot key={p.lift} axis={axis} panel={p} />)}
     </WeekGroup>
   );
 }
@@ -631,7 +632,9 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnagePro
       axis={axis}
       weeks={weeks}
       ticks={wide ? axis.ticksWide : axis.ticksNarrow}
-      tip={(w) => [w.head, ...w.tonnageTip]}
+      readout={(w) => ({ head: w.head, cells: [], facts: w.tonnageTip })}
+      lines={4}
+      cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
       padTop={BLOCK_ROOM}
     >

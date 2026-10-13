@@ -50,6 +50,8 @@ function ride(date: string, o: Partial<RideMetricsRow> = {}): RideMetricsRow {
     eftpYearAgoDate: null,
     eftpYearAgoW: null,
     eftpDeltaW: null,
+    vi: null,
+    viWarning: null,
     computedAt: AT,
     ...o,
   };
@@ -175,9 +177,9 @@ test("hero sr: no year-ago sentence without the year-ago date (the visible line 
 test("two rides on one day keep two marks, and the tooltip lists both", () => {
   const chart = {
     marks: [
-      { x: 100, y: 1.2, trend: 1.15, seg: 0, latest: false, excluded: false, tip: ["a"] },
-      { x: 100, y: 1.3, trend: 1.16, seg: 0, latest: false, excluded: false, tip: ["b"] },
-      { x: 104, y: null, trend: null, seg: 0, latest: false, excluded: true, tip: ["c"] },
+      { x: 100, y: 1.2, trend: 1.15, seg: 0, latest: false, excluded: false, tip: ["a"], readout: { head: "a", cells: [], facts: [] } },
+      { x: 100, y: 1.3, trend: 1.16, seg: 0, latest: false, excluded: false, tip: ["b"], readout: { head: "b", cells: [], facts: [] } },
+      { x: 104, y: null, trend: null, seg: 0, latest: false, excluded: true, tip: ["c"], readout: { head: "c", cells: [], facts: [] } },
     ],
     segments: 1,
     domain: [1, 1.5] as const,
