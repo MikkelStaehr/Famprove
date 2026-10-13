@@ -72,7 +72,7 @@ def weekly(hours: list[float]) -> list[RideMetrics]:
 def producer() -> dict[str, object]:
     # Live: hard rides only (IF >= 0.75), the last one without HR, as on 2026-10-13.
     live_rides = [
-        *weekly([1.0, 1.0, 1.0, 1.0, 1.99, 0, 0, 0]),
+        *weekly([1.0, 0, 1.0, 1.0, 1.99, 0, 0, 0]),  # + the 30 Aug ride: 1.0 h before
         *rides(
             (date(2025, 9, 7), {"if_set": 0.85, "rolling_ftp_w": 233}),
             (date(2026, 8, 30), {"if_set": 0.8, "rolling_ftp_w": 188}),
@@ -141,7 +141,11 @@ def test_the_live_rows_say_what_the_spec_says() -> None:
     )
     assert (ef["state"], ef["have_n"], ef["need_n"]) == ("needs_data", 0, EF_MIN_RIDES)
     assert ef["detail_text"] == "Af dine 2 seneste ture var 2 for hårde."
-    assert (volume["value"], volume["planned_n"]) == (0.9, None)  # 1.99 + 0 + 0 + 1.73 h
+    assert (volume["value"], volume["direction"], volume["planned_n"]) == (
+        0.9,
+        "flat",
+        None,
+    )  # 1.99 + 0 + 0 + 1.73 h
 
 
 def test_the_web_fixture_is_pythons_current_output() -> None:
