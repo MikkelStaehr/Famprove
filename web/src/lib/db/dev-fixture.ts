@@ -16,6 +16,10 @@
  *          week, the first MIDSESSION_DONE sets done (one every 3 minutes, the last 1:42 ago) and the
  *          next one skipped, so the overview and Fokus can be screenshotted mid-session without a
  *          write (taps are refused under a dev switch, lib/db/set-log.ts).
+ *   answers  real /analyse rows with illustrative analysis_summary rows, all three in `answer`
+ *          (eFTP flat, EF up, volume with a plan, 3 of 4 done; analyse.md §12d), so the normal
+ *          state of the answer blocks can be screenshotted. The sentences are Python's (the
+ *          contract fixture's), never real numbers. Other screens: real rows.
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
@@ -23,6 +27,7 @@
 import { LIFTS } from "../lifts.ts";
 import { PostgrestError } from "./postgrest.ts";
 import type {
+  AnalysisSummaryRow,
   DailyProjectionRow,
   IsoDate,
   PrescribedSetRow,
@@ -32,8 +37,8 @@ import type {
   StrengthWeekRow,
 } from "./rows.ts";
 
-export type DevFixture = "empty" | "stale" | "error" | "band" | "ef-few" | "lsrpe" | "midsession";
-const FIXTURES: readonly DevFixture[] = ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession"];
+export type DevFixture = "empty" | "stale" | "error" | "band" | "ef-few" | "lsrpe" | "midsession" | "answers";
+const FIXTURES: readonly DevFixture[] = ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers"];
 
 /** DEV_FIXTURE=midsession: sets done per session before the skipped one. */
 export const MIDSESSION_DONE = 3;
@@ -149,4 +154,75 @@ export function illustrativeLogged(weeks: readonly StrengthWeekRow[]): StrengthW
     for (const w of points.slice(-LSRPE_POINTS)) keep.add(`${w.weekStart}#${w.lift}`);
   }
   return weeks.map((w) => (keep.has(`${w.weekStart}#${w.lift}`) ? { ...w, e1rmRpeSource: "logged" } : w));
+}
+
+const NO_EXTRA = { haveN: null, needN: null, target: null, targetSince: null, plannedN: null, doneN: null } as const;
+
+/**
+ * DEV_FIXTURE=answers: the contract fixture's rows (tests/fixtures/analysis_summary.json: live eftp,
+ * edges.ef_up, edges.volume_plan; a test holds them equal), as Python wrote them.
+ */
+export const ILLUSTRATIVE_ANSWERS: readonly AnalysisSummaryRow[] = [
+  {
+    ...NO_EXTRA,
+    question: "eftp",
+    asOf: "2026-10-13",
+    computedAt: "2026-10-13T06:25:00+00:00",
+    state: "answer",
+    direction: "flat",
+    value: 183,
+    valueDate: "2026-10-11",
+    compare: 188,
+    compareDate: "2026-08-30",
+    delta: -5,
+    verdictText: "Uændret: −5 W på 6 uger (188 W, 30. aug.).",
+    detailText: "Din top er 233 W fra 7. sep. 2025.",
+  },
+  {
+    ...NO_EXTRA,
+    question: "ef",
+    asOf: "2026-10-13",
+    computedAt: "2026-10-13T06:25:00+00:00",
+    state: "answer",
+    direction: "up",
+    value: 1.2,
+    valueDate: "2026-10-13",
+    compare: 1.1,
+    compareDate: "2026-09-01",
+    delta: 0.1,
+    haveN: 3,
+    needN: 3,
+    verdictText: "Ja: EF er steget fra 1,10 til 1,20 på 6 uger, så du træder flere watt for samme puls.",
+    detailText: null,
+  },
+  {
+    ...NO_EXTRA,
+    question: "volume",
+    asOf: "2026-10-13",
+    computedAt: "2026-10-13T06:25:00+00:00",
+    state: "answer",
+    direction: "up",
+    value: 3.1,
+    valueDate: null,
+    compare: 0,
+    compareDate: "2026-08-17",
+    delta: 3.1,
+    target: 3,
+    targetSince: "2026-10-13",
+    plannedN: 4,
+    doneN: 3,
+    verdictText: "Ja: 3,1 t pr. uge mod målet på 3,0 t.",
+    detailText: "3 af 4 planlagte ture er kørt de sidste 4 uger.",
+  },
+];
+
+/**
+ * DEV_FIXTURE=answers: ILLUSTRATIVE_ANSWERS with the real rows' as_of and computed_at (the
+ * freshness line stays real). Dev only.
+ */
+export function illustrativeAnswers(real: readonly AnalysisSummaryRow[]): AnalysisSummaryRow[] {
+  return ILLUSTRATIVE_ANSWERS.map((a) => {
+    const r = real.find((x) => x.question === a.question);
+    return r === undefined ? a : { ...a, asOf: r.asOf, computedAt: r.computedAt };
+  });
 }

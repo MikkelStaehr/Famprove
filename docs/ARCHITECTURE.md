@@ -37,7 +37,8 @@ Next.js (web/), server components only
                   → exercise_set_log (the one write: set taps via app/actions.ts → lib/db/set-log.ts;
                     checked against strength_sets + exercises; Python never reads it)
   /load   Load    ← daily_load, blocks, weekly_load; week details ← activities, ride_metrics (VI), strength_sessions, strength_sets
-  /analyse Analyse (Cykel) ← analysis_summary (the three answers, rendered verbatim), ride_metrics, cycling_weeks
+  /analyse Analyse (Cykel) ← analysis_summary (the three answers, rendered verbatim: lib/analyse-answers.ts,
+                             components/AnswerBlock.tsx), ride_metrics, cycling_weeks
   /analyse/styrke Analyse (Styrke) ← strength_weeks, blocks (phase), strength_sets.e1rm (the sheet 1RM)
 ```
 

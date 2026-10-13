@@ -277,7 +277,58 @@ export type CyclingAnalysisData = {
   readonly weeks: readonly CyclingWeekRow[] | null;
   /** Why weeks is null (set by loadCyclingAnalysis); absent/null when they were read. */
   readonly weeksError?: DataError | null;
+  /**
+   * The three answers (analyse.md §12); null when they couldn't be read (the blocks show an error,
+   * the charts still render). Absent = not read (tests of the chart view).
+   */
+  readonly summary?: readonly AnalysisSummaryRow[] | null;
+  /** Why summary is null (set by loadCyclingAnalysis). */
+  readonly summaryError?: DataError | null;
 };
+
+/** The three questions on top of Cykel (python domain/cycling_answers.py). */
+export type SummaryQuestion = "eftp" | "ef" | "volume";
+export const SUMMARY_QUESTIONS: readonly SummaryQuestion[] = ["eftp", "ef", "volume"];
+export type SummaryState = "answer" | "needs_data";
+const SUMMARY_STATES: readonly SummaryState[] = ["answer", "needs_data"];
+export type SummaryDirection = "up" | "down" | "flat";
+const SUMMARY_DIRECTIONS: readonly SummaryDirection[] = ["up", "down", "flat"];
+
+/**
+ * public.analysis_summary, one row per question. Python writes every number and sentence; the web
+ * renders verdictText/detailText verbatim. Zero vs null per field (migration comments):
+ * value: eftp W / ef / volume h; 0 valid only for volume, null = none (eftp, ef). compare: 0 valid
+ * only for volume, null = nothing to compare with. delta: 0 valid. haveN (ef only): 0 valid.
+ * needN (ef only): > 0. target, targetSince (volume only). plannedN (volume): never 0, null = no
+ * plan. doneN: 0 valid when plannedN is set, null exactly when plannedN is null.
+ */
+export type AnalysisSummaryRow = {
+  readonly question: SummaryQuestion;
+  readonly asOf: IsoDate;
+  readonly computedAt: string;
+  readonly state: SummaryState;
+  readonly direction: SummaryDirection | null; // null exactly when state = needs_data
+  readonly value: number | null;
+  readonly valueDate: IsoDate | null;
+  readonly compare: number | null;
+  readonly compareDate: IsoDate | null;
+  readonly delta: number | null;
+  readonly haveN: number | null;
+  readonly needN: number | null;
+  readonly target: number | null;
+  readonly targetSince: IsoDate | null;
+  readonly plannedN: number | null;
+  readonly doneN: number | null;
+  readonly verdictText: string;
+  readonly detailText: string | null;
+};
+
+export const ANALYSIS_SUMMARY_SELECT = {
+  table: "analysis_summary",
+  columns:
+    "question,as_of,computed_at,state,direction,value,value_date,compare,compare_date,delta,have_n,need_n,target,target_since,planned_n,done_n,verdict_text,detail_text",
+  order: "question", // the primary key
+} as const;
 
 export const RIDE_METRICS_SELECT = {
   table: "ride_metrics",
@@ -540,6 +591,55 @@ export function parseCyclingWeekRow(raw: unknown): CyclingWeekRow {
     load: f.number("load"),
     excluded: f.number("excluded"),
     computedAt: f.timestamp("computed_at"),
+  };
+}
+
+export function parseAnalysisSummaryRow(raw: unknown): AnalysisSummaryRow {
+  const t = ANALYSIS_SUMMARY_SELECT.table;
+  const f = new Fields(t, raw);
+  const question = oneOf(t, "question", f.string("question"), SUMMARY_QUESTIONS);
+  const state = oneOf(t, "state", f.string("state"), SUMMARY_STATES);
+  if (question === null || state === null) throw new RowError(`${t}: expected question and state`);
+  const direction = oneOf(t, "direction", f.stringOrNull("direction"), SUMMARY_DIRECTIONS);
+  // The migration's checks, re-asserted: the figure row needs them, and a mismatch is never guessed.
+  if ((state === "answer") !== (direction !== null)) {
+    throw new RowError(`${t}.direction: expected a direction exactly when state is answer`);
+  }
+  const value = f.numberOrNull("value");
+  const compare = f.numberOrNull("compare");
+  if (state === "answer" && (value === null || compare === null)) {
+    throw new RowError(`${t}.value: expected value and compare when state is answer`);
+  }
+  const haveN = f.numberOrNull("have_n");
+  const needN = f.numberOrNull("need_n");
+  if (question === "ef" && (haveN === null || needN === null)) {
+    throw new RowError(`${t}.have_n: expected have_n and need_n for ef`);
+  }
+  const target = f.numberOrNull("target");
+  if (question === "volume" && (target === null || value === null)) {
+    throw new RowError(`${t}.target: expected value and target for volume`);
+  }
+  const verdictText = f.string("verdict_text");
+  if (verdictText.trim() === "") throw new RowError(`${t}.verdict_text: expected a sentence`);
+  return {
+    question,
+    asOf: f.date("as_of"),
+    computedAt: f.timestamp("computed_at"),
+    state,
+    direction,
+    value,
+    valueDate: f.dateOrNull("value_date"),
+    compare,
+    compareDate: f.dateOrNull("compare_date"),
+    delta: f.numberOrNull("delta"),
+    haveN,
+    needN,
+    target,
+    targetSince: f.dateOrNull("target_since"),
+    plannedN: f.numberOrNull("planned_n"),
+    doneN: f.numberOrNull("done_n"),
+    verdictText,
+    detailText: f.stringOrNull("detail_text"),
   };
 }
 

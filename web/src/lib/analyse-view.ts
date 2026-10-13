@@ -181,7 +181,7 @@ export type AnalyseView =
       readonly hero: HeroView;
       readonly eftp: LineChartView | null; // null: fewer than 2 points
       readonly noWattNote: string | null;
-      readonly ef: LineChartView | { readonly kind: "few"; readonly text: string; readonly list: readonly string[] };
+      readonly ef: LineChartView | EfFew;
       readonly weeks: readonly WeekBar[] | null; // null: cycling_weeks couldn't be read
       readonly weeksError: DataError | null; // why (the card's ErrorState)
       readonly weekMax: { readonly hours: number; readonly load: number };
@@ -326,7 +326,13 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
   return { marks, segments: seg + 1, domain, ticks, sr };
 }
 
-export type EfFew = { readonly kind: "few"; readonly text: string; readonly list: readonly string[] };
+export type EfFew = {
+  readonly kind: "few";
+  readonly text: string;
+  readonly list: readonly string[];
+  /** The one line §12b keeps under the list ("Grafen vises fra 5 rolige ture."). */
+  readonly note: string;
+};
 
 export function efTooFew(points: readonly RideMetricsRow[], currentYear: number): EfFew {
   const n = points.length;
@@ -337,7 +343,7 @@ export function efTooFew(points: readonly RideMetricsRow[], currentYear: number)
   const list = [...points]
     .reverse()
     .map((r) => `${dayText(r.date, currentYear)} · EF ${r.ef === null ? "–" : formatEf(r.ef)}`);
-  return { kind: "few", text, list };
+  return { kind: "few", text, list, note: `Grafen vises fra ${EF_MIN_POINTS} rolige ture.` };
 }
 
 /**
@@ -520,6 +526,12 @@ export function weekBars(weeks: readonly CyclingWeekRow[], today: IsoDate, lo: n
   });
 }
 
+/** DESIGN.md "Gaps": a tap inside a seam reads the seam, never a 0: "Ingen ture · 30. sep. 2025 – 10. mar. 2026". */
+export function seamReadout(s: Seam): Readout {
+  const day = (x: number) => new Date(Math.round(x) * 86_400_000).toISOString().slice(0, 10) as IsoDate;
+  return { head: `Ingen ture · ${dateWithYear(day(s.x0 + 0.5))} – ${dateWithYear(day(s.x1 - 1.5))}`, cells: [], facts: [] };
+}
+
 /** Runs of >= 4 consecutive cycling_weeks rows with rides = 0 (spec §4): from its first Monday to the Monday after. */
 export function seams(weeks: readonly CyclingWeekRow[]): Seam[] {
   const out: Seam[] = [];
@@ -557,14 +569,14 @@ export function axisTicks(today: IsoDate, wide: boolean): AxisTick[] {
 
 // --- page ----------------------------------------------------------------------------------
 
-/** The older of the two tables' latest computed_at (spec §8). */
+/** The oldest of the tables' latest computed_at (spec §8; §12d adds analysis_summary). */
 function olderComputedAt(data: CyclingAnalysisData): string | null {
   const latest = (xs: readonly { readonly computedAt: string }[]): string | null =>
     xs.reduce<string | null>((a, r) => (a === null || Date.parse(r.computedAt) > Date.parse(a) ? r.computedAt : a), null);
-  const rides = latest(data.rides);
-  const weeks = data.weeks === null ? null : latest(data.weeks);
-  if (rides === null || weeks === null) return rides ?? weeks;
-  return Date.parse(rides) < Date.parse(weeks) ? rides : weeks;
+  const tables = [data.rides, data.weeks ?? [], data.summary ?? []]
+    .map(latest)
+    .filter((t): t is string => t !== null);
+  return tables.reduce<string | null>((a, t) => (a === null || Date.parse(t) < Date.parse(a) ? t : a), null);
 }
 
 export function buildAnalyseView(data: CyclingAnalysisData, now: Date, today: IsoDate): AnalyseView {

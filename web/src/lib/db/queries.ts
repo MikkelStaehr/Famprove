@@ -8,6 +8,7 @@ import {
   devFixture,
   fewEfPoints,
   fixtureError,
+  illustrativeAnswers,
   illustrativeBands,
   illustrativeLogged,
   midsessionLog,
@@ -17,6 +18,8 @@ import { readSupabaseEnv } from "./env.ts";
 import { createClient, selectAll, selectFirst } from "./postgrest.ts";
 import { addDays, isoWeekStart } from "../dates.ts";
 import {
+  ANALYSIS_SUMMARY_SELECT,
+  parseAnalysisSummaryRow,
   ACTIVITIES_SELECT,
   APP_NOTICES_SELECT,
   parseAppNoticeRow,
@@ -336,7 +339,7 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
   await connection();
   const fixture = devFixture();
   if (fixture === "error") throw fixtureError(RIDE_METRICS_SELECT.table);
-  if (fixture === "empty") return { rides: [], weeks: [] };
+  if (fixture === "empty") return { rides: [], weeks: [], summary: [] };
   const db = client();
   // A cycling_weeks failure stays inside its card (analyse.md §5d): carried as weeksError.
   const weeksRead = selectAll(db, CYCLING_WEEKS_SELECT.table, CYCLING_WEEKS_SELECT, parseCyclingWeekRow).catch(
@@ -346,22 +349,41 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
       throw error;
     },
   );
-  // Promise.all also awaits weeksRead when the rides read fails first (no unhandled rejection).
-  const [rides, weeksResult] = await Promise.all([
+  // The answers are secondary too (analyse.md §12d): a failure shows in place of the blocks only.
+  const summaryRead = selectAll(db, ANALYSIS_SUMMARY_SELECT.table, ANALYSIS_SUMMARY_SELECT, parseAnalysisSummaryRow).catch(
+    (error: unknown) => {
+      console.error("analyse: loading analysis_summary failed", error);
+      if (isDataError(error)) return error;
+      throw error;
+    },
+  );
+  // Promise.all also awaits the secondary reads when the rides read fails first (no unhandled rejection).
+  const [rides, weeksResult, summaryResult] = await Promise.all([
     selectAll(db, RIDE_METRICS_SELECT.table, RIDE_METRICS_SELECT, parseRideMetricsRow),
     weeksRead,
+    summaryRead,
   ]);
   const weeks = weeksResult instanceof Error ? null : weeksResult;
   const weeksError = weeksResult instanceof Error ? weeksResult : null;
+  const summary = summaryResult instanceof Error ? null : summaryResult;
+  const summaryError = summaryResult instanceof Error ? summaryResult : null;
   if (fixture === "stale") {
     const computedAt = staleComputedAt(new Date());
     return {
       rides: rides.map((r) => ({ ...r, computedAt })),
       weeks: weeks === null ? null : weeks.map((w) => ({ ...w, computedAt })),
       weeksError,
+      summary: summary === null ? null : summary.map((a) => ({ ...a, computedAt })),
+      summaryError,
     };
   }
-  return { rides: fixture === "ef-few" ? fewEfPoints(rides) : rides, weeks, weeksError };
+  return {
+    rides: fixture === "ef-few" ? fewEfPoints(rides) : rides,
+    weeks,
+    weeksError,
+    summary: fixture === "answers" && summary !== null ? illustrativeAnswers(summary) : summary,
+    summaryError,
+  };
 }
 
 /**

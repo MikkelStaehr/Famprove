@@ -2,15 +2,13 @@ import type { Metadata } from "next";
 
 import { MarkChart, WeekStrips } from "@/components/AnalyseCharts";
 import { AnalyseTabs } from "@/components/AnalyseTabs";
+import { AnswerBlocks } from "@/components/AnswerBlock";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { UpdatedLine } from "@/components/UpdatedLine";
-import {
-  type AnalyseView,
-  buildAnalyseView,
-  type Direction,
-} from "@/lib/analyse-view";
+import { type AnswersView, buildAnswers } from "@/lib/analyse-answers";
+import { type AnalyseView, buildAnalyseView } from "@/lib/analyse-view";
 import {
   type DataError,
   describeDataError,
@@ -25,19 +23,18 @@ export const metadata: Metadata = { title: "Analyse" };
 
 type Ready = Extract<AnalyseView, { kind: "ready" }>;
 type PageState =
-  | AnalyseView
+  | { readonly kind: "empty" }
+  | (Ready & { readonly answers: AnswersView })
   | { readonly kind: "error"; readonly error: DataError; readonly at: Date };
-
-const HONESTY =
-  "eFTP er et skøn fra intervals.icu ud fra dine hårdeste indsatser, ikke et testresultat. Uden maksimale indsatser ligger den ofte for lavt.";
-const EF_EXPLAINER =
-  "EF er normaliseret watt (NP) delt med gennemsnitspuls. Stiger den, træder du flere watt for samme puls. Kun rolige ture på mindst 30 min med både watt og puls. Trendlinjen vises, hvor der er mindst 3 ture inden for 28 dage.";
 
 async function loadPageState(): Promise<PageState> {
   try {
     const data = await loadCyclingAnalysis();
     const now = new Date();
-    return buildAnalyseView(data, now, resolveToday(now, process.env));
+    const today = resolveToday(now, process.env);
+    const view = buildAnalyseView(data, now, today);
+    if (view.kind === "empty") return view;
+    return { ...view, answers: buildAnswers(data.summary, data.summaryError, Number(today.slice(0, 4))) };
   } catch (error) {
     if (isDataError(error)) {
       console.error("analyse: loading data failed", error);
@@ -64,11 +61,12 @@ export default async function Page() {
           </div>
         )}
         {state.kind === "ready" && (
-          // §11: header row above, full width; from lg a 12-column grid, rail = hero (sticky), main = the cards,
-          // one width so the seams line up. DOM order stays the phone order.
+          // §11/§12c: header row above, full width; from lg a 12-column grid, rail = the three answers
+          // (sticky, scrolls on its own), main = the cards, one width so the seams line up. DOM order
+          // stays the phone order: answers, then charts.
           <div className={RAIL_GRID.grid}>
-            <div className={RAIL_GRID.rail}>
-              <Hero view={state} />
+            <div className={RAIL_GRID.railScroll}>
+              <AnswerBlocks view={state.answers} />
             </div>
             <div className={RAIL_GRID.main}>
               <Cards view={state} />
@@ -95,69 +93,6 @@ export default async function Page() {
   );
 }
 
-function Hero({ view }: { readonly view: Ready }) {
-  const { hero } = view;
-  return (
-    <div className="mt-3 lg:mt-0">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <p className="text-14 font-bold tracking-[0.04em] uppercase">
-          Estimeret FTP
-        </p>
-        {hero.kind === "eftp" && (
-          <p className="text-14 font-semibold text-text">{hero.dateText}</p>
-        )}
-      </div>
-      {hero.kind === "none" ? (
-        <p className="mt-2 text-16 text-text-muted">{hero.text}</p>
-      ) : (
-        <>
-          <p className="sr-only">{hero.sr}</p>
-          <div aria-hidden="true">
-            <p className="mt-2 font-display text-56 leading-none font-extrabold italic tabular-nums">
-              {hero.value}
-            </p>
-            <p className="mt-3 flex items-center gap-1.5 text-16 font-semibold">
-              {hero.delta.direction !== null && (
-                <DirectionIcon direction={hero.delta.direction} />
-              )}
-              {hero.delta.text}
-            </p>
-            {hero.detail !== null && (
-              <p className="mt-1 text-14 text-text-muted tabular-nums">
-                {hero.detail}
-              </p>
-            )}
-          </div>
-        </>
-      )}
-      <p className="mt-2 max-w-[60ch] text-14 text-text-muted">{HONESTY}</p>
-    </div>
-  );
-}
-
-function DirectionIcon({ direction }: { readonly direction: Direction }) {
-  const d =
-    direction === "up"
-      ? "M8 3v10M4 7l4-4 4 4"
-      : direction === "down"
-        ? "M8 13V3M4 9l4 4 4-4"
-        : "M3 8h10M9 4l4 4-4 4";
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      className="size-4 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d={d} />
-    </svg>
-  );
-}
-
 const axisOf = (v: Ready) => ({
   lo: v.lo,
   hi: v.hi,
@@ -175,12 +110,8 @@ function Cards({ view }: { readonly view: Ready }) {
           <EmptyState message="Trenden vises, når der er mindst to ture med watt." />
         ) : (
           <figure className="flex flex-col gap-2">
-            <Legend
-              items={[
-                { swatch: <LineDot />, label: "eFTP" },
-                { swatch: <Hollow />, label: "Udeladt tur" },
-              ]}
-            />
+            {/* The eFTP line's legend item lives in the readout row's cell (DESIGN.md Charts: interaction). */}
+            <Legend items={[{ swatch: <Hollow />, label: "Udeladt tur" }]} />
             <p
               className="text-12 font-medium text-text-muted"
               aria-hidden="true"
@@ -209,15 +140,9 @@ function Cards({ view }: { readonly view: Ready }) {
         level={3}
         title="Effektivitet på rolige ture"
       >
-        <p className="max-w-[60ch] text-14 text-text-muted">{EF_EXPLAINER}</p>
         {"kind" in view.ef ? (
+          // §12b: the explainer moved into block 2's "?"; the ride list stays, with one line.
           <div className="flex flex-col gap-2">
-            <h4 className="text-16 font-semibold">
-              For få rolige ture til en trend
-            </h4>
-            <p className="max-w-[60ch] text-14 text-text-muted">
-              {view.ef.text}
-            </p>
             {view.ef.list.length > 0 && (
               <ul className="flex flex-col gap-1 text-16 tabular-nums">
                 {view.ef.list.map((l) => (
@@ -225,19 +150,14 @@ function Cards({ view }: { readonly view: Ready }) {
                 ))}
               </ul>
             )}
+            <p className="max-w-[60ch] text-14 text-text-muted">
+              {view.ef.note}
+            </p>
           </div>
         ) : (
           <figure className="flex flex-col gap-2">
-            <Legend
-              items={[
-                {
-                  swatch: <LineDot line />,
-                  label: "Trend (median over 28 dage)",
-                },
-                { swatch: <MarkDot />, label: "Tur" },
-                { swatch: <Hollow />, label: "Udeladt tur" },
-              ]}
-            />
+            {/* Trend and Tur live in the readout row's cells (DESIGN.md Charts: interaction). */}
+            <Legend items={[{ swatch: <Hollow />, label: "Udeladt tur" }]} />
             <p
               className="text-12 font-medium text-text-muted"
               aria-hidden="true"
@@ -416,33 +336,6 @@ function Legend({
         </li>
       ))}
     </ul>
-  );
-}
-
-function LineDot({ line = true }: { readonly line?: boolean }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
-      {line && (
-        <line
-          x1="2"
-          y1="6"
-          x2="22"
-          y2="6"
-          stroke="var(--text)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-      )}
-      <circle cx="12" cy="6" r="2.5" fill="var(--text)" />
-    </svg>
-  );
-}
-
-function MarkDot() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0">
-      <circle cx="6" cy="6" r="3" fill="var(--chart-mark)" />
-    </svg>
   );
 }
 
