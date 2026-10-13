@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { SECONDARY } from "./instrument";
+import { DiamondIcon } from "./WarningLine";
+
 type Retry =
   // Server-rendered: a soft navigation re-reads the route. Never a full reload, so Træning's
   // ticks (held in the root layout) survive a retry.
@@ -17,17 +20,14 @@ type ErrorStateProps = {
   readonly retry: Retry;
 };
 
-const RETRY_CLASS =
-  "inline-flex min-h-11 items-center rounded-pill bg-track px-4 text-16 font-semibold text-text focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus";
+const RETRY_CLASS = SECONDARY;
 
-/** DESIGN.md ErrorState: what failed, when, retry. */
+/** DESIGN.md ErrorState (Revision 5): ◆ + an Inter 20 title in --text (never red), what failed, when, retry. */
 export function ErrorState({ title, what, detail, at, retry }: ErrorStateProps) {
   return (
     <div role="alert" className="flex flex-col items-start gap-2">
-      <p className="flex items-center gap-2 text-16 font-semibold text-negative">
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0" fill="currentColor">
-          <rect x="3" y="3" width="10" height="10" transform="rotate(45 8 8)" />
-        </svg>
+      <p className="flex items-center gap-2 font-sans text-20 font-normal text-text">
+        <DiamondIcon className="size-4" />
         {title}
       </p>
       <p className="text-16">{what}</p>

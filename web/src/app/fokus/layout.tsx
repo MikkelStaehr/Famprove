@@ -1,21 +1,12 @@
-import { Chivo_Mono, Inter } from "next/font/google";
-
-// Instrument's fonts (DESIGN.md Part B Type), self-hosted by next/font and loaded on /fokus only.
-// Inter carries every big number, heading and button (tabular figures, set on the root below).
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-inter", display: "swap" });
-// The mono is for captions, axis labels and small numbers only. Chivo Mono, not JetBrains Mono:
-// JetBrains Mono's plain 0 is dotted (and DM / Red Hat Mono's slashed); Chivo Mono's is a plain oval.
-const mono = Chivo_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-instrument-mono",
-  display: "swap",
-});
-
-/** The Instrument scope (design/specs/fokus-instrument.md §0): its tokens apply inside this root only. */
+/**
+ * The Fokus root. `data-screen="fokus"` is the route marker globals.css keys on: 14px captions, main
+ * fills the viewport without the bottom bar's padding, focused controls scroll clear of the pinned
+ * primary. Tokens and fonts (Inter + Chivo Mono) are app-wide since DESIGN.md Revision 5 (root
+ * layout); Fokus keeps tabular figures on everything.
+ */
 export default function FokusLayout({ children }: LayoutProps<"/fokus">) {
   return (
-    <div data-direction="instrument" className={`bg-bg ${inter.variable} ${mono.variable} flex flex-1 flex-col font-grotesk font-normal text-text tabular-nums`}>
+    <div data-screen="fokus" className="flex flex-1 flex-col font-grotesk font-normal text-text tabular-nums">
       {children}
     </div>
   );

@@ -11,11 +11,11 @@ type UpdatedLineProps = {
   readonly unknownNote: string;
 };
 
-/** "Opdateret <time>"; stale or unknown in --warning with an icon and words, never colour alone. */
+/** "Opdateret <time>" in Inter 14 muted; stale or unknown = ◆ + words in --text (WarningLine), never colour alone. */
 export function UpdatedLine({ freshness, staleNote, unknownNote }: UpdatedLineProps) {
   if (freshness.kind === "fresh") {
     return (
-      <p className="text-14 text-text-muted">
+      <p className="font-sans text-14 text-text-muted">
         Opdateret <time dateTime={freshness.computedAt}>{formatUpdatedAt(freshness.computedAt)}</time>
       </p>
     );

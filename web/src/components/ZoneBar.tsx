@@ -4,20 +4,32 @@ import type { ReactNode } from "react";
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDay, formatDayLong, formatSigned, stopAfter } from "@/lib/format";
 import { formSentence, type TrainingHeader, TSB_HINT } from "@/lib/training-view";
-import { BANDS, isZoneKey, pinned, position, THRESHOLDS, type ZoneKey, ZONE_FILL, zoneSentence } from "@/lib/zone-scale";
+import { MARKS } from "@/lib/chart-marks";
+import {
+  BANDS,
+  isZoneKey,
+  pinned,
+  position,
+  SCALE_MAX,
+  SCALE_MIN,
+  THRESHOLDS,
+  type ZoneKey,
+  zoneSentence,
+} from "@/lib/zone-scale";
 
 /**
- * DESIGN.md Part B › Zone bar: form (TSB) on the −40 … +30 scale. The active band comes from
- * daily_load.form_zone (header.zone.key) only; the thresholds only draw the bands.
+ * The zone ruler (DESIGN.md Part B Revision 5; design/specs/instrument-load.md §1–§2): the figure
+ * row (caption, value, zone name in words) over a monochrome −40 … +30 ruler. The active zone comes
+ * from daily_load.form_zone (header.zone.key) only, drawn as a thicker span of the baseline; the
+ * thresholds only draw ticks. Today is the one red mark: a 2×28 tick at x(tsb).
  */
 
 export type ZoneBarSize = "compact" | "hero";
 
-// slot = flag height + 6px notch, so nothing shifts between loading, no-TSB and loaded. The flag
-// is a min-height: at 200 % text it may wrap (the zone label under the value), never overflow.
+// slot = the value row's height, so nothing shifts between loading, no-TSB and loaded.
 const SIZE = {
-  compact: { flag: "min-h-8 px-3", value: "text-24", slot: "min-h-[2.375rem]" },
-  hero: { flag: "min-h-16 px-4", value: "text-56", slot: "min-h-[4.375rem]" },
+  compact: { value: "text-24", name: "text-16", slot: "min-h-[calc(var(--text-24)*var(--text-24--line-height))]" },
+  hero: { value: "text-56", name: "text-24", slot: "min-h-[calc(var(--text-56)*var(--text-56--line-height))]" },
 } as const;
 
 const pct = (x: number) => `${(x * 100).toFixed(4)}%`;
@@ -38,28 +50,13 @@ export function ZoneBar({ header, today, size }: ZoneBarProps) {
         <p className={`mt-2 flex items-center text-16 text-text-muted ${s.slot}`}>
           Form er ikke beregnet endnu. Det daglige job beregner den omkring kl. 05.00.
         </p>
-        <Bands active={null} />
+        <Ruler active={null} />
         <Thresholds />
       </div>
     );
   }
-  const x = position(header.tsb);
   const zoneKey = header.zone !== null && isZoneKey(header.zone.key) ? header.zone.key : null;
   const notToday = header.date !== today;
-  const flagClass = `max-w-full flex-wrap items-center rounded-pill bg-slab text-on-slab ${s.flag}`;
-  const flag = (
-    <>
-      <span className={`whitespace-nowrap font-display font-extrabold italic tabular-nums ${s.value}`}>
-        {formatSigned(header.tsb)}
-      </span>
-      {zoneKey !== null && header.zone !== null && (
-        <span className="ml-2 inline-flex items-center whitespace-nowrap">
-          <span className={`size-3 shrink-0 rounded-mark ring-[1.5px] ring-on-slab ${ZONE_FILL[zoneKey]}`} />
-          <span className="ml-1.5 text-14 font-bold uppercase tracking-[0.04em]">{header.zone.label}</span>
-        </span>
-      )}
-    </>
-  );
   return (
     <div>
       <p className="sr-only">
@@ -69,27 +66,21 @@ export function ZoneBar({ header, today, size }: ZoneBarProps) {
         <LabelLine
           from={
             notToday ? (
-              <span className="text-14 font-semibold text-text">
+              <span className="text-14 text-text">
                 fra <time dateTime={header.date}>{formatDay(header.date)}</time>
               </span>
             ) : undefined
           }
         />
-        <div className={`relative mt-2 pb-1.5 ${s.slot}`}>
-          {/* An invisible in-flow copy reserves the flag's real height (it wraps at 200 % text),
-              so the notch and the bands below never sit under it. */}
-          <span className={`invisible flex w-fit ${flagClass}`}>{flag}</span>
-          {/* w-max: an absolute box only gets the room right of its left edge; without it the flag
-              wrapped at 100 % whenever the marker sat right of the middle (TSB −3). */}
-          <span className={`absolute top-0 inline-flex w-max ${flagClass}`} style={{ left: pct(x), transform: `translateX(-${pct(x)})` }}>
-            {flag}
+        <p className={`mt-2 flex flex-wrap items-baseline gap-x-3 ${s.slot}`}>
+          <span className={`font-sans font-normal whitespace-nowrap tabular-nums text-text ${s.value}`}>
+            {formatSigned(header.tsb)}
           </span>
-          <span
-            className="absolute bottom-0 h-1.5 w-2 -translate-x-1/2 bg-slab [clip-path:polygon(0_0,100%_0,50%_100%)]"
-            style={{ left: pct(x) }}
-          />
-        </div>
-        <Bands active={zoneKey} marker={x} end={pinned(header.tsb)} />
+          {zoneKey !== null && header.zone !== null && (
+            <span className={`font-sans font-normal whitespace-nowrap text-text ${s.name}`}>{header.zone.label}</span>
+          )}
+        </p>
+        <Ruler active={zoneKey} tsb={header.tsb} />
         <Thresholds />
         {zoneKey === null && <p className="mt-1 text-14 text-text-muted">Zone ikke beregnet.</p>}
       </div>
@@ -98,41 +89,38 @@ export function ZoneBar({ header, today, size }: ZoneBarProps) {
 }
 
 /**
- * Træning's form row (spec traening.md §3.1.3): the zone flag on its own (compact, prefixed
- * "TSB", no bands, notch or marker) and the zone's one-line hint, plus "Tallet er fra …" when the
- * latest row is not today's. One sr-only sentence carries all of it; the visual copy is hidden.
+ * Træning's form row (instrument-traening.md, form flag row): text only, no pill, no swatch, no
+ * scale. `caption` FORM (TSB), then value Inter 500 24 tabular + zone name Inter 400 16, the
+ * zone's one-line hint and "Tallet er fra …" when the latest row is not today's. One sr-only
+ * sentence carries all of it; the visual copy is hidden.
  */
 export function ZoneFlagRow({ header, today }: { readonly header: TrainingHeader | null; readonly today: IsoDate }) {
   if (header === null) return <p className="text-16 text-text-muted">Form (TSB) er ikke beregnet endnu.</p>;
   const zoneKey = header.zone !== null && isZoneKey(header.zone.key) ? header.zone.key : null;
   const notToday = header.date !== today;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <div>
       <p className="sr-only">{formSentence(header.tsb, zoneKey, notToday ? formatDayLong(header.date) : undefined)}</p>
-      <span
-        aria-hidden="true"
-        className="inline-flex min-h-8 max-w-full flex-wrap items-center rounded-pill bg-slab px-3 py-1 text-on-slab"
-      >
-        <span className="text-14 font-bold tracking-[0.04em] text-on-slab-muted uppercase">TSB</span>
-        <span className="ml-1.5 font-display text-24 font-extrabold whitespace-nowrap tabular-nums italic">
-          {formatSigned(header.tsb)}
-        </span>
-        {zoneKey !== null && header.zone !== null && (
-          <span className="ml-2 inline-flex items-center whitespace-nowrap">
-            <span className={`size-3 shrink-0 rounded-mark ring-[1.5px] ring-on-slab ${ZONE_FILL[zoneKey]}`} />
-            <span className="ml-1.5 text-14 font-bold tracking-[0.04em] uppercase">{header.zone.label}</span>
+      <div aria-hidden="true">
+        <p className="caption">Form (TSB)</p>
+        <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
+          <span className="font-sans text-24 font-medium whitespace-nowrap tabular-nums text-text">
+            {formatSigned(header.tsb)}
           </span>
-        )}
-      </span>
-      <p aria-hidden="true" className={`text-16 font-medium ${zoneKey === null ? "text-text-muted" : ""}`}>
-        {zoneKey === null ? "Zone ikke beregnet." : TSB_HINT[zoneKey]}
-      </p>
-      {notToday && (
-        <p aria-hidden="true" className="text-14 font-semibold">
-          Tallet er fra <time dateTime={header.date}>{formatDay(header.date)}</time>
-          {stopAfter(formatDay(header.date))}
+          {zoneKey !== null && header.zone !== null && (
+            <span className="font-sans text-16 font-normal whitespace-nowrap text-text">{header.zone.label}</span>
+          )}
         </p>
-      )}
+        <p className={`mt-1 text-16 ${zoneKey === null ? "text-text-muted" : "text-text"}`}>
+          {zoneKey === null ? "Zone ikke beregnet." : TSB_HINT[zoneKey]}
+        </p>
+        {notToday && (
+          <p className="mt-1 text-14 text-text">
+            Tallet er fra <time dateTime={header.date}>{formatDay(header.date)}</time>
+            {stopAfter(formatDay(header.date))}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -140,62 +128,77 @@ export function ZoneFlagRow({ header, today }: { readonly header: TrainingHeader
 function LabelLine({ from }: { readonly from?: ReactNode }) {
   return (
     <p className="flex flex-wrap items-baseline justify-between gap-x-3">
-      <span className="flex items-baseline gap-2">
-        <span className="text-14 font-bold uppercase tracking-[0.04em]">Form (TSB)</span>
-        <span className="text-14 text-text-muted">TSS/dag</span>
-      </span>
+      <span className="caption">Form (TSB) · TSS/dag</span>
       {from}
     </p>
   );
 }
 
-type BandsProps = {
+/** The ruler's drawing box (spec §2): viewBox 0 0 366 40, baseline at y 24. */
+const W = 366;
+const H = 40;
+const BASE = 24;
+const MINOR_STEP = 5;
+const MINOR_TICKS: readonly number[] = Array.from(
+  { length: Math.floor((SCALE_MAX - SCALE_MIN) / MINOR_STEP) + 1 },
+  (_, i) => SCALE_MIN + i * MINOR_STEP,
+).filter((v) => !THRESHOLDS.includes(v));
+const TICK_TODAY = MARKS.todayTick;
+
+/** x in the viewBox for a TSB value, with a 1-unit stroke kept inside the box. */
+const rx = (v: number, w = 1) => Math.min(W - w, Math.max(0, position(v) * W - w / 2));
+
+type RulerProps = {
   readonly active: ZoneKey | null;
-  /** Marker position 0..1; none without a TSB. */
-  readonly marker?: number;
-  readonly end?: "low" | "high" | null;
-  readonly skeleton?: boolean;
+  /** Today's TSB; none (loading, no TSB) = no red tick. */
+  readonly tsb?: number;
 };
 
-/** Five bands at their exact spans, 2px inset at inner edges (a 4px gap centred on each threshold). */
-function Bands({ active, marker, end = null, skeleton = false }: BandsProps) {
+/** Monochrome ruler: baseline, minor and threshold ticks, the active span 3px, today's red tick. */
+function Ruler({ active, tsb }: RulerProps) {
+  const band = active === null ? undefined : BANDS.find((b) => b.key === active);
+  const end = tsb === undefined ? null : pinned(tsb);
+  const tw = TICK_TODAY.width;
+  const tx = tsb === undefined ? 0 : Math.min(W - tw, Math.max(0, position(tsb) * W - tw / 2));
   return (
-    <div aria-hidden="true" className="relative h-3">
-      {BANDS.map((band) => (
-        <span
-          key={band.key}
-          className={`absolute inset-y-0 rounded-mark ${
-            skeleton ? "bg-track motion-safe:animate-pulse" : ZONE_FILL[band.key]
-          } ${band.key === active ? "outline-2 -outline-offset-2 outline-text" : ""}`}
-          style={{
-            left: band.start === 0 ? 0 : `calc(${pct(band.start)} + 2px)`,
-            right: band.end === 1 ? 0 : `calc(${pct(1 - band.end)} + 2px)`,
-          }}
-        />
+    <svg aria-hidden="true" viewBox={`0 0 ${W} ${H}`} className="mt-3 block h-auto w-full overflow-visible">
+      <rect x={0} y={BASE - 0.5} width={W} height={1} fill="var(--text-muted)" />
+      {MINOR_TICKS.map((v) => (
+        <rect key={v} x={rx(v)} y={BASE - 6} width={1} height={6} fill="var(--text-muted)" />
       ))}
-      {marker !== undefined && (
-        <span className="absolute top-0 h-4 w-[3px] -translate-x-1/2 bg-slab" style={{ left: pct(marker) }} />
+      {THRESHOLDS.map((v) => (
+        <rect key={v} x={rx(v)} y={BASE - 14} width={1} height={14} fill="var(--text)" />
+      ))}
+      {band !== undefined && (
+        <rect
+          data-zone={band.key}
+          x={band.start * W}
+          y={BASE - 1.5}
+          width={(band.end - band.start) * W}
+          height={3}
+          fill="var(--text)"
+        />
+      )}
+      {tsb !== undefined && (
+        <rect data-today x={tx} y={0} width={tw} height={TICK_TODAY.height.ruler} fill={TICK_TODAY.color} />
       )}
       {end !== null && (
-        <svg
-          viewBox="0 0 8 12"
-          className={`absolute top-0 h-3 w-2 text-slab ${end === "low" ? "-left-2.5" : "-right-2.5"}`}
+        // 8px chevron pointing outward, just inside the pinned end, above the baseline.
+        <path
+          d={end === "low" ? "M10 2 6 6l4 4" : `M${W - 10} 2 ${W - 6} 6l-4 4`}
           fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d={end === "low" ? "M6.5 1.5 2 6l4.5 4.5" : "M1.5 1.5 6 6l-4.5 4.5"} />
-        </svg>
+          stroke="var(--text)"
+          strokeWidth="1.5"
+          strokeLinecap="square"
+        />
       )}
-    </div>
+    </svg>
   );
 }
 
 function Thresholds() {
   return (
-    <p aria-hidden="true" className="relative mt-1 h-lh text-14 font-semibold text-text-muted tabular-nums">
+    <p aria-hidden="true" className="relative -mt-2 h-lh font-mono text-12 text-text-muted tabular-nums">
       {THRESHOLDS.map((t) => (
         <span key={t} className="absolute -translate-x-1/2" style={{ left: pct(position(t)) }}>
           {formatSigned(t).replace("+", "")}
@@ -205,13 +208,15 @@ function Thresholds() {
   );
 }
 
-/** Loading: the label line and thresholds are real text, the bands --track, no flag or marker. */
+/** Loading: real caption, a --surface bar for the value, the real ruler with no active span or red tick. */
 export function ZoneBarSkeleton({ size }: { readonly size: ZoneBarSize }) {
   return (
     <div aria-hidden="true">
       <LabelLine />
-      <div className={`mt-2 ${SIZE[size].slot}`} />
-      <Bands active={null} skeleton />
+      <div className={`mt-2 flex items-center ${SIZE[size].slot}`}>
+        <span className={`block w-1/3 bg-surface motion-safe:animate-pulse ${size === "hero" ? "h-14" : "h-6"}`} />
+      </div>
+      <Ruler active={null} />
       <Thresholds />
     </div>
   );
@@ -227,14 +232,14 @@ export function ZoneBarError({ retry }: ZoneBarErrorProps) {
   return (
     <p className="flex flex-wrap items-center gap-x-2 text-14 text-warning">
       <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0" fill="currentColor">
-        <path d="M6 1 11 11H1Z" />
+        <path d="M6 1 11 6 6 11 1 6Z" />
       </svg>
       <span>Kunne ikke hente form (TSB).</span>
       {retry && (
         <Link
           href="/"
           prefetch={false}
-          className="inline-flex min-h-11 items-center font-semibold text-text underline underline-offset-3"
+          className="inline-flex min-h-11 items-center font-medium text-text underline underline-offset-3"
         >
           Prøv igen
         </Link>

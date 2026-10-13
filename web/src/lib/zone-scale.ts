@@ -1,7 +1,8 @@
 /**
- * The zone bar's drawing scale (DESIGN.md Part B › Zone bar). Pure; no I/O, no React.
+ * The zone ruler's drawing scale (DESIGN.md Part B Revision 5; instrument-load.md §2). Pure; no
+ * I/O, no React.
  *
- * The thresholds here only DRAW the bands. Which zone is active always comes from
+ * The thresholds here only DRAW the ticks and the active span. Which zone is active always comes from
  * daily_load.form_zone (Python, python/src/training_load/domain/form.py); the UI never
  * classifies a TSB itself. tests/zone-scale.test.ts fails if these numbers drift from
  * form.py's FORM_ZONES.
@@ -54,7 +55,10 @@ export const BANDS: readonly Band[] = LOWERS.map(([key, lower], i) => {
 /** The threshold numbers printed under the bar: −30, −10, 5, 20. */
 export const THRESHOLDS: readonly number[] = BANDS.flatMap((b) => (b.lower === null ? [] : [b.lower]));
 
-/** Tailwind fill utility per zone (the --zone-* tokens), shared by ZoneBar and the /load explainer. */
+/**
+ * @deprecated Revision 5 retires the --zone-* tints (zones are words + the ruler's thicker span).
+ * Kept only until LoadExplainer stops reading it (Belastning restyle); then delete it.
+ */
 export const ZONE_FILL: Readonly<Record<ZoneKey, string>> = {
   high_risk: "bg-zone-risk",
   optimal: "bg-zone-optimal",

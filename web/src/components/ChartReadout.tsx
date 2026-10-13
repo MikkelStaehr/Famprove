@@ -18,7 +18,7 @@ export type Pick = { readonly index: number; readonly mode: PickMode; readonly x
  * focus from a tap (tabindex -1, never tabbable); they get no browser outline.
  */
 export const PLOT_FOCUS =
-  "rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus [&_:focus]:outline-none";
+  "focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus [&_:focus]:outline-none";
 
 export function useChartPick(opts: {
   readonly count: number;
@@ -101,10 +101,11 @@ export function readoutMinHeight(lines: number, cells: boolean): string {
   return `calc(${small} * var(--text-14) * var(--text-14--line-height) + ${cells ? 1 : 0} * var(--text-16) * var(--text-16--line-height))`;
 }
 
-function Triangle() {
+/** The warning ◆ (Revision 5: an ink glyph + the word, never colour), inline SVG, not text. */
+function Diamond() {
   return (
     <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0" fill="currentColor">
-      <path d="M6 1 11 11H1Z" />
+      <path d="M6 1 11 6 6 11 1 6Z" />
     </svg>
   );
 }
@@ -116,15 +117,15 @@ function Triangle() {
 export function ReadoutLines({ readout, swatch }: { readonly readout: Readout; readonly swatch?: (key: string) => ReactNode }) {
   return (
     <>
-      <p className={`text-14 ${readout.muted === true ? "text-text-muted" : "font-semibold text-text"}`}>{readout.head}</p>
+      <p className={`text-14 tabular-nums ${readout.muted === true ? "text-text-muted" : "font-medium text-text"}`}>{readout.head}</p>
       {readout.cells.length > 0 && (
-        <p className="flex flex-wrap gap-x-4 text-16 font-semibold tabular-nums">
+        <p className="flex flex-wrap gap-x-4 text-16 font-medium tabular-nums">
           {readout.cells.map((c) => (
             <span key={c.key} className="flex items-center gap-2 whitespace-nowrap">
               {swatch?.(c.key)}
               <span className="font-normal text-text-muted">{c.label}</span>
               <span className={c.warning === true ? "flex items-center gap-1 text-warning" : "text-text"}>
-                {c.warning === true && <Triangle />}
+                {c.warning === true && <Diamond />}
                 {c.value}
               </span>
             </span>
@@ -199,6 +200,7 @@ export function ReadoutSpace({ lines, cells }: { readonly lines: number; readonl
 /**
  * Mouse only: the floating tooltip, top-aligned 8px under the plot top, 12px right of the marker;
  * flipped left of it when it would cross the plot's right edge (measured before paint).
+ * Revision 5: a --bg box, 1px --text-muted border, radius 0, no shadow.
  */
 export function PointerTip({
   readout,
@@ -225,7 +227,7 @@ export function PointerTip({
     <div
       ref={ref}
       aria-hidden="true"
-      className="pointer-events-none absolute top-2 z-10 flex w-max max-w-72 flex-col gap-0.5 rounded-control border border-border bg-surface px-3 py-2 shadow-card"
+      className="pointer-events-none absolute top-2 z-10 flex w-max max-w-72 flex-col gap-0.5 border border-text-muted bg-bg px-3 py-2"
       style={{ left: `calc(${left} + 12px)`, visibility: "hidden" }}
     >
       <ReadoutLines readout={readout} swatch={swatch} />

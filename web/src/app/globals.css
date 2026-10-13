@@ -1,115 +1,63 @@
 @import "tailwindcss";
 
-/* Design tokens: values and reasons live in DESIGN.md Part B ("Spurt"). */
+/* Design tokens: values and reasons live in DESIGN.md Part B ("Instrument", Revision 5: app-wide).
+   Light is the alternative, dark (the media block below) the design target. */
 :root {
   color-scheme: light dark;
 
-  --bg: #efeee9;
-  --surface: #ffffff;
-  --border: #e4e2dc;
-  --track: #d9d7d0;
-  --text: #121212;
-  --text-muted: #595959;
-  --accent: #d4ff3a;
-  --slab: #121212;
-  --on-slab: #ffffff;
-  --on-slab-muted: #bdbdbd;
-  --slab-mark: #d4ff3a;
-  --focus: #121212;
-  --positive: #18743a;
-  --warning: #8a4f00;
-  --negative: #b42318;
-
-  --series-ctl: #121212;
-  --series-atl: #595959;
-  --series-tsb: #1f5bd0;
-  --block-fill: #efeee9;
-  --chart-mark: #807e78;
-  --prognose-band: rgb(18 18 18 / 0.16); /* CTL band after the block (load.md §10a) */
-  --chart-height: 224px; /* 240px from 640px, 320px from lg, below (load.md §9a fold fix, §11a) */
-  /* Phone bottom bar (ScreenNav): 1px hairline + 8px + the 52px pill (44 + 2 × 4) + max(8px, the
-     home-indicator inset). */
-  --bottom-bar: calc(3.8125rem + max(0.5rem, env(safe-area-inset-bottom)));
-
-  --zone-risk: #f0b9aa;
-  --zone-optimal: #c3e0b0;
-  --zone-grey: #d3d0c8;
-  --zone-fresh: #b9d4ec;
-  --zone-transition: #f0d9a0;
-
-  --card-shadow: 0 1px 0 rgb(0 0 0 / 0.05), 0 12px 28px -18px rgb(0 0 0 / 0.35);
-}
-
-/* Dark: Ro's near-black tones; cards are raised by tone only (no border, no shadow). */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0e12;
-    --surface: #141920;
-    --border: #262d37;
-    --track: #2c3440;
-    --text: #eef1f5;
-    --text-muted: #9ba6b4;
-    --accent: #d4ff3a;
-    --slab: #d4ff3a;
-    --on-slab: #121212;
-    --on-slab-muted: #3d4a0f;
-    --slab-mark: #121212;
-    --focus: #d4ff3a;
-    --positive: #4ade9a;
-    --warning: #f5c451;
-    --negative: #ff7b7b;
-
-    --series-ctl: #eef1f5;
-    --series-atl: #9ba6b4;
-    --series-tsb: #7aa7ff;
-    --block-fill: #1c222b;
-    --chart-mark: #737d8a;
-    --prognose-band: rgb(238 241 245 / 0.18);
-
-    --zone-risk: #542f32;
-    --zone-optimal: #1e4c3b;
-    --zone-grey: #3a3f47;
-    --zone-fresh: #234159;
-    --zone-transition: #514525;
-
-    --card-shadow: none;
-  }
-}
-
-/* Instrument (DESIGN.md Part B, pilot): scoped to the Fokus root; :root above stays Spurt. body:has()
-   gives the page behind the scope the same tokens (body paints the background). */
-[data-direction="instrument"],
-body:has([data-direction="instrument"]) {
   --bg: #eae0d2;
   --surface: #e3d8c4;
   --border: #d7c9ae;
   --track: #d7c9ae;
   --text: #2d2d2d;
-  /* Warm grey (user, round 2): #6E675C was 4.28:1 on --bg, so the nearest same-hue grey that passes. */
+  /* Warm grey (Revision 2): the nearest same-hue grey that passes 4.5:1 on --bg. */
   --text-muted: #645e54;
-  /* Barley Corn, the small uppercase caption labels only (the caption utility). */
+  /* Barley Corn: the small uppercase caption labels only (the caption utility). */
   --caption: #725b41;
+  /* The today/now tick only (Revision 5). */
   --accent: #e0362b;
-  --on-accent: #141414;
   --focus: #2d2d2d;
-  --positive: var(--accent);
-  --negative: var(--accent);
+  /* Status is ink with a word and the ◆ glyph, never red (Revision 5, [A1]). */
+  --positive: var(--text);
+  --negative: var(--text);
   --warning: var(--text);
-  /* Leftover slab classes render unfilled. */
-  --slab: var(--bg);
-  --on-slab: var(--text);
-  --on-slab-muted: var(--text-muted);
-  --slab-mark: var(--accent);
+
+  /* Charts (Revision 5): one ink, marks not areas; the series differ by form (lib/chart-marks.ts). */
   --series-ctl: var(--text);
   --series-atl: var(--text);
   --series-tsb: var(--text);
   --chart-mark: var(--text-muted);
+  --chart-today: var(--accent);
+  --chart-height: 224px; /* 240px from 640px, 320px from lg, below (load.md §9a fold fix, §11a) */
+  /* Phone bottom bar (ScreenNav): 1px hairline + the 44px tabs + max(8px, the home-indicator
+     inset). */
+  --bottom-bar: calc(2.8125rem + max(0.5rem, env(safe-area-inset-bottom)));
+
+  /* Grain (Revision 4/5, fokus-round4.md §4): 160px tile of static fractal noise, shown at 3 %. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* --- transition aliases, deleted by the last instrument-rest step ---------------------------
+     Retired by Revision 5; kept so screens not yet restyled still compile and render unfilled and
+     monochrome. The radius tokens (all 0) sit in the theme block below. */
+  --slab: var(--bg);
+  --on-slab: var(--text);
+  --on-slab-muted: var(--text-muted);
+  --slab-mark: var(--text);
+  --on-accent: var(--bg);
+  --zone-risk: var(--text-muted);
+  --zone-optimal: var(--text-muted);
+  --zone-grey: var(--text-muted);
+  --zone-fresh: var(--text-muted);
+  --zone-transition: var(--text-muted);
+  --block-fill: transparent;
+  --prognose-band: transparent;
   --card-shadow: none;
+  /* --- end of transition aliases --- */
 }
 
+/* Dark: the design target (Part B palette, dark primary). */
 @media (prefers-color-scheme: dark) {
-  [data-direction="instrument"],
-  body:has([data-direction="instrument"]) {
+  :root {
     --bg: #141414;
     --surface: #1c1c1c;
     --border: #2d2d2d;
@@ -118,7 +66,6 @@ body:has([data-direction="instrument"]) {
     --text-muted: #8c8578;
     --caption: #a68763;
     --accent: #e0362b;
-    --on-accent: #141414;
     --focus: #eae0d2;
   }
 }
@@ -160,6 +107,7 @@ body:has([data-direction="instrument"]) {
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
   --color-accent: var(--accent);
+  --color-caption: var(--caption);
   --color-slab: var(--slab);
   --color-on-slab: var(--on-slab);
   --color-on-slab-muted: var(--on-slab-muted);
@@ -178,14 +126,15 @@ body:has([data-direction="instrument"]) {
   --color-series-tsb: var(--series-tsb);
   --color-block-fill: var(--block-fill);
   --color-chart-mark: var(--chart-mark);
+  --color-chart-today: var(--chart-today);
   --color-on-accent: var(--on-accent);
 
-  --font-sans: var(--font-barlow), system-ui, sans-serif;
-  --font-display: var(--font-barlow-condensed), system-ui, sans-serif;
-  /* Instrument (Part B Type): loaded by app/fokus/layout.tsx only. */
-  /* Fallbacks inside var(): outside /fokus the next/font variables are undefined. */
-  --font-grotesk: var(--font-inter, system-ui), system-ui, sans-serif;
-  --font-mono: var(--font-instrument-mono, ui-monospace), ui-monospace, monospace;
+  /* Instrument (Part B Type): Inter + Chivo Mono, loaded once by app/layout.tsx. */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-grotesk: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-instrument-mono), ui-monospace, monospace;
+  /* Transition alias (Barlow Condensed is retired): deleted by the last instrument-rest step. */
+  --font-display: var(--font-inter), system-ui, sans-serif;
 
   --text-12: 0.75rem;
   --text-12--line-height: 1.4;
@@ -204,11 +153,11 @@ body:has([data-direction="instrument"]) {
   --text-56: 3.5rem;
   --text-56--line-height: 1;
 
-  --radius-mark: 4px;
-  --radius-control: 16px;
-  --radius-card: 24px;
-  --radius-pill: 999px;
-
+  /* Transition aliases (Revision 5: radius 0, no shadows): deleted by the last instrument-rest step. */
+  --radius-mark: 0;
+  --radius-control: 0;
+  --radius-card: 0;
+  --radius-pill: 0;
   --shadow-card: var(--card-shadow);
 
   --container-content: 720px;
@@ -218,9 +167,33 @@ body:has([data-direction="instrument"]) {
   --container-phone: 35rem;
 }
 
+/* Grain (Revision 5, fokus-round4.md §4): 3 % static noise on every screen, both themes. Fixed
+   behind the content (z -1 inside the isolated body), never interactive. A bar painted in the page
+   colour (the phone nav, Fokus's pinned primary) repeats it, aligned to the viewport, so it shows no
+   seam: give it `grain-bar` (it must be positioned with a z-index). */
 body {
   background: var(--bg);
   color: var(--text);
+  isolation: isolate;
+}
+body::before,
+.grain-bar::before,
+.fokus-dock::before {
+  content: "";
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.03;
+  background: var(--grain) repeat;
+  background-size: 160px;
+}
+body::before {
+  position: fixed;
+}
+.grain-bar::before,
+.fokus-dock::before {
+  position: absolute;
+  background-attachment: fixed;
 }
 
 :focus-visible {
@@ -233,52 +206,32 @@ summary::-webkit-details-marker {
   display: none;
 }
 
-/* Instrument caption (Part B Type): mono 500, uppercase, +0.08em, Barley Corn (--caption, muted
-   outside the Instrument scope); 14px on Fokus. */
+/* Instrument caption (Part B Type, [A3]): mono 500, uppercase, +0.08em, Barley Corn (--caption);
+   12px app-wide, 14px on Fokus (--caption-size, set on the Fokus root below). */
 @utility caption {
   font-family: --theme(--font-mono);
   font-weight: 500;
-  font-size: --theme(--text-14);
-  line-height: --theme(--text-14--line-height);
+  font-size: var(--caption-size, 0.75rem); /* text-12 */
+  line-height: 1.4;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--caption, var(--text-muted));
+  color: var(--caption);
+}
+
+/* Fokus (`data-screen="fokus"` on its layout root): captions are gym-readable 14px. */
+[data-screen="fokus"] {
+  --caption-size: 0.875rem; /* text-14 */
 }
 
 /* Fokus: the pinned primary action (about 80px) must never cover the focused element (WCAG
    2.4.11), so a focused control scrolls into view above it. */
-html:has([data-direction="instrument"]) {
+html:has([data-screen="fokus"]) {
   scroll-padding-bottom: 6rem;
 }
 
 /* Fokus has no bottom bar: main fills the viewport and drops the bar's padding, so the views can
    push their pinned primary to the bottom edge even when their content is short (the set view). */
-main:has(> [data-direction="instrument"]) {
+main:has(> [data-screen="fokus"]) {
   min-height: 100dvh;
   padding-bottom: 0;
-}
-
-/* Fokus grain (Revision 4, fokus-round4.md §4): 3 % static fractal noise, both themes, /fokus only.
-   Fixed behind the content (z -1 inside the isolated root), never interactive. The pinned primary's
-   dock repeats it over its page colour, aligned to the viewport, so its bar shows no seam. */
-[data-direction="instrument"] {
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  isolation: isolate;
-}
-[data-direction="instrument"]::before,
-[data-direction="instrument"] .fokus-dock::before {
-  content: "";
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.03;
-  background: var(--grain) repeat;
-  background-size: 160px;
-}
-[data-direction="instrument"]::before {
-  position: fixed;
-}
-[data-direction="instrument"] .fokus-dock::before {
-  position: absolute;
-  background-attachment: fixed;
 }

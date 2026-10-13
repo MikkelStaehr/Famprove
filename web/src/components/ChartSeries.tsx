@@ -1,4 +1,7 @@
+import { MARKS } from "@/lib/chart-marks";
 import { formatLoad, formatSigned } from "@/lib/format";
+
+import { CombSwatch, HollowDotSwatch, NeedleSwatch, TickSwatch } from "./ChartMarks";
 
 /**
  * The chart's three series and their stroke sample, shared by TrendChart (client) and the
@@ -11,54 +14,39 @@ export type Series = {
   readonly label: string;
   readonly short: string; // the readout cell's label (DESIGN.md "Charts: interaction")
   readonly color: string;
-  readonly dash: string | undefined; // stroke pattern: lines never differ by colour alone
+  /** Mark form (Revision 5): CTL/ATL a horizontal day tick, TSB a vertical needle from 0. */
+  readonly form: "tick" | "needle";
+  /** Tick thickness / needle width in px (lib/chart-marks.ts): told apart by weight and form, never colour. */
   readonly width: number;
+  /** Kept for the transition only: no series is dashed in Revision 5 (the TSB prognose needle is, see MARKS.tsb). */
+  readonly dash: string | undefined;
   readonly format: (value: number) => string;
 };
 
-/** Legend and tooltip order. Part B: CTL ink solid 2.5px, ATL dashed 2px (6 4), TSB dotted 2px (round caps). */
+/** Legend and tooltip order. Revision 5: all ink; CTL 3px tick, ATL 1.5px tick, TSB 1px needle. */
 export const SERIES: readonly Series[] = [
-  { key: "ctl", label: "Fitness (CTL)", short: "Fitness", color: "var(--series-ctl)", dash: undefined, width: 2.5, format: formatLoad },
-  { key: "atl", label: "Træthed (ATL)", short: "Træthed", color: "var(--series-atl)", dash: "6 4", width: 2, format: formatLoad },
-  { key: "tsb", label: "Form (TSB)", short: "Form", color: "var(--series-tsb)", dash: "0.5 4", width: 2, format: formatSigned },
+  { key: "ctl", label: "Fitness (CTL)", short: "Fitness", color: MARKS.ctl.color, form: "tick", width: MARKS.ctl.thickness, dash: undefined, format: formatLoad },
+  { key: "atl", label: "Træthed (ATL)", short: "Træthed", color: MARKS.atl.color, form: "tick", width: MARKS.atl.thickness, dash: undefined, format: formatLoad },
+  { key: "tsb", label: "Form (TSB)", short: "Form", color: MARKS.tsb.color, form: "needle", width: MARKS.tsb.width, dash: undefined, format: formatSigned },
 ];
 
-/** Stroke sample in the series' colour and dash pattern, 24px wide (decorative; the label names it). */
-export function LineSample({ series }: { readonly series: Series }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
-      <line
-        x1="2"
-        y1="6"
-        x2="22"
-        y2="6"
-        stroke={series.color}
-        strokeWidth={series.width}
-        strokeDasharray={series.dash}
-        strokeLinecap="round"
-      />
-    </svg>
-  );
+/** The series' mark as its legend / readout swatch, 24×12 (decorative; the label names it). */
+export function SeriesSwatch({ series }: { readonly series: Series }) {
+  return series.form === "needle" ? <NeedleSwatch /> : <TickSwatch thickness={series.width} />;
 }
+
+/** Former name of SeriesSwatch (TrendChart, LoadExplainer); same mark-form swatch. */
+export const LineSample = SeriesSwatch;
 
 /** Legend / explainer name of the prognose region (load.md §9b). */
 export const PROGNOSE_LABEL = "Prognose (anslået)";
 
-/** The prognose region's swatch: --track at 60% with a 1px --chart-mark ring, 24×12 (decorative). */
+/** The prognose swatch: hollow dots (estimated = hollow, Revision 5). */
 export function PrognoseSwatch() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
-      <rect x="0.5" y="0.5" width="23" height="11" fill="var(--track)" fillOpacity={0.6} stroke="var(--chart-mark)" />
-    </svg>
-  );
+  return <HollowDotSwatch />;
 }
 
-/** The CTL band's swatch (load.md §10a): --prognose-band over --track 60%, 1px --chart-mark ring, 24×12. */
+/** The CTL band's swatch (load.md §10a): the range comb. */
 export function BandSwatch() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
-      <rect x="0.5" y="0.5" width="23" height="11" fill="var(--track)" fillOpacity={0.6} />
-      <rect x="0.5" y="0.5" width="23" height="11" fill="var(--prognose-band)" stroke="var(--chart-mark)" />
-    </svg>
-  );
+  return <CombSwatch />;
 }

@@ -7,8 +7,8 @@ type CardProps = {
   /** Optional control shown right of the title. */
   readonly action?: ReactNode;
   /**
-   * "session": Træning's cards (Part B: 32px Condensed 800 italic, uppercase via CSS).
-   * "calm": /load's cards (20px Barlow 700, sentence case).
+   * Kept for the callers; since Revision 5 both variants are the same section heading (Inter 400
+   * text-20, sentence case). "session": Træning's sections; "calm": /load's and /analyse's.
    */
   readonly variant: "session" | "calm";
   /** Heading level; 3 under a section h2 (/analyse "Cykel"). Default 2. */
@@ -19,22 +19,20 @@ type CardProps = {
 };
 
 const TITLE = {
-  session: "font-display text-32 leading-none font-extrabold uppercase italic",
-  calm: "text-20 font-bold",
+  session: "font-sans text-20 font-normal",
+  calm: "font-sans text-20 font-normal",
 } as const;
 
 /**
- * DESIGN.md Card. Part B: --surface, light --shadow-card (dark: tone only), no border, 24/16
- * padding; 24px on all sides from lg (Part A "Spacing and type on desktop").
+ * DESIGN.md Card, a section since Part B Revision 5: heading, 8px, a 1px --border hairline, 16px,
+ * content. No fill, radius 0, no shadow; the screens space sections 40px apart.
  */
 export function Card({ id, title, action, variant, level = 2, className, children }: CardProps) {
   const Heading = level === 3 ? "h3" : "h2";
   return (
-    <section
-      aria-labelledby={id}
-      className={`flex flex-col gap-3 rounded-card bg-surface px-4 pt-6 pb-4 shadow-card lg:px-6 lg:pb-6${className === undefined ? "" : ` ${className}`}`}
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+    <section aria-labelledby={id} className={`flex flex-col gap-3${className === undefined ? "" : ` ${className}`}`}>
+      {/* pb-2 = 8px to the hairline; mb-1 + the section's gap-3 = 16px to the content. */}
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border pb-2">
         <Heading id={id} className={TITLE[variant]}>
           {title}
         </Heading>
