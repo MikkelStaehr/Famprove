@@ -15,6 +15,8 @@ Data: `ride_metrics` and `cycling_weeks`, read server-side through `web/src/lib/
 - **Section heading (superseded by e2, 2026-10-01):** the visible h2 "Cykel" is replaced by the section tabs `Cykel` · `Styrke` (link tabs, no tab roles), specified in [`analyse-styrke.md`](analyse-styrke.md) §2. The panel keeps an `sr-only` h2 `Cykel`. The `UpdatedLine` moves under the tabs (8px). Nothing else on Cykel changes.
 
 ## 3. Layout (390px first; desktop from `lg` in §11)
+> **Superseded in part by §12 (2026-10-13):** item 3, the eFTP hero, becomes the three answer blocks; the §5c too-few block and the §5c explainer are cut; tooltips follow DESIGN.md "Charts: interaction". The rest stands.
+
 1. Nav, h1 `Analyse` (`text-44` display, date not shown, from `app/analyse/layout.tsx`).
 2. Section tabs (§2, `analyse-styrke.md` §2), then `UpdatedLine` 8px under them.
 3. **Hero: eFTP key figure**, 12px under the h2, directly on `--bg` (no card, as the `/load` hero):
@@ -176,3 +178,89 @@ Picking the latest `eftp_ok` row is selection, not arithmetic; the delta is show
 - Charts: eFTP and EF at `--chart-height` (320px from `lg`); the weekly strips keep their height. Ticks as §4 (quarterly from 640).
 - **Excluded rides from `lg`:** opened, the list is a `<table>` (caption sr-only `Udeladte ture`) with columns **Dato** · **Årsag** · **Forklaring** · **Fakta** (`text-14`, Fakta tabular muted, header row `text-14` 700). Same rows, newest first, same strings as §5e split into cells; a null fact stays dropped. Below `lg` it stays the §5e list.
 - Fold at 1280 × 800: the hero and the eFTP plot including its x labels are visible.
+
+## 12. Answers first (slice `cykel-answers`, 2026-10-13)
+The top of Cykel is three answer blocks. Charts follow them unchanged except for the readout row (DESIGN.md "Charts: interaction"). Python writes every number, direction and sentence into `analysis_summary`, one row per `question` (`eftp` | `ef` | `volume`). The web picks the row, formats the number (decimal comma, U+2212) and renders the strings verbatim. It does no arithmetic and makes no threshold decision.
+
+### 12a. Anatomy (one block, all three identical)
+Directly on `--bg` with no card, 24px apart. Each block is a `<section aria-labelledby>`, top to bottom:
+1. **Question row**, `h3` in `text-14` 700 uppercase +0.04em (the old hero label style), space-between with the **"?"** button: `Er jeg stærkere?` · `Bliver min base bedre?` · `Træner jeg nok?`.
+2. **Figure row**, 4px down: the direction arrow and the number on one baseline.
+   - The arrow is 24px, `--text`, `aria-hidden`: ↗ up, ↘ down, → flat, and none when `direction` is null. It is neutral, never coloured, because the sentence carries the meaning.
+   - The number is Condensed 800 italic tabular. Block 1 uses `text-56`, the largest on the page. Blocks 2–3 use `text-44`. The unit is the same size.
+   - The caption follows, `text-14` `--text-muted`, wrapping under the number at 390.
+3. **Verdict**, 8px down: Python's `verdict_text`, `text-16` 600 `--text`, max 60ch. One sentence.
+4. **Detail**, 4px down, only when `detail_text` is not null: `text-14` `--text-muted`. One line of context.
+5. sr-only: the arrow as a word (`stigende` / `faldende` / `uændret`) before the number.
+
+| Block | Number (state `answer`) | Caption |
+|---|---|---|
+| 1 `eftp` | `value` W (`183 W`) | `eFTP nu · for 6 uger siden {compare} W` |
+| 2 `ef` | `value`, 2 dp (`1,24`) | `EF på rolige ture · for 6 uger siden {compare}` |
+| 3 `volume` | `value` t, 1 dp (`0,9 t`) | `pr. uge, snit af de sidste 4 hele uger · mål {target} t` |
+
+**State `needs_data`:** no arrow.
+- Block 2's number becomes `{have_n} af {need_n}` (`0 af 2`) with the caption `rolige ture med puls og watt de sidste 28 dage`, and the verdict is Python's "what's needed" sentence.
+- Block 1 (no eFTP 6 weeks ago, or none for now) keeps its number when one exists and gets Python's needed sentence. With no eFTP at all, the number is `–` (sr `ikke registreret`).
+- Never `0` for missing, and never a generic EmptyState.
+
+**No plan (block 3):** the number and verdict are as normal. `detail_text` is Python's no-plan sentence (`Ingen planlagte ture de sidste 4 uger.`), never `0 af 0`.
+
+### 12b. The "?" disclosure
+- It is a native `<details>` per block. The `<summary>` is a 44×44 target at the end of the question row, holding a visible 24px circle with `?`. The ring is 1.5px `--text-muted` (≥ 3:1) and the glyph `text-14` 700. Its sr name is `Forklaring: {question}`. The focus ring is on the summary.
+- The explanation opens **inline under the block** (not a popover), as `text-14` `--text-muted` at 60ch, with no animation. When open, the circle fills with `--text` and the `?` turns `--bg`, so state shows by shape and fill. Tap, Enter and Space all work natively.
+- Contents (moved out of body text):
+  - Block 1: the §6 honesty note (`eFTP er et skøn fra intervals.icu …`), plus `Sammenligner den seneste eFTP med den seneste fra 6 uger før. Toppen er den højeste eFTP siden 1. jan. 2025.`
+  - Block 2: the old §5c explainer (`EF er normaliseret watt (NP) delt med gennemsnitspuls …`), plus `Rolig tur: IF under 0,75, mindst 30 min, med både watt og puls.`
+  - Block 3: `Timer er bevægelsestid på alle cykelture, også udeladte. Målet på 3 t pr. uge er sat {target_since}. Planlagte ture er dem, du har lagt ind i intervals.icu.`
+- **Cut from the body:** the hero delta, the detail and the honesty note (§6 rows `Delta`, `Detail`, `Honesty note`), the EF card's explainer line, and the §5c too-few heading and text. The EF card with fewer than 5 points shows its 1–4 rides as the §5c list plus one muted line `Grafen vises fra 5 rolige ture.`. The §5b `… ture uden watt` note stays, because it is a chart fact.
+
+### 12c. Layout
+- **390:** h1 → tabs → `UpdatedLine` → blocks 1, 2, 3 → the eFTP card → EF → weekly → excluded. **Fold (replaces §10.4):** at 390 × 844 all three verdict sentences end above the fixed bottom bar, i.e. at or above 844 − `--bottom-bar`. If block 3 doesn't fit, block 1 drops to `text-44` before anything is cut.
+- **1280:** the three blocks replace the hero in the **rail** (cols 1–4, `lg:sticky lg:top-6`, `lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto`, so an opened "?" never pushes content off-screen). The **main** column (cols 5–12) holds the charts, unchanged. DOM order is blocks then charts.
+
+### 12d. States
+| State | Treatment |
+|---|---|
+| Loading | Three block skeletons: the real question row, a 56/44px bar at w-1/3, two text bars. |
+| Live today | Block 1 answer: 183 W, down 5 W. Block 2 `needs_data` (`0 af 2`). Block 3 answer 0,9 t with the no-plan detail. |
+| `DEV_FIXTURE=answers` (new, dev only) | Illustrative rows with all three in `answer`, block 2 up and block 3 with plan `3 af 4`, so the normal state can be shot. |
+| `DEV_FIXTURE=ef-few` | Unchanged for the EF card. Block 2 shows `needs_data`. |
+| `DEV_FIXTURE=empty` / `error` | The page EmptyState / ErrorState as §8 (the blocks are hidden too). |
+| `analysis_summary` fails, rides OK | In place of the blocks, an ErrorState `Kunne ikke hente svarene` + `describeDataError` + `Prøv igen`. The charts are unaffected. |
+| A question row missing | That block shows its question and `Intet svar endnu. Det daglige job regner det ud omkring kl. 05.00.` |
+| `DEV_FIXTURE=stale` | The freshness time also includes max(`analysis_summary.computed_at`). |
+
+### 12e. Sentence templates for Python (Danish; architect sets the thresholds)
+- Format rules:
+  - Dates are `7. sep. 2025`, with the year only outside the current year and no weekday.
+  - Numbers use a decimal comma, and negatives use U+2212.
+  - W are whole, EF has 2 dp, hours have 1 dp + ` t`.
+  - Variables are in `{}`. `{d}` is always an absolute value; the word carries the sign.
+- **`eftp` verdict:** `{now_w}` and `{then_w}`/`{then_date}` = the latest eFTP 6 weeks before the latest ride.
+  - up: `Ja: {d} W over for 6 uger siden ({then_w} W, {then_date}).`
+  - down: `Nej: {d} W under for 6 uger siden ({then_w} W, {then_date}).`
+  - flat (within the flat threshold): `Uændret: {d_signed} W på 6 uger ({then_w} W, {then_date}).`
+  - detail: `Din top er {peak_w} W fra {peak_date}.`, or when now is the peak: `Det er din højeste eFTP siden {first_date}.`
+  - needs (no then): `Ingen eFTP fra omkring {then_target_date} at sammenligne med.`
+  - needs (latest too old): `Din seneste eFTP er fra {latest_date}. Kør en tur med watt, så er tallet aktuelt.`
+- **`ef` verdict:**
+  - up: `Ja: EF er steget fra {then} til {now} på 6 uger, så du træder flere watt for samme puls.`
+  - down: `Nej: EF er faldet fra {then} til {now} på 6 uger, så du træder færre watt for samme puls.`
+  - flat: `Uændret: EF {now} mod {then} for 6 uger siden.`
+  - needs (now window short): `Kør {n} rolige ture mere med puls og watt, så kan basen måles.`
+  - needs (now OK, then short): `EF er {now} nu. Der er ingen rolige ture fra for 6 uger siden at sammenligne med før {compare_from_date}.`
+  - detail (why recent rides didn't count, counts from the last 28 days, omitted when 0): `Af dine {k} seneste ture var {a} for hårde og {b} uden puls.` One part is dropped when it is 0, e.g. `… var 3 for hårde.`
+- **`volume` verdict:**
+  - under: `Nej: {hours} t pr. uge mod målet på {target} t.`
+  - at or over: `Ja: {hours} t pr. uge mod målet på {target} t.`
+  - detail: `{done} af {planned} planlagte ture er kørt de sidste 4 uger.`, or with 0 planned: `Ingen planlagte ture de sidste 4 uger.`
+  - direction: hours vs the 4 complete weeks before, the same as the arrow.
+
+### 12f. Acceptance criteria
+1. A `node --test` test feeds `analysis_summary` rows to the view model and asserts that `verdict_text`, `detail_text` and `direction` pass through unchanged, and that no number is derived in the web.
+2. Live (390, light and dark): block 1 shows `183 W` with ↘, block 2 `0 af 2` with no arrow, block 3 `0,9 t` with the no-plan detail. No block shows `0 af 0` or a generic empty state.
+3. Each "?" opens by tap and by Enter/Space, its summary is ≥ 44×44 with a visible focus ring, and the old paragraphs exist only inside the disclosures.
+4. Fold per §12c at 390 × 844. At 1280 the blocks sit in the sticky rail and the charts' `Ingen ture` seams still align (§10.6).
+5. Every chart: on touch there is no floating tooltip, a tap moves the marker and fills the readout, and a tap outside clears it. The readout's height does not change between two taps (measure the element). With the mouse, the tooltip never overlaps the hovered point (screenshots at the left and right plot edges), and it hides on leave. Keyboard ←/→ and Esc work as before.
+6. States `answers`, `ef-few`, `empty`, `error` and `stale` are shot via `run-web`, with every string verbatim and no English UI string.
