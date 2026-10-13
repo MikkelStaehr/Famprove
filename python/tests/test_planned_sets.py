@@ -160,18 +160,22 @@ def test_the_weekly_cap(
     assert weekly_cap(suggested, last) == expected
 
 
-def test_the_cap_needs_the_same_row_reps_and_rpe_last_week(sheet: Sheet) -> None:
+def test_the_cap_follows_the_row_whatever_the_rpe(sheet: Sheet) -> None:
+    """The programme's RPE +0.5 a week must not bypass the cap (user, 2026-10-13)."""
     sheet.add(week_start=LAST_WEEK, reps=3.0, prescribed="RPE 7", logged_kg=150.0)  # e1RM 180
     sheet.add(week_start=LAST_WEEK, sheet_row=40, reps=3.0, prescribed="RPE 6", logged_kg=120.0)
-    sheet.add(week_start=LAST_WEEK, sheet_row=41, reps=5.0, prescribed="RPE 5 - 6", logged_kg=110.0)
-    same = sheet.add(sheet_row=40, reps=3.0, prescribed="RPE 6")
-    other_rpe = sheet.add(sheet_row=41, reps=5.0, prescribed="RPE 5 - 7")
+    sheet.add(week_start=LAST_WEEK, sheet_row=41, reps=8.0, prescribed="RPE 6", logged_kg=110.0)
+    sheet.add(week_start=LAST_WEEK, sheet_row=42, reps=3.0, prescribed="RPE 6", logged_kg=120.0,
+              name="3.0.0 Tempo squat")  # fmt: skip
+    progressed = sheet.add(sheet_row=40, reps=3.0, prescribed="RPE 6.5")
+    fewer_reps = sheet.add(sheet_row=41, reps=3.0, prescribed="RPE 6")
+    other_exercise = sheet.add(sheet_row=42, reps=3.0, prescribed="RPE 6")
     by_row = {p.sheet_row: p for p in sheet.plan()}
-    assert (by_row[same.sheet_row].suggested_kg, by_row[same.sheet_row].uncapped_kg) == (
-        122.5,
-        145.0,
-    )
-    assert by_row[other_rpe.sheet_row].uncapped_kg is None  # 5 @ 5-6 last week is not 5 @ 5-7
+    # 3 @ 6.5 from e1RM 180: 148 -> 147.5, capped at 120 + 2.5
+    assert (by_row[40].suggested_kg, by_row[40].uncapped_kg) == (122.5, 147.5)
+    assert by_row[fewer_reps.sheet_row].uncapped_kg is None  # 8 reps last week, 3 now
+    assert by_row[other_exercise.sheet_row].uncapped_kg is None  # tempo last week, squat now
+    assert progressed.sheet_row == 40
 
 
 def test_a_suggestion_is_the_exact_inverse_of_the_e1rm_formula() -> None:

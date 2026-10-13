@@ -11,10 +11,12 @@
   high-rep sets inflate the estimate (an 8-rep back-off at RPE 5-7 put bench at 110 kg against
   a top set of 85 x 3 @ 7). RPE = the set's logged RPE when present, else the prescribed one.
   /analyse keeps its own, wider rule (strength_analysis.MAX_E1RM_REPS) for the e1RM history.
-- Weekly cap (user, 2026-10-13): against last week's logged kg for the same prescription (the
-  same sheet row the week before, same reps and prescribed RPE: what Træning shows as "Sidste
-  uge"), a suggestion rises at most CAP_UP_KG and falls at most CAP_DOWN_KG, both rounded inward
-  to ROUND_TO_KG. A capped set keeps its uncapped suggestion in uncapped_kg (the web shows
+- Weekly cap (user, 2026-10-13): against last week's logged kg for the same row (the same
+  sheet row of the same block the week before, same exercise and reps: what Træning shows as
+  "Sidste uge"), a suggestion rises at most CAP_UP_KG and falls at most CAP_DOWN_KG, both rounded
+  inward to ROUND_TO_KG. The prescribed RPE may differ: the programme's own +0.5 a week must not
+  bypass the cap (user, 2026-10-13). Reps must match: 3 reps are not capped by an 8-rep kg.
+  A capped set keeps its uncapped suggestion in uncapped_kg (the web shows
   "(begrænset)"); None when the cap didn't apply or there is no such logged kg.
 - pct(RPE, reps) = 1 / (1 + E1RM_FACTOR x (reps + 10 - RPE)): the relation /analyse uses to get an
   e1RM from a lifted set, so a suggestion is its exact inverse. The coach's sheet has no RPE table
@@ -143,12 +145,16 @@ def weekly_cap(suggested: float, last_kg: float | None) -> tuple[float, float | 
     return (capped, suggested) if capped != suggested else (suggested, None)
 
 
+def _same_exercise(a: str, b: str) -> bool:
+    return a.strip().casefold() == b.strip().casefold()
+
+
 def last_week_kg(
     sets: Iterable[StrengthSet], statuses: Mapping[SetKey, KgStatus]
-) -> dict[tuple[str, int, date], tuple[float, float, float]]:
-    """(block, sheet_row, week_start) -> (reps, prescribed RPE, logged kg) of each lifted RPE row:
-    its first set with logged kg, as Træning's "Sidste uge" shows it. A session that wasn't
-    lifted (pre-filled kg of a missed session) anchors nothing."""
+) -> dict[tuple[str, int, date], StrengthSet]:
+    """(block, sheet_row, week_start) -> the first set with logged kg of each lifted RPE row, as
+    Træning's "Sidste uge" shows it. A session that wasn't lifted (pre-filled kg of a missed
+    session) anchors nothing."""
     first: dict[tuple[str, int, date], StrengthSet] = {}
     for s in sets:
         if statuses[set_key(s)] == "planned" or s.logged_kg is None or s.logged_kg <= 0:
@@ -156,12 +162,7 @@ def last_week_kg(
         key = (s.block, s.sheet_row, s.week_start)
         if key not in first or s.set_no < first[key].set_no:
             first[key] = s
-    out: dict[tuple[str, int, date], tuple[float, float, float]] = {}
-    for key, s in first.items():
-        rpe = prescribed_rpe(s.prescribed)
-        if rpe is not None and s.logged_kg is not None:
-            out[key] = (s.reps, rpe, s.logged_kg)
-    return out
+    return {key: s for key, s in first.items() if prescribed_rpe(s.prescribed) is not None}
 
 
 def planned_sets(
@@ -205,8 +206,11 @@ def planned_sets(
         uncapped = None
         if suggested is not None and suggested > 0:
             before = logged.get((s.block, s.sheet_row, s.week_start - timedelta(days=7)))
-            same = before is not None and before[0] == s.reps and before[1] == rpe
-            suggested, uncapped = weekly_cap(suggested, before[2] if same and before else None)
+            same = (
+                before is not None and _same_exercise(before.name, s.name) and before.reps == s.reps
+            )
+            anchor = before.logged_kg if same and before is not None else None
+            suggested, uncapped = weekly_cap(suggested, anchor)
         out.append(
             PlannedSet(
                 sheet_id=s.sheet_id,
