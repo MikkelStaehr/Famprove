@@ -410,9 +410,6 @@ export function isMainLift(e: Pick<FokusExercise, "name" | "ramp">, mainKeys: re
   return mainKeys !== null && mainKeys.includes(catalogueKey(e.name));
 }
 
-/** The warm-up clock with no recorded start (§2.2): a static 0:00 and this line, never a timer from page load. */
-export const WARMUP_NOT_STARTED = "Opvarmningen er ikke startet.";
-
 /** Fortryd of "Begynd træning" goes back to Træning with this query (fokus-pause.md §6). */
 export const BEGIN_UNDONE_HREF = "/?fortrudt=begin";
 export const BEGIN_UNDONE_TEXT = "Fortrudt: træningen er ikke begyndt.";

@@ -252,7 +252,17 @@ Fokus (instrument panel):
 
 Don'ts: neon, italic condensed uppercase, pill badges with background, drop shadows, rounded cards, more than one accent colour per screen.
 
-### Single filled accent per Fokus view (design-lead decision, 2026-10-13)
+### Revision 2 after the Fokus pilot (user, 2026-10-13: "it reads as a terminal, not an instrument")
+Supersedes the lines above and the tables and sections below where they differ:
+- **Air first.** A view is a few groups (warm-up: title block, timer, ramp, next set; pause: rating, timer, next set; set view: title block, figures, secondary actions). **40px between groups, 12px inside a group; the timer group gets the most space (56px above and below). Nothing below the primary action**: the footer line and Spring over sit above it, the dev-only "Testvisning" line at the top.
+- **Type.** Mono only for captions (≤ 14px), axis/scale labels and small tabular numbers. Big numbers (timer, kg, reps, the progress count), headings and buttons are Inter with tabular figures. No slashed or dotted zeros anywhere.
+- **Colour.** Muted text is a warm grey: #8C8578 dark, **#645E54** light (the user's #6E675C is 4.28:1 on the light bg; #645E54 is the nearest same hue that passes, 4.92:1). Barley Corn is reserved for one thing, the small uppercase caption labels (`--caption`): #A68763 dark (5.50:1), **#725B41** light (the user's #A68763 is 2.57:1 there; #725B41 passes, 4.89:1).
+- **Primary action: no filled slab.** Full width, ≥ 44px target, a 1px red rule above it, label in Inter medium, red, ≥ 24px. It is the only red on the screen besides the rest scale's moving tick, so the progress row's current-set tick and the rating's lamp are ink (`--text`), not red.
+- **Pinned primary (main session, 2026-10-13).** With the new air, the pause and end-of-exercise views are taller than 390 × 844, so the primary action is `sticky` at the bottom (page colour behind it, the red rule on top, safe-area padding): in place when a view is short, pinned when it is long, so it is always reachable without scrolling and nothing sits below it.
+- **Mono face: Chivo Mono** (plain oval zero). JetBrains Mono's zero is dotted, DM Mono's and Red Hat Mono's slashed, Space Mono's and Spline Sans Mono's dotted (checked by rendering, 2026-10-13).
+- **Timer.** Inter 56px, `--text`, tabular, with the red-tick scale directly under it. The warm-up has the same timer and scale (0–10 min, no MIN/MAX band); an unstarted warm-up shows 0:00 with the tick at 0 (no "not started" sentence).
+
+### Single filled accent per Fokus view (design-lead decision, 2026-10-13; the fill is retired by Revision 2: the same element is the view's one red, as a rule + red label)
 | View | The one filled accent | Everything else |
 |---|---|---|
 | Set | **Udført** | Spring over: outlined (`--text-muted`, 1px). Fortryd, Afslut: ink text, underlined |
@@ -273,8 +283,9 @@ Existing names are reused so later screens change cheaply. Ratios are the main s
 | `--border` | #2D2D2D | #D7C9AE | the hairline (divider only, [A5]) |
 | `--track` | #2D2D2D | #D7C9AE | scale baselines that are decoration |
 | `--text` | #EAE0D2 | #2D2D2D | text, ink marks, 2px selected outline |
-| `--text-muted` | #A68763 | #665946 | captions, control outlines, minor ticks |
-| `--accent` | #E0362B | #E0362B | the one fill, the "now" tick, lamps |
+| `--text-muted` | #8C8578 | #645E54 | muted text, control outlines, minor ticks (Revision 2) |
+| `--caption` (new, Revision 2) | #A68763 | #725B41 | the small uppercase caption labels only |
+| `--accent` | #E0362B | #E0362B | the primary action's rule and label, the rest scale's moving tick (Revision 2) |
 | `--on-accent` (new) | #141414 | #141414 | label on the accent fill (≥ 24px) |
 | `--focus` | #EAE0D2 | #2D2D2D | 3px ring, 3px offset (sits on bg) |
 | `--positive`, `--negative` | = `--accent` | = `--accent` | only with a word or glyph |

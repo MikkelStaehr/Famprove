@@ -85,7 +85,10 @@ body:has([data-direction="instrument"]) {
   --border: #d7c9ae;
   --track: #d7c9ae;
   --text: #2d2d2d;
-  --text-muted: #665946;
+  /* Warm grey (user, round 2): #6E675C was 4.28:1 on --bg, so the nearest same-hue grey that passes. */
+  --text-muted: #645e54;
+  /* Barley Corn, the small uppercase caption labels only (the caption utility). */
+  --caption: #725b41;
   --accent: #e0362b;
   --on-accent: #141414;
   --focus: #2d2d2d;
@@ -112,7 +115,8 @@ body:has([data-direction="instrument"]) {
     --border: #2d2d2d;
     --track: #2d2d2d;
     --text: #eae0d2;
-    --text-muted: #a68763;
+    --text-muted: #8c8578;
+    --caption: #a68763;
     --accent: #e0362b;
     --on-accent: #141414;
     --focus: #eae0d2;
@@ -181,7 +185,7 @@ body:has([data-direction="instrument"]) {
   /* Instrument (Part B Type): loaded by app/fokus/layout.tsx only. */
   /* Fallbacks inside var(): outside /fokus the next/font variables are undefined. */
   --font-grotesk: var(--font-inter, system-ui), system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono, ui-monospace), ui-monospace, monospace;
+  --font-mono: var(--font-instrument-mono, ui-monospace), ui-monospace, monospace;
 
   --text-12: 0.75rem;
   --text-12--line-height: 1.4;
@@ -229,13 +233,14 @@ summary::-webkit-details-marker {
   display: none;
 }
 
-/* Instrument caption (Part B Type): mono 500, uppercase, +0.08em, muted; 14px on Fokus. */
+/* Instrument caption (Part B Type): mono 500, uppercase, +0.08em, Barley Corn (--caption, muted
+   outside the Instrument scope); 14px on Fokus. */
 @utility caption {
-  font-family: var(--font-mono);
+  font-family: --theme(--font-mono);
   font-weight: 500;
   font-size: --theme(--text-14);
   line-height: --theme(--text-14--line-height);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--caption, var(--text-muted));
 }

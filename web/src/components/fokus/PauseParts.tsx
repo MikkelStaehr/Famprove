@@ -6,7 +6,6 @@ import {
   FEEL_OPTIONS,
   feelQuestion,
   footerText,
-  formatTimer,
   type FokusExercise,
   lastWeekLine,
   nextFeel,
@@ -23,7 +22,6 @@ import {
   stepperBounds,
   stepperValue,
   warmupTitle,
-  WARMUP_NOT_STARTED,
 } from "@/lib/fokus-view";
 import type { LoggedSet, SetRef } from "@/lib/set-taps";
 import { formatKg } from "@/lib/format";
@@ -35,7 +33,7 @@ type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
 export function PrimaryButton({ primary, onClick, children }: { readonly primary: PrimaryRef; readonly onClick: () => void; readonly children: string }) {
   return (
-    <button ref={primary} type="button" onClick={onClick} className={`mt-4 ${PRIMARY_FILL}`}>
+    <button ref={primary} type="button" onClick={onClick} className={`mt-10 ${PRIMARY_FILL}`}>
       {children}
       <ArrowIcon />
     </button>
@@ -67,7 +65,7 @@ export function FeelBlock({
       <h2 id={`${id}-q`} className="font-grotesk text-20 font-normal">
         {feelQuestion(set, named)}
       </h2>
-      <div role="group" aria-labelledby={`${id}-q`} className="mt-2 grid grid-cols-3 gap-2">
+      <div role="group" aria-labelledby={`${id}-q`} className="mt-3 grid grid-cols-3 gap-2">
         {FEEL_OPTIONS.map((o) => {
           const on = felt === o.value;
           return (
@@ -77,12 +75,12 @@ export function FeelBlock({
               aria-pressed={on}
               aria-label={o.label}
               onClick={() => onTap("feel", set.ref, nextFeel(felt, o.value))}
-              className={`flex min-h-14 flex-col items-center justify-center gap-1.5 px-2 font-mono text-16 leading-tight font-medium tracking-normal text-text uppercase ${
+              className={`flex min-h-14 flex-col items-center justify-center gap-1.5 px-2 font-grotesk text-16 leading-tight font-medium text-text ${
                 on ? "border-2 border-text" : "border border-text-muted"
               }`}
             >
-              {/* The lamp: filled --accent when lit, hollow when off (shape, not colour alone). */}
-              <span aria-hidden="true" data-lamp={on ? "on" : "off"} className={`block size-2.5 shrink-0 ${on ? "bg-accent" : "border border-text-muted"}`} />
+              {/* The lamp: filled ink when lit, hollow when off (shape, not colour alone; red is the primary's). */}
+              <span aria-hidden="true" data-lamp={on ? "on" : "off"} className={`block size-2.5 shrink-0 ${on ? "bg-text" : "border border-text-muted"}`} />
               <span>{o.label}</span>
             </button>
           );
@@ -137,7 +135,8 @@ function RepsStepper({
     <div role="group" aria-labelledby={`${id}-l`} className="mt-3 flex items-center justify-between gap-3">
       <p id={`${id}-l`} className="flex flex-col">
         <span className="font-grotesk text-16">Reps i sæt {set.number}</span>
-        <span className="caption">
+        {/* A small tabular number, not a caption label: mono in the muted grey (Barley Corn is for captions only). */}
+        <span className="font-mono text-14 text-text-muted">
           {low} - {top}
         </span>
       </p>
@@ -148,7 +147,7 @@ function RepsStepper({
           </svg>
           <span className="sr-only">Færre reps</span>
         </button>
-        <output aria-live="polite" className="min-w-[3ch] text-center font-mono text-32 font-normal">
+        <output aria-live="polite" className="min-w-[3ch] text-center font-grotesk text-32 font-normal tabular-nums">
           {value}
         </output>
         <button type="button" disabled={value >= max} aria-disabled={value >= max} onClick={() => change(1)} className={stepButton}>
@@ -179,19 +178,20 @@ export function PauseCard({ since, exercise, onAnnounce }: { readonly since: str
   const rail = exercise.restMinS !== null && exercise.restMaxS !== null ? restRail(seconds, exercise.restMinS, exercise.restMaxS) : null;
   const ok = band.kind === "ready" || band.kind === "over";
   return (
-    <section aria-label="Pause" className="mt-4 flex flex-col">
-      <Hairline />
-      <p className="mt-4 flex items-baseline justify-between gap-2">
+    <section aria-label="Pause" className="mt-14 flex flex-col">
+      <p className="flex items-baseline justify-between gap-2">
         <span className="caption">Pause</span>
         {label !== null && <span className="caption">{label}</span>}
       </p>
-      <div className="mt-1">
+      <div className="mt-3">
         <RestTimer seconds={seconds} label="Pause" />
       </div>
-      {rail !== null && exercise.restMaxS !== null && <RestScale rail={rail} scaleS={1.2 * exercise.restMaxS} />}
+      {rail !== null && exercise.restMaxS !== null && (
+        <Scale scaleS={1.2 * exercise.restMaxS} now={rail.fill} min={rail.min} max={rail.max} />
+      )}
       {band.kind !== "none" && (
-        <p className={`mt-2 flex items-center gap-2 text-16 ${ok ? "text-text" : "text-text-muted"}`}>
-          {ok && <CheckIcon className="size-4 text-accent" />}
+        <p className={`mt-3 flex items-center gap-2 text-16 ${ok ? "text-text" : "text-text-muted"}`}>
+          {ok && <CheckIcon className="size-4 text-text" />}
           {band.text}
         </p>
       )}
@@ -205,15 +205,17 @@ function at(fraction: number, width: number): string {
 }
 
 /**
- * The rest scale (fokus-instrument.md §4.4): 0 … 1.2 × max, ticks every 30 s, labelled minutes,
- * MIN and MAX marks, and the red "now" tick, which jumps once a second (no transition) and stays
- * pinned at the right end past the scale.
+ * The timer's scale (fokus-instrument.md §4.4), directly under the clock: 0 … `scaleS`, ticks every
+ * 30 s, labelled minutes, the red "now" tick, which jumps once a second (no transition) and stays
+ * pinned at the right end past the scale. The pause adds its MIN and MAX marks; the warm-up has none
+ * (no recommended rest).
  */
-function RestScale({ rail, scaleS }: { readonly rail: ReturnType<typeof restRail>; readonly scaleS: number }) {
+function Scale({ scaleS, now, min, max }: { readonly scaleS: number; readonly now: number; readonly min?: number; readonly max?: number }) {
   const ticks: number[] = [];
   for (let t = 0; t <= scaleS; t += 30) ticks.push(t);
+  const marks = min !== undefined && max !== undefined;
   return (
-    <div aria-hidden="true" data-scale-s={scaleS} className="relative mt-2 h-17 w-full">
+    <div aria-hidden="true" data-scale-s={scaleS} className={`relative mt-3 w-full ${marks ? "h-17" : "h-11"}`}>
       <span className="absolute inset-x-0 bottom-4 block h-px bg-text-muted" />
       {ticks.map((t) =>
         t % 60 === 0 ? (
@@ -227,51 +229,48 @@ function RestScale({ rail, scaleS }: { readonly rail: ReturnType<typeof restRail
           <span key={t} className="absolute bottom-4 block h-1.5 w-px bg-text-muted" style={{ left: at(t / scaleS, 1) }} />
         ),
       )}
-      <span className="absolute bottom-4 block h-6 w-0.5 bg-text" style={{ left: at(rail.min, 2) }} />
-      <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: at(rail.min, 2) }}>
-        Min
-      </span>
-      <span className="absolute bottom-4 block h-6 w-px bg-text" style={{ left: at(rail.max, 1) }} />
-      <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: at(rail.max, 1) }}>
-        Max
-      </span>
-      <span data-now={rail.fill} className="absolute bottom-4 block h-8 w-0.5 bg-accent" style={{ left: at(rail.fill, 2) }} />
+      {marks && (
+        <>
+          <span className="absolute bottom-4 block h-6 w-0.5 bg-text" style={{ left: at(min, 2) }} />
+          <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: at(min, 2) }}>
+            Min
+          </span>
+          <span className="absolute bottom-4 block h-6 w-px bg-text" style={{ left: at(max, 1) }} />
+          <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: at(max, 1) }}>
+            Max
+          </span>
+        </>
+      )}
+      <span data-now={now} className="absolute bottom-4 block h-7 w-0.5 bg-accent" style={{ left: at(now, 2) }} />
     </div>
   );
 }
+
+/** The warm-up's scale: 0-10 minutes (round 2). */
+const WARMUP_SCALE_S = 600;
 
 /** §2: the warm-up of `exercise`, with Python's ramp on a main lift (fokus-instrument.md §3: a mono table). */
 export function WarmupCard({ since, exercise, mainLift }: { readonly since: string | null; readonly exercise: FokusExercise; readonly mainLift: boolean }) {
   const ramp = rampState(exercise, mainLift);
   const basis = rampBasis(exercise);
   return (
-    <section aria-labelledby="fokus-warmup" className="mt-2 flex flex-col">
+    <section aria-labelledby="fokus-warmup" className="flex flex-col">
       <h2 id="fokus-warmup" className="font-grotesk text-32 font-normal [overflow-wrap:anywhere]">
         {warmupTitle(exercise)}
       </h2>
-      <Hairline className="mt-4" />
-      <div className="mt-4">
-        {since === null ? (
-          <>
-            {/* No recorded start (§2.2): a static clock, never one running from page load. */}
-            <p role="timer" aria-live="off" aria-label="Opvarmning" className="font-mono text-56 leading-none font-normal text-text-muted">
-              {formatTimer(0)}
-            </p>
-            <p className="mt-1 text-16 text-text-muted">{WARMUP_NOT_STARTED}</p>
-          </>
-        ) : (
-          <WarmupTimer since={since} />
-        )}
+      <div className="mt-14">
+        {/* No recorded start (§2.2): a static 0:00 with the tick at 0, never a clock from page load. */}
+        {since === null ? <WarmupClock seconds={0} /> : <WarmupTimer since={since} />}
       </div>
       {ramp === "ramp" && exercise.ramp !== null && (
-        <div className="@container mt-4 flex flex-col">
+        <div className="@container mt-14 flex flex-col">
           {basis !== null && <p className="caption">{basis}</p>}
           {/* One row of columns while they fit (21rem at 100 % text); stacked at 200 % text. */}
-          <ol aria-label="Opvarmningssæt" className="mt-2 grid gap-x-3 gap-y-4 @min-[21rem]:auto-cols-fr @min-[21rem]:grid-flow-col">
+          <ol aria-label="Opvarmningssæt" className="mt-3 grid gap-x-3 gap-y-4 @min-[21rem]:auto-cols-fr @min-[21rem]:grid-flow-col">
             {exercise.ramp.map((r) => (
               <li key={r.pct} className="flex flex-col @min-[21rem]:not-first:border-l @min-[21rem]:not-first:border-border @min-[21rem]:not-first:pl-3">
                 <span className="caption">{Math.round(r.pct)}&nbsp;%</span>
-                <span className="flex flex-wrap items-baseline font-mono">
+                <span className="flex flex-wrap items-baseline">
                   <span className="text-24 text-text">{formatKg(r.kg)}</span>
                   <span className="text-14 text-text-muted">&nbsp;kg</span>
                 </span>
@@ -284,33 +283,53 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
           </ol>
         </div>
       )}
-      {ramp === "none" && <p className="mt-4 text-16 text-text-muted">Intet kg at regne opvarmningen ud fra.</p>}
+      {ramp === "none" && <p className="mt-14 text-16 text-text-muted">Intet kg at regne opvarmningen ud fra.</p>}
     </section>
   );
 }
 
 function WarmupTimer({ since }: { readonly since: string }) {
-  return <RestTimer seconds={useElapsed(since)} label="Opvarmning" />;
+  return <WarmupClock seconds={useElapsed(since)} />;
+}
+
+function WarmupClock({ seconds }: { readonly seconds: number }) {
+  return (
+    <>
+      <RestTimer seconds={seconds} label="Opvarmning" />
+      <Scale scaleS={WARMUP_SCALE_S} now={Math.min(1, seconds / WARMUP_SCALE_S)} />
+    </>
+  );
 }
 
 /** §1.2: the next set without a background (Part B): caption + title, a hairline, mono values. */
-export function NextSetCard({ next, week, inWarmup }: { readonly next: SetInContext; readonly week: number; readonly inWarmup: boolean }) {
+export function NextSetCard({
+  next,
+  week,
+  inWarmup,
+  afterTimer,
+}: {
+  readonly next: SetInContext;
+  readonly week: number;
+  readonly inWarmup: boolean;
+  /** Straight under the timer group (56px of air), else after another group (40px). */
+  readonly afterTimer: boolean;
+}) {
   const summary = nextSetSummary(next, inWarmup);
   const e = next.exercise;
   // The card always has a last-week line (§1.2.3), suggestion or not.
   const lastWeek = lastWeekLine({ ...e, suggestedKg: e.suggestedKg ?? 0 }, week);
   return (
-    <div className="mt-4 flex flex-col gap-1">
+    <div className={`${afterTimer ? "mt-14" : "mt-10"} flex flex-col gap-1`}>
       <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="caption">Næste</span>
         <span className="font-grotesk text-20">{summary.title}</span>
       </p>
-      <Hairline className="mt-1" />
-      <p className="mt-1 font-mono text-16">{summary.line}</p>
+      <Hairline className="my-2" />
+      <p className="text-16">{summary.line}</p>
       {lastWeek !== null &&
         (lastWeek.kind === "kg" ? (
           <p className="flex flex-wrap items-baseline gap-x-2">
-            <span className="caption">Sidste uge</span> <span className="font-mono text-16">{lastWeek.text}</span>
+            <span className="caption">Sidste uge</span> <span className="text-16">{lastWeek.text}</span>
           </p>
         ) : (
           <p className="text-16 text-text-muted">{lastWeek.text}</p>
@@ -345,7 +364,7 @@ export function Footer({ order, log }: { readonly order: readonly SetRef[]; read
   const text = footerText(order, log, now);
   if (text === null) return null;
   return (
-    <p suppressHydrationWarning className="mt-4 font-mono text-14 text-text-muted">
+    <p suppressHydrationWarning className="mt-3 font-mono text-14 text-text-muted">
       {text}
     </p>
   );

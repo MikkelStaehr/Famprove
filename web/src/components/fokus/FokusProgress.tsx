@@ -3,7 +3,8 @@ import { type SetRef, setKey, type SetState } from "@/lib/set-taps";
 /**
  * Progress barcode (DESIGN.md Part B signature 2, fokus-instrument.md §1): one tick per set in
  * sheet order, bottom-aligned on a hairline. Done 2×16px ink, skipped 2×6px muted, open 1×6px
- * muted, the current set 2×24px --accent (none when finished). Shape carries state; aria-hidden:
+ * muted, the current set 2×24px ink (taller than done; none when finished). The primary button
+ * and the rest scale's tick are the only red (round 2). Shape carries state; aria-hidden:
  * the count text carries it.
  */
 export function FokusProgress({
@@ -23,7 +24,7 @@ export function FokusProgress({
         const state = stateOf(ref);
         const tick =
           key === now
-            ? "h-6 w-0.5 bg-accent"
+            ? "h-6 w-0.5 bg-text"
             : state === "done"
               ? "h-4 w-0.5 bg-text"
               : state === "skipped"

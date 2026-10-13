@@ -29,7 +29,6 @@ import {
   beginUndone,
   isMainLift,
   mainLiftKeys,
-  WARMUP_NOT_STARTED,
 } from "../src/lib/fokus-view.ts";
 import { applyTap, type LoggedSet, progress, setKey, type SetRef } from "../src/lib/set-taps.ts";
 
@@ -458,5 +457,4 @@ test("polish: Fortryd of Begynd goes to Træning with the query it reads", () =>
   assert.equal(beginUndone(""), false);
   assert.equal(beginUndone("?fortrudt=other"), false);
   assert.equal(BEGIN_UNDONE_TEXT, "Fortrudt: træningen er ikke begyndt.");
-  assert.equal(WARMUP_NOT_STARTED, "Opvarmningen er ikke startet.");
 });

@@ -10,17 +10,17 @@ export function NoSessionNote({ sentence, devSwitches }: { readonly sentence: st
   return (
     <div className="flex flex-col">
       <h1 className="sr-only">Fokus</h1>
-      <section aria-labelledby="fokus-none" className="mt-2 flex flex-col gap-2">
+      {devSwitches && <p className="text-14 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
+      <section aria-labelledby="fokus-none" className="mt-2 flex flex-col gap-3">
         <h2 id="fokus-none" className="font-grotesk text-20 font-normal">
           Ingen styrkesession at træne nu.
         </h2>
         <Hairline />
         <p className="text-16">{sentence}</p>
-        <Link href="/" className={`mt-4 ${PRIMARY_FILL}`}>
+        <Link href="/" className={`mt-7 ${PRIMARY_FILL}`}>
           Til Træning
         </Link>
       </section>
-      {devSwitches && <p className="caption mt-4 normal-case tracking-normal">Testvisning: sæt gemmes ikke.</p>}
     </div>
   );
 }

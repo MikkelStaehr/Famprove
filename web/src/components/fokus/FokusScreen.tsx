@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 
 import { settle, useSetLog } from "@/components/useSetLog";
 import { HomeLink } from "./HomeLink";
@@ -30,6 +30,7 @@ import {
   unsavedText,
   warmupSentence,
   isMainLift,
+  rampState,
 } from "@/lib/fokus-view";
 import { adjustmentLine } from "@/lib/training-view";
 import {
@@ -46,7 +47,7 @@ import {
 } from "@/lib/set-taps";
 
 import { FokusProgress } from "./FokusProgress";
-import { CheckIcon, FokusWarning as WarningLine, Hairline, INK_LINK, OUTLINED, PRIMARY_FILL } from "./Instrument";
+import { CheckIcon, FokusWarning as WarningLine, INK_LINK, OUTLINED, PRIMARY_FILL } from "./Instrument";
 import { FeelBlock, Footer, NextSetCard, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
 
@@ -198,7 +199,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         <HomeLink flush={flush} className={`inline-flex shrink-0 items-center ${INK_LINK}`}>
           Afslut
         </HomeLink>
-        <p className="flex flex-wrap items-baseline justify-end gap-x-1 text-right font-mono">
+        <p className="flex flex-wrap items-baseline justify-end gap-x-1 text-right">
           <span>
             <span className="text-24">{p.done}</span>
             <span className="text-14 text-text-muted"> af {p.total} sæt udført</span>
@@ -206,6 +207,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           {skipped !== null && <span className="text-14 text-text-muted">{skipped}</span>}
         </p>
       </div>
+      {(devSwitches || dev) && <p className="text-14 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
       <div className="mt-4">
         <FokusProgress
           order={session.order.filter((ref) => !isWarmup(ref))}
@@ -229,7 +231,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         )}
         {rejected && <WarningLine>Et tryk blev afvist. Genindlæs siden.</WarningLine>}
         {lastLine !== null && (
-          <p className="flex items-center justify-between gap-x-4 font-mono text-14 text-text-muted">
+          <p className="flex items-center justify-between gap-x-4 text-14 text-text-muted">
             <span className="min-w-0">
               <KeepClock text={lastLine} />
             </span>
@@ -266,6 +268,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           onNext={onNext}
           onTap={onFeelOrReps}
           onAnnounce={setAnnouncement}
+          footer={<Footer order={session.order} log={log} />}
         />
       )}
       {view.kind === "warmup" && (
@@ -281,6 +284,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           primary={primary}
           onWarmupEnd={onWarmupEnd}
           onTap={onFeelOrReps}
+          footer={<Footer order={session.order} log={log} />}
         />
       )}
       {view.kind === "finished" && (
@@ -294,9 +298,6 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           onTap={onFeelOrReps}
         />
       )}
-      {view.kind !== "set" && view.kind !== "finished" && <Footer order={session.order} log={log} />}
-
-      {(devSwitches || dev) && <p className="caption mt-4 normal-case tracking-normal">Testvisning: sæt gemmes ikke.</p>}
     </div>
   );
 }
@@ -325,87 +326,89 @@ function SetView({
   const word = e.repsText === null ? null : repsWord(e.repsText);
   return (
     <div className={`flex flex-col ${FADE_IN}`}>
-      <section aria-labelledby="fokus-set" className="mt-2 flex flex-col">
+      <section aria-labelledby="fokus-set" className="mt-4 flex flex-col">
         <h2 id="fokus-set" className="font-grotesk text-32 font-normal [overflow-wrap:anywhere]">
           {exerciseName(e)}
         </h2>
-        <p className="caption mt-1">{setTitle(current)}</p>
-        <Hairline className="mt-4" />
+        <p className="caption mt-3">{setTitle(current)}</p>
 
-        {(e.repsText !== null || e.prescribed !== null) && (
-          <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-2 font-mono">
-            {e.repsText !== null && (
-              <p className="flex flex-col [overflow-wrap:anywhere]">
-                <span className="caption">Reps</span>
-                <span>
-                  <span className="text-56">{e.repsText}</span>
-                  {word !== null && <span className="text-24 text-text-muted"> {word}</span>}
-                </span>
+        {/* The figures: reps and the sheet's prescription, then kg (one group, 12px inside). */}
+        <div className="mt-10 flex flex-col gap-3">
+          {(e.repsText !== null || e.prescribed !== null) && (
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
+              {e.repsText !== null && (
+                <p className="flex flex-col [overflow-wrap:anywhere]">
+                  <span className="caption">Reps</span>
+                  <span>
+                    <span className="text-56 leading-none">{e.repsText}</span>
+                    {word !== null && <span className="text-24 text-text-muted"> {word}</span>}
+                  </span>
+                </p>
+              )}
+              {e.prescribed !== null && (
+                <p className="flex flex-col">
+                  <span className="caption">Arket</span>
+                  <span className="text-32">{e.prescribed}</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-col">
+            <p className="caption">{kg.label}</p>
+            {kg.kind === "suggestion" && (
+              <p className="[overflow-wrap:anywhere]">
+                <span className="text-56 leading-none">{kg.figure}</span>
+                <span className="text-24 text-text-muted">{" "}kg</span>
               </p>
             )}
-            {e.prescribed !== null && (
-              <p className="flex flex-col">
-                <span className="caption">Arket</span>
-                <span className="text-32">{e.prescribed}</span>
+            {kg.kind === "suggestion" && adjustment !== null && (
+              <p className="mt-1 text-16 text-text-muted">
+                {adjustment.signed !== "" && <span className="font-medium text-text">{adjustment.signed}</span>}
+                {adjustment.rest}
               </p>
+            )}
+            {kg.kind === "last_week" && (
+              <>
+                <p className="[overflow-wrap:anywhere]">
+                  <span className="text-56 leading-none">{kg.figure}</span>
+                  {kg.unit !== null && <span className="text-24 text-text-muted">{" "}kg</span>}
+                </p>
+                {kg.reason !== null && <p className="text-16 text-text-muted">{kg.reason}</p>}
+              </>
+            )}
+            {kg.kind === "none" && (
+              <>
+                <p className="text-24 text-text-muted">{kg.text}</p>
+                {kg.reason !== null && <p className="text-16 text-text-muted">{kg.reason}</p>}
+              </>
             )}
           </div>
-        )}
 
-        <Hairline className="mt-4" />
-        <div className="mt-4 flex flex-col">
-          <p className="caption">{kg.label}</p>
-          {kg.kind === "suggestion" && (
-            <p className="font-mono [overflow-wrap:anywhere]">
-              <span className="text-56">{kg.figure}</span>
-              <span className="text-24 text-text-muted">{" "}kg</span>
+          {lastWeek !== null && (
+            <p className="flex flex-wrap items-baseline gap-x-2">
+              {lastWeek.kind === "kg" ? (
+                <>
+                  <span className="caption">Sidste uge</span>
+                  <span className="text-24">{lastWeek.text}</span>
+                </>
+              ) : (
+                <span className="text-16 text-text-muted">{lastWeek.text}</span>
+              )}
             </p>
-          )}
-          {kg.kind === "suggestion" && adjustment !== null && (
-            <p className="mt-1 text-16 text-text-muted">
-              {adjustment.signed !== "" && <span className="font-mono font-medium text-text">{adjustment.signed}</span>}
-              {adjustment.rest}
-            </p>
-          )}
-          {kg.kind === "last_week" && (
-            <>
-              <p className="font-mono [overflow-wrap:anywhere]">
-                <span className="text-56">{kg.figure}</span>
-                {kg.unit !== null && <span className="text-24 text-text-muted">{" "}kg</span>}
-              </p>
-              {kg.reason !== null && <p className="text-16 text-text-muted">{kg.reason}</p>}
-            </>
-          )}
-          {kg.kind === "none" && (
-            <>
-              <p className="text-24 text-text-muted">{kg.text}</p>
-              {kg.reason !== null && <p className="text-16 text-text-muted">{kg.reason}</p>}
-            </>
           )}
         </div>
 
-        {lastWeek !== null && (
-          <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
-            {lastWeek.kind === "kg" ? (
-              <>
-                <span className="caption">Sidste uge</span>
-                <span className="font-mono text-24">{lastWeek.text}</span>
-              </>
-            ) : (
-              <span className="text-16 text-text-muted">{lastWeek.text}</span>
-            )}
-          </p>
-        )}
+        {/* Secondary action above the primary: nothing sits below Udført (round 2). */}
+        <button type="button" onClick={() => onSkip(current)} className={`mt-10 min-h-12 self-center px-6 ${OUTLINED}`}>
+          Spring over
+        </button>
 
-        <button ref={primary} type="button" onClick={() => onDone(current)} className={`mt-6 ${PRIMARY_FILL}`}>
+        <button ref={primary} type="button" onClick={() => onDone(current)} className={`mt-10 ${PRIMARY_FILL}`}>
           <CheckIcon className="size-6" />
           Udført
         </button>
       </section>
-
-      <button type="button" onClick={() => onSkip(current)} className={`mt-4 min-h-12 self-center px-6 ${OUTLINED}`}>
-        Spring over
-      </button>
     </div>
   );
 }
@@ -423,6 +426,7 @@ function PauseView({
   onNext,
   onTap,
   onAnnounce,
+  footer,
 }: {
   readonly since: string;
   readonly done: SetInContext | null;
@@ -433,12 +437,14 @@ function PauseView({
   readonly onNext: (since: string, next: SetInContext | null) => void;
   readonly onTap: FeelTap;
   readonly onAnnounce: (s: string) => void;
+  readonly footer: ReactNode;
 }) {
   return (
     <div className={`flex flex-col ${FADE_IN}`}>
       {done !== null && <FeelBlock set={done} logged={logged} named={false} onTap={onTap} />}
       {done !== null && <PauseCard since={since} exercise={done.exercise} onAnnounce={onAnnounce} />}
-      {next !== null && <NextSetCard next={next} week={week} inWarmup={false} />}
+      {next !== null && <NextSetCard next={next} week={week} inWarmup={false} afterTimer />}
+      {footer}
       <PrimaryButton primary={primary} onClick={() => onNext(since, next)}>
         Til næste sæt
       </PrimaryButton>
@@ -458,6 +464,7 @@ function WarmupView({
   primary,
   onWarmupEnd,
   onTap,
+  footer,
 }: {
   readonly since: string | null; // null: no recorded start (§2.2), a static 0:00
   readonly mainLifts: readonly string[] | null;
@@ -469,16 +476,18 @@ function WarmupView({
   readonly primary: PrimaryRef;
   readonly onWarmupEnd: (warmup: SetRef) => void;
   readonly onTap: FeelTap;
+  readonly footer: ReactNode;
 }) {
   if (setOne === null) return null; // the order and the rows come from the same sets: not reached
+  const mainLift = isMainLift(setOne.exercise, mainLifts);
   return (
     <div className={`flex flex-col ${FADE_IN}`}>
       {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
-      {feel !== null && <Hairline className="mt-4" />}
-      <div>
-        <WarmupCard since={since} exercise={setOne.exercise} mainLift={isMainLift(setOne.exercise, mainLifts)} />
+      <div className={feel !== null ? "mt-10" : "mt-4"}>
+        <WarmupCard since={since} exercise={setOne.exercise} mainLift={mainLift} />
       </div>
-      <NextSetCard next={setOne} week={week} inWarmup />
+      <NextSetCard next={setOne} week={week} inWarmup afterTimer={rampState(setOne.exercise, mainLift) === "hidden"} />
+      {footer}
       <PrimaryButton primary={primary} onClick={() => onWarmupEnd(warmup)}>
         Til sæt 1
       </PrimaryButton>
@@ -507,16 +516,17 @@ function FinishedView({
   return (
     <div className={`flex flex-col ${FADE_IN}`}>
       {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
-      <section aria-labelledby={`fokus-finished-${session}`} className="mt-2 flex flex-col">
+      <section aria-labelledby={`fokus-finished-${session}`} className={`${feel !== null ? "mt-10" : "mt-4"} flex flex-col`}>
         <h2 id={`fokus-finished-${session}`} className="font-grotesk text-44 font-normal">
           {card.title}
         </h2>
-        <Hairline className="mt-4" />
-        <CountsFigure text={card.counts} />
-        {card.times !== null && <p className="caption mt-1">{card.times}</p>}
-        <p className="mt-4 text-20">Husk at logge kg i arket.</p>
+        <div className="mt-10 flex flex-col gap-3">
+          <CountsFigure text={card.counts} />
+          {card.times !== null && <p className="caption">{card.times}</p>}
+        </div>
+        <p className="mt-10 text-20">Husk at logge kg i arket.</p>
       </section>
-      <HomeLink ref={primary} flush={flush} className={`mt-6 ${PRIMARY_FILL}`}>
+      <HomeLink ref={primary} flush={flush} className={`mt-10 ${PRIMARY_FILL}`}>
         Tilbage til Træning
       </HomeLink>
     </div>
@@ -526,11 +536,11 @@ function FinishedView({
 /** finishCard's counts sentence with its first number as the mono key figure (copy unchanged). */
 function CountsFigure({ text }: { readonly text: string }) {
   const m = /^(\D*?)(\d+)(.*)$/.exec(text);
-  if (m === null) return <p className="mt-4 text-16 text-text-muted">{text}</p>;
+  if (m === null) return <p className="text-16 text-text-muted">{text}</p>;
   return (
-    <p className="mt-4 text-16 text-text-muted">
+    <p className="text-16 text-text-muted">
       {m[1]}
-      <span className="font-mono text-56 text-text">{m[2]}</span>
+      <span className="text-56 text-text">{m[2]}</span>
       {m[3]}
     </p>
   );

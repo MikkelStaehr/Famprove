@@ -2,13 +2,19 @@ import type { ReactNode } from "react";
 
 /** Instrument parts shared by the Fokus views (DESIGN.md Part B, design/specs/fokus-instrument.md). */
 
-/** The view's one filled accent (Part B single-accent table): mono 500 24px label on --accent. */
+/**
+ * The view's one primary action (Part B single-accent, round 2): no fill, a 1px --accent rule
+ * above, the label in Inter 500 24px --accent. With the rest scale's "now" tick, the only red.
+ */
+// Pinned to the bottom of the screen while the view is taller than it (Revision 2: air first, and
+// the one action stays reachable at 390 x 844 without scrolling); in place when the view is short.
+// The page colour behind it hides content scrolling under the red rule.
 export const PRIMARY_FILL =
-  "flex min-h-16 w-full items-center justify-center gap-3 bg-accent px-4 font-mono text-24 font-medium tracking-[0.08em] text-on-accent uppercase active:brightness-90";
-/** An outlined control ([A5]): 1px --text-muted, mono 500. */
-export const OUTLINED = "border border-text-muted font-mono text-16 font-medium text-text";
-/** An ink text action (Afslut, Fortryd, Hele noten): mono 500, underlined 1px at 4px. */
-export const INK_LINK = "min-h-11 font-mono text-16 font-medium text-text underline decoration-1 underline-offset-4";
+  "sticky bottom-0 z-10 flex min-h-16 w-full items-center justify-center gap-3 border-t border-accent bg-bg px-4 pb-[env(safe-area-inset-bottom)] font-grotesk text-24 font-medium text-accent active:opacity-70";
+/** An outlined control ([A5]): 1px --text-muted, Inter 500. */
+export const OUTLINED = "border border-text-muted font-grotesk text-16 font-medium text-text";
+/** An ink text action (Afslut, Fortryd, Hele noten): Inter 500, underlined 1px at 4px. */
+export const INK_LINK = "min-h-11 font-grotesk text-16 font-medium text-text underline decoration-1 underline-offset-4";
 
 /** A 1px divider in --border (never an outline, [A5]). */
 export function Hairline({ className = "" }: { readonly className?: string }) {

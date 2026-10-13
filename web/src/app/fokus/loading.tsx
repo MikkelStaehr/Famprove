@@ -2,8 +2,8 @@ import Link from "next/link";
 
 /**
  * Fokus's skeleton (§5, fokus-instrument.md §6): the real Afslut link, then hairlines and 1px
- * --text-muted placeholder rules where the count, the barcode, the name, the figures, Udført and
- * Spring over will be. No grey blocks, no shimmer.
+ * --text-muted placeholder rules where the count, the barcode, the name, the figures, Spring over
+ * and Udført (last) will be. No grey blocks, no shimmer.
  */
 export default function Loading() {
   const rule = "block h-px bg-text-muted";
@@ -16,7 +16,7 @@ export default function Loading() {
       <div className="flex items-center justify-between gap-3">
         <Link
           href="/"
-          className="inline-flex min-h-11 shrink-0 items-center font-mono text-16 font-medium text-text underline decoration-1 underline-offset-4"
+          className="inline-flex min-h-11 shrink-0 items-center font-grotesk text-16 font-medium text-text underline decoration-1 underline-offset-4"
         >
           Afslut
         </Link>
@@ -30,8 +30,8 @@ export default function Loading() {
         <span className="mt-4 flex h-14 items-end"><span className={`${rule} w-1/2`} /></span>
         <span className="mt-4 block h-px bg-border" />
         <span className="mt-4 flex h-14 items-end"><span className={`${rule} w-2/5`} /></span>
-        <span className="mt-6 block min-h-16 border border-text-muted" />
-        <span className="mt-4 block min-h-12 w-36 self-center border border-text-muted" />
+        <span className="mt-10 block min-h-12 w-36 self-center border border-text-muted" />
+        <span className="mt-10 block min-h-16 border-t border-text-muted" />
       </div>
     </div>
   );
