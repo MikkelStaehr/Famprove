@@ -20,6 +20,7 @@ import {
   seams,
   weekBars,
 } from "../src/lib/analyse-view.ts";
+import { highestAt, nearestIndex, restingReadout, restingWeekIndex } from "../src/lib/chart-readout.ts";
 import type { CyclingWeekRow, RideMetricsRow } from "../src/lib/db/rows.ts";
 import { parseRideMetricsRow } from "../src/lib/db/rows.ts";
 
@@ -128,6 +129,19 @@ test("week rows: zero weeks are ticks, the current week is marked, tooltip copy"
   assert.deepEqual(bars[1].tip, ["Uge 40 · 28. sep.–4. okt. · indtil videre", "Ingen ture"]);
 });
 
+test("week strips at rest: the latest week with rides, the current one once it has a ride", () => {
+  const empty = weekBars([week("2026-09-28", 2), week("2026-10-05", 1), week("2026-10-12", 0)], "2026-10-13", 0);
+  const i = restingWeekIndex(empty, (w) => !w.zero);
+  assert.equal(i, 1);
+  assert.equal(restingReadout(empty[i]?.readout ?? null, "x").head, "Seneste · Uge 41 · 5.–11. okt.");
+  const ridden = weekBars([week("2026-10-05", 1), week("2026-10-12", 1)], "2026-10-13", 0);
+  assert.equal(restingReadout(ridden[restingWeekIndex(ridden, (w) => !w.zero)]?.readout ?? null, "x").head, "Seneste · Uge 42 · 12.–18. okt. · indtil videre");
+  const none = weekBars([week("2026-10-05", 0), week("2026-10-12", 0)], "2026-10-13", 0);
+  assert.equal(restingWeekIndex(none, (w) => !w.zero), 1); // no ride at all: the current week ("Ingen ture")
+  assert.equal(restingWeekIndex(empty), 2); // without a data rule (Styrke): the current week
+  assert.equal(restingWeekIndex([]), -1);
+});
+
 test("seams: only runs of 4+ zero weeks", () => {
   const ws = [
     week("2025-01-06", 0), week("2025-01-13", 0), week("2025-01-20", 0),
@@ -194,6 +208,21 @@ test("two rides on one day keep two marks, and the tooltip lists both", () => {
   const excluded = rows.find((r) => r.x === 104);
   assert.ok(excluded !== undefined && excluded.excl === 1 && excluded.dots === null && excluded.s0 === undefined);
   assert.deepEqual(chartRows({ ...chart, marks: chart.marks.slice(0, 1) }, "eftp")[0]?.s0, 1.2);
+});
+
+test("two rides on one day: a tap rings and reads the same (higher) ride, ←/→ visit both", () => {
+  const mark = (y: number, head: string) =>
+    ({ x: 100, y, trend: null, seg: 0, latest: false, excluded: false, tip: [head], readout: { head, cells: [], facts: [] } });
+  const chart = { marks: [mark(180, "lav"), mark(195, "høj")], segments: 1, domain: [150, 200] as const, ticks: [], sr: "" };
+  const rows = chartRows(chart, "eftp");
+  const xs = rows.map((r) => r.x);
+  const ys = rows.map((r) => (r.marks[0]?.excluded === false ? r.marks[0].y : null)); // as MarkChartInner
+  const tapped = highestAt(xs, ys, nearestIndex(xs, 100));
+  const picked = rows[tapped]?.marks[0];
+  assert.equal(picked?.readout.head, "høj"); // the readout row
+  assert.equal(picked?.y, 195); // the ring's y comes from the same mark
+  const stepped = [tapped - 1, tapped + 1].filter((i) => i >= 0 && i < rows.length).map((i) => rows[i]?.marks[0]?.readout.head);
+  assert.deepEqual(stepped, ["lav"]); // one arrow step reaches the other ride of that day
 });
 
 test("EF line breaks: a gap or a hidden trend starts a new segment; dots always stay", () => {

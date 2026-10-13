@@ -2,7 +2,7 @@
 
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { capFacts, type Readout, readoutText, tipLeft } from "@/lib/chart-readout";
+import { type Readout, readoutText, tipLeft } from "@/lib/chart-readout";
 
 /**
  * DESIGN.md "Charts: interaction": one selection per chart card. Touch and pen (pointerType !==
@@ -109,17 +109,11 @@ function Triangle() {
   );
 }
 
-/** Line 1, the cells (swatch, muted label, value) and the facts (Styrke's lift lines in --text). */
-export function ReadoutLines({
-  readout,
-  swatch,
-  slots,
-}: {
-  readonly readout: Readout;
-  readonly swatch?: (key: string) => ReactNode;
-  readonly slots?: number; // the row's fact lines; the tooltip shows every fact
-}) {
-  const facts = slots === undefined ? readout.facts : capFacts(readout.facts, slots);
+/**
+ * Line 1, the cells (swatch, muted label, value) and every fact as its own line, wrapping allowed
+ * (Styrke's lift lines in --text). Never cut: a range ("Spænd: …") must be readable on touch too.
+ */
+export function ReadoutLines({ readout, swatch }: { readonly readout: Readout; readonly swatch?: (key: string) => ReactNode }) {
   return (
     <>
       <p className={`text-14 ${readout.muted === true ? "text-text-muted" : "font-semibold text-text"}`}>{readout.head}</p>
@@ -137,12 +131,8 @@ export function ReadoutLines({
           ))}
         </p>
       )}
-      {facts.map((f, i) => (
-        <p
-          key={i}
-          // the joined overflow line (prognose basis) is cut with an ellipsis so the row keeps its lines
-          className={`text-14 tabular-nums ${readout.factTone === "text" ? "text-text" : "text-text-muted"}${slots !== undefined && readout.facts.length > slots && i === facts.length - 1 ? " truncate" : ""}`}
-        >
+      {readout.facts.map((f, i) => (
+        <p key={i} className={`text-14 tabular-nums ${readout.factTone === "text" ? "text-text" : "text-text-muted"}`}>
           {f}
         </p>
       ))}
@@ -151,10 +141,11 @@ export function ReadoutLines({
 }
 
 /**
- * The readout row: under the x labels, fixed height, aria-live (throttled to 150 ms). Facts beyond
- * the chart's line count join into its last line. Every readout the chart can show is stacked
- * invisibly in the same grid cell, so the row is as tall as the tallest one at this width (cells
- * that wrap at 390px, a long Styrke line) and two taps never change its height; 200 % text grows it.
+ * The readout row: under the x labels, fixed height, aria-live (throttled to 150 ms). Every fact
+ * gets its own line and may wrap. Every readout the chart can show is stacked invisibly in the same
+ * grid cell, so the row is as tall as the tallest one at this width (a prognose day's basis and
+ * range, cells that wrap at 390px, a long Styrke line) and two taps never change its height; 200 %
+ * text grows it. `lines` only sets the min-height before the stack is laid out.
  */
 export function ChartReadout({
   readout,
@@ -170,18 +161,17 @@ export function ChartReadout({
   readonly swatch?: (key: string) => ReactNode;
 }) {
   const live = useThrottled(readoutText(readout));
-  const slots = lines - 1 - (cells ? 1 : 0);
   const key = all.map(readoutText).join("\n");
   // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the readouts' text, not the array identity
   const sizers = useMemo(() => uniqueByText(all), [key]);
   return (
     <div className="grid grid-cols-[minmax(0,1fr)]" style={{ minHeight: readoutMinHeight(lines, cells) }}>
       <div aria-hidden="true" className="col-start-1 row-start-1 flex flex-col">
-        <ReadoutLines readout={readout} swatch={swatch} slots={slots} />
+        <ReadoutLines readout={readout} swatch={swatch} />
       </div>
       {sizers.map((r, i) => (
         <div key={i} aria-hidden="true" className="invisible col-start-1 row-start-1 flex flex-col">
-          <ReadoutLines readout={r} swatch={swatch} slots={slots} />
+          <ReadoutLines readout={r} swatch={swatch} />
         </div>
       ))}
       <p className="sr-only" aria-live="polite">

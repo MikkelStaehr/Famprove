@@ -4,7 +4,7 @@ import { ComposedChart, CartesianGrid, Line, ReferenceDot, XAxis, YAxis } from "
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
 import { type AxisTick, type ChartRow, chartRows, formatEf, type LineChartView, type Seam, seamReadout, type WeekBar } from "@/lib/analyse-view";
-import { gapSeam, highestAt, nearestIndex, type Readout, restingReadout, xAtPointer } from "@/lib/chart-readout";
+import { gapSeam, highestAt, nearestIndex, type Readout, restingReadout, restingWeekIndex, xAtPointer } from "@/lib/chart-readout";
 import { formatLoad } from "@/lib/format";
 import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
@@ -251,7 +251,8 @@ function niceMax(v: number): number {
 
 /**
  * One focusable group per card (analyse.md §5d): tap or pointer picks a week, ←/→ step (starting
- * at the current one), Esc closes the tooltip. Draws the x labels once, under the last child.
+ * at the resting week: the current one, or Cykel's latest week with rides), Esc closes the
+ * tooltip. Draws the x labels once, under the last child.
  */
 function WeekGroup<W extends PickWeek>({
   axis,
@@ -262,6 +263,7 @@ function WeekGroup<W extends PickWeek>({
   cells,
   overlay,
   padTop = 0,
+  hasData,
   children,
 }: {
   readonly axis: XDomain;
@@ -272,10 +274,10 @@ function WeekGroup<W extends PickWeek>({
   readonly cells: boolean;
   readonly overlay: React.ReactNode;
   readonly padTop?: number;
+  readonly hasData?: (w: W) => boolean; // rest on the latest week with data (Cykel: a week with rides)
   readonly children: (active: W | null) => React.ReactNode;
 }) {
-  const currentIndex = weeks.findIndex((w) => w.current);
-  const latestIndex = currentIndex >= 0 ? currentIndex : weeks.length - 1;
+  const latestIndex = restingWeekIndex(weeks, hasData);
   const { pick, plotProps } = useChartPick({
     count: weeks.length,
     startIndex: latestIndex,
@@ -416,6 +418,7 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
       lines={3}
       cells
       overlay={<SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />}
+      hasData={(w) => !w.zero}
     >
       {(active) => (
         <>

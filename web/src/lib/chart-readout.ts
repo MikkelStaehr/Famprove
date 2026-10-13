@@ -85,13 +85,21 @@ export function readoutText(r: Readout): string {
 }
 
 /**
- * The fact lines that fit the row's fixed line count: more facts than `slots` keep the first
- * slots − 1 and join the rest into the last line with " · " (the aria-live text keeps them all).
+ * The week a weekly chart reads at rest (and ←/→ start from): the current week once it has data,
+ * else the latest week before it that has; the current (or last) week when none has. -1 when empty.
  */
-export function capFacts(facts: readonly string[], slots: number): readonly string[] {
-  if (facts.length <= slots) return facts;
-  if (slots <= 0) return [];
-  return [...facts.slice(0, slots - 1), facts.slice(slots - 1).join(" · ")];
+export function restingWeekIndex<W extends { readonly current: boolean }>(
+  weeks: readonly W[],
+  hasData?: (w: W) => boolean,
+): number {
+  const current = weeks.findIndex((w) => w.current);
+  const end = current >= 0 ? current : weeks.length - 1;
+  if (hasData === undefined) return end;
+  for (let i = end; i >= 0; i -= 1) {
+    const w = weeks[i];
+    if (w !== undefined && hasData(w)) return i;
+  }
+  return end;
 }
 
 /** Two marks on one x (two rides on one day): the one with the highest value; a null value never wins. */

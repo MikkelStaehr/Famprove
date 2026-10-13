@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { capFacts, gapSeam, highestAt, nearestIndex, readoutText, restingReadout, tipLeft, viCell, xAtPointer } from "../src/lib/chart-readout.ts";
+import * as readoutLib from "../src/lib/chart-readout.ts";
+import { gapSeam, highestAt, nearestIndex, readoutText, restingReadout, tipLeft, viCell, xAtPointer } from "../src/lib/chart-readout.ts";
 
 test("nearestIndex snaps to the nearest x, ties left, -1 when empty", () => {
   assert.equal(nearestIndex([], 5), -1);
@@ -56,13 +58,24 @@ test("readoutText: a short month keeps its own stop, 'maj' gets one", () => {
   assert.equal(readoutText({ head: "fre. 8. maj", cells: [], facts: ["1:45 t"] }), "fre. 8. maj. 1:45 t");
 });
 
-test("capFacts keeps the row's line count: the rest joins the last line", () => {
-  assert.deepEqual(capFacts(["a"], 1), ["a"]);
-  assert.deepEqual(capFacts(["Cykel ≈ 40 TSS", "Styrke ≈ 60 TSS", "Spænd: fitness 44 til 49"], 1), [
-    "Cykel ≈ 40 TSS · Styrke ≈ 60 TSS · Spænd: fitness 44 til 49",
-  ]);
-  assert.deepEqual(capFacts(["a", "b", "c", "d"], 3), ["a", "b", "c · d"]);
-  assert.deepEqual(capFacts(["a"], 0), []);
+test("a prognose day keeps every fact, in order, never cut (basis lines, then Spænd)", () => {
+  const facts = [
+    "Cykel ≈ 40 TSS · typisk uge",
+    "Styrke ≈ 57 TSS (51 til 64) · session 2 · gennemsnit af de sidste 4 uger",
+    "Spænd: fitness 44 til 49, træthed 50 til 58",
+  ];
+  const text = readoutText({ head: "tors. 22. okt. · prognose", cells: [], facts });
+  let at = 0;
+  for (const f of facts) {
+    const i = text.indexOf(f, at);
+    assert.ok(i >= at, f);
+    at = i + f.length;
+  }
+  // No line cap: the helper that joined overflow facts is gone, and the row never truncates.
+  assert.equal("capFacts" in readoutLib, false);
+  const component = readFileSync(new URL("../src/components/ChartReadout.tsx", import.meta.url), "utf8");
+  assert.ok(!component.includes("truncate"));
+  assert.ok(component.includes("readout.facts.map"));
 });
 
 test("highestAt: two rides on one day read the higher value; null never wins", () => {
