@@ -105,9 +105,9 @@ test("exclusion copy and facts; an unknown code is never guessed", () => {
 });
 
 test("EF too few: 0, 1 and n, newest first with the year outside the current one", () => {
-  assert.match(efTooFew([], 2026).text, /^Der er ingen rolige ture med både watt og puls siden 1\. jan\. 2025\. Trenden vises, når der er mindst 5\.$/);
+  assert.match(efTooFew([], 2026).text, /^Der er ingen rolige ture med både watt og puls siden 1\. jan\. 2025\. Grafen vises fra 5 rolige ture\.$/);
   const one = efTooFew([ride("2025-06-03", { efOk: true, ef: 1.24 })], 2026);
-  assert.equal(one.text, "Der er kun 1 rolig tur med både watt og puls siden 1. jan. 2025. Trenden vises fra 5.");
+  assert.equal(one.text, "Der er kun 1 rolig tur med både watt og puls siden 1. jan. 2025. Grafen vises fra 5 rolige ture.");
   assert.deepEqual(one.list, ["tirs. 3. jun. 2025 · EF 1,24"]);
   const three = efTooFew(
     ["2026-09-01", "2026-09-08", "2026-09-15"].map((d) => ride(d, { efOk: true, ef: 1.2 })),

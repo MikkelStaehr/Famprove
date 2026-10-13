@@ -21,7 +21,8 @@ import {
 } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { loadAppNotices, loadDashboardData, loadWeekDetail } from "@/lib/db/queries";
-import { LOAD_GRID, LOAD_PLACE, noticeText } from "@/lib/load-grid";
+import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
+import { noticeText } from "@/lib/notices";
 import {
   formatDate,
   formatDay,
@@ -200,7 +201,7 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
           <figcaption className="sr-only">{chartSummary(view)}</figcaption>
         </figure>
         {view.projection === "ready" && view.typicalRides !== null && (
-          <p className="mt-2 max-w-[60ch] text-14 text-text-muted">{typicalRidesNote(view.typicalRides)}</p>
+          <p className="max-w-[60ch] text-14 text-text-muted">{typicalRidesNote(view.typicalRides)}</p>
         )}
         {/* User, 2026-10-02: STRENGTH_K = 0.035 is an anchor (~60 TSS per heavy session), not a
             calibration. In the chart card's foot since load.md §11b (phone fold with the bottom bar). */}

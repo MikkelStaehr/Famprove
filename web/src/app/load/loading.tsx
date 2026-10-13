@@ -38,6 +38,11 @@ export default function Loading() {
               <Bar className="w-1/3 text-16" />
             </div>
           </div>
+          {/* The strength-estimate and coarse-zones note in the card's foot (load.md §11b), two lines at 390px. */}
+          <div aria-hidden="true" className="flex flex-col">
+            <Bar className="w-full text-14" />
+            <Bar className="w-2/3 text-14" />
+          </div>
         </Card>
 
         <Card id="week" variant="calm" title="Denne uge" className={LOAD_PLACE.week}>

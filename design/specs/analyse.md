@@ -72,9 +72,9 @@ The mapping lives in one view-model constant with a `node --test` test. An unkno
 - **Too few: fewer than 5 `ef_ok` rows.** No axes. In place of the plot, a block at its natural height:
   - heading `For få rolige ture til en trend` (`text-16` 600)
   - text (`text-14` muted, 60ch):
-    - 0: `Der er ingen rolige ture med både watt og puls siden 1. jan. 2025. Trenden vises, når der er mindst 5.`
-    - 1: `Der er kun 1 rolig tur med både watt og puls siden 1. jan. 2025. Trenden vises fra 5.`
-    - n: `Der er kun 3 rolige ture med både watt og puls siden 1. jan. 2025. Trenden vises fra 5.`
+    - 0: `Der er ingen rolige ture med både watt og puls siden 1. jan. 2025. Grafen vises fra 5 rolige ture.`
+    - 1: `Der er kun 1 rolig tur med både watt og puls siden 1. jan. 2025. Grafen vises fra 5 rolige ture.`
+    - n: `Der er kun 3 rolige ture med både watt og puls siden 1. jan. 2025. Grafen vises fra 5 rolige ture.`
   - With 1–4, a list follows (`text-16`, tabular, newest first): `tirs. 3. jun. 2025 · EF 1,24`. The data is shown, not hidden.
 
 ### 5d. Timer og belastning pr. uge

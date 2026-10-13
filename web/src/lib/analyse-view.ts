@@ -312,8 +312,8 @@ export function efTooFew(points: readonly RideMetricsRow[], currentYear: number)
   const n = points.length;
   const text =
     n === 0
-      ? `Der er ingen rolige ture med både watt og puls siden ${SINCE}. Trenden vises, når der er mindst 5.`
-      : `Der er kun ${n === 1 ? "1 rolig tur" : `${n} rolige ture`} med både watt og puls siden ${SINCE}. Trenden vises fra 5.`;
+      ? `Der er ingen rolige ture med både watt og puls siden ${SINCE}. Grafen vises fra ${EF_MIN_POINTS} rolige ture.`
+      : `Der er kun ${n === 1 ? "1 rolig tur" : `${n} rolige ture`} med både watt og puls siden ${SINCE}. Grafen vises fra ${EF_MIN_POINTS} rolige ture.`;
   const list = [...points]
     .reverse()
     .map((r) => `${dayText(r.date, currentYear)} · EF ${r.ef === null ? "–" : formatEf(r.ef)}`);

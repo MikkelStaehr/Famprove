@@ -1,6 +1,7 @@
 import { AnalyseTabs } from "@/components/AnalyseTabs";
 import { Card } from "@/components/Card";
 import { SkeletonBar as Bar } from "@/components/Skeleton";
+import { RAIL_GRID } from "@/lib/rail-grid";
 
 const BLOCK = "w-full rounded-control bg-track motion-safe:animate-pulse";
 
@@ -14,8 +15,8 @@ export default function Loading() {
         <div aria-hidden="true" className="mt-2">
           <Bar className="w-1/3 text-14" />
         </div>
-        <div className="flex flex-col gap-4 lg:mt-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
-          <div className="lg:sticky lg:top-6 lg:col-span-4">
+        <div className={RAIL_GRID.grid}>
+          <div className={RAIL_GRID.rail}>
             <div className="mt-3 lg:mt-0">
               <p className="text-14 font-bold tracking-[0.04em] uppercase">Estimeret FTP</p>
               <div aria-hidden="true">
@@ -25,7 +26,7 @@ export default function Loading() {
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6">
+          <div className={RAIL_GRID.main}>
             <Card id="eftp" variant="calm" level={3} title="eFTP pr. tur">
               <div aria-hidden="true" className={`h-(--chart-height) ${BLOCK}`} />
             </Card>

@@ -13,7 +13,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: "light dark",
-  // Safe areas are handled in CSS (env(safe-area-inset-*)): the bottom bar and the top padding.
+  // Safe areas are handled in CSS (env(safe-area-inset-*)): the bottom bar, the top padding and,
+  // below lg, the side gutters of the bar and of main (landscape notch).
   viewportFit: "cover",
 };
 
@@ -43,7 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="da" className={`${barlow.variable} ${barlowCondensed.variable}`}>
       <body className="bg-bg font-sans text-16 text-text antialiased">
         <ScreenNav />
-        <main className="mx-auto flex w-full max-w-content flex-col gap-4 px-3 pt-[max(12px,env(safe-area-inset-top))] pb-[calc(var(--bottom-bar)+3rem)] lg:max-w-wide lg:gap-6 lg:px-8 lg:pb-12">{children}</main>
+        <main className="mx-auto flex w-full max-w-content flex-col gap-4 pt-[max(12px,env(safe-area-inset-top))] pr-[max(0.75rem,env(safe-area-inset-right))] pb-[calc(var(--bottom-bar)+3rem)] pl-[max(0.75rem,env(safe-area-inset-left))] lg:max-w-wide lg:gap-6 lg:px-8 lg:pb-12">{children}</main>
       </body>
     </html>
   );

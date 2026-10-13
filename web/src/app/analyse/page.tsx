@@ -18,6 +18,7 @@ import {
 } from "@/lib/data-error";
 import { loadCyclingAnalysis } from "@/lib/db/queries";
 import { formatUpdatedAt } from "@/lib/format";
+import { RAIL_GRID } from "@/lib/rail-grid";
 import { resolveToday } from "@/lib/training-view";
 
 export const metadata: Metadata = { title: "Analyse" };
@@ -65,11 +66,11 @@ export default async function Page() {
         {state.kind === "ready" && (
           // §11: header row above, full width; from lg a 12-column grid, rail = hero (sticky), main = the cards,
           // one width so the seams line up. DOM order stays the phone order.
-          <div className="flex flex-col gap-4 lg:mt-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
-            <div className="lg:sticky lg:top-6 lg:col-span-4">
+          <div className={RAIL_GRID.grid}>
+            <div className={RAIL_GRID.rail}>
               <Hero view={state} />
             </div>
-            <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6">
+            <div className={RAIL_GRID.main}>
               <Cards view={state} />
             </div>
           </div>

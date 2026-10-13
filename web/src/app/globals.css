@@ -27,8 +27,9 @@
   --chart-mark: #807e78;
   --prognose-band: rgb(18 18 18 / 0.16); /* CTL band after the block (load.md §10a) */
   --chart-height: 224px; /* 240px from 640px, 320px from lg, below (load.md §9a fold fix, §11a) */
-  /* Phone bottom bar (ScreenNav): 8 + 44 + 8 + 8px (pill + padding) + the home-indicator inset. */
-  --bottom-bar: calc(4.25rem + env(safe-area-inset-bottom));
+  /* Phone bottom bar (ScreenNav): 1px hairline + 8px + the 52px pill (44 + 2 × 4) + max(8px, the
+     home-indicator inset). */
+  --bottom-bar: calc(3.8125rem + max(0.5rem, env(safe-area-inset-bottom)));
 
   --zone-risk: #f0b9aa;
   --zone-optimal: #c3e0b0;

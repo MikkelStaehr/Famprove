@@ -31,7 +31,7 @@ export function ScreenNav() {
     // takes rounded-card. The tabs need 3 × 6.5rem + gaps + padding = 20.5rem of track; the header
     // is the bar's 2 × 0.75rem gutters wider, so the query is 22rem.
     <header className="@container/nav mx-auto w-full max-w-content lg:max-w-wide lg:px-8 lg:pt-4 lg:pb-3">
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-bg px-3 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] @max-[22rem]/nav:static @max-[22rem]/nav:border-0 lg:static lg:border-0 lg:p-0">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-bg pt-2 pr-[max(0.75rem,env(safe-area-inset-right))] pl-[max(0.75rem,env(safe-area-inset-left))] pb-[max(8px,env(safe-area-inset-bottom))] @max-[22rem]/nav:static @max-[22rem]/nav:border-0 lg:static lg:border-0 lg:p-0">
         <nav aria-label="Hovedmenu">
           <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6.5rem),1fr))] gap-1 rounded-pill bg-track p-1 @max-[22rem]/nav:rounded-card lg:inline-grid lg:grid-cols-3">
             {TABS.map((tab) => {
