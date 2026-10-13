@@ -86,6 +86,8 @@ Nav ends ≈ 56 · title ≈ 72–116 · updated line ≈ 120–140 · form row 
 - If a build misses the button guarantee, cut in this order: title→date gap, form row gap-y; never shrink the button or the prescriptions.
 
 ## 4. Fokus (`/fokus`) at 390px
+> **2026-10-13: the pause screen is rebuilt in [`fokus-pause.md`](fokus-pause.md)** (warm-up, felt-RPE and reps, recommended rest, next-set card, footer). It replaces §4.3 and amends §4.1, §4.2's suggestion line, §4.4, §4.7, §6 and §7. Where they differ, `fokus-pause.md` wins.
+
 Full-screen: no ScreenNav, no page title text, no zone flag. Page gutter 12px. `h1` is `sr-only` "Fokus". Readable at 60–80 cm: **reps and kg are `text-56`, the largest things on the screen** (≈ 6.4mm cap height on a 390pt iPhone, ≈ 30 arc-minutes at 70 cm; text-32 is ≈ 18').
 
 ### 4.1 Top bar (every view state; fixed layout so nothing jumps)
