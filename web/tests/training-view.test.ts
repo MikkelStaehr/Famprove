@@ -371,9 +371,9 @@ test("contract: the planned_sets rows Python writes parse; a capped row keeps it
   const parsed = Object.fromEntries(Object.entries(rows).map(([k, v]) => [k, parsePlannedSetRow(v)]));
   assert.deepEqual(
     [parsed.suggestion?.suggestedKg, parsed.suggestion?.uncappedKg, parsed.capped?.suggestedKg, parsed.capped?.uncappedKg],
-    [82.5, null, 75, 72.5],
+    [82.5, null, 82.5, 85],
   );
   assert.equal(parsed.none?.basis, "not_rpe");
   assert.throws(() => parsePlannedSetRow({ ...(rows.suggestion as object), uncapped_kg: 82.5 }), RowError); // same as suggested
-  assert.throws(() => parsePlannedSetRow({ ...(rows.none as object), uncapped_kg: 72.5 }), RowError); // no suggestion
+  assert.throws(() => parsePlannedSetRow({ ...(rows.none as object), uncapped_kg: 85 }), RowError); // no suggestion
 });

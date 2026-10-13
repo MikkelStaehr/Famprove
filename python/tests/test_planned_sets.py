@@ -9,6 +9,7 @@ import pytest
 from training_load.domain.exercises import Catalog, Exercise
 from training_load.domain.planned_sets import (
     PlannedSet,
+    cap_kg,
     counts_for_rolling_e1rm,
     pct_of_e1rm,
     planned_sets,
@@ -131,8 +132,8 @@ def test_the_users_bench_of_2026_10_13(sheet: Sheet) -> None:
     assert by_row[28].e1rm_kg == pytest.approx(e1rm(85.0, 3, 7))  # 101.98, from the RPE 7 set
     assert (by_row[28].suggested_kg, by_row[28].uncapped_kg) == (82.5, None)  # was 90
     assert (by_row[29].suggested_kg, by_row[29].uncapped_kg) == (85.0, None)  # was 92.5
-    # 8 @ 6: 101.98 x 0.7145 = 72.9 -> 72.5, more than 5 kg under last week's 78.5 -> 75
-    assert (by_row[30].suggested_kg, by_row[30].uncapped_kg) == (75.0, 72.5)
+    # 8 @ 6: 101.98 x 0.7145 = 72.9 -> 72.5; the cap only limits a rise
+    assert (by_row[30].suggested_kg, by_row[30].uncapped_kg) == (72.5, None)
 
 
 def test_squat_without_a_qualifying_set_has_no_suggestion(sheet: Sheet) -> None:
@@ -144,20 +145,29 @@ def test_squat_without_a_qualifying_set_has_no_suggestion(sheet: Sheet) -> None:
 
 
 @pytest.mark.parametrize(
-    ("suggested", "last", "expected"),
+    ("suggested", "last", "up", "expected"),
     [
-        (90.0, 82.5, (85.0, 90.0)),  # up at most 2.5
-        (85.0, 82.5, (85.0, None)),  # exactly +2.5: not capped
-        (70.0, 80.0, (75.0, 70.0)),  # down at most 5
-        (72.5, 78.5, (75.0, 72.5)),  # 78.5 - 5 = 73.5, rounded inward to 75
-        (82.5, 78.5, (80.0, 82.5)),  # 78.5 + 2.5 = 81, rounded inward to 80
-        (80.0, None, (80.0, None)),  # nothing logged last week: no cap
+        (90.0, 82.5, 2.5, (85.0, 90.0)),  # upper body: up at most 2.5
+        (85.0, 82.5, 2.5, (85.0, None)),  # exactly +2.5: not capped
+        (150.0, 140.0, 5.0, (145.0, 150.0)),  # lower body: up at most 5
+        (70.0, 80.0, 2.5, (70.0, None)),  # a fall is never capped
+        (85.0, 78.5, 2.5, (80.0, 85.0)),  # 78.5 + 2.5 = 81, rounded down to 80
+        (80.0, None, 2.5, (80.0, None)),  # nothing logged last week: no cap
     ],
 )
 def test_the_weekly_cap(
-    suggested: float, last: float | None, expected: tuple[float, float | None]
+    suggested: float, last: float | None, up: float, expected: tuple[float, float | None]
 ) -> None:
-    assert weekly_cap(suggested, last) == expected
+    assert weekly_cap(suggested, last, up) == expected
+
+
+@pytest.mark.parametrize(
+    ("sheet_type", "up"),
+    [("BENCH", 2.5), ("SQUAT", 5.0), ("DEADLIFT", 5.0), ("QUADS/ADDUCTORS/GLUTES", 5.0),
+     ("HAMSTRINGS", 5.0), ("CHEST/SHOULDERS", 2.5), ("LATS/MIDDLE BACK", 2.5)],
+)  # fmt: skip
+def test_upper_body_rises_2_5_and_lower_body_5_a_week(sheet_type: str, up: float) -> None:
+    assert cap_kg(sheet_type) == up
 
 
 def test_the_cap_follows_the_row_whatever_the_rpe(sheet: Sheet) -> None:
@@ -171,8 +181,8 @@ def test_the_cap_follows_the_row_whatever_the_rpe(sheet: Sheet) -> None:
     fewer_reps = sheet.add(sheet_row=41, reps=3.0, prescribed="RPE 6")
     other_exercise = sheet.add(sheet_row=42, reps=3.0, prescribed="RPE 6")
     by_row = {p.sheet_row: p for p in sheet.plan()}
-    # 3 @ 6.5 from e1RM 180: 148 -> 147.5, capped at 120 + 2.5
-    assert (by_row[40].suggested_kg, by_row[40].uncapped_kg) == (122.5, 147.5)
+    # 3 @ 6.5 from e1RM 180: 148 -> 147.5, capped at 120 + 5 (squat is lower body)
+    assert (by_row[40].suggested_kg, by_row[40].uncapped_kg) == (125.0, 147.5)
     assert by_row[fewer_reps.sheet_row].uncapped_kg is None  # 8 reps last week, 3 now
     assert by_row[other_exercise.sheet_row].uncapped_kg is None  # tempo last week, squat now
     assert progressed.sheet_row == 40

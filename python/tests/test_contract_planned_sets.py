@@ -1,7 +1,7 @@
 """Contract: the planned_sets rows Python writes are the web parser's fixture (CLAUDE.md).
 web/tests/fixtures/planned_sets.json is the real producer's output (domain.planned_sets +
-db.planned_sets) on the bench of 2026-10-13: a suggestion (82.5), a capped one (75, uncapped
-72.5) and a set without one (a %-row). Regenerate:
+db.planned_sets) on the bench of 2026-10-13: a suggestion (82.5), a capped one (82.5, uncapped
+85: last week's 80 + 2.5) and a set without one (a %-row). Regenerate:
     REGENERATE_CONTRACT=1 uv run pytest tests/test_contract_planned_sets.py
 """
 
@@ -41,7 +41,7 @@ BASE = StrengthSet(
 
 def producer() -> dict[str, object]:
     rows = [(28, 3.0, "RPE 6", 82.5), (29, 3.0, "RPE 7", 85.0), (30, 8.0, "RPE 5 - 7", 78.5),
-            (31, 5.0, "-10%", 72.5)]  # fmt: skip
+            (31, 5.0, "-10%", 72.5), (32, 3.0, "RPE 7", 80.0)]  # fmt: skip
     sets: list[StrengthSet] = []
     statuses: dict[SetKey, KgStatus] = {}
     for row, reps, rx, kg in rows:
@@ -54,7 +54,7 @@ def producer() -> dict[str, object]:
     planned = planned_sets(sets, catalog, statuses, today=date(2026, 10, 13))
     by_row = {p.sheet_row: to_row(p, RUN_AT) for p in planned}
     out: dict[str, object] = json.loads(
-        json.dumps({"suggestion": by_row[28], "capped": by_row[30], "none": by_row[31]})
+        json.dumps({"suggestion": by_row[28], "capped": by_row[32], "none": by_row[31]})
     )
     return out
 
@@ -62,7 +62,7 @@ def producer() -> dict[str, object]:
 def test_the_capped_row_carries_its_uncapped_suggestion() -> None:
     rows = producer()
     assert isinstance(rows["capped"], dict) and isinstance(rows["suggestion"], dict)
-    assert (rows["capped"]["suggested_kg"], rows["capped"]["uncapped_kg"]) == (75.0, 72.5)
+    assert (rows["capped"]["suggested_kg"], rows["capped"]["uncapped_kg"]) == (82.5, 85.0)
     assert (rows["suggestion"]["suggested_kg"], rows["suggestion"]["uncapped_kg"]) == (82.5, None)
 
 

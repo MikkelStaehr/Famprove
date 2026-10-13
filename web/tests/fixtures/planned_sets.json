@@ -21,7 +21,7 @@
   "capped": {
     "sheet_id": "sheet",
     "block": "Program - blok 12",
-    "sheet_row": 30,
+    "sheet_row": 32,
     "week": 10,
     "set_no": 1,
     "week_start": "2026-10-12",
@@ -29,12 +29,12 @@
     "exercise_id": 3,
     "e1rm_lift": "BENCH",
     "e1rm_kg": 101.983,
-    "rpe": 6.0,
-    "reps": 8.0,
-    "pct": 0.7144898542440697,
-    "suggested_kg": 75.0,
+    "rpe": 7.0,
+    "reps": 3.0,
+    "pct": 0.833472245374229,
+    "suggested_kg": 82.5,
     "basis": "rpe_e1rm",
-    "uncapped_kg": 72.5,
+    "uncapped_kg": 85.0,
     "computed_at": "2026-10-13T08:00:00+00:00"
   },
   "none": {

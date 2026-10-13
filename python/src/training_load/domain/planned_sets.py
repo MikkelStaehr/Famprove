@@ -13,11 +13,12 @@
   /analyse keeps its own, wider rule (strength_analysis.MAX_E1RM_REPS) for the e1RM history.
 - Weekly cap (user, 2026-10-13): against last week's logged kg for the same row (the same
   sheet row of the same block the week before, same exercise and reps: what Træning shows as
-  "Sidste uge"), a suggestion rises at most CAP_UP_KG and falls at most CAP_DOWN_KG, both rounded
-  inward to ROUND_TO_KG. The prescribed RPE may differ: the programme's own +0.5 a week must not
-  bypass the cap (user, 2026-10-13). Reps must match: 3 reps are not capped by an 8-rep kg.
-  A capped set keeps its uncapped suggestion in uncapped_kg (the web shows
-  "(begrænset)"); None when the cap didn't apply or there is no such logged kg.
+  "Sidste uge"), a suggestion rises at most CAP_UPPER_KG for an upper-body exercise and
+  CAP_LOWER_KG for a lower-body one (the sheet's TYPE, LOWER_BODY_WORDS), rounded down to
+  ROUND_TO_KG; it may fall freely ("+2.5 kg (upper) / +5 kg (lower)"). The prescribed RPE may
+  differ: the programme's own +0.5 a week must not bypass the cap. Reps must match: 3 reps are
+  not capped by an 8-rep kg. A capped set keeps its uncapped suggestion in uncapped_kg (the web
+  shows "(begrænset)"); None when the cap didn't apply or there is no such logged kg.
 - pct(RPE, reps) = 1 / (1 + E1RM_FACTOR x (reps + 10 - RPE)): the relation /analyse uses to get an
   e1RM from a lifted set, so a suggestion is its exact inverse. The coach's sheet has no RPE table
   (checked 2026-10-12: Home has an RPE word scale; the only 1RM formula is Brzycki, without RPE).
@@ -53,8 +54,19 @@ from training_load.domain.strength_analysis import (
 ROLLING_E1RM_WEEKS: Final = 4
 ROLLING_MAX_REPS: Final = 5
 ROLLING_MIN_RPE: Final = 7.0
-CAP_UP_KG: Final = 2.5
-CAP_DOWN_KG: Final = 5.0
+CAP_UPPER_KG: Final = 2.5
+CAP_LOWER_KG: Final = 5.0
+LOWER_BODY_WORDS: Final = (
+    "SQUAT",
+    "DEADLIFT",
+    "QUADS",
+    "HAMSTRINGS",
+    "GLUTES",
+    "ADDUCTORS",
+    "CALVES",
+)
+"""A sheet TYPE (e.g. "QUADS/ADDUCTORS", "HAMSTRINGS") with any of these words is lower body;
+every other type (BENCH, CHEST/SHOULDERS, LATS/MIDDLE BACK, ...) is upper body."""
 ROUND_TO_KG: Final = 2.5
 
 type Basis = Literal["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift"]
@@ -128,20 +140,26 @@ def rolling_e1rm(
     return max(values, default=None)
 
 
-def _step_up(kg: float) -> float:
-    return math.ceil(kg / ROUND_TO_KG - 1e-9) * ROUND_TO_KG
-
-
 def _step_down(kg: float) -> float:
     return math.floor(kg / ROUND_TO_KG + 1e-9) * ROUND_TO_KG
 
 
-def weekly_cap(suggested: float, last_kg: float | None) -> tuple[float, float | None]:
-    """(the suggestion within CAP_UP_KG / CAP_DOWN_KG of last week's kg, the uncapped
-    suggestion when the cap changed it, else None)."""
+def is_lower_body(sheet_type: str) -> bool:
+    words = sheet_type.upper().replace("/", " ").split()
+    return any(w in LOWER_BODY_WORDS for w in words)
+
+
+def cap_kg(sheet_type: str) -> float:
+    """How much a suggestion may rise in a week: CAP_LOWER_KG or CAP_UPPER_KG."""
+    return CAP_LOWER_KG if is_lower_body(sheet_type) else CAP_UPPER_KG
+
+
+def weekly_cap(suggested: float, last_kg: float | None, up_kg: float) -> tuple[float, float | None]:
+    """(the suggestion at most ``up_kg`` above last week's kg, rounded down to the grid; the
+    uncapped suggestion when the cap lowered it, else None)."""
     if last_kg is None:
         return suggested, None
-    capped = min(max(suggested, _step_up(last_kg - CAP_DOWN_KG)), _step_down(last_kg + CAP_UP_KG))
+    capped = min(suggested, _step_down(last_kg + up_kg))
     return (capped, suggested) if capped != suggested else (suggested, None)
 
 
@@ -210,7 +228,7 @@ def planned_sets(
                 before is not None and _same_exercise(before.name, s.name) and before.reps == s.reps
             )
             anchor = before.logged_kg if same and before is not None else None
-            suggested, uncapped = weekly_cap(suggested, anchor)
+            suggested, uncapped = weekly_cap(suggested, anchor, cap_kg(s.type))
         out.append(
             PlannedSet(
                 sheet_id=s.sheet_id,
