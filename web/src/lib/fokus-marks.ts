@@ -64,14 +64,17 @@ export type RowDot = { readonly cx: number; readonly kind: "done" | "skipped" };
 export type DotRowGroup = { readonly key: string; readonly width: number; readonly dots: readonly RowDot[] };
 export type DotRow = { readonly groups: readonly DotRowGroup[]; readonly done: number; readonly skipped: number; readonly sentence: string };
 
+/** Dot row geometry (user, 2026-10-13): 8px dots with 8px gaps. */
+const DOT_PITCH = 16;
+
 type Named = Pick<FokusExercise, "name" | "row">;
 const nameOf = (exercises: readonly Named[], ref: SetRef): string =>
   exercises.find((e) => e.row === ref.row)?.name.trim().toLowerCase() ?? `#${ref.row}`;
 
 /**
  * One dot per set tapped today in this session, in sheet order (warm-ups never): done = filled,
- * skipped = ring; open sets draw nothing. Grouped per exercise run (pitch 10px, +6px between
- * groups, the gap is the layout's).
+ * skipped = ring; open sets draw nothing. Grouped per exercise run (8px dots, pitch 16px = 8px gaps;
+ * the gap between groups is the layout's).
  */
 export function dotRow(exercises: readonly Named[], order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): DotRow {
   const groups: { key: string; name: string; dots: RowDot[] }[] = [];
@@ -89,10 +92,10 @@ export function dotRow(exercises: readonly Named[], order: readonly SetRef[], lo
       g = { key: setKey(ref), name, dots: [] };
       groups.push(g);
     }
-    g.dots.push({ cx: 4 + 10 * g.dots.length, kind: state === "done" ? "done" : "skipped" });
+    g.dots.push({ cx: 4 + DOT_PITCH * g.dots.length, kind: state === "done" ? "done" : "skipped" });
   }
   return {
-    groups: groups.map((g) => ({ key: g.key, width: 10 * g.dots.length - 2, dots: g.dots })),
+    groups: groups.map((g) => ({ key: g.key, width: DOT_PITCH * g.dots.length - 8, dots: g.dots })),
     done,
     skipped,
     sentence: dotRowSentence(done, skipped),

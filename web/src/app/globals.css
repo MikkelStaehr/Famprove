@@ -251,6 +251,13 @@ html:has([data-direction="instrument"]) {
   scroll-padding-bottom: 6rem;
 }
 
+/* Fokus has no bottom bar: main fills the viewport and drops the bar's padding, so the views can
+   push their pinned primary to the bottom edge even when their content is short (the set view). */
+main:has(> [data-direction="instrument"]) {
+  min-height: 100dvh;
+  padding-bottom: 0;
+}
+
 /* Fokus grain (Revision 4, fokus-round4.md §4): 3 % static fractal noise, both themes, /fokus only.
    Fixed behind the content (z -1 inside the isolated root), never interactive. The pinned primary's
    dock repeats it over its page colour, aligned to the viewport, so its bar shows no seam. */

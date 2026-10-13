@@ -191,7 +191,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     view.kind === "set" ? view.current : view.kind === "pause" ? view.next : view.kind === "warmup" ? setOneOf(view.warmup) : null;
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-1 flex-col">
       <h1 className="sr-only">Fokus</h1>
       <p role="status" className="sr-only">
         {announcement}
@@ -332,8 +332,8 @@ function SetView({
   const lastWeek = lastWeekLine(e, week);
   const cell = prescribedCell(e.prescribed);
   return (
-    <div className={`flex flex-col ${FADE_IN}`}>
-      <section aria-labelledby="fokus-set" className="mt-4 flex flex-col">
+    <div className={`flex flex-1 flex-col ${FADE_IN}`}>
+      <section aria-labelledby="fokus-set" className="mt-4 flex flex-1 flex-col">
         <h2 id="fokus-set" className="font-grotesk text-32 font-normal [overflow-wrap:anywhere]">
           {exerciseName(e)}
         </h2>
@@ -373,7 +373,7 @@ function SetView({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="mt-3 mb-10 flex flex-col gap-3">
           <DotRow dots={dots} />
           {kg?.kind === "suggestion" && adjustment !== null && (
             <p className="text-16 text-text-muted">
@@ -387,8 +387,9 @@ function SetView({
           {note !== "" && <Note text={note} />}
         </div>
 
-        {/* Secondary action above the primary: nothing sits below Udført (round 2). */}
-        <button type="button" onClick={() => onSkip(current)} className={`mt-10 self-center ${MUTED_LINK}`}>
+        {/* Secondary action above the primary: nothing sits below Udført (round 2). mt-auto takes the
+            free height, so on a short set Udført sits at the bottom edge like the pause's button. */}
+        <button type="button" onClick={() => onSkip(current)} className={`mt-auto self-center ${MUTED_LINK}`}>
           Spring over
         </button>
 
@@ -403,17 +404,18 @@ function SetView({
   );
 }
 
-/** Round 4 §3.2: sets tapped today, filled = done, ring = skipped; the 8px row is reserved when empty. */
+/** Round 4 §3.2: sets tapped today, filled = done, ring = skipped, 8px dots with 8px gaps (16px between
+ * exercises); the 8px row is reserved when empty. */
 function DotRow({ dots }: { readonly dots: DotRowMarks }) {
   return (
-    <div className="flex min-h-2 flex-wrap gap-x-2 gap-y-1">
+    <div className="flex min-h-2 flex-wrap gap-x-4 gap-y-2">
       {dots.groups.map((g) => (
         <svg key={g.key} aria-hidden="true" width={g.width} height={8} viewBox={`0 0 ${g.width} 8`} className="block shrink-0">
           {g.dots.map((d) =>
             d.kind === "done" ? (
-              <circle key={d.cx} cx={d.cx} cy={4} r={3} fill="var(--text)" />
+              <circle key={d.cx} cx={d.cx} cy={4} r={4} fill="var(--text)" />
             ) : (
-              <circle key={d.cx} cx={d.cx} cy={4} r={2.5} fill="none" stroke="var(--text)" strokeWidth={1.5} />
+              <circle key={d.cx} cx={d.cx} cy={4} r={3.25} fill="none" stroke="var(--text)" strokeWidth={1.5} />
             ),
           )}
         </svg>
@@ -446,7 +448,7 @@ function PauseView({
   readonly onAnnounce: (s: string) => void;
 }) {
   return (
-    <div className={`flex flex-col ${FADE_IN}`}>
+    <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       {done !== null && <FeelBlock set={done} logged={logged} named={false} onTap={onTap} />}
       {done !== null && <PauseCard since={since} exercise={done.exercise} onAnnounce={onAnnounce} />}
       {next !== null && <NextSetCard next={next} inWarmup={false} afterTimer />}
@@ -482,7 +484,7 @@ function WarmupView({
   if (setOne === null) return null; // the order and the rows come from the same sets: not reached
   const mainLift = isMainLift(setOne.exercise, mainLifts);
   return (
-    <div className={`flex flex-col ${FADE_IN}`}>
+    <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
       <div className={feel !== null ? "mt-10" : "mt-4"}>
         <WarmupCard since={since} exercise={setOne.exercise} mainLift={mainLift} />
@@ -519,7 +521,7 @@ function FinishedView({
   readonly footer: ReactNode;
 }) {
   return (
-    <div className={`flex flex-col ${FADE_IN}`}>
+    <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
       <section aria-labelledby={`fokus-finished-${session}`} className={`${feel !== null ? "mt-10" : "mt-4"} flex flex-col`}>
         <h2 id={`fokus-finished-${session}`} className="font-grotesk text-44 font-normal">
@@ -532,6 +534,7 @@ function FinishedView({
           {footer}
         </div>
       </section>
+      <div aria-hidden="true" className="flex-1" />
       <div className={`mt-10 ${PRIMARY_DOCK}`}>
         <HomeLink ref={primary} flush={flush} className={PRIMARY_BOX}>
           Tilbage til Træning

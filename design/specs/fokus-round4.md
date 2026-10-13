@@ -27,7 +27,7 @@ Below 21rem container width the kg column wraps to its own line. Under it, in or
 - sr: the existing `role="timer"` + band live region stay; nothing added.
 
 ### 3.2 Set view: dot row
-- `<svg height=8 aria-hidden>` single line, wraps (`flex-wrap` of rows at the content width): one dot per **set tapped today in this session**, sheet order: done = filled circle r 3 `--text`; skipped = ring r 2.5, stroke 1.5 `--text`; open and current sets draw nothing (the barcode shows them). Pitch 10px, +6px between exercises. Warm-ups never. 0 tapped: the 8px row is reserved empty, so Udført doesn't move between sets 1 and 2.
+- `<svg height=8 aria-hidden>` single line, wraps (`flex-wrap` of rows at the content width): one dot per **set tapped today in this session**, sheet order: done = filled 8px circle (r 4) `--text`; skipped = ring r 3.25, stroke 1.5 `--text` (8px outside); open and current sets draw nothing (the barcode shows them). 8px gaps (pitch 16px), 16px between exercises (user, 2026-10-13). Warm-ups never. 0 tapped: the 8px row is reserved empty. Udført is pinned to the bottom edge in every view (user, 2026-10-13), so it never moves between sets.
 - sr-only: `I dag: 7 sæt udført, 1 sprunget over.`
 
 ### 3.3 Finished: session signature (above the time summary)

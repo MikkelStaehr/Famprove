@@ -60,8 +60,9 @@ test("dot row: one dot per tapped set, rings for skips, warm-ups never, grouped 
   assert.equal(empty.sentence, "I dag: 0 sæt udført, 0 sprunget over.");
   const row = dotRow(EX, ORDER, logOf([done(4, 0, 100), done(4, 1, 200), skip(4, 2, 250), done(4, 3, 400), done(6, 0, 500), done(6, 1, 600)]));
   assert.deepEqual(row.groups.map((g) => g.dots.map((d) => d.kind)), [["done", "skipped", "done"], ["done"]]);
-  assert.deepEqual(row.groups[0].dots.map((d) => d.cx), [4, 14, 24]);
-  assert.equal(row.groups[0].width, 28);
+  // 8px dots with 8px gaps: centres 16px apart, the group as wide as its dots and gaps.
+  assert.deepEqual(row.groups[0].dots.map((d) => d.cx), [4, 20, 36]);
+  assert.equal(row.groups[0].width, 40);
   assert.equal(row.sentence, "I dag: 3 sæt udført, 1 sprunget over.");
 });
 

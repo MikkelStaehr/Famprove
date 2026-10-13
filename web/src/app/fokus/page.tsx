@@ -108,5 +108,5 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
  * inset) from the top.
  */
 function FokusColumn({ children }: { readonly children: ReactNode }) {
-  return <div className="mx-auto flex w-full max-w-phone flex-col">{children}</div>;
+  return <div className="mx-auto flex w-full max-w-phone flex-1 flex-col">{children}</div>;
 }

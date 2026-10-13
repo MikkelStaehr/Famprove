@@ -31,12 +31,16 @@ type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
 export function PrimaryButton({ primary, onClick, children }: { readonly primary: PrimaryRef; readonly onClick: () => void; readonly children: string }) {
   return (
-    <div className={`mt-10 ${PRIMARY_DOCK}`}>
-      <button ref={primary} type="button" onClick={onClick} className={PRIMARY_BOX}>
-        {children}
-        <ArrowIcon />
-      </button>
-    </div>
+    <>
+      {/* Takes the free height of a short view, so the button sits at the bottom edge (user, 2026-10-13). */}
+      <div aria-hidden="true" className="flex-1" />
+      <div className={`mt-10 ${PRIMARY_DOCK}`}>
+        <button ref={primary} type="button" onClick={onClick} className={PRIMARY_BOX}>
+          {children}
+          <ArrowIcon />
+        </button>
+      </div>
+    </>
   );
 }
 
