@@ -37,6 +37,12 @@ const SQUAT: FokusExercise = {
   suggestedKg: 142.5,
   suggestionBasis: "rpe_e1rm",
   suggestionCapped: false,
+  adjustmentKg: null,
+  adjustmentReason: null,
+  restMinS: null,
+  restMaxS: null,
+  ramp: null,
+  notes: null,
   sets: [
     { row: 4, set: 1 },
     { row: 4, set: 2 },
@@ -52,6 +58,12 @@ const PULLDOWN: FokusExercise = {
   suggestedKg: null,
   suggestionBasis: "not_rpe",
   suggestionCapped: false,
+  adjustmentKg: null,
+  adjustmentReason: null,
+  restMinS: null,
+  restMaxS: null,
+  ramp: null,
+  notes: null,
   sets: [{ row: 7, set: 1 }],
 };
 const EXERCISES = [SQUAT, PULLDOWN];
@@ -75,16 +87,16 @@ test("fokusView: set view at the first open set before any tap", () => {
   assert.deepEqual(fokusView(ORDER, new Map(), null), { kind: "set", current: ORDER[0] });
 });
 
-test("fokusView: rest view after a done, counting from that tap, next = first open set", () => {
+test("fokusView: pause (Variant B) after a done, counting from that tap, next = first open set", () => {
   const log = tapAll([["done", ORDER[0], T0]]);
-  assert.deepEqual(fokusView(ORDER, log, null), { kind: "rest", since: T0, next: ORDER[1] });
+  assert.deepEqual(fokusView(ORDER, log, null), { kind: "pause", since: T0, done: ORDER[0], next: ORDER[1] });
 });
 
 test("fokusView: Til næste sæt dismisses that rest only; the next done rests again", () => {
   const log = tapAll([["done", ORDER[0], T0]]);
   assert.deepEqual(fokusView(ORDER, log, T0), { kind: "set", current: ORDER[1] });
   const later = applyTap(ORDER, log, "done", ORDER[1], T1);
-  assert.deepEqual(fokusView(ORDER, later, T0), { kind: "rest", since: T1, next: ORDER[2] });
+  assert.deepEqual(fokusView(ORDER, later, T0), { kind: "pause", since: T1, done: ORDER[1], next: ORDER[2] });
 });
 
 test("fokusView: a skip as the latest tap shows the next set directly (no rest)", () => {
@@ -101,7 +113,7 @@ test("fokusView: finished when no set is open, also with skips", () => {
     ["skip", ORDER[1], T1],
     ["done", ORDER[2], T2],
   ]);
-  assert.deepEqual(fokusView(ORDER, log, null), { kind: "finished" });
+  assert.deepEqual(fokusView(ORDER, log, null), { kind: "finished", feel: ORDER[2] });
 });
 
 test("setInContext: Sæt n af m by the row's sets; unknown row is null", () => {
@@ -287,4 +299,125 @@ test("D11: Fokus numbers sets across the run, in every text that shows the numbe
   const pull = setInContext(exercises, { row: 7, set: 1 });
   assert.ok(pull !== null);
   assert.equal(setTitle(pull), "Sæt 1 af 1");
+});
+
+// fokus-pause.md (2026-10-13): warm-ups, pause variants, stepper, rest band, footer, suggestion line.
+import { sessionOrderWithWarmups } from "../src/lib/set-taps.ts";
+import {
+  begunWarmup,
+  durationText,
+  footerText,
+  nextFeel,
+  repsRange,
+  restBand,
+  restLabel,
+  restRail,
+  stepperBounds,
+  stepperValue,
+} from "../src/lib/fokus-view.ts";
+import { adjustmentBrackets, adjustmentLine } from "../src/lib/training-view.ts";
+
+const W_ORDER = sessionOrderWithWarmups([
+  { ref: { row: 4, set: 1 }, name: "Squat" },
+  { ref: { row: 4, set: 2 }, name: "Squat" },
+  { ref: { row: 7, set: 1 }, name: "Lat pulldowns" },
+]);
+function wTaps(taps: readonly ["begin" | "done" | "skip" | "undo", SetRef, string][]): Map<string, LoggedSet> {
+  let log = new Map<string, LoggedSet>();
+  for (const [kind, ref, at] of taps) log = applyTap(W_ORDER, log, kind, ref, at);
+  return log;
+}
+
+test("pause variants: begin -> warm-up (A); Til sæt 1 -> set 1; done mid-run -> pause (B); done ending a run -> warm-up with feel (C)", () => {
+  const begun = wTaps([["begin", { row: 4, set: 0 }, T0]]);
+  assert.deepEqual(fokusView(W_ORDER, begun, null), { kind: "warmup", warmup: { row: 4, set: 0 }, since: T0, feel: null });
+  assert.deepEqual(begunWarmup(W_ORDER, begun), { ref: { row: 4, set: 0 }, at: T0 });
+  const warmedUp = applyTap(W_ORDER, begun, "done", { row: 4, set: 0 }, T1);
+  assert.deepEqual(fokusView(W_ORDER, warmedUp, null), { kind: "set", current: { row: 4, set: 1 } });
+  assert.equal(begunWarmup(W_ORDER, warmedUp), null);
+  const one = applyTap(W_ORDER, warmedUp, "done", { row: 4, set: 1 }, T2);
+  assert.deepEqual(fokusView(W_ORDER, one, null), { kind: "pause", since: T2, done: { row: 4, set: 1 }, next: { row: 4, set: 2 } });
+  const T3 = "2026-10-12T16:09:00.000Z";
+  const two = applyTap(W_ORDER, one, "done", { row: 4, set: 2 }, T3);
+  assert.deepEqual(fokusView(W_ORDER, two, null), { kind: "warmup", warmup: { row: 7, set: 0 }, since: T3, feel: { row: 4, set: 2 } });
+});
+
+test("pause variants: a skip that ends a run opens the next warm-up without a feel block (R5)", () => {
+  const log = wTaps([
+    ["done", { row: 4, set: 0 }, T0],
+    ["done", { row: 4, set: 1 }, T1],
+    ["skip", { row: 4, set: 2 }, T2],
+  ]);
+  const view = fokusView(W_ORDER, log, null);
+  assert.equal(view.kind, "warmup");
+  assert.equal(view.kind === "warmup" ? view.feel : "x", null);
+});
+
+test("reps stepper: ranges only; default = the log's value, else the top; bounds 1..top + 10", () => {
+  assert.deepEqual(repsRange("6 - 10"), { low: 6, top: 10 });
+  assert.deepEqual(repsRange("8-12"), { low: 8, top: 12 });
+  assert.equal(repsRange("5"), null);
+  assert.equal(repsRange("AMRAP"), null);
+  assert.deepEqual(stepperBounds(10), { min: 1, max: 20 });
+  assert.equal(stepperValue(null, 10), 10);
+  assert.equal(stepperValue(8, 10), 8);
+  assert.equal(stepperValue(40, 10), 20);
+});
+
+test("feel: tapping the chosen option clears it, another overwrites", () => {
+  assert.equal(nextFeel(null, -1), -1);
+  assert.equal(nextFeel(-1, -1), null);
+  assert.equal(nextFeel(-1, 1), 1);
+});
+
+test("rest band: before the minimum, ready at it, over after the maximum; none without a recommendation", () => {
+  assert.equal(restLabel(180, 300), "Anbefalet 3–5 min");
+  assert.equal(restLabel(90, 120), "Anbefalet 1½–2 min");
+  assert.equal(restLabel(null, null), null);
+  assert.deepEqual(restBand(130, 180, 300), { kind: "before", text: "Hvil mindst 3:00" });
+  assert.deepEqual(restBand(180, 180, 300), { kind: "ready", text: "Klar til næste sæt" });
+  assert.deepEqual(restBand(301, 180, 300), { kind: "over", text: "Klar · over 5 min pause" });
+  assert.deepEqual(restBand(500, null, null), { kind: "none" });
+  assert.deepEqual(restRail(720, 180, 300), { fill: 1, min: 0.5, max: 1 / 1.2 });
+});
+
+test("footer: elapsed from the first start; remaining from 2 done sets; warm-ups and skips never count", () => {
+  const log = wTaps([
+    ["begin", { row: 4, set: 0 }, T0],
+    ["done", { row: 4, set: 0 }, T1],
+    ["done", { row: 4, set: 1 }, T2],
+  ]);
+  const now = Date.parse(T2) + 60_000;
+  assert.equal(footerText(W_ORDER, new Map(), now), null);
+  assert.equal(footerText(W_ORDER, log, now), "Tid brugt 7 min"); // one done set: no estimate
+  const T3 = "2026-10-12T16:12:00.000Z";
+  const more = applyTap(W_ORDER, log, "done", { row: 4, set: 2 }, T3); // spans 3 and 6 min: mean 4.5
+  assert.equal(footerText(W_ORDER, more, Date.parse(T3)), "Tid brugt 12 min · ca. 5 min tilbage");
+  assert.equal(durationText(65), "1 t 5 min");
+  assert.equal(durationText(60), "1 t");
+});
+
+test("suggestion line: added, range, hold, capped + added, cap only; never 0 kg", () => {
+  const base = { suggestedKg: 87.5, suggestionCapped: false, adjustmentKg: null, adjustmentReason: null };
+  const added = { ...base, adjustmentKg: 2.5, adjustmentReason: "de sidste to var lettere" };
+  assert.equal(adjustmentBrackets(added, "long"), "(+2,5 – de sidste to var lettere)");
+  assert.equal(adjustmentBrackets(added, "short"), "(+2,5)");
+  assert.deepEqual(adjustmentLine(added), { signed: "+2,5 kg", rest: " – de sidste to var lettere" });
+  const range = { ...base, adjustmentKg: 2.5, adjustmentReason: "du ramte 10 reps to gange" };
+  assert.deepEqual(adjustmentLine(range), { signed: "+2,5 kg", rest: " – du ramte 10 reps to gange" });
+  const hold = { ...base, adjustmentKg: 0, adjustmentReason: "de sidste to var hårdere" };
+  assert.equal(adjustmentBrackets(hold, "long"), "(holdt – de sidste to var hårdere)");
+  assert.equal(adjustmentBrackets(hold, "short"), "(holdt)");
+  assert.deepEqual(adjustmentLine(hold), { signed: "Holdt", rest: " – de sidste to var hårdere" });
+  const cappedAdded = { ...added, suggestionCapped: true };
+  assert.equal(adjustmentBrackets(cappedAdded, "long"), "(+2,5 – de sidste to var lettere, begrænset)");
+  assert.equal(adjustmentLine(cappedAdded)?.rest, " – de sidste to var lettere · begrænset i forhold til sidste uge");
+  const capOnly = { ...base, suggestionCapped: true };
+  assert.equal(adjustmentBrackets(capOnly, "long"), "(begrænset)");
+  assert.deepEqual(adjustmentLine(capOnly), { signed: "", rest: "(begrænset) i forhold til sidste uge" });
+  assert.equal(adjustmentLine(base), null);
+  assert.equal(adjustmentBrackets({ ...added, suggestedKg: null }, "long"), null);
+  for (const e of [added, range, hold, cappedAdded, capOnly]) {
+    assert.doesNotMatch(`${adjustmentBrackets(e, "long")} ${adjustmentLine(e)?.signed}`, /\b0 kg/);
+  }
 });

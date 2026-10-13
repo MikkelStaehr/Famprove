@@ -538,3 +538,23 @@ export function buildStyrkeView(data: StrengthAnalysisData, now: Date, today: Is
     warnings,
   };
 }
+
+/** The competition lifts first in the feel card (fokus-pause.md §7), in S/B/D order. */
+const FEEL_FIRST = ["squat", "bench", "bench press", "bænkpres", "deadlift", "dødløft"];
+
+/**
+ * "Sådan føles sættene" (fokus-pause.md §7): Python's exercise_feel rows, competition S/B/D first,
+ * then the rest alphabetically (da-DK). The sentence is shown verbatim; only the count is worded.
+ * An empty list means no card.
+ */
+export function feelRows(
+  rows: readonly { readonly name: string; readonly ratedN: number; readonly verdictText: string }[],
+): { readonly name: string; readonly verdict: string; readonly basis: string }[] {
+  const rank = (name: string) => {
+    const i = FEEL_FIRST.indexOf(name.trim().toLowerCase());
+    return i === -1 ? FEEL_FIRST.length : i;
+  };
+  return rows
+    .toSorted((a, b) => rank(a.name) - rank(b.name) || a.name.trim().localeCompare(b.name.trim(), "da-DK"))
+    .map((r) => ({ name: r.name.trim(), verdict: r.verdictText, basis: `Ud fra ${r.ratedN} vurderede sæt` }));
+}

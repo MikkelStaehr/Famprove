@@ -16,6 +16,14 @@
  *          week, the first MIDSESSION_DONE sets done (one every 3 minutes, the last 1:42 ago) and the
  *          next one skipped, so the overview and Fokus can be screenshotted mid-session without a
  *          write (taps are refused under a dev switch, lib/db/set-log.ts).
+ *   warmup / pause / exercise-end  real Træning rows with an illustrative set log for today
+ *          (fokus-pause.md §8): "Begynd træning" just tapped (Variant A with a ramp); set 1 of a
+ *          range exercise done 2:10 ago, with a note (Variant B before the minimum); the last set of
+ *          a range exercise done, the next run's warm-up started, with a ramp and a 2-line note
+ *          (Variant C, the fold's worst case). Ramps, rests and notes the real rows lack are
+ *          illustrative, never real suggestions.
+ *   feel   /analyse/styrke with two illustrative exercise_feel rows (Python's sentence form).
+ *   midsession also gives planned rows an adjustment (+2,5, a capped +2,5, a hold) and a note.
  *   answers  real /analyse rows with illustrative analysis_summary rows, all three in `answer`
  *          (eFTP flat, EF up, volume with a plan, 3 of 4 done; analyse.md §12d), so the normal
  *          state of the answer blocks can be screenshotted. The sentences are Python's (the
@@ -25,11 +33,14 @@
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
  */
 import { LIFTS } from "../lifts.ts";
+import { sessionOrderWithWarmups, setKey, type SetRef } from "../set-taps.ts";
 import { PostgrestError } from "./postgrest.ts";
 import type {
   AnalysisSummaryRow,
   DailyProjectionRow,
+  ExerciseFeelRow,
   IsoDate,
+  PlannedSetRow,
   PrescribedSetRow,
   ProjectedSession,
   RideMetricsRow,
@@ -37,8 +48,196 @@ import type {
   StrengthWeekRow,
 } from "./rows.ts";
 
-export type DevFixture = "empty" | "stale" | "error" | "band" | "ef-few" | "lsrpe" | "midsession" | "answers";
-const FIXTURES: readonly DevFixture[] = ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers"];
+export type DevFixture =
+  | "empty"
+  | "stale"
+  | "error"
+  | "band"
+  | "ef-few"
+  | "lsrpe"
+  | "midsession"
+  | "answers"
+  | "warmup"
+  | "pause"
+  | "exercise-end"
+  | "feel";
+const FIXTURES: readonly DevFixture[] = [
+  "empty",
+  "stale",
+  "error",
+  "band",
+  "ef-few",
+  "lsrpe",
+  "midsession",
+  "answers",
+  "warmup",
+  "pause",
+  "exercise-end",
+  "feel",
+];
+
+/** The Fokus pause fixtures (fokus-pause.md §8). */
+export type PauseFixture = "warmup" | "pause" | "exercise-end";
+export function isPauseFixture(f: DevFixture | null): f is PauseFixture {
+  return f === "warmup" || f === "pause" || f === "exercise-end";
+}
+
+const RANGE = /^\s*\d+\s*[-–]\s*\d+\s*$/;
+const NOTE_SHORT = "Palloff + GHD";
+const NOTE_LONG = "Hold pausen i bunden et sekund, og stop sættet, hvis ryggen runder. Palloff + GHD efter sidste sæt.";
+const FIXTURE_RAMP_BASIS_KG = 100; // only when the real row has no suggestion to ramp from
+
+/** An illustrative 40/60/80 % ramp of `kg`, rounded to 2.5 (dev only; Python owns the real one). */
+function illustrativeRamp(kg: number): PlannedSetRow["ramp"] {
+  return [
+    { pct: 40, reps: 5 },
+    { pct: 60, reps: 3 },
+    { pct: 80, reps: 2 },
+  ].map((r) => ({ ...r, kg: Math.round((kg * r.pct) / 100 / 2.5) * 2.5 }));
+}
+
+function plannedFor(s: PrescribedSetRow, planned: readonly PlannedSetRow[]): PlannedSetRow {
+  return (
+    planned.find((p) => p.block === s.block && p.sheetRow === s.sheetRow && p.week === s.week && p.setNo === s.setNo) ?? {
+      block: s.block,
+      sheetRow: s.sheetRow,
+      week: s.week,
+      setNo: s.setNo,
+      suggestedKg: null,
+      basis: "no_lift",
+      uncappedKg: null,
+      adjustmentKg: null,
+      adjustmentReason: null,
+      restMinS: null,
+      restMaxS: null,
+      ramp: null,
+    }
+  );
+}
+
+/**
+ * The Træning data for a pause fixture: the set log, and planned rows / sets with the ramp, rest
+ * and note each state needs. `now` anchors the times. Nothing is written anywhere.
+ */
+export function pauseFixture(
+  fixture: PauseFixture,
+  sets: readonly PrescribedSetRow[],
+  planned: readonly PlannedSetRow[],
+  today: IsoDate,
+  now: Date,
+): { sets: PrescribedSetRow[]; plannedSets: PlannedSetRow[]; setLog: SetLogRow[] } {
+  const outSets = [...sets];
+  const outPlanned = new Map(planned.map((p) => [`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, p]));
+  const patch = (s: PrescribedSetRow, change: Partial<PlannedSetRow>) => {
+    const p = plannedFor(s, planned);
+    outPlanned.set(`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, { ...p, ...change });
+  };
+  const note = (row: PrescribedSetRow, text: string) => {
+    for (let i = 0; i < outSets.length; i += 1) {
+      const s = outSets[i];
+      if (s.session === row.session && s.sheetRow === row.sheetRow) outSets[i] = { ...s, notes: text };
+    }
+  };
+  const log: SetLogRow[] = [];
+  const t = (secondsAgo: number) => new Date(now.getTime() - secondsAgo * 1000).toISOString();
+  const bySession = new Map<number, PrescribedSetRow[]>();
+  for (const s of sets) bySession.set(s.session, [...(bySession.get(s.session) ?? []), s]);
+  for (const [session, rows] of bySession) {
+    const byKey = new Map(rows.map((r) => [setKey({ row: r.sheetRow, set: r.setNo }), r]));
+    const order = sessionOrderWithWarmups(rows.map((r) => ({ ref: { row: r.sheetRow, set: r.setNo }, name: r.name })));
+    const rowOf = (ref: SetRef) => byKey.get(setKey({ row: ref.row, set: Math.max(1, ref.set) }));
+    const rampOn = (ref: SetRef) => {
+      const r = rowOf(ref);
+      if (r === undefined) return;
+      const p = plannedFor(r, planned);
+      if (p.ramp === null) patch(r, { ramp: illustrativeRamp(p.suggestedKg ?? r.loggedKg ?? FIXTURE_RAMP_BASIS_KG) });
+    };
+    // Every item before `upTo` (exclusive) done, 3 minutes apart, the last ending `endAgo` s ago.
+    const doneUpTo = (upTo: number, endAgo: number) => {
+      for (let k = 0; k < upTo; k += 1) {
+        const ref = order[k];
+        const end = endAgo + (upTo - 1 - k) * 180;
+        const r = rowOf(ref);
+        const top = r !== null && r !== undefined && RANGE.test(r.repsText ?? "") ? Number((r.repsText ?? "").split(/[-–]/)[1]) : null;
+        log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: t(end + 180), endedAt: t(end), skipped: false, updatedAt: t(end), feltRpe: null, repsDone: ref.set === 0 ? null : top });
+      }
+    };
+    const startOpen = (ref: SetRef, ago: number) =>
+      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: t(ago), endedAt: null, skipped: false, updatedAt: t(ago), feltRpe: null, repsDone: null });
+    if (fixture === "warmup") {
+      startOpen(order[0], 40);
+      rampOn(order[0]);
+      continue;
+    }
+    if (fixture === "pause") {
+      // Set 1 of the first range row with 2+ sets (else the first set) done 2:10 ago.
+      const i = order.findIndex((ref) => ref.set === 1 && RANGE.test(rowOf(ref)?.repsText ?? "") && byKey.has(setKey({ row: ref.row, set: 2 })));
+      const at = i === -1 ? order.findIndex((ref) => ref.set === 1) : i;
+      doneUpTo(at + 1, 130);
+      const next = order[at + 1];
+      if (next !== undefined) startOpen(next, 130);
+      const r = rowOf(order[at]);
+      if (r !== undefined) {
+        note(r, NOTE_SHORT);
+        for (const s of rows.filter((x) => x.sheetRow === r.sheetRow)) {
+          patch(s, { restMinS: 180, restMaxS: 300 }); // 3–5 min, so 2:10 is before the minimum
+        }
+      }
+      continue;
+    }
+    // exercise-end: the last set before a later warm-up whose row is a range row, else any.
+    const warmups = order.map((ref, k) => [ref, k] as const).filter(([ref, k]) => ref.set === 0 && k > 0);
+    const main = (ref: SetRef) => /^(squat|bench|bænkpres|deadlift|dødløft)\b/i.test(rowOf(ref)?.name.trim() ?? "");
+    const ranged = warmups.filter(([, k]) => RANGE.test(rowOf(order[k - 1])?.repsText ?? ""));
+    const pick = ranged.find(([ref]) => main(ref)) ?? ranged[0] ?? warmups[0];
+    if (pick === undefined) continue;
+    const [warm, k] = pick;
+    doneUpTo(k, 40);
+    startOpen(warm, 40);
+    rampOn(warm);
+    const next = rowOf(warm);
+    if (next !== undefined) note(next, NOTE_LONG);
+  }
+  return { sets: outSets, plannedSets: [...outPlanned.values()], setLog: log };
+}
+
+/**
+ * DEV_FIXTURE=midsession's planned rows: the first three rows with a suggestion get +2,5
+ * (lettere), a capped +2,5, and a hold; the fourth row gets a note. Illustrative only.
+ */
+export function midsessionPlanned(
+  sets: readonly PrescribedSetRow[],
+  planned: readonly PlannedSetRow[],
+): { sets: PrescribedSetRow[]; plannedSets: PlannedSetRow[] } {
+  // The first three sheet rows; a row without a real suggestion gets an illustrative one.
+  // Per session: a week's sessions are different sheet rows.
+  const rowsOf = (session: number) =>
+    [...new Set(sets.filter((s) => s.session === session).map((s) => s.sheetRow))].toSorted((a, b) => a - b);
+  const changes: Partial<PlannedSetRow>[] = [
+    { adjustmentKg: 2.5, adjustmentReason: "de sidste to var lettere" },
+    { adjustmentKg: 2.5, adjustmentReason: "du ramte 10 reps to gange" },
+    { adjustmentKg: 0, adjustmentReason: "de sidste to var hårdere" },
+  ];
+  const out = new Map(planned.map((p) => [`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, p]));
+  for (const s of sets) {
+    const i = rowsOf(s.session).indexOf(s.sheetRow);
+    if (i === -1 || i > 2) continue;
+    const p = plannedFor(s, planned);
+    const kg = p.suggestedKg ?? s.loggedKg ?? FIXTURE_RAMP_BASIS_KG;
+    const capped = i === 1 ? { uncappedKg: kg + 2.5 } : {};
+    out.set(`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, { ...p, suggestedKg: kg, basis: p.suggestedKg === null ? "rpe_e1rm" : p.basis, ...changes[i], ...capped });
+  }
+  return {
+    sets: sets.map((s) => (rowsOf(s.session)[3] === s.sheetRow ? { ...s, notes: NOTE_SHORT } : s)),
+    plannedSets: [...out.values()],
+  };
+}
+
+/** DEV_FIXTURE=feel: two exercise_feel rows in Python's sentence form (not real verdicts). */
+export const ILLUSTRATIVE_FEEL: readonly ExerciseFeelRow[] = [
+  { exerciseId: -2, name: "Romanian deadlift", ratedN: 6, verdictText: "Du melder oftest som ventet – forslaget rammer trænerens RPE" },
+  { exerciseId: -1, name: "Squat", ratedN: 12, verdictText: "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE" },
+];
 
 /** DEV_FIXTURE=midsession: sets done per session before the skipped one. */
 export const MIDSESSION_DONE = 3;

@@ -11,7 +11,11 @@ import {
   illustrativeAnswers,
   illustrativeBands,
   illustrativeLogged,
+  ILLUSTRATIVE_FEEL,
+  isPauseFixture,
   midsessionLog,
+  midsessionPlanned,
+  pauseFixture,
   staleComputedAt,
 } from "./dev-fixture.ts";
 import { readSupabaseEnv } from "./env.ts";
@@ -32,6 +36,8 @@ import {
   parsePlannedTargetRow,
   parsePrescribedSetRow,
   parseSetLogRow,
+  parseExerciseFeelRow,
+  EXERCISE_FEEL_SELECT,
   PLANNED_SETS_SELECT,
   PLANNED_TARGETS_SELECT,
   PRESCRIBED_SETS_SELECT,
@@ -64,6 +70,7 @@ import type {
   StrengthAnalysisData,
   DashboardData,
   DailyLoadRow,
+  ExerciseFeelRow,
   IsoDate,
   PlannedSetRow,
   PlannedTargetRow,
@@ -316,7 +323,7 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
       ),
     ),
   );
-  return {
+  const base = {
     weekStart,
     sessions,
     sets,
@@ -324,9 +331,15 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     rides,
     upcomingRides,
     plannedSets,
-    setLog: fixture === "midsession" ? midsessionLog(sets, today, new Date()) : (setLog ?? []),
+    setLog: setLog ?? [],
     setLogFailed: setLog === null,
   };
+  // Dev fixtures (never in production, never written): illustrative logs, ramps, notes.
+  if (fixture === "midsession") {
+    return { ...base, ...midsessionPlanned(sets, plannedSets), setLog: midsessionLog(sets, today, new Date()) };
+  }
+  if (isPauseFixture(fixture)) return { ...base, ...pauseFixture(fixture, sets, plannedSets, today, new Date()) };
+  return base;
 }
 
 /**
@@ -384,6 +397,25 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
     summary: fixture === "answers" && summary !== null ? illustrativeAnswers(summary) : summary,
     summaryError,
   };
+}
+
+/**
+ * /analyse/styrke's feel card (fokus-pause.md §7): Python's exercise_feel rows. A secondary read:
+ * a failure returns null (the card shows its WarningLine), never breaks the page.
+ */
+export async function loadExerciseFeel(): Promise<readonly ExerciseFeelRow[] | null> {
+  await connection();
+  const fixture = devFixture();
+  if (fixture === "feel") return ILLUSTRATIVE_FEEL;
+  if (fixture === "empty") return [];
+  if (fixture === "error") return null;
+  try {
+    return await selectAll(client(), EXERCISE_FEEL_SELECT.table, EXERCISE_FEEL_SELECT, parseExerciseFeelRow);
+  } catch (error: unknown) {
+    if (!isDataError(error)) throw error;
+    console.error("analyse/styrke: reading exercise_feel failed", error);
+    return null;
+  }
 }
 
 /**

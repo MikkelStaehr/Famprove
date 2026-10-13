@@ -25,7 +25,8 @@ import {
  */
 export type SetLog = {
   readonly log: ReadonlyMap<string, LoggedSet>;
-  readonly tap: (kind: SetTapKind, ref: SetRef) => void;
+  /** `value`: a feel (-1/0/+1, null clears) or the reps done; omitted for the other kinds. */
+  readonly tap: (kind: SetTapKind, ref: SetRef, value?: number | null) => void;
   readonly unsaved: number; // sets with a tap whose save failed, waiting for retry
   readonly retry: () => void;
   readonly rejected: boolean; // the server refused a tap (e.g. the day changed): reload the page
@@ -77,7 +78,7 @@ export function useSetLog(
   );
 
   const tap = useCallback(
-    (kind: SetTapKind, ref: SetRef) => {
+    (kind: SetTapKind, ref: SetRef, value: number | null = null) => {
       if (refused(log, kind, ref)) return; // the server would refuse it too (skip of a done set)
       const undoes = kind === "undo" ? undoesOf(log, ref) : null;
       if (kind === "undo" && undoes === null) return; // nothing this set's taps wrote
@@ -87,8 +88,9 @@ export function useSetLog(
         failed.current = failed.current.filter((f) => setKey(f) !== setKey(ref));
         countFailed();
       }
-      setLog((previous) => applyTap(order, previous, kind, ref, new Date().toISOString()));
-      const input: SetTapInput = { kind, date, session, row: ref.row, set: ref.set, undoes };
+      setLog((previous) => applyTap(order, previous, kind, ref, new Date().toISOString(), value));
+      const withValue = kind === "feel" || kind === "reps";
+      const input: SetTapInput = { kind, date, session, row: ref.row, set: ref.set, undoes, ...(withValue ? { value } : {}) };
       queue.current = queue.current.then(() => send(input));
     },
     [log, order, date, session, send, countFailed],

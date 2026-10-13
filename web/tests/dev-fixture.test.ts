@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { devFixture, fixtureError, midsessionLog, STALE_AGE_MS, staleComputedAt } from "../src/lib/db/dev-fixture.ts";
+import {
+  devFixture,
+  fixtureError,
+  midsessionLog,
+  midsessionPlanned,
+  pauseFixture,
+  STALE_AGE_MS,
+  staleComputedAt,
+} from "../src/lib/db/dev-fixture.ts";
+import { fokusView } from "../src/lib/fokus-view.ts";
+import { type LoggedSet, sessionOrderWithWarmups, setKey } from "../src/lib/set-taps.ts";
 import { PostgrestError } from "../src/lib/db/postgrest.ts";
 import { freshness } from "../src/lib/dashboard-view.ts";
 
 test("DEV_FIXTURE only switches under next dev, and only to known states", () => {
-  for (const state of ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers"] as const) {
+  for (const state of ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers", "warmup", "pause", "exercise-end", "feel"] as const) {
     assert.equal(devFixture({ DEV_FIXTURE: state }, "development"), state);
     assert.equal(devFixture({ DEV_FIXTURE: state }, "production"), null);
     assert.equal(devFixture({ DEV_FIXTURE: state }, "test"), null);
@@ -21,7 +31,7 @@ test("DEV_FIXTURE only switches under next dev, and only to known states", () =>
   } finally {
     console.warn = warn;
   }
-  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers"]);
+  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, feel"]);
   assert.equal(devFixture({}, "development"), null);
 });
 
@@ -57,4 +67,49 @@ test("DEV_FIXTURE=midsession: per session, 3 sets done 3 min apart, then one ski
   assert.deepEqual(one.map((l) => [l.row, l.set, l.skipped]), [[25, 1, false], [25, 2, false], [26, 1, false], [27, 1, true]]);
   assert.equal(one[2]?.endedAt, new Date(now.getTime() - 102_000).toISOString()); // rest timer 1:42
   assert.deepEqual(log.filter((l) => l.session === 2).map((l) => l.row), [77]);
+});
+
+test("DEV_FIXTURE warmup / pause / exercise-end: each gives its Fokus view (pure: nothing is written)", () => {
+  const row = (sheetRow: number, setNo: number, name: string, repsText: string) => ({
+    weekStart: "2026-10-12",
+    session: 1,
+    block: "B",
+    week: 3,
+    sheetRow,
+    setNo,
+    name,
+    type: "X",
+    setsText: "2",
+    repsText,
+    prescribed: "RPE 7",
+    loggedKg: 60,
+    bodyweight: false,
+    notes: null,
+  });
+  const sets = [row(5, 1, "Dips", "6 - 10"), row(5, 2, "Dips", "6 - 10"), row(6, 1, "Squat", "5"), row(6, 2, "Squat", "5")];
+  const order = sessionOrderWithWarmups(sets.map((s) => ({ ref: { row: s.sheetRow, set: s.setNo }, name: s.name })));
+  const now = new Date("2026-10-12T16:00:00Z");
+  const viewOf = (f: "warmup" | "pause" | "exercise-end") => {
+    const out = pauseFixture(f, sets, [], "2026-10-12", now);
+    const log = new Map<string, LoggedSet>(out.setLog.map((l) => [setKey(l), l]));
+    return { out, view: fokusView(order, log, null) };
+  };
+  assert.equal(viewOf("warmup").view.kind, "warmup");
+  assert.ok(viewOf("warmup").out.plannedSets.some((p) => p.ramp !== null));
+  const pause = viewOf("pause");
+  assert.equal(pause.view.kind, "pause");
+  assert.ok(pause.out.sets.some((s) => s.notes !== null));
+  assert.ok(pause.out.setLog.some((l) => l.repsDone === 10)); // the server's default at Udført
+  const end = viewOf("exercise-end");
+  assert.deepEqual(end.view, { kind: "warmup", warmup: { row: 6, set: 0 }, since: new Date(now.getTime() - 40_000).toISOString(), feel: { row: 5, set: 2 } });
+});
+
+test("DEV_FIXTURE=midsession: adjustments (+2,5, capped, hold) and a note, illustrative", () => {
+  const row = (sheetRow: number) => ({
+    weekStart: "2026-10-12", session: 1, block: "B", week: 3, sheetRow, setNo: 1, name: `E${sheetRow}`, type: "X",
+    setsText: "1", repsText: "5", prescribed: "RPE 7", loggedKg: 50, bodyweight: false, notes: null,
+  });
+  const out = midsessionPlanned([row(1), row(2), row(3), row(4)], []);
+  assert.deepEqual(out.plannedSets.map((p) => [p.sheetRow, p.adjustmentKg, p.uncappedKg !== null]), [[1, 2.5, false], [2, 2.5, true], [3, 0, false]]);
+  assert.deepEqual(out.sets.filter((s) => s.notes !== null).map((s) => s.sheetRow), [4]);
 });

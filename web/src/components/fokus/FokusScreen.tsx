@@ -1,12 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 
-import { useSetLog } from "@/components/useSetLog";
+import { settle, useSetLog } from "@/components/useSetLog";
 import { HomeLink } from "./HomeLink";
 import { WarningLine } from "@/components/WarningLine";
 import {
-  doneSentence,
+  begunText,
+  begunWarmup,
   exerciseName,
   FINISHED_SENTENCE,
   finishCard,
@@ -15,20 +17,23 @@ import {
   kgBlock,
   lastTapText,
   lastWeekLine,
-  nextSetSummary,
+  pauseSentence,
   repsWord,
   type SetInContext,
   setInContext,
+  setOneOf,
   setSentence,
   setTitle,
   skippedText,
   skipSentence,
   undoSentence,
   unsavedText,
+  warmupSentence,
 } from "@/lib/fokus-view";
-import { CAPPED_WORD } from "@/lib/training-view";
+import { adjustmentLine } from "@/lib/training-view";
 import {
   applyTap,
+  isWarmup,
   lastTap,
   type LoggedSet,
   nextOpen,
@@ -40,7 +45,7 @@ import {
 } from "@/lib/set-taps";
 
 import { FokusProgress } from "./FokusProgress";
-import { RestTimer } from "./RestTimer";
+import { FeelBlock, Footer, isMainLift, NextSetCard, PauseCard, PRIMARY_INK, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
 
 export type FokusSession = {
@@ -64,7 +69,6 @@ type FokusScreenProps = {
 
 const PRESS =
   "transition-transform duration-120 ease-out active:scale-97 motion-reduce:transition-none motion-reduce:active:scale-100";
-const PRIMARY_INK = `flex min-h-16 w-full items-center justify-center gap-2 rounded-pill bg-text px-4 font-display text-32 font-extrabold text-bg uppercase italic ${PRESS}`;
 const OUTLINE_PILL = "rounded-pill border-2 border-text-muted text-16 font-semibold text-text";
 const IN_SLAB_FOCUS = "focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-slab-mark";
 const FADE_IN = "transition-opacity duration-180 ease-out starting:opacity-0 motion-reduce:transition-none";
@@ -83,6 +87,9 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const [announcement, setAnnouncement] = useState("");
   const [focusRequest, setFocusRequest] = useState(0);
   const primary = useRef<HTMLButtonElement & HTMLAnchorElement>(null);
+  const router = useRouter();
+  // The warm-up timer's fallback when a warm-up has no start in the log (e.g. after overview ticks).
+  const [mountedAt] = useState(() => new Date().toISOString());
 
   useWakeLock();
 
@@ -109,14 +116,34 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const onDone = (current: SetInContext) => {
     const following = nextOpen(session.order, log, current.ref);
     tap("done", current.ref);
-    after(following === null ? FINISHED_SENTENCE : doneSentence(current));
+    const next = following === null ? null : at(following);
+    after(
+      following === null
+        ? FINISHED_SENTENCE
+        : isWarmup(following) && next !== null
+          ? warmupSentence(current, next.exercise)
+          : pauseSentence(current),
+    );
   };
 
   const onSkip = (current: SetInContext) => {
     const following = nextOpen(session.order, log, current.ref);
     const next = following === null ? null : at(following);
     tap("skip", current.ref);
-    after(`${skipSentence(current)} ${next === null ? FINISHED_SENTENCE : setSentence(next, session.week)}`);
+    const then =
+      next === null
+        ? FINISHED_SENTENCE
+        : isWarmup(next.ref)
+          ? warmupSentence(null, next.exercise)
+          : setSentence(next, session.week);
+    after(`${skipSentence(current)} ${then}`);
+  };
+
+  /** "Til sæt 1": a done on the warm-up, which ends it and starts set 1 (no rest timer). */
+  const onWarmupEnd = (warmup: SetRef) => {
+    tap("done", warmup);
+    const one = at(setOneOf(warmup));
+    after(one === null ? "" : setSentence(one, session.week));
   };
 
   const onNext = (since: string, next: SetInContext | null) => {
@@ -124,16 +151,36 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     after(next === null ? "" : setSentence(next, session.week));
   };
 
+  const onFeelOrReps = useCallback(
+    (kind: "feel" | "reps", ref: SetRef, value: number | null) => tap(kind, ref, value),
+    [tap],
+  );
+
+  const begun = begunWarmup(session.order, log);
+
   const onUndo = () => {
-    if (latest === null) return;
+    if (latest === null) {
+      // Fortryd of "Begynd træning" (§6): the warm-up row goes, and Træning shows Begynd again.
+      if (begun === null) return;
+      tap("undo", begun.ref);
+      void settle(flush).then(() => router.push("/"));
+      return;
+    }
     const undone = at(latest.ref);
     // The reopened set shows in the set view, even if an earlier done tap is now the latest.
     setDismissed(restStart(applyTap(session.order, log, "undo", latest.ref, new Date().toISOString())));
     tap("undo", latest.ref);
-    after(undone === null ? "" : undoSentence(undone));
+    after(
+      undone === null
+        ? ""
+        : isWarmup(latest.ref)
+          ? `Fortrudt: ${exerciseName(undone.exercise)}, opvarmning er i gang igen.`
+          : undoSentence(undone),
+    );
   };
 
-  const lastLine = latest === null ? null : lastTapText(session.exercises, latest);
+  const lastLine =
+    latest !== null ? lastTapText(session.exercises, latest) : begun !== null ? begunText(begun.at) : null;
   const skipped = skippedText(p);
 
   return (
@@ -157,7 +204,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         </p>
       </div>
       <div className="mt-3">
-        <FokusProgress order={session.order} stateOf={(ref) => stateOf(log.get(setKey(ref)))} />
+        <FokusProgress order={session.order.filter((ref) => !isWarmup(ref))} stateOf={(ref) => stateOf(log.get(setKey(ref)))} />
       </div>
       <div className="mt-2 flex min-h-11 flex-col justify-center">
         {staleNote !== null && <WarningLine>{staleNote}</WarningLine>}
@@ -200,18 +247,46 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           onSkip={onSkip}
         />
       )}
-      {view.kind === "rest" && (
-        <RestView
-          key={`rest-${view.since}`}
+      {view.kind === "pause" && (
+        <PauseView
+          key={`pause-${view.since}`}
           since={view.since}
+          done={at(view.done)}
           next={at(view.next)}
+          logged={log.get(setKey(view.done))}
+          week={session.week}
           primary={primary}
           onNext={onNext}
+          onTap={onFeelOrReps}
+          onAnnounce={setAnnouncement}
+        />
+      )}
+      {view.kind === "warmup" && (
+        <WarmupView
+          key={`warmup-${setKey(view.warmup)}`}
+          since={view.since ?? mountedAt}
+          warmup={view.warmup}
+          setOne={at(setOneOf(view.warmup))}
+          feel={view.feel === null ? null : at(view.feel)}
+          logged={view.feel === null ? undefined : log.get(setKey(view.feel))}
+          week={session.week}
+          primary={primary}
+          onWarmupEnd={onWarmupEnd}
+          onTap={onFeelOrReps}
         />
       )}
       {view.kind === "finished" && (
-        <FinishedView session={session.session} card={finishCard(session.session, p, log)} primary={primary} flush={flush} />
+        <FinishedView
+          session={session.session}
+          card={finishCard(session.session, p, log)}
+          primary={primary}
+          flush={flush}
+          feel={view.feel === null ? null : at(view.feel)}
+          logged={view.feel === null ? undefined : log.get(setKey(view.feel))}
+          onTap={onFeelOrReps}
+        />
       )}
+      {view.kind !== "set" && view.kind !== "finished" && <Footer order={session.order} log={log} />}
 
       {(devSwitches || dev) && <p className="mt-4 text-14 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
     </div>
@@ -228,13 +303,6 @@ function CheckIcon() {
   );
 }
 
-function ArrowIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6 shrink-0" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 12h15M13 6l6 6-6 6" />
-    </svg>
-  );
-}
 
 /** §4.2: the current set on a full slab card, Udført inside it, Spring over below. */
 function SetView({
@@ -253,6 +321,7 @@ function SetView({
   if (current === null) return null; // the order and the rows come from the same sets: not reached
   const e = current.exercise;
   const kg = kgBlock(e);
+  const adjustment = adjustmentLine(e);
   const lastWeek = lastWeekLine(e, week);
   const word = e.repsText === null ? null : repsWord(e.repsText);
   return (
@@ -283,8 +352,11 @@ function SetView({
               <span className="text-32">{" "}kg</span>
             </p>
           )}
-          {kg.kind === "suggestion" && kg.capped && (
-            <p className="text-16 text-on-slab-muted">{CAPPED_WORD} i forhold til sidste uge</p>
+          {kg.kind === "suggestion" && adjustment !== null && (
+            <p className="text-16 text-on-slab-muted">
+              {adjustment.signed !== "" && <span className="font-semibold text-on-slab">{adjustment.signed}</span>}
+              {adjustment.rest}
+            </p>
           )}
           {kg.kind === "last_week" && (
             <>
@@ -338,44 +410,76 @@ function SetView({
   );
 }
 
-/** §4.3: the count-up rest, the next set in a small slab, Til næste sæt (no write). */
-function RestView({
+type FeelTap = (kind: "feel" | "reps", ref: SetRef, value: number | null) => void;
+
+/** fokus-pause.md §3 (Variant B): feel, the pause with its recommended rest, the next set. */
+function PauseView({
   since,
+  done,
   next,
+  logged,
+  week,
   primary,
   onNext,
+  onTap,
+  onAnnounce,
 }: {
   readonly since: string;
+  readonly done: SetInContext | null;
   readonly next: SetInContext | null;
+  readonly logged: LoggedSet | undefined;
+  readonly week: number;
   readonly primary: PrimaryRef;
   readonly onNext: (since: string, next: SetInContext | null) => void;
+  readonly onTap: FeelTap;
+  readonly onAnnounce: (s: string) => void;
 }) {
-  const summary = next === null ? null : nextSetSummary(next);
   return (
-    <section
-      aria-labelledby="fokus-rest"
-      className={`mt-2 flex flex-col rounded-card bg-surface px-4 pt-6 pb-4 shadow-card ${FADE_IN}`}
-    >
-      <h2 id="fokus-rest" className="text-14 font-bold tracking-[0.04em] text-text-muted uppercase">
-        Pause
-      </h2>
-      <RestTimer since={since} />
-      {summary !== null && (
-        <div className="mt-4 flex flex-col rounded-control bg-slab p-3 text-on-slab">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="rounded-mark bg-slab-mark px-2 py-0.5 text-14 font-bold tracking-[0.08em] text-slab uppercase">
-              Næste
-            </span>
-            <span className="text-20 font-bold">{summary.title}</span>
-          </p>
-          <p className="text-16 font-medium tabular-nums">{summary.line}</p>
-        </div>
-      )}
-      <button ref={primary} type="button" onClick={() => onNext(since, next)} className={`mt-6 ${PRIMARY_INK}`}>
+    <div className={`flex flex-col ${FADE_IN}`}>
+      {done !== null && <FeelBlock set={done} logged={logged} named={false} onTap={onTap} />}
+      {done !== null && <PauseCard since={since} exercise={done.exercise} onAnnounce={onAnnounce} />}
+      {next !== null && <NextSetCard next={next} week={week} inWarmup={false} />}
+      <PrimaryButton primary={primary} onClick={() => onNext(since, next)}>
         Til næste sæt
-        <ArrowIcon />
-      </button>
-    </section>
+      </PrimaryButton>
+    </div>
+  );
+}
+
+/** fokus-pause.md §2 and §4 (Variants A and C): the warm-up, after the feel of the set before. */
+function WarmupView({
+  since,
+  warmup,
+  setOne,
+  feel,
+  logged,
+  week,
+  primary,
+  onWarmupEnd,
+  onTap,
+}: {
+  readonly since: string;
+  readonly warmup: SetRef;
+  readonly setOne: SetInContext | null;
+  readonly feel: SetInContext | null;
+  readonly logged: LoggedSet | undefined;
+  readonly week: number;
+  readonly primary: PrimaryRef;
+  readonly onWarmupEnd: (warmup: SetRef) => void;
+  readonly onTap: FeelTap;
+}) {
+  if (setOne === null) return null; // the order and the rows come from the same sets: not reached
+  return (
+    <div className={`flex flex-col ${FADE_IN}`}>
+      {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
+      <div className={feel !== null ? "mt-1" : undefined}>
+        <WarmupCard since={since} exercise={setOne.exercise} mainLift={isMainLift(setOne.exercise)} />
+      </div>
+      <NextSetCard next={setOne} week={week} inWarmup />
+      <PrimaryButton primary={primary} onClick={() => onWarmupEnd(warmup)}>
+        Til sæt 1
+      </PrimaryButton>
+    </div>
   );
 }
 
@@ -385,14 +489,21 @@ function FinishedView({
   card,
   primary,
   flush,
+  feel,
+  logged,
+  onTap,
 }: {
   readonly session: number;
   readonly card: ReturnType<typeof finishCard>;
   readonly primary: PrimaryRef;
   readonly flush: () => Promise<void>;
+  readonly feel: SetInContext | null;
+  readonly logged: LoggedSet | undefined;
+  readonly onTap: FeelTap;
 }) {
   return (
     <div className={`flex flex-col ${FADE_IN}`}>
+      {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
       <section
         aria-labelledby={`fokus-finished-${session}`}
         className="mt-2 flex flex-col rounded-card bg-slab px-4 pt-6 pb-4 text-on-slab"

@@ -31,6 +31,12 @@ function row(row: number, overrides: Partial<ExerciseView> = {}, sets = 2): Exer
     suggestedKg: 142.5,
     suggestionBasis: "rpe_e1rm",
     suggestionCapped: false,
+    adjustmentKg: null,
+    adjustmentReason: null,
+    restMinS: null,
+    restMaxS: null,
+    ramp: null,
+    notes: null,
     sets: Array.from({ length: sets }, (_, i) => ({ row, set: i + 1 })),
     ...overrides,
   };
@@ -178,4 +184,17 @@ test("D11: sets are numbered across the run (same trimmed name, consecutive rows
     ["1 af 4", "2 af 4", "3 af 4", "4 af 4"],
   );
   assert.match(spokenSetLine(exercises[2], 3, view.groups[2].sets[1]), /^Bænk, sæt 4 af 4, /);
+});
+
+test("warm-ups never show as ticks: the list, the segments and NÆSTE skip set 0", async () => {
+  const { sessionOrderWithWarmups } = await import("../src/lib/set-taps.ts");
+  const exercises = [row(10, {}, 2), row(11, { name: "Dips" }, 1)];
+  const order = sessionOrderWithWarmups(exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name }))));
+  assert.equal(order.filter((r) => r.set === 0).length, 2);
+  const view = checklistView(exercises, order, new Map());
+  assert.equal(view.segments.length, 3);
+  assert.ok(view.groups.every((g) => g.sets.every((l) => l.ref.set !== 0)));
+  assert.deepEqual(view.first, { row: 10, set: 1 });
+  assert.equal(view.groups[0].sets[0].next, true);
+  assert.equal(view.progress.total, 3);
 });

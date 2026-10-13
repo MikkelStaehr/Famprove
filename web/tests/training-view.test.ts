@@ -218,7 +218,7 @@ test("next session: each row lists its sets, Python's suggestion, and today's lo
       [27, null, "not_rpe", [1, 2]],
     ],
   );
-  assert.deepEqual(next?.order, [{ row: 25, set: 1 }, { row: 27, set: 1 }, { row: 27, set: 2 }]);
+  assert.deepEqual(next?.order, [{ row: 25, set: 0 }, { row: 25, set: 1 }, { row: 27, set: 1 }, { row: 27, set: 2 }]); // one run: one warm-up
   assert.deepEqual(next?.log.map((l) => [l.row, l.set]), [[25, 1]]); // today, this session only
 });
 

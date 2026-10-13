@@ -13,16 +13,18 @@ import type {
   PlanItem,
   PlannedSetRow,
   PrescribedSetRow,
+  RampStep,
   StrengthSessionRow,
   SuggestionBasis,
 } from "./db/rows.ts";
 import { formatClock, formatKg, formatSetLoad, formatSetsReps, spokenRange, spokenSigned } from "./format.ts";
 import {
   firstOpen,
+  isWarmup,
   type LoggedSet,
   progress,
   type Progress,
-  sessionOrder,
+  sessionOrderWithWarmups,
   setKey,
   type SetRef,
   type SetState,
@@ -82,6 +84,13 @@ export type ExerciseView = {
   readonly suggestionBasis: SuggestionBasis | null; // null: no planned_sets row (yet)
   /** The weekly cap changed Python's suggestion (planned_sets.uncapped_kg set): "(begrænset)". */
   readonly suggestionCapped: boolean;
+  /** What Python's rule added after the cap (2.5 / 5), 0 = held; null = no rule (planned_sets). */
+  readonly adjustmentKg: number | null;
+  readonly adjustmentReason: string | null; // lowercase, shown after a dash, never re-cased
+  readonly restMinS: number | null; // recommended rest after a set; null = none shown
+  readonly restMaxS: number | null;
+  readonly ramp: readonly RampStep[] | null; // a main lift's warm-up ramp (first row of a run)
+  readonly notes: string | null; // the coach's NOTES cell as written
   readonly sets: readonly SetRef[]; // this row's sets, 1..n (each has its own tick)
 };
 
@@ -210,6 +219,12 @@ function exercisesOf(
         suggestedKg: suggestion?.suggestedKg ?? null,
         suggestionBasis: suggestion?.basis ?? null,
         suggestionCapped: suggestion !== undefined && suggestion.uncappedKg !== null,
+        adjustmentKg: suggestion?.adjustmentKg ?? null,
+        adjustmentReason: suggestion?.adjustmentReason ?? null,
+        restMinS: suggestion?.restMinS ?? null,
+        restMaxS: suggestion?.restMaxS ?? null,
+        ramp: suggestion?.ramp ?? null,
+        notes: s.notes,
         sets: [],
       });
     }
@@ -260,7 +275,7 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
       block: slot.block,
       week: slot.week,
       exercises,
-      order: sessionOrder(exercises.flatMap((e) => e.sets)),
+      order: sessionOrderWithWarmups(exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name })))),
       log: data.setLog.filter((l) => l.date === today && l.session === slot.session),
       logFailed: data.setLogFailed,
     },
@@ -363,6 +378,53 @@ export function suggestionView(
   };
 }
 
+type AdjustmentFields = Pick<ExerciseView, "suggestedKg" | "suggestionCapped" | "adjustmentKg" | "adjustmentReason">;
+
+/** "+2,5" / "−2,5" (U+2212); null for a hold (0) or no rule. */
+function signedKg(kg: number): string {
+  return `${kg < 0 ? "\u2212" : "+"}${formatKg(Math.abs(kg))}`;
+}
+
+/**
+ * The suggestion's adjustment in brackets (fokus-pause.md §5), after "Forslag 87,5 kg":
+ *   long  "(+2,5 – de sidste to var lettere)", "(+2,5 – …, begrænset)", "(holdt – …)"
+ *   short "(+2,5)", "(holdt)" (the Fokus mini card)
+ * Cap only: "(begrænset)". No rule and no cap: null. "0 kg" never shows.
+ */
+export function adjustmentBrackets(e: AdjustmentFields, form: "long" | "short"): string | null {
+  if (e.suggestedKg === null) return null;
+  if (e.adjustmentKg !== null && e.adjustmentReason !== null) {
+    const head = e.adjustmentKg === 0 ? "holdt" : signedKg(e.adjustmentKg);
+    if (form === "short") return `(${head})`;
+    const capped = e.suggestionCapped && e.adjustmentKg !== 0 ? ", begrænset" : "";
+    return `(${head} – ${e.adjustmentReason}${capped})`;
+  }
+  return e.suggestionCapped ? CAPPED_WORD : null;
+}
+
+/** The spoken adjustment: ", 2,5 kg mere, fordi de sidste to var lettere"; "" without one. */
+export function spokenAdjustment(e: AdjustmentFields): string {
+  if (e.suggestedKg === null || e.adjustmentKg === null || e.adjustmentReason === null) return "";
+  if (e.adjustmentKg === 0) return `, holdt, fordi ${e.adjustmentReason}`;
+  const word = e.adjustmentKg > 0 ? "mere" : "mindre";
+  return `, ${formatKg(Math.abs(e.adjustmentKg))} kg ${word}, fordi ${e.adjustmentReason}`;
+}
+
+/**
+ * The Fokus set card's line under the suggestion (§5): "+2,5 kg – de sidste to var lettere",
+ * "Holdt – de sidste to var hårdere", "… · begrænset i forhold til sidste uge", or the cap alone
+ * "(begrænset) i forhold til sidste uge". `signed` is the 600 part. Null: nothing to say.
+ */
+export function adjustmentLine(e: AdjustmentFields): { readonly signed: string; readonly rest: string } | null {
+  if (e.suggestedKg === null) return null;
+  if (e.adjustmentKg !== null && e.adjustmentReason !== null) {
+    const signed = e.adjustmentKg === 0 ? "Holdt" : `${signedKg(e.adjustmentKg)} kg`;
+    const capped = e.suggestionCapped && e.adjustmentKg !== 0 ? " · begrænset i forhold til sidste uge" : "";
+    return { signed, rest: ` – ${e.adjustmentReason}${capped}` };
+  }
+  return e.suggestionCapped ? { signed: "", rest: `${CAPPED_WORD} i forhold til sidste uge` } : null;
+}
+
 /** Last week's logged load: undefined in week 1 (no item), null when nothing was logged. */
 export function lastWeekText(e: Pick<ExerciseView, "reference">, week: number): string | null | undefined {
   if (week < 2) return undefined;
@@ -436,7 +498,9 @@ export function checklistView(
   order: readonly SetRef[],
   log: ReadonlyMap<string, LoggedSet>,
 ): ChecklistView {
-  const first = firstOpen(order, log);
+  // A warm-up is never a tick (fokus-pause.md): an open warm-up points at its set 1.
+  const open = firstOpen(order, log);
+  const first = open !== null && isWarmup(open) ? { row: open.row, set: 1 } : open;
   const closed = (refs: readonly SetRef[]) => refs.every((r) => stateOf(log.get(setKey(r))) !== "open");
   const isSlab = (e: ExerciseView) => first !== null && e.sets.some((r) => r.row === first.row && r.set === first.set);
   const runs = runPositions(exercises);
@@ -474,7 +538,7 @@ export function checklistView(
   return {
     groups,
     progress: p,
-    segments: order.map((r) => stateOf(log.get(setKey(r)))),
+    segments: order.filter((r) => !isWarmup(r)).map((r) => stateOf(log.get(setKey(r)))),
     first,
     primary: first === null ? "finished" : p.done + p.skipped > 0 ? "continue" : "begin",
   };
@@ -499,7 +563,7 @@ export function spokenSetLine(e: ExerciseView, week: number, line: SetLineView):
   const parts = [e.name.trim(), `sæt ${line.n} af ${line.of}`];
   if (what !== null) parts.push(what);
   const suggestion = suggestionView(e);
-  parts.push(suggestion.kg !== null ? `forslag ${suggestion.kg}` : "intet forslag");
+  parts.push(suggestion.kg !== null ? `forslag ${suggestion.kg}${spokenAdjustment(e)}` : "intet forslag");
   const lastWeek = lastWeekText(e, week);
   if (lastWeek === null) parts.push("intet logget sidste uge");
   else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);

@@ -9,14 +9,24 @@ import { formatKg, formatSetLoad, formatTimeOfDay, formatUpdatedAt, spokenRange 
 import type { SuggestionBasis } from "./db/rows.ts";
 import {
   firstOpen,
+  isWarmup,
   type LastTap,
+  lastTap,
   type LoggedSet,
   type Progress,
   restStart,
   setKey,
   type SetRef,
+  stateOf,
 } from "./set-taps.ts";
-import { CAPPED_WORD, type ExerciseView, type Reference, runPositions } from "./training-view.ts";
+import {
+  adjustmentBrackets,
+  CAPPED_WORD,
+  type ExerciseView,
+  type Reference,
+  runPositions,
+  spokenAdjustment,
+} from "./training-view.ts";
 
 /** What Fokus needs of one sheet row (a subset of ExerciseView, so fixtures stay small). */
 export type FokusExercise = Pick<
@@ -30,18 +40,29 @@ export type FokusExercise = Pick<
   | "suggestedKg"
   | "suggestionBasis"
   | "suggestionCapped"
+  | "adjustmentKg"
+  | "adjustmentReason"
+  | "restMinS"
+  | "restMaxS"
+  | "ramp"
+  | "notes"
   | "sets"
 >;
 
 /**
- * The three view states (§4.5): the set view at the first open set; the rest view when the
- * latest tap was a done and an open set remains (unless "Til næste sæt" dismissed that rest:
- * `dismissed` holds the rest start it dismissed); the finished view when no set is open.
+ * The view states (traening.md §4.5, fokus-pause.md §2–§4):
+ *   set       the first open set (Udført, Spring over)
+ *   pause     Variant B: the latest tap was a done of a set and the next open set is a set of the
+ *             same run (unless "Til næste sæt" dismissed it: `dismissed` holds that rest start)
+ *   warmup    Variants A and C: the first open item is a warm-up. `feel` is the set whose done
+ *             ended the previous exercise (C), null after a begin, a skip or a dismissed rest (A)
+ *   finished  no open set; `feel` is the session's last set when the latest tap was its done
  */
 export type FokusView =
   | { readonly kind: "set"; readonly current: SetRef }
-  | { readonly kind: "rest"; readonly since: string; readonly next: SetRef }
-  | { readonly kind: "finished" };
+  | { readonly kind: "pause"; readonly since: string; readonly done: SetRef; readonly next: SetRef }
+  | { readonly kind: "warmup"; readonly warmup: SetRef; readonly since: string | null; readonly feel: SetRef | null }
+  | { readonly kind: "finished"; readonly feel: SetRef | null };
 
 export function fokusView(
   order: readonly SetRef[],
@@ -49,9 +70,14 @@ export function fokusView(
   dismissed: string | null,
 ): FokusView {
   const open = firstOpen(order, log);
-  if (open === null) return { kind: "finished" };
   const since = restStart(log);
-  if (since !== null && since !== dismissed) return { kind: "rest", since, next: open };
+  const latest = lastTap(log);
+  const done = since !== null && since !== dismissed && latest !== null ? latest.ref : null;
+  if (open === null) return { kind: "finished", feel: since !== null && latest !== null ? latest.ref : null };
+  if (isWarmup(open)) {
+    return { kind: "warmup", warmup: open, since: log.get(setKey(open))?.startedAt ?? null, feel: done };
+  }
+  if (since !== null && done !== null) return { kind: "pause", since, done, next: open };
   return { kind: "set", current: open };
 }
 
@@ -198,6 +224,7 @@ export function lastTapText(exercises: readonly FokusExercise[], tap: LastTap): 
   const s = setInContext(exercises, tap.ref);
   if (s === null) return null;
   const name = exerciseName(s.exercise);
+  if (isWarmup(tap.ref)) return `${name} · opvarmning færdig kl. ${clockTime(tap.at)}`;
   return tap.kind === "done"
     ? `${name} · sæt ${s.number} udført kl. ${clockTime(tap.at)}`
     : `${name} · sæt ${s.number} sprunget over`;
@@ -214,11 +241,18 @@ export function unsavedText(n: number): string {
  */
 function suggestionWords(e: FokusExercise, space: "\u00a0" | " "): string {
   if (e.suggestedKg === null) return "intet forslag";
-  return `forslag ${formatKg(e.suggestedKg)}${space}kg${e.suggestionCapped ? ` ${CAPPED_WORD}` : ""}`;
+  if (space === " ") {
+    return `forslag ${formatKg(e.suggestedKg)} kg${e.suggestionCapped ? ` ${CAPPED_WORD}` : ""}${spokenAdjustment(e)}`;
+  }
+  const brackets = adjustmentBrackets(e, "short");
+  return `forslag ${formatKg(e.suggestedKg)}${space}kg${brackets === null ? "" : ` ${brackets}`}`;
 }
 
-/** The rest view's next set (§4.3): "Squat · sæt 2 af 2" and "5 reps · RPE 7 · forslag 142,5 kg". */
-export function nextSetSummary(s: SetInContext): { readonly title: string; readonly line: string } {
+/**
+ * The next-set card (fokus-pause.md §1.2): "Squat · sæt 2 af 2" (in a warm-up, whose heading
+ * names the exercise: "Sæt 1 af 4") and "5 reps · RPE 7 · forslag 142,5 kg (+2,5)".
+ */
+export function nextSetSummary(s: SetInContext, inWarmup = false): { readonly title: string; readonly line: string } {
   const e = s.exercise;
   const parts: string[] = [];
   if (e.repsText !== null) {
@@ -227,7 +261,8 @@ export function nextSetSummary(s: SetInContext): { readonly title: string; reado
   }
   if (e.prescribed !== null) parts.push(e.prescribed);
   parts.push(suggestionWords(e, "\u00a0"));
-  return { title: `${exerciseName(e)} · sæt ${s.number} af ${s.count}`, line: parts.join(" · ") };
+  const title = inWarmup ? `Sæt ${s.number} af ${s.count}` : `${exerciseName(e)} · sæt ${s.number} af ${s.count}`;
+  return { title, line: parts.join(" · ") };
 }
 
 /**
@@ -312,3 +347,183 @@ export function noSessionSentence(state: "all_done" | "no_program", planned: num
   if (state === "no_program") return "Intet styrkeprogram i denne uge.";
   return planned === 1 ? "Ugens session er udført." : `Alle ${planned} sessioner er udført i denne uge.`;
 }
+
+/**
+ * A begin with nothing done or skipped (fokus-pause.md §1, §6): the warm-up it started, for the
+ * last-tap line "Begyndt kl. 17.58" and a Fortryd that removes it. Null otherwise.
+ */
+export function begunWarmup(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): { readonly ref: SetRef; readonly at: string } | null {
+  if (lastTap(log) !== null) return null;
+  const first = firstOpen(order, log);
+  const started = first === null ? null : (log.get(setKey(first))?.startedAt ?? null);
+  return first !== null && isWarmup(first) && started !== null ? { ref: first, at: started } : null;
+}
+
+export function begunText(at: string): string {
+  return `Begyndt kl. ${clockTime(at)}`;
+}
+
+/** The set a warm-up comes before (its set 1). */
+export function setOneOf(warmup: SetRef): SetRef {
+  return { row: warmup.row, set: 1 };
+}
+
+/** "Opvarmning · Squat". */
+export function warmupTitle(e: FokusExercise): string {
+  return `Opvarmning · ${exerciseName(e)}`;
+}
+
+/**
+ * The ramp's basis line (§2.3): Python's ramp is 40/60/80 % of the first working set's kg, which
+ * is the suggestion when there is one, else last week's logged kg. The web never computes it.
+ */
+export function rampBasis(e: FokusExercise): string | null {
+  if (e.ramp === null) return null;
+  if (e.suggestedKg !== null) return `Op mod forslaget ${formatKg(e.suggestedKg)} kg`;
+  if (e.reference !== null) return `Op mod sidste uge ${referenceText(e.reference)}`;
+  return null;
+}
+
+/** Main lifts get a ramp or its absence; accessories nothing (timer only). */
+export function rampState(e: FokusExercise, mainLift: boolean): "ramp" | "none" | "hidden" {
+  if (e.ramp !== null && e.ramp.length > 0) return "ramp";
+  return mainLift ? "none" : "hidden";
+}
+
+/** The ramp in the status sentence: "5 reps 57,5 kg, 3 reps 85 kg, 2 reps 115 kg". */
+export function spokenRamp(e: FokusExercise): string | null {
+  if (e.ramp === null || e.ramp.length === 0) return null;
+  return e.ramp.map((r) => `${r.reps} reps ${formatKg(r.kg)} kg`).join(", ");
+}
+
+/** A range reps cell ("6 - 10", "8-12", "6–10") as its bounds; null for a fixed count or text. */
+export function repsRange(repsText: string | null): { readonly low: number; readonly top: number } | null {
+  const m = repsText === null ? null : /^\s*(\d+)\s*[-–]\s*(\d+)\s*$/.exec(repsText);
+  if (m === null) return null;
+  const low = Number(m[1]);
+  const top = Number(m[2]);
+  return top > low ? { low, top } : null;
+}
+
+/** The reps stepper (§1.1): 1 to top + 10; the value shown is the log's, else the range top
+ * (the server stores the top at Udført, so the default is the stored value after a reload). */
+export function stepperBounds(top: number): { readonly min: number; readonly max: number } {
+  return { min: 1, max: top + 10 };
+}
+
+export function stepperValue(logged: number | null | undefined, top: number): number {
+  const { min, max } = stepperBounds(top);
+  return logged == null ? top : Math.min(max, Math.max(min, logged));
+}
+
+/** Seconds as the band's minutes: 180 -> "3", 90 -> "1½", 150 -> "2½". */
+export function restMinutes(seconds: number): string {
+  const halves = Math.round(seconds / 30);
+  const whole = Math.floor(halves / 2);
+  if (halves % 2 === 0) return String(whole);
+  return whole === 0 ? "½" : `${whole}½`;
+}
+
+/** "Anbefalet 3–5 min"; null without a recommendation (§3.1). */
+export function restLabel(minS: number | null, maxS: number | null): string | null {
+  if (minS === null || maxS === null) return null;
+  return `Anbefalet ${restMinutes(minS)}–${restMinutes(maxS)} min`;
+}
+
+/** The pause's state against the recommended rest (§3.4). The text carries it, never colour alone. */
+export type RestBand =
+  | { readonly kind: "none" }
+  | { readonly kind: "before"; readonly text: string }
+  | { readonly kind: "ready"; readonly text: "Klar til næste sæt" }
+  | { readonly kind: "over"; readonly text: string };
+
+export function restBand(seconds: number, minS: number | null, maxS: number | null): RestBand {
+  if (minS === null || maxS === null) return { kind: "none" };
+  if (seconds < minS) return { kind: "before", text: `Hvil mindst ${formatTimer(minS)}` };
+  if (seconds <= maxS) return { kind: "ready", text: "Klar til næste sæt" };
+  return { kind: "over", text: `Klar · over ${restMinutes(maxS)} min pause` };
+}
+
+/** The rest rail (§3.3): the scale runs to 1.2 × max; fill, min tick and max tick as fractions. */
+export function restRail(seconds: number, minS: number, maxS: number): { readonly fill: number; readonly min: number; readonly max: number } {
+  const scale = 1.2 * maxS;
+  return { fill: Math.min(1, Math.max(0, seconds / scale)), min: minS / scale, max: maxS / scale };
+}
+
+/** "Anbefalet pause nået: 3 minutter. Klar til næste sæt." / "Pausen er over 5 minutter." */
+export function restSentence(band: RestBand, minS: number | null, maxS: number | null): string | null {
+  if (band.kind === "ready" && minS !== null) return `Anbefalet pause nået: ${spokenMinutes(minS)}. Klar til næste sæt.`;
+  if (band.kind === "over" && maxS !== null) return `Pausen er over ${spokenMinutes(maxS)}.`;
+  return null;
+}
+
+function spokenMinutes(seconds: number): string {
+  const m = restMinutes(seconds).replace("½", ",5");
+  return m === "1" ? "1 minut" : `${m.startsWith(",") ? "0" + m : m} minutter`;
+}
+
+/** "Squat, sæt 2 udført. Pause, anbefalet 3 til 5 minutter. Hvordan var sæt 2?" */
+export function pauseSentence(s: SetInContext): string {
+  const e = s.exercise;
+  const rest =
+    e.restMinS !== null && e.restMaxS !== null
+      ? `Pause, anbefalet ${restMinutes(e.restMinS).replace("½", ",5")} til ${restMinutes(e.restMaxS).replace("½", ",5")} minutter.`
+      : "Pause.";
+  return `${exerciseName(e)}, sæt ${s.number} udført. ${rest} ${feelQuestion(s, false)}`;
+}
+
+/** "Squat, sæt 4 udført. Opvarmning, Bænkpres: 5 reps 57,5 kg, 3 reps 85 kg, 2 reps 115 kg." */
+export function warmupSentence(done: SetInContext | null, next: FokusExercise): string {
+  const ramp = spokenRamp(next);
+  const head = done === null ? "" : `${exerciseName(done.exercise)}, sæt ${done.number} udført. `;
+  return `${head}Opvarmning, ${exerciseName(next)}${ramp === null ? "." : `: ${ramp}.`}`;
+}
+
+/** "Hvordan var sæt 2?" / "Hvordan var sæt 4 i Squat?" (when the card below names another exercise). */
+export function feelQuestion(s: SetInContext, named: boolean): string {
+  return named ? `Hvordan var sæt ${s.number} i ${exerciseName(s.exercise)}?` : `Hvordan var sæt ${s.number}?`;
+}
+
+export const FEEL_OPTIONS: readonly { readonly value: -1 | 0 | 1; readonly label: string }[] = [
+  { value: -1, label: "Lettere" },
+  { value: 0, label: "Som ventet" },
+  { value: 1, label: "Hårdere" },
+];
+
+/** A feel tap: the chosen option again clears it (null), another overwrites. */
+export function nextFeel(current: number | null | undefined, chosen: -1 | 0 | 1): -1 | 0 | 1 | null {
+  return current === chosen ? null : chosen;
+}
+
+/**
+ * The footer (§1.3): "Tid brugt 42 min · ca. 31 min tilbage". Display timing computed in the
+ * browser from today's log (like the rest timer), never stored and never a training number:
+ * elapsed = now − the session's first start (warm-up or set); remaining = open sets × the mean
+ * span (end − start) of today's done sets, from 2 done sets. Null before the first start.
+ */
+export function footerText(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, now: number): string | null {
+  const starts = [...log.values()].flatMap((l) => (l.startedAt === null ? [] : [Date.parse(l.startedAt)]));
+  if (starts.length === 0) return null;
+  const elapsed = `Tid brugt ${Math.max(0, Math.floor((now - Math.min(...starts)) / 60_000))} min`;
+  const spans = [...log.values()].flatMap((l) =>
+    isWarmup(l) || l.skipped || l.startedAt === null || l.endedAt === null
+      ? []
+      : [Date.parse(l.endedAt) - Date.parse(l.startedAt)],
+  );
+  if (spans.length < 2) return elapsed;
+  const open = order.filter((r) => !isWarmup(r) && stateOf(log.get(setKey(r))) === "open").length;
+  if (open === 0) return elapsed;
+  const mean = spans.reduce((a, b) => a + b, 0) / spans.length;
+  return `${elapsed} · ca. ${durationText(Math.round((open * mean) / 60_000))} tilbage`;
+}
+
+/** 31 -> "31 min", 65 -> "1 t 5 min", 60 -> "1 t". */
+export function durationText(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h} t` : `${h} t ${m} min`;
+}
+
+/** Notes up to this many characters show in full; longer ones clamp to 2 lines with "Hele noten". */
+export const NOTE_CLAMP_CHARS = 60;

@@ -6,10 +6,11 @@ import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { UpdatedLine } from "@/components/UpdatedLine";
-import { buildStyrkeView, NO_E1RM, type StyrkeView, TONNAGE_EXPLAINER } from "@/lib/analyse-styrke-view";
+import { WarningLine } from "@/components/WarningLine";
+import { buildStyrkeView, feelRows, NO_E1RM, type StyrkeView, TONNAGE_EXPLAINER } from "@/lib/analyse-styrke-view";
 import { LIFT_NAME, LIFTS } from "@/lib/lifts";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
-import { loadStrengthAnalysis } from "@/lib/db/queries";
+import { loadExerciseFeel, loadStrengthAnalysis } from "@/lib/db/queries";
 import { formatUpdatedAt } from "@/lib/format";
 import { RAIL_GRID } from "@/lib/rail-grid";
 import { resolveToday } from "@/lib/training-view";
@@ -197,6 +198,8 @@ function Cards({ view }: { readonly view: Ready }) {
         </figure>
       </Card>
 
+      <FeelCard />
+
       {view.rpeLine !== null && <p className="max-w-[60ch] text-14 text-text-muted">{view.rpeLine}</p>}
     </>
   );
@@ -253,4 +256,37 @@ function Bar({ className }: { readonly className: string }) {
 
 function ZeroTick() {
   return <span aria-hidden="true" className="mt-2.5 h-0.5 w-2 shrink-0 bg-chart-mark" />;
+}
+
+/**
+ * "Sådan føles sættene" (fokus-pause.md §7): one row per exercise_feel row, Python's sentence
+ * verbatim. Absent with no rows; a failed read shows a WarningLine in its place.
+ */
+async function FeelCard() {
+  const rows = await loadExerciseFeel();
+  if (rows === null) {
+    return (
+      <WarningLine>
+        Kunne ikke hente dine vurderinger.{" "}
+        <a href="/analyse/styrke" className="font-semibold text-text underline decoration-1 underline-offset-3">
+          Prøv igen
+        </a>
+      </WarningLine>
+    );
+  }
+  const items = feelRows(rows);
+  if (items.length === 0) return null;
+  return (
+    <Card id="feel" variant="calm" level={3} title="Sådan føles sættene">
+      <ul className="flex flex-col gap-3">
+        {items.map((r) => (
+          <li key={r.name} className="flex max-w-[60ch] flex-col">
+            <span className="text-16 font-bold">{r.name}</span>
+            <span className="text-16">{r.verdict}</span>
+            <span className="text-14 text-text-muted">{r.basis}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
 }
