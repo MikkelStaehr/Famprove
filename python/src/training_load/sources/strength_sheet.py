@@ -101,7 +101,7 @@ def prescribed_text(load: object) -> str | None:
     return str(load).strip()
 
 # Årsager i issues (nøglerne logges som de er; aldrig celleværdier).
-KG_NOT_A_NUMBER = "kg not a number"
+KG_NOT_A_NUMBER = "kg not a number"   # også negativ kg ("-5"): ulæselig, aldrig brugt
 SETS_REPS_NOT_A_NUMBER = "sets/reps not a number"
 WEEK_DATE_NOT_A_DATE = "week date not a date"
 ROW_WITHOUT_TYPE = "prescribed row without type"
@@ -238,10 +238,10 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
                 issues[SETS_REPS_NOT_A_NUMBER] += 1; continue
             if not isinstance(date, dt.datetime):
                 issues[WEEK_DATE_NOT_A_DATE] += 1; continue
-            kg_ok = isinstance(kg,(int,float)) and not isinstance(kg,bool)
+            kg_ok = isinstance(kg,(int,float)) and not isinstance(kg,bool) and kg >= 0   # -5 er ingen kg
             if not kg_ok and kg not in (None,""): issues[KG_NOT_A_NUMBER] += 1
             nsets, reps = int(mid(nsets)), mid(reps)
-            kg = float(kg) if isinstance(kg,(int,float)) else 0.0
+            kg = float(kg) if kg_ok and isinstance(kg,(int,float)) else 0.0
             logged = kg
             if not rpe_readable(load): issues[RPE_NOT_HALF] += 1   # tælles; cellens RPE bruges aldrig ("RPE ukendt")
             lsrpe = logged_rpe(cells[4], issues) if lsrpe_ok else None

@@ -85,6 +85,14 @@ def test_an_implausible_1rm_is_counted_and_never_used() -> None:
     assert sets_of(parsed, 25, 1)[0]["rpe"] == 5.0
 
 
+def test_a_negative_kg_is_unreadable_never_a_negative_score() -> None:
+    issues: Counter[str] = Counter()
+    parsed = parse_all(workbook({(25, 7): -5}), legacy_scoring(BODYWEIGHT), issues)
+    assert issues == Counter({KG_NOT_A_NUMBER: 1})
+    assert {(p["logged_kg"], p["kg"]) for p in sets_of(parsed, 25, 1)} == {(None, 0.0)}
+    assert all(p["score"] >= 0 for p in parsed)
+
+
 def test_unreadable_kg_is_counted_and_stored_as_none() -> None:
     issues: Counter[str] = Counter()
     parsed = parse_all(workbook({(25, 7): "BW"}), legacy_scoring(BODYWEIGHT), issues)

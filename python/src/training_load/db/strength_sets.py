@@ -1,4 +1,6 @@
-"""public.strength_sets: replace-per-sheet (delete + insert), full read for compute."""
+"""public.strength_sets: replace-per-sheet (delete + insert) by collect-strength, full read for
+compute, and compute's write-back of each set's final score and RPE (score_final, rpe_final;
+every other column written back as read)."""
 
 from collections.abc import Sequence
 from typing import Final, TypedDict

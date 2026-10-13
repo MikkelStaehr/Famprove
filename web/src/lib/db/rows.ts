@@ -769,7 +769,7 @@ export function parseStrengthSetRow(raw: unknown): StrengthSetRow {
     rpe: f.numberOrNull("rpe"),
     prescribed: f.stringOrNull("prescribed"),
     score: f.number("score"),
-    scoreFinal: f.optionalNumber("score_final"),
+    scoreFinal: f.numberOrNull("score_final"),
   };
 }
 

@@ -278,8 +278,14 @@ test("parseActivityRow and parseStrengthSetRow map and validate", () => {
     rpe: 7.49,
     prescribed: "RPE 7 - 8",
     score: 336.8,
+    score_final: 223.2,
   };
   assert.equal(parseStrengthSetRow(raw).prescribed, "RPE 7 - 8");
+  assert.equal(parseStrengthSetRow(raw).scoreFinal, 223.2);
+  assert.equal(parseStrengthSetRow({ ...raw, score_final: null }).scoreFinal, null);
+  const noFinal: Record<string, unknown> = { ...raw };
+  delete noFinal.score_final;
+  assert.throws(() => parseStrengthSetRow(noFinal), RowError); // selected column: never absent
   assert.equal(parseStrengthSetRow(raw).session, 1);
   assert.throws(() => parseStrengthSetRow({ ...raw, week_start: "2026-9-28" }), RowError);
   assert.throws(() => parseStrengthSetRow({ ...raw, bodyweight: "no" }), RowError);
