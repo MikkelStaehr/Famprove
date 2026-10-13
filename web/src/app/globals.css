@@ -244,3 +244,9 @@ summary::-webkit-details-marker {
   text-transform: uppercase;
   color: var(--caption, var(--text-muted));
 }
+
+/* Fokus: the pinned primary action (about 80px) must never cover the focused element (WCAG
+   2.4.11), so a focused control scrolls into view above it. */
+html:has([data-direction="instrument"]) {
+  scroll-padding-bottom: 6rem;
+}

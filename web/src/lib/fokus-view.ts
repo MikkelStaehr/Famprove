@@ -115,20 +115,6 @@ export function repsWord(repsText: string): string | null {
   return repsText.trim() === "1" ? "rep" : "reps";
 }
 
-/** Null-basis reasons (§6). A null basis (no planned_sets row yet) has no reason to give. */
-export function suggestionReason(basis: SuggestionBasis | null): string | null {
-  switch (basis) {
-    case "not_rpe":
-      return "Intet forslag til %-sæt";
-    case "no_e1rm":
-      return "Intet forslag: ingen e1RM endnu";
-    case "no_lift":
-      return "Intet forslag til denne øvelse";
-    default:
-      return null;
-  }
-}
-
 /** Last week's load as words: "140 kg", "kropsvægt", "kropsvægt + 10 kg". */
 export function referenceText(reference: Reference): string {
   return formatSetLoad(reference.kg, reference.bodyweight) ?? `${formatKg(reference.kg)} kg`;
@@ -209,9 +195,9 @@ export function formatTimer(seconds: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
 
-/** The top bar's skipped part: "· 1 sprunget over"; null without skips. */
+/** The top bar's skipped part, spoken after the count: ", 1 sprunget over"; null without skips. */
 export function skippedText(p: Progress): string | null {
-  return p.skipped > 0 ? `· ${p.skipped} sprunget over` : null;
+  return p.skipped > 0 ? `, ${p.skipped} sprunget over` : null;
 }
 
 /** Fortryd's spoken context (round 3, sr-only): "Squat, sæt 1 udført kl. 18.42" / "Squat, sæt 2 sprunget over". */

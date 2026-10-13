@@ -183,7 +183,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const lastLine =
     latest !== null ? lastTapText(session.exercises, latest) : begun !== null ? begunText(begun.at) : null;
   const skipped = skippedText(p);
-  // The barcode's red "now" tick: the set the view is about (none when finished).
+  // The barcode's "now" tick (ink since round 2): the set the view is about (none when finished).
   const now =
     view.kind === "set" ? view.current : view.kind === "pause" ? view.next : view.kind === "warmup" ? setOneOf(view.warmup) : null;
 
@@ -215,7 +215,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
             {p.done}/{p.total}
           </span>
           <span className="sr-only">
-            {p.done} af {p.total} sæt udført{skipped !== null && ` ${skipped}`}
+            {p.done} af {p.total} sæt udført{skipped}
           </span>
         </p>
       </div>

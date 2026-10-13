@@ -21,7 +21,6 @@ import {
   setTitle,
   skippedText,
   skipSentence,
-  suggestionReason,
   undoSentence,
   unsavedText,
   BEGIN_UNDONE_HREF,
@@ -181,12 +180,6 @@ test("kgBlock: no suggestion -> last week upright; neither -> null (no block, ne
   assert.equal(bw?.kind === "last_week" && bw.unit, null);
 });
 
-test("suggestionReason: the three bases, nothing for a null basis", () => {
-  assert.equal(suggestionReason("no_e1rm"), "Intet forslag: ingen e1RM endnu");
-  assert.equal(suggestionReason("no_lift"), "Intet forslag til denne øvelse");
-  assert.equal(suggestionReason(null), null);
-});
-
 test("lastWeekLine: only under a suggestion; week 1 and nothing logged have their words", () => {
   assert.deepEqual(lastWeekLine(SQUAT, 3), { kind: "kg", text: "140 kg" });
   assert.deepEqual(lastWeekLine({ ...SQUAT, reference: null }, 3), { kind: "none", text: "Intet logget sidste uge" });
@@ -204,7 +197,7 @@ test("lastTapText (Fortryd's sr-only context): done with its time, skip without"
 
 test("skippedText and unsavedText", () => {
   assert.equal(skippedText({ done: 7, skipped: 0, total: 24 }), null);
-  assert.equal(skippedText({ done: 7, skipped: 1, total: 24 }), "· 1 sprunget over");
+  assert.equal(skippedText({ done: 7, skipped: 1, total: 24 }), ", 1 sprunget over"); // spoken after the count: a comma, not a middle dot
   assert.equal(unsavedText(1), "1 sæt er ikke gemt.");
   assert.equal(unsavedText(3), "3 sæt er ikke gemt.");
 });
