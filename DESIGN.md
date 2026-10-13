@@ -272,6 +272,17 @@ Supersedes Revision 2 and everything above it where they differ. **Target: the p
 - **Primary action:** a full-width 1px `--accent` outlined box, 56px tall, red Inter medium label (≥ 24px) centred, no fill, for Udført, Til sæt 1, Til næste sæt and Tilbage til Træning. Still the only red besides the rest scale's tick (the 1px box is ≥ 3:1: 4.15 dark, 3.40 light). Still pinned to the bottom on a view taller than the screen.
 - **Screen readers keep what the eye loses** (main session): Fortryd's accessible name starts "Fortryd" and adds what it undoes ("Fortryd: Dips, sæt 1 udført kl. 21.09"); "0/19" reads "0 af 19 sæt udført"; the next set's kg names its source; the rest band's minimum/maximum announcements stay in the live region.
 
+### Revision 4 (user, 2026-10-13: "red only as a tick, real buttons, and one living element per screen"; spec `design/specs/fokus-round4.md`)
+Supersedes Revisions 2–3, [A4], [A8] and the single-accent table below where they differ.
+- **Red is a tick, nothing else:** `--accent` only for the moving tick on the rest/warm-up scale and, later, the charts' "today" mark. No red text, rule, box, lamp or fill.
+- **Primary = ink slab:** fill `--text`, label `--bg` Inter 500 24px, 56px, full width, radius 0, for Udført, Til sæt 1, Til næste sæt, Tilbage til Træning; still pinned at the bottom. It is each view's one filled element (the table below now reads "ink fill" for "filled accent").
+- **Rating = segmented control:** three equal segments in one 1px `--text-muted` box (≥ 3:1, [A5]), `--border` hairlines inside only; selected segment fills `--text`, label inverts to `--bg`. No lamp, no checkbox.
+- **Spring over:** a centred muted underlined text link, ≥ 44px target, no box.
+- **Set view:** captions `REPS` · `RPE` (or `PROCENT`) · `FORSLAG` / `SIDSTE UGE` (the source stays named; `ARKET` retired); unit shown once; coach note muted under the values.
+- **One generative element per screen, carrying data, never decoration** (browser drawing scales only, nothing shown or stored as a number; each has an sr sentence): the pause/warm-up **dot field** (60 × 6 dot matrix filling with elapsed time, MIN/MAX as taller ink marks, the red tick at the front); the set view's **dot row** (sets tapped today, hollow = skipped); the finished view's **session signature** (bars = reps × kg, hollow where kg isn't in the sheet yet; gaps = time between done taps, capped at 6 min; rating as shade plus a marker shape).
+- **Grain on:** 3 % static feTurbulence noise, both themes, `/fokus` only for now, `pointer-events: none`.
+- **Signature elements** (below) now read: the red "now" tick; the progress barcode; the generative element of each view; registration marks on desktop.
+
 ### Single filled accent per Fokus view (design-lead decision, 2026-10-13; the fill is retired by Revision 2: the same element is the view's one red, as a rule + red label)
 | View | The one filled accent | Everything else |
 |---|---|---|
