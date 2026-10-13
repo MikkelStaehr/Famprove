@@ -87,6 +87,7 @@ Nav ends ≈ 56 · title ≈ 72–116 · updated line ≈ 120–140 · form row 
 
 ## 4. Fokus (`/fokus`) at 390px
 > **2026-10-13: the pause screen is rebuilt in [`fokus-pause.md`](fokus-pause.md)** (warm-up, felt-RPE and reps, recommended rest, next-set card, footer). It replaces §4.3 and amends §4.1, §4.2's suggestion line, §4.4, §4.7, §6 and §7. Where they differ, `fokus-pause.md` wins.
+> **2026-10-13: Fokus is the pilot of the Instrument direction** ([`fokus-instrument.md`](fokus-instrument.md)). It replaces every visual rule here (slab, Condensed italic, pills, segments); structure, copy and behaviour stay as written.
 
 Full-screen: no ScreenNav, no page title text, no zone flag. Page gutter 12px. `h1` is `sr-only` "Fokus". Readable at 60–80 cm: **reps and kg are `text-56`, the largest things on the screen** (≈ 6.4mm cap height on a 390pt iPhone, ≈ 30 arc-minutes at 70 cm; text-32 is ≈ 18').
 

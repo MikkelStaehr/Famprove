@@ -61,7 +61,7 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - `docs/ARCHITECTURE.md` is a one-page map of folders, data flow and commands. Agents read it **instead of scanning the repo**. Update it when structure changes.
 
 ## Design
-- `DESIGN.md` is the contract, owned by `design-lead`. Part A (guardrails) is fixed; Part B (direction: **Spurt**, chosen 2026-09-30) is this product's identity.
+- `DESIGN.md` is the contract, owned by `design-lead`. Part A (guardrails) is fixed; Part B (direction: **Instrument** — editorial instrument panel, chosen by the user 2026-10-13, replacing **Spurt** from 2026-09-30) is this product's identity. Rollout: Fokus first (pilot, scoped by `data-direction="instrument"`); Træning, Belastning and Analyse keep Spurt (DESIGN.md appendix) until each is restyled (slice `instrument-rest`). Guardrail adjustments to the user's overrides are marked [A1]–[A8] in DESIGN.md (red text only ≥ 24px, warning as a labelled mark, outlines in muted not hairline, captions ≥ 12px / 14px on Fokus).
 - UI must express Part B. Correct but generic is not done. No UI component library (shadcn/ui considered and not adopted, see Part B); Tailwind is themed from DESIGN.md tokens.
 - Screen specs live in `design/specs/`, template and pattern packs in `design/`. `design/directions/` (Mode 0 samples with real data) is git-ignored.
 

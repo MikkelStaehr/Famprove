@@ -3,7 +3,7 @@
 Contract between `design-lead` (owns this file) and `ui` (builds). Read before any UI work.
 
 - **Part A: Guardrails.** Fixed. Never traded away, whatever the direction.
-- **Part B: Direction.** The product's visual identity: **Spurt**, with Logbog's zone bar and a dark theme derived from Ro (chosen 2026-09-30). Token values live in `web/src/app/globals.css` and come from Part B.
+- **Part B: Direction.** The product's visual identity: **Instrument** (chosen 2026-10-13, replacing Spurt of 2026-09-30). Rolling out screen by screen: Fokus first; the other screens follow the Spurt appendix until restyled. Token values live in `web/src/app/globals.css` and come from Part B.
 
 When Part B and a pattern pack conflict, Part B wins on look and the pack wins on structure. Part A beats both.
 
@@ -207,7 +207,109 @@ Applies to Belastning's trend, Cykel's eFTP, EF and weekly strips, and Styrke's 
 
 ---
 
-# Part B – Direction: Spurt (chosen 2026-09-30)
+# Part B – Direction: Instrument (chosen 2026-10-13)
+
+**History:** Spurt (chosen 2026-09-30) was replaced by Instrument on 2026-10-13 at the user's request. Spurt's text is kept as the appendix at the end of this file only while the rollout runs; delete it when the last screen is restyled.
+
+**Rollout:** **Fokus (`/fokus`) first** (pilot spec `design/specs/fokus-instrument.md`), so the user can judge it on the phone. Træning, Belastning and Analyse stay on Spurt (appendix) until each gets its own restyle. The new tokens apply only under the scope `[data-direction="instrument"]` on the Fokus root; outside it, `:root` stays Spurt.
+
+## Personality
+Editorial, exact, quiet. An instrument panel, not a sports app: monochrome type and hairlines, one red mark that tells you where you are.
+
+## Project overrides – Famprove
+The user's direction (2026-10-13), verbatim except where Part A forced a change. Each change is marked **[A1]…[A8]**.
+
+Direction: editorial minimalism with a brutalist edge. Instrument panel, not sports app. Reference: monochrome editorial data viz, generative dot-matrix posters, audio-gear dials with mono labels, Swiss infographics with one accent.
+
+Palette (dark primary):
+- bg #141414, surface #1C1C1C, hairline #2D2D2D, text #EAE0D2, text-muted #A68763, accent #E0362B (red). ~~Positive/warning/negative are the accent at 100 / 60 / 100 %~~ **[A1]** Positive and negative are the accent at 100 %, always with a word or glyph. Warning is **not** 60 % red (≈ 2.2:1, fails 3:1): it is an ink mark with a shape (a ◆ drawn as inline SVG, or a dashed rule) plus a word. Colour never carries meaning without a label.
+- Light alternative: bg #EAE0D2, surface #E3D8C4, hairline #D7C9AE, text #2D2D2D, text-muted ~~#6B5E4A~~ **[A2] #665946** (#6B5E4A is 4.48:1 on the light surface, under 4.5), same accent.
+- Optional 3 % grain on bg. **Decided: off** (it costs crispness on a phone at arm's length and adds nothing to the hierarchy; revisit for desktop Belastning only).
+
+Type:
+- Headings: neutral grotesk (Inter), regular weight, no italics, no condensed, no all-caps display.
+- Numbers, axes, labels, captions: monospace (JetBrains Mono). Key figures large (40–56px) as plain type, never inside a badge.
+- Captions: ~~11px~~ **[A3] 12px minimum, 14px on Fokus** (gym-readable), mono, uppercase, letter-spacing 0.08em, muted.
+- **[A4] Red text** only at ≥ 24px, or bold ≥ 18.66px (accent ≈ 4.15:1 on dark bg, 3.40 on light bg: large-text only). Smaller than that, red is a mark, tick or fill, always next to a word.
+
+Layout:
+- Hairlines instead of cards. A section is a heading, a hairline, content, air. No filled containers except the single accent element on a screen.
+- **[A5]** A hairline (#2D2D2D on bg ≈ 1.34:1; light ≈ 1.25) is a divider only. Anything you tap that has an outline (Spring over, Afslut, the felt-RPE buttons, the stepper) is outlined in `--text-muted` (≥ 3:1 in both themes) or `--text`, never in the hairline.
+- Registration marks (small + crosses) at page corners on desktop only, 1px, muted.
+- Generous whitespace; max content width 1200; 8-pt grid. **[A6]** Part A's 4-pt scale stays the token set; layout steps use its multiples of 8 (8, 16, 24, 32, 48, 64); 4 and 12 are for optical fixes inside a component only.
+
+Charts:
+- Marks, not areas. Lines are 1px; days are ticks; rides are dots; strength sessions are short vertical bars (barcode). CTL/ATL/TSB as three line weights/dashes in one colour, "today" as a red tick.
+- No gradients, no filled areas under curves, no gridlines heavier than the hairline.
+- Annotations as footnotes in mono caption style.
+- **[A7]** Part A's chart interaction rules (keyboard, tap targets, a text alternative) stand; a 1px line keeps a ≥ 44px hit area.
+
+Fokus (instrument panel):
+- Rest timer as a horizontal scale with a red tick moving along it; minimum rest marked. Numbers mono.
+- Next-set card has no background: heading, hairline, mono values.
+- Felt-RPE buttons: three outlined mono labels, ~~selected one filled accent~~ **[A8]** the selected one is lit (a filled red lamp square + a 2px `--text` outline), not filled: see the single-accent rule below.
+- "Udført" is the one filled element on the screen. **[A8]** Every Fokus view has exactly one filled accent element, its primary action (table below). A filled label is ≥ 24px, ink `#141414` on red (≈ 4.15:1) in both themes.
+
+Don'ts: neon, italic condensed uppercase, pill badges with background, drop shadows, rounded cards, more than one accent colour per screen.
+
+### Single filled accent per Fokus view (design-lead decision, 2026-10-13)
+| View | The one filled accent | Everything else |
+|---|---|---|
+| Set | **Udført** | Spring over: outlined (`--text-muted`, 1px). Fortryd, Afslut: ink text, underlined |
+| Pause (Variant B) | **Til næste sæt** | Felt-RPE: outlined; selected = lit lamp + 2px `--text` outline. Stepper: outlined |
+| Warm-up (Variant A) | **Til sæt 1** | — |
+| End of exercise (Variant C) | **Til sæt 1** | Felt-RPE as the pause |
+| Finished | **Tilbage til Træning** | Felt-RPE (last set) as the pause |
+
+Reason: Part A gives each view one dominant primary action; a filled RPE choice would compete with it. The red moving tick and the progress "now" tick are marks, not fills, so they do not count.
+
+## Colour tokens (scope `[data-direction="instrument"]`)
+Existing names are reused so later screens change cheaply. Ratios are the main session's 2026-10-13 measurements; `tester` recomputes them at render time.
+
+| Token | Dark (primary) | Light | Role |
+|---|---|---|---|
+| `--bg` | #141414 | #EAE0D2 | page |
+| `--surface` | #1C1C1C | #E3D8C4 | rare: the skeleton, nothing else in Fokus |
+| `--border` | #2D2D2D | #D7C9AE | the hairline (divider only, [A5]) |
+| `--track` | #2D2D2D | #D7C9AE | scale baselines that are decoration |
+| `--text` | #EAE0D2 | #2D2D2D | text, ink marks, 2px selected outline |
+| `--text-muted` | #A68763 | #665946 | captions, control outlines, minor ticks |
+| `--accent` | #E0362B | #E0362B | the one fill, the "now" tick, lamps |
+| `--on-accent` (new) | #141414 | #141414 | label on the accent fill (≥ 24px) |
+| `--focus` | #EAE0D2 | #2D2D2D | 3px ring, 3px offset (sits on bg) |
+| `--positive`, `--negative` | = `--accent` | = `--accent` | only with a word or glyph |
+| `--warning` | = `--text` | = `--text` | ◆ SVG or dashed mark + a word ([A1]) |
+| `--slab` / `--on-slab` / `--on-slab-muted` / `--slab-mark` | `--bg` / `--text` / `--text-muted` / `--accent` | same | so leftover slab classes render unfilled |
+| `--card-shadow` | none | none | |
+| `--series-ctl/atl/tsb`, `--chart-mark` | `--text` (CTL 1px solid, ATL 1px dashed 4/4, TSB 2px solid); marks `--text-muted` | same | Belastning rollout; listed now so names are fixed |
+
+Theme still follows `prefers-color-scheme` (dark is the design target, light the alternative; no toggle).
+
+## Type
+- Fonts via `next/font/google`, self-hosted at build, imported in `web/src/app/fokus/layout.tsx` (not the root layout) so other routes don't preload them: **Inter** (400 only) → `--font-inter`; **JetBrains Mono** (400, 500) → `--font-jetbrains-mono`. Subset `latin` (covers æøå, ·, –, U+2212). Glyphs outside it (✓, ◆, ≈, arrows) are inline SVG, never text, so nothing falls back to a system font.
+- Utilities (add to `@theme inline`): `font-grotesk` = `var(--font-inter), system-ui, sans-serif`; `font-mono` = `var(--font-jetbrains-mono), ui-monospace, monospace`.
+- Scale: the existing `text-12 … text-56` tokens. Grotesk 400 for headings (20, 24, 32) and sentences (16). Mono for every number, label, button and caption; key figures 40–56 mono 400, tabular by nature.
+- **`caption`** utility (new `@utility`): mono 500, uppercase, `letter-spacing: 0.08em`, `--text-muted`; size `text-14` on Fokus, `text-12` minimum elsewhere.
+- **Computed vs written:** italic is retired. The caption above a figure names its source (`FORSLAG`, `OPVARMNING` = computed by the app; `SIDSTE UGE` = logged; `ARKET` = as written). Every figure has its caption directly above it.
+
+## Shape
+- Radius **0** everywhere in scope (no `rounded-*` class; the radius tokens are `@theme inline`, so they can't be zeroed by the scope). No shadows. No filled containers except the view's one accent element.
+- Lines: hairline 1px `--border`; ticks 1–2px; control outline 1px `--text-muted`, selected 2px `--text`.
+
+## Space and density
+8-pt rhythm ([A6]). Section = caption or heading → 8px → hairline → 8–16px → content → 24px air (16px on Fokus at 390 to hold the fold). Gutter 16px at 390, 24px from 640px, content max 1200px centred. Generous on desktop, compact enough on Fokus to meet `fokus-pause.md` §10.1.
+
+## Motion
+Instruments step, they don't glide. The rest tick and the timer jump once a second with no transition. View change: opacity cross-fade 120ms. Lamp lights in 0ms (it is a lamp). Press: no scale; the fill darkens via `filter: brightness(0.9)` on `:active`. `prefers-reduced-motion`: the cross-fade is 0ms; everything else already is.
+
+## Signature elements
+1. **The red "now" tick.** One 2px red vertical mark that says where you are: the moving tick on the rest scale, the current set in the progress barcode, "today" on charts later.
+2. **Progress barcode.** One vertical tick per set (done tall ink, skipped short muted, open hairline-short muted, current red and tallest). Shape carries state, red only marks "now".
+3. **Registration marks** on desktop (≥ 1024px): 12px + crosses, 1px `--text-muted`, 24px in from each viewport corner, `aria-hidden`, `pointer-events: none`.
+
+---
+
+# Appendix – Spurt (replaced 2026-10-13; still governs Træning, Belastning and Analyse until each is restyled, see Part B "Rollout")
 
 **Decision:** base **Spurt** (type, light palette, shape, density, motion, the NÆSTE slab, the segmented progress bar) + **Logbog's zone bar** as the one form element on both screens, restyled in Spurt's language + **dark theme derived from Ro's palette**. The Mode 0 samples (Ro, Logbog, Spurt) are local HTML files, git-ignored; this part is the contract, not the samples.
 
