@@ -27,7 +27,7 @@ import { nearestIndex, type Readout, restingReadout, xAtPointer } from "@/lib/ch
 import { formatDate, formatDay, LOCALE, TSS_PER_DAY } from "@/lib/format";
 import { prognoseStatus, strengthLine, strengthUnknownNote } from "@/lib/prognose-text";
 
-import { ChartReadout, Marker, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
+import { ChartReadout, Marker, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
 
 import { LineSample, SERIES, type SeriesKey } from "./ChartSeries";
 import { EmptyState } from "./EmptyState";
@@ -204,17 +204,16 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
   const picked = pick === null ? undefined : rows[pick.index];
   const latest = latestIndex < 0 ? undefined : rows[latestIndex];
   const markerX = picked === undefined ? null : `calc${xCss((picked.x - lo) / (hi - lo))}`;
-  const readout =
-    picked !== undefined && pick?.mode !== "mouse"
-      ? rowReadout(picked, blocks)
-      : restingReadout(latest === undefined ? null : rowReadout(latest, blocks), "Tryk på grafen for at se en dag");
+  const resting = restingReadout(latest === undefined ? null : rowReadout(latest, blocks), "Tryk på grafen for at se en dag");
+  const readout = picked !== undefined && pick?.mode !== "mouse" ? rowReadout(picked, blocks) : resting;
+  const all = [resting, ...rows.map((r) => rowReadout(r, blocks))];
 
   return (
     <>
     <div
       {...plotProps}
       aria-label={`${title}. Piletaster vælger en dag`}
-      className="relative flex h-(--chart-height) w-full flex-col rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus"
+      className={`relative flex h-(--chart-height) w-full flex-col ${PLOT_FOCUS}`}
     >
       {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
       {picked !== undefined && markerX !== null && pick?.mode === "mouse" && (
@@ -370,7 +369,7 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
         </ComposedChart>
       </div>
     </div>
-    <ChartReadout readout={readout} lines={READOUT_LINES} cells swatch={seriesSwatch} />
+    <ChartReadout readout={readout} all={all} lines={READOUT_LINES} cells swatch={seriesSwatch} />
     </>
   );
 }

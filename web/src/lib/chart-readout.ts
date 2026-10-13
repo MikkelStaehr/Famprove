@@ -3,6 +3,8 @@
  * No React: the components (components/ChartReadout.tsx) render what these return.
  */
 
+import { stopAfter } from "./format.ts";
+
 /** One value cell on line 2: the series' swatch (by key), its label in --text-muted, then the value. */
 export type ReadoutCell = {
   readonly key: string; // a SeriesKey on /load; otherwise a stable id (no swatch)
@@ -18,6 +20,7 @@ export type Readout = {
   readonly cells: readonly ReadoutCell[];
   readonly facts: readonly string[];
   readonly muted?: boolean; // the "Tryk på grafen …" empty rest state
+  readonly factTone?: "text"; // Styrke: the lift lines are lines 2+ in --text, not muted facts
 };
 
 export const REST_PREFIX = "Seneste · ";
@@ -74,8 +77,45 @@ export function viCell(vi: number | null, warning: boolean | null): ReadoutCell 
     : { key: "vi", label: "VI", value: VI_FORMAT.format(vi) };
 }
 
-/** Plain text of a readout, for the throttled aria-live region. */
+/** Plain text of a readout, for the throttled aria-live region; a part ending in "okt." gets no second stop. */
 export function readoutText(r: Readout): string {
   const cells = r.cells.map((c) => `${c.label} ${c.value === MISSING ? "ikke registreret" : c.value}${c.sr !== undefined && c.value !== MISSING ? c.sr : ""}`);
-  return [r.head, cells.join(", "), ...r.facts].filter((s) => s !== "").join(". ");
+  const parts = [r.head, cells.join(", "), ...r.facts].filter((s) => s !== "");
+  return parts.map((s, i) => (i === parts.length - 1 ? s : `${s}${stopAfter(s)}`)).join(" ");
+}
+
+/**
+ * The fact lines that fit the row's fixed line count: more facts than `slots` keep the first
+ * slots − 1 and join the rest into the last line with " · " (the aria-live text keeps them all).
+ */
+export function capFacts(facts: readonly string[], slots: number): readonly string[] {
+  if (facts.length <= slots) return facts;
+  if (slots <= 0) return [];
+  return [...facts.slice(0, slots - 1), facts.slice(slots - 1).join(" · ")];
+}
+
+/** Two marks on one x (two rides on one day): the one with the highest value; a null value never wins. */
+export function highestAt(xs: readonly number[], ys: readonly (number | null)[], i: number): number {
+  let best = i;
+  for (let j = 0; j < xs.length; j += 1) {
+    if (xs[j] !== xs[i]) continue;
+    const y = ys[j];
+    const b = ys[best];
+    if (y !== null && (b === null || y > b)) best = j;
+  }
+  return best;
+}
+
+/**
+ * DESIGN.md "Gaps": the index of the seam the pointer x lies in when the nearest point is more
+ * than `maxDays` away (the marker stays at the tap and line 1 reads the seam); otherwise -1.
+ */
+export function gapSeam(
+  x: number,
+  nearestX: number | undefined,
+  seams: readonly { readonly x0: number; readonly x1: number }[],
+  maxDays = 14,
+): number {
+  if (nearestX !== undefined && Math.abs(nearestX - x) <= maxDays) return -1;
+  return seams.findIndex((s) => s.x0 <= x && x < s.x1);
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { type Readout, readoutText, tipLeft } from "@/lib/chart-readout";
+import { capFacts, type Readout, readoutText, tipLeft } from "@/lib/chart-readout";
 
 /**
  * DESIGN.md "Charts: interaction": one selection per chart card. Touch and pen (pointerType !==
@@ -10,12 +10,20 @@ import { type Readout, readoutText, tipLeft } from "@/lib/chart-readout";
  * a floating tooltip that never covers the point; ←/→ step, Esc clears. A tap outside clears.
  */
 export type PickMode = "touch" | "mouse" | "key";
-export type Pick = { readonly index: number; readonly mode: PickMode };
+// x: the data x of a tap that stayed in an "Ingen ture" seam (DESIGN.md "Gaps"); index is the nearest point.
+export type Pick = { readonly index: number; readonly mode: PickMode; readonly x?: number };
+
+/**
+ * The plot's focus ring: keyboard only (:focus-visible, --focus). Recharts' inner svg groups can take
+ * focus from a tap (tabindex -1, never tabbable); they get no browser outline.
+ */
+export const PLOT_FOCUS =
+  "rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus [&_:focus]:outline-none";
 
 export function useChartPick(opts: {
   readonly count: number;
   readonly startIndex: number; // where ←/→ start (the latest point / current week)
-  readonly indexAt: (clientX: number, box: DOMRect) => number | null;
+  readonly indexAt: (clientX: number, box: DOMRect) => number | { readonly index: number; readonly x: number } | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pick, setPick] = useState<Pick | null>(null);
@@ -35,12 +43,13 @@ export function useChartPick(opts: {
   const at = (e: PointerEvent<HTMLDivElement>, press: boolean) => {
     const touch = e.pointerType !== "mouse";
     if (touch && !press && e.buttons === 0) return; // a pen hovering: no selection
-    const index = opts.indexAt(e.clientX, e.currentTarget.getBoundingClientRect());
-    if (index === null) {
+    const hit = opts.indexAt(e.clientX, e.currentTarget.getBoundingClientRect());
+    if (hit === null) {
       if (!touch) setPick(null);
       return;
     }
-    setPick({ index, mode: touch ? "touch" : "mouse" });
+    const mode = touch ? "touch" : "mouse";
+    setPick(typeof hit === "number" ? { index: hit, mode } : { index: hit.index, x: hit.x, mode });
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -100,8 +109,17 @@ function Triangle() {
   );
 }
 
-/** Line 1, the cells (swatch, muted label, value) and the facts. */
-export function ReadoutLines({ readout, swatch }: { readonly readout: Readout; readonly swatch?: (key: string) => ReactNode }) {
+/** Line 1, the cells (swatch, muted label, value) and the facts (Styrke's lift lines in --text). */
+export function ReadoutLines({
+  readout,
+  swatch,
+  slots,
+}: {
+  readonly readout: Readout;
+  readonly swatch?: (key: string) => ReactNode;
+  readonly slots?: number; // the row's fact lines; the tooltip shows every fact
+}) {
+  const facts = slots === undefined ? readout.facts : capFacts(readout.facts, slots);
   return (
     <>
       <p className={`text-14 ${readout.muted === true ? "text-text-muted" : "font-semibold text-text"}`}>{readout.head}</p>
@@ -119,8 +137,12 @@ export function ReadoutLines({ readout, swatch }: { readonly readout: Readout; r
           ))}
         </p>
       )}
-      {readout.facts.map((f, i) => (
-        <p key={i} className="text-14 text-text-muted tabular-nums">
+      {facts.map((f, i) => (
+        <p
+          key={i}
+          // the joined overflow line (prognose basis) is cut with an ellipsis so the row keeps its lines
+          className={`text-14 tabular-nums ${readout.factTone === "text" ? "text-text" : "text-text-muted"}${slots !== undefined && readout.facts.length > slots && i === facts.length - 1 ? " truncate" : ""}`}
+        >
           {f}
         </p>
       ))}
@@ -128,29 +150,55 @@ export function ReadoutLines({ readout, swatch }: { readonly readout: Readout; r
   );
 }
 
-/** The readout row: under the x labels, fixed min-height, aria-live (throttled to 150 ms). */
+/**
+ * The readout row: under the x labels, fixed height, aria-live (throttled to 150 ms). Facts beyond
+ * the chart's line count join into its last line. Every readout the chart can show is stacked
+ * invisibly in the same grid cell, so the row is as tall as the tallest one at this width (cells
+ * that wrap at 390px, a long Styrke line) and two taps never change its height; 200 % text grows it.
+ */
 export function ChartReadout({
   readout,
+  all,
   lines,
   cells,
   swatch,
 }: {
   readonly readout: Readout;
+  readonly all: readonly Readout[]; // every readout the chart can show (rest state included)
   readonly lines: number;
   readonly cells: boolean; // the chart has a cells line (line 2 at text-16)
   readonly swatch?: (key: string) => ReactNode;
 }) {
   const live = useThrottled(readoutText(readout));
+  const slots = lines - 1 - (cells ? 1 : 0);
+  const key = all.map(readoutText).join("\n");
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the readouts' text, not the array identity
+  const sizers = useMemo(() => uniqueByText(all), [key]);
   return (
-    <div className="flex flex-col" style={{ minHeight: readoutMinHeight(lines, cells) }}>
-      <div aria-hidden="true" className="flex flex-col">
-        <ReadoutLines readout={readout} swatch={swatch} />
+    <div className="grid grid-cols-[minmax(0,1fr)]" style={{ minHeight: readoutMinHeight(lines, cells) }}>
+      <div aria-hidden="true" className="col-start-1 row-start-1 flex flex-col">
+        <ReadoutLines readout={readout} swatch={swatch} slots={slots} />
       </div>
+      {sizers.map((r, i) => (
+        <div key={i} aria-hidden="true" className="invisible col-start-1 row-start-1 flex flex-col">
+          <ReadoutLines readout={r} swatch={swatch} slots={slots} />
+        </div>
+      ))}
       <p className="sr-only" aria-live="polite">
         {live}
       </p>
     </div>
   );
+}
+
+function uniqueByText(all: readonly Readout[]): readonly Readout[] {
+  const seen = new Set<string>();
+  return all.filter((r) => {
+    const t = readoutText(r);
+    if (seen.has(t)) return false;
+    seen.add(t);
+    return true;
+  });
 }
 
 /** Same min-height as the row, for the pre-hydration skeleton (nothing jumps on hydrate). */

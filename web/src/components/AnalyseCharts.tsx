@@ -3,12 +3,12 @@
 import { ComposedChart, CartesianGrid, Line, ReferenceDot, XAxis, YAxis } from "recharts";
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
-import { type AxisTick, type ChartRow, chartRows, formatEf, type LineChartView, type Seam, type WeekBar } from "@/lib/analyse-view";
-import { nearestIndex, type Readout, restingReadout, xAtPointer } from "@/lib/chart-readout";
+import { type AxisTick, type ChartRow, chartRows, formatEf, type LineChartView, type Seam, seamReadout, type WeekBar } from "@/lib/analyse-view";
+import { gapSeam, highestAt, nearestIndex, type Readout, restingReadout, xAtPointer } from "@/lib/chart-readout";
 import { formatLoad } from "@/lib/format";
 import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
-import { ChartReadout, Marker, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
+import { ChartReadout, Marker, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
 import { ChartBoundary, TICK, useHydrated, useWide } from "./TrendChart";
 
 /**
@@ -108,12 +108,19 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
   // One row per mark (two rides on one day keep both); segment keys s0..sN carry the line.
   const rows = chartRows(chart, variant);
   const xs = rows.map((r) => r.x);
+  // Two rides on one day: the readout and ring show the one with the highest value (eFTP or EF).
+  const ys = rows.map((r) => (r.marks[0]?.excluded === false ? r.marks[0].y : null));
   const latestIndex = Math.max(rows.findLastIndex((r) => r.marks.some((m) => m.latest)), rows.findLastIndex((r) => r.marks.some((m) => !m.excluded)));
   const { pick, plotProps } = useChartPick({
     count: rows.length,
     startIndex: latestIndex,
-    indexAt: (clientX, box) =>
-      nearestIndex(xs, xAtPointer(clientX, box, { left: Y_AXIS_WIDTH, right: MARGIN_RIGHT }, axis)),
+    indexAt: (clientX, box) => {
+      const x = xAtPointer(clientX, box, { left: Y_AXIS_WIDTH, right: MARGIN_RIGHT }, axis);
+      const i = nearestIndex(xs, x);
+      if (i < 0) return null;
+      // DESIGN.md "Gaps": far from every ride and inside an "Ingen ture" seam, the marker stays at the tap.
+      return gapSeam(x, xs[i], axis.seams) >= 0 ? { index: i, x } : highestAt(xs, ys, i);
+    },
   });
   if (!hydrated)
     return (
@@ -123,14 +130,16 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
       </>
     );
   const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
-  const picked = pick === null ? undefined : rows[pick.index];
+  const gapX = pick?.x;
+  const seam = gapX === undefined ? undefined : axis.seams[gapSeam(gapX, undefined, axis.seams)];
+  const picked = pick === null || seam !== undefined ? undefined : rows[pick.index];
   const pickedMark = picked?.marks[0];
   const latestMark = latestIndex < 0 ? undefined : rows[latestIndex]?.marks[0];
-  const markerX = picked === undefined ? null : xCss(axis, picked.x);
-  const readout: Readout =
-    pickedMark !== undefined && pick?.mode !== "mouse"
-      ? pickedMark.readout
-      : restingReadout(latestMark?.readout ?? null, "Tryk på grafen for at se en tur");
+  const pickedReadout = seam !== undefined ? seamReadout(seam) : pickedMark?.readout;
+  const markerX = seam !== undefined && gapX !== undefined ? xCss(axis, gapX) : picked === undefined ? null : xCss(axis, picked.x);
+  const resting = restingReadout(latestMark?.readout ?? null, "Tryk på grafen for at se en tur");
+  const readout: Readout = pickedReadout !== undefined && pick?.mode !== "mouse" ? pickedReadout : resting;
+  const all = [resting, ...axis.seams.map(seamReadout), ...rows.flatMap((r) => r.marks.map((m) => m.readout))];
   const ringY = pickedMark === undefined ? null : pickedMark.excluded ? chart.domain[0] : pickedMark.y;
   const segKeys = Array.from({ length: chart.segments }, (_, i) => `s${i}`);
 
@@ -161,11 +170,11 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
     <div
       {...plotProps}
       aria-label={`${title}. Piletaster vælger en tur`}
-      className="relative h-(--chart-height) w-full rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus"
+      className={`relative h-(--chart-height) w-full ${PLOT_FOCUS}`}
     >
       {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
-      {pickedMark !== undefined && markerX !== null && pick?.mode === "mouse" && (
-        <PointerTip readout={pickedMark.readout} left={markerX} rightInset={MARGIN_RIGHT} />
+      {pickedReadout !== undefined && markerX !== null && pick?.mode === "mouse" && (
+        <PointerTip readout={pickedReadout} left={markerX} rightInset={MARGIN_RIGHT} />
       )}
       <ComposedChart
         responsive
@@ -220,7 +229,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
       </ComposedChart>
       <SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />
     </div>
-    <ChartReadout readout={readout} lines={3} cells />
+    <ChartReadout readout={readout} all={all} lines={3} cells />
     </>
   );
 }
@@ -279,16 +288,15 @@ function WeekGroup<W extends PickWeek>({
   const active = pick === null ? null : (weeks[pick.index] ?? null);
   const latest = latestIndex < 0 ? undefined : weeks[latestIndex];
   const markerX = active === null ? null : xCss(axis, (active.x0 + active.x1) / 2);
-  const shown =
-    active !== null && pick?.mode !== "mouse"
-      ? readout(active)
-      : restingReadout(latest === undefined ? null : readout(latest), "Tryk på grafen for at se en uge");
+  const resting = restingReadout(latest === undefined ? null : readout(latest), "Tryk på grafen for at se en uge");
+  const shown = active !== null && pick?.mode !== "mouse" ? readout(active) : resting;
+  const all = [resting, ...weeks.map(readout)];
 
   return (
     <div className="flex flex-col gap-2">
       <div
         {...plotProps}
-        className="relative flex flex-col gap-2 rounded-control focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus"
+        className={`relative flex flex-col gap-2 ${PLOT_FOCUS}`}
         style={{ ...plotProps.style, ...(padTop > 0 ? { paddingTop: padTop } : {}) }}
         aria-label="Uger. Piletaster vælger en uge"
       >
@@ -314,7 +322,7 @@ function WeekGroup<W extends PickWeek>({
           <PointerTip readout={readout(active)} left={markerX} rightInset={MARGIN_RIGHT} />
         )}
       </div>
-      <ChartReadout readout={shown} lines={lines} cells={cells} />
+      <ChartReadout readout={shown} all={all} lines={lines} cells={cells} />
     </div>
   );
 }
@@ -600,7 +608,7 @@ function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProp
       axis={axis}
       weeks={weeks}
       ticks={wide ? axis.ticksWide : axis.ticksNarrow}
-      readout={(w) => ({ head: w.head, cells: [], facts: w.e1rmTip })}
+      readout={(w) => ({ head: w.head, cells: [], facts: w.e1rmTip, factTone: "text" })}
       lines={4}
       cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
@@ -632,7 +640,7 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnagePro
       axis={axis}
       weeks={weeks}
       ticks={wide ? axis.ticksWide : axis.ticksNarrow}
-      readout={(w) => ({ head: w.head, cells: [], facts: w.tonnageTip })}
+      readout={(w) => ({ head: w.head, cells: [], facts: w.tonnageTip, factTone: "text" })}
       lines={4}
       cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
