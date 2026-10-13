@@ -8,7 +8,7 @@ import { addDays, dayNumber, isoWeekNumber, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
 import type { DataError } from "./data-error.ts";
 import type { CyclingAnalysisData, CyclingWeekRow, IsoDate, RideExclusion, RideMetricsRow } from "./db/rows.ts";
-import { formatDate, formatDateRange, formatDay, formatDayLong, formatDuration, formatLoad, formatSigned, formatWatts, LOCALE } from "./format.ts";
+import { formatDate, formatDateRange, formatDay, formatDuration, formatLoad, formatWatts, LOCALE } from "./format.ts";
 
 /** The analysis window starts here (spec §4); weeks from 2024-12-30 are clipped to it. */
 export const AXIS_START: IsoDate = "2025-01-01";
@@ -111,19 +111,6 @@ export function exclusionFacts(r: RideMetricsRow): string {
 
 // --- view types ----------------------------------------------------------------------------
 
-export type Direction = "up" | "down" | "flat";
-
-export type HeroView =
-  | { readonly kind: "none"; readonly text: string; readonly sr: string }
-  | {
-      readonly kind: "eftp";
-      readonly value: string; // "184 W"
-      readonly dateText: string; // "fra tirs. 15. sep."
-      readonly delta: { readonly direction: Direction | null; readonly text: string };
-      readonly detail: string | null;
-      readonly sr: string;
-    };
-
 /** A mark in a line chart: x, y (null for an excluded mark: drawn on the bottom edge). */
 export type Mark = {
   readonly x: number;
@@ -178,7 +165,6 @@ export type AnalyseView =
       readonly ticksNarrow: readonly AxisTick[];
       readonly ticksWide: readonly AxisTick[];
       readonly seams: readonly Seam[];
-      readonly hero: HeroView;
       readonly eftp: LineChartView | null; // null: fewer than 2 points
       readonly noWattNote: string | null;
       readonly ef: LineChartView | EfFew;
@@ -187,46 +173,6 @@ export type AnalyseView =
       readonly weekMax: { readonly hours: number; readonly load: number };
       readonly excluded: { readonly summary: string; readonly items: readonly ExcludedItem[] } | null;
     };
-
-// --- hero (spec §3, §6, §9) ----------------------------------------------------------------
-
-export function deltaCopy(deltaW: number | null): { readonly direction: Direction | null; readonly text: string } {
-  if (deltaW === null) return { direction: null, text: "Ingen eFTP fra samme tid sidste år at sammenligne med" };
-  const signed = formatSigned(deltaW);
-  if (signed.startsWith("+")) return { direction: "up", text: `eFTP stiger: ${signed} W på et år` };
-  if (signed.startsWith("−")) return { direction: "down", text: `eFTP falder: ${signed} W på et år` };
-  return { direction: "flat", text: "eFTP uændret på et år" };
-}
-
-/** The hero is the latest eftp_ok row (selection); its delta is passed through as delivered. */
-export function buildHero(rows: readonly RideMetricsRow[], currentYear: number): HeroView {
-  const latest = rows.findLast(isEftpRow);
-  if (latest === undefined) {
-    const text = `Ingen ture med watt siden ${SINCE}, så der er ingen eFTP endnu.`;
-    return { kind: "none", text, sr: text };
-  }
-  const w = formatLoad(latest.rollingFtpW);
-  const yearAgoW = latest.eftpYearAgoW;
-  const yearAgoDate = latest.eftpYearAgoDate;
-  const detail =
-    yearAgoW !== null && yearAgoDate !== null
-      ? `Samme tid sidste år: ${formatWatts(yearAgoW)} (${dayText(yearAgoDate, currentYear)})`
-      : null;
-  let sr = `Estimeret FTP ${w} watt den ${formatDayLong(latest.date)}.`;
-  if (detail !== null && yearAgoW !== null && latest.eftpDeltaW !== null) {
-    const d = formatSigned(latest.eftpDeltaW);
-    const spoken = d.startsWith("+") ? `plus ${d.slice(1)} watt` : d.startsWith("−") ? `minus ${d.slice(1)} watt` : "uændret";
-    sr += ` Et år før: ${formatLoad(yearAgoW)} watt, ${spoken}.`;
-  }
-  return {
-    kind: "eftp",
-    value: `${w} W`,
-    dateText: `fra ${dayText(latest.date, currentYear)}`,
-    delta: deltaCopy(latest.eftpDeltaW),
-    detail,
-    sr,
-  };
-}
 
 // --- y domains (choosing a domain is allowed, spec intro) -----------------------------------
 
@@ -597,7 +543,6 @@ export function buildAnalyseView(data: CyclingAnalysisData, now: Date, today: Is
     ticksNarrow: axisTicks(today, false),
     ticksWide: axisTicks(today, true),
     seams: data.weeks === null ? [] : seams(data.weeks),
-    hero: buildHero(rows, year),
     eftp: eftpChart(plotted, today, excludedRows.length),
     noWattNote:
       noWatt === 0 ? null : `${rides(noWatt)} uden watt er ikke med her, men tæller i timer og belastning.`,

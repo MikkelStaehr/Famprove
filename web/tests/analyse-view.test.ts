@@ -10,8 +10,6 @@ import {
   shownEfTrend,
   marksAt,
   buildAnalyseView,
-  buildHero,
-  deltaCopy,
   efTooFew,
   exclusionFacts,
   exclusionText,
@@ -61,35 +59,6 @@ function ride(date: string, o: Partial<RideMetricsRow> = {}): RideMetricsRow {
 function week(weekStart: string, rides: number, o: Partial<CyclingWeekRow> = {}): CyclingWeekRow {
   return { weekStart, rides, movingS: rides * 3600, load: rides * 50, excluded: 0, computedAt: AT, ...o };
 }
-
-test("hero: the latest eftp_ok row, its delta passed through as delivered", () => {
-  const rows = [
-    ride("2026-09-10", { eftpOk: true, rollingFtpW: 190, eftpDeltaW: -10, eftpYearAgoW: 200, eftpYearAgoDate: "2025-09-08" }),
-    ride("2026-09-15", { eftpOk: true, rollingFtpW: 184, eftpDeltaW: -49, eftpYearAgoW: 233, eftpYearAgoDate: "2025-09-12" }),
-    ride("2026-09-20", { eftpOk: false, rollingFtpW: 300 }),
-  ];
-  const hero = buildHero(rows, 2026);
-  assert.equal(hero.kind, "eftp");
-  if (hero.kind !== "eftp") return;
-  assert.equal(hero.value, "184 W");
-  assert.equal(hero.dateText, "fra tirs. 15. sep.");
-  assert.equal(hero.delta.text, "eFTP falder: −49 W på et år");
-  assert.equal(hero.detail, "Samme tid sidste år: 233 W (fre. 12. sep. 2025)");
-  assert.equal(hero.sr, "Estimeret FTP 184 watt den tirsdag 15. september. Et år før: 233 watt, minus 49 watt.");
-});
-
-test("hero: no eFTP", () => {
-  const hero = buildHero([ride("2026-09-15")], 2026);
-  assert.deepEqual(hero.kind, "none");
-  assert.match(hero.sr, /^Ingen ture med watt siden 1\. jan\. 2025/);
-});
-
-test("delta copy variants (no arithmetic: the delivered value, rounded for display)", () => {
-  assert.deepEqual(deltaCopy(12), { direction: "up", text: "eFTP stiger: +12 W på et år" });
-  assert.deepEqual(deltaCopy(-49), { direction: "down", text: "eFTP falder: −49 W på et år" });
-  assert.deepEqual(deltaCopy(0.2), { direction: "flat", text: "eFTP uændret på et år" });
-  assert.deepEqual(deltaCopy(null), { direction: null, text: "Ingen eFTP fra samme tid sidste år at sammenligne med" });
-});
 
 test("exclusion copy and facts; an unknown code is never guessed", () => {
   assert.equal(exclusionText("too_short").short, "For kort");
@@ -178,14 +147,6 @@ test("page view: summary counts, sr sentences, freshness from the older table", 
     "eFTP fra intervals.icu for 3 ture med watt fra 1. jan. 2025 til 1. okt. 2026. Seneste 184 W den 15. sep. 2026, højeste 233 W den 12. sep. 2025, laveste 181 W den 10. mar. 2026. Pause uden punkter fra 12. sep. 2025 til 10. mar. 2026. 1 tur er udeladt; se listen Udeladte ture.",
   );
   assert.equal(buildAnalyseView({ rides: [], weeks: [] }, new Date(AT), "2026-10-01").kind, "empty");
-});
-
-test("hero sr: no year-ago sentence without the year-ago date (the visible line is hidden too)", () => {
-  const rows = [ride("2026-09-20", { eftpOk: true, rollingFtpW: 184, eftpYearAgoW: 233, eftpYearAgoDate: null, eftpDeltaW: -49 })];
-  const hero = buildHero(rows, 2026);
-  assert.ok(hero.kind === "eftp");
-  assert.equal(hero.detail, null);
-  assert.ok(!hero.sr.includes("Et år før"));
 });
 
 test("two rides on one day keep two marks, and the tooltip lists both", () => {

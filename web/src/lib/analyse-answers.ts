@@ -7,7 +7,7 @@
  */
 import { EF_TREND_MIN_RIDES, formatEf } from "./analyse-view.ts";
 import type { DataError } from "./data-error.ts";
-import type { AnalysisSummaryRow, IsoDate, SummaryDirection, SummaryQuestion } from "./db/rows.ts";
+import { type AnalysisSummaryRow, type IsoDate, SUMMARY_QUESTIONS, type SummaryDirection, type SummaryQuestion } from "./db/rows.ts";
 import { formatDate, formatWatts, LOCALE } from "./format.ts";
 
 const HOURS = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -151,9 +151,8 @@ export function buildAnswers(
   currentYear: number,
 ): AnswersView {
   if (summary === null || summary === undefined) return { kind: "error", error: error ?? null };
-  const order: readonly SummaryQuestion[] = ["eftp", "ef", "volume"];
   return {
     kind: "ready",
-    blocks: order.map((q) => answerBlock(q, summary.find((r) => r.question === q) ?? null, currentYear)),
+    blocks: SUMMARY_QUESTIONS.map((q) => answerBlock(q, summary.find((r) => r.question === q) ?? null, currentYear)),
   };
 }
