@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { formatClock, spokenSigned } from "../src/lib/format.ts";
-import { type LoggedSet, setKey, type SetRef } from "../src/lib/set-taps.ts";
+import { type LoggedSet, sessionOrderWithWarmups, setKey, type SetRef } from "../src/lib/set-taps.ts";
 import {
   checklistView,
   type ExerciseView,
@@ -87,6 +87,22 @@ test("last week and reps as written", () => {
   assert.equal(lastWeekText(row(1, { reference: { kg: 10, bodyweight: true } }), 3), "kropsvægt + 10 kg");
   assert.equal(repsText(row(1, { repsText: "8 - 12" })), "8 - 12 reps");
   assert.equal(repsText(row(1, { repsText: null })), null);
+});
+
+test("checklist: Begynd begins the open warm-up (set 0); the highlight stays on set 1", () => {
+  const exercises = [row(10), row(11), row(20, { name: "Bench press" })];
+  const order = sessionOrderWithWarmups(exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name }))));
+  const empty = checklistView(exercises, order, new Map());
+  assert.deepEqual([empty.beginAt, empty.first], [{ row: 10, set: 0 }, { row: 10, set: 1 }]);
+  // Warm-up begun: Fortsæt begins nothing new (the warm-up is still the first open entry).
+  const begun = checklistView(exercises, order, logOf([{ row: 10, set: 0, startedAt: AT }]));
+  assert.deepEqual(begun.beginAt, { row: 10, set: 0 });
+  // Squat done: the next open entry is Bench press's warm-up.
+  const squatDone = logOf([
+    { row: 10, set: 0, startedAt: AT, endedAt: AT },
+    ...[10, 11].flatMap((r) => [1, 2].map((set) => ({ row: r, set, startedAt: AT, endedAt: AT }))),
+  ]);
+  assert.deepEqual(checklistView(exercises, order, squatDone).beginAt, { row: 20, set: 0 });
 });
 
 test("checklist: slab on the first open set's group, runs, dividers, progress", () => {

@@ -280,7 +280,7 @@ async function FeelCard() {
     <Card id="feel" variant="calm" level={3} title="Sådan føles sættene">
       <ul className="flex flex-col gap-3">
         {items.map((r) => (
-          <li key={r.name} className="flex max-w-[60ch] flex-col">
+          <li key={r.id} className="flex max-w-[60ch] flex-col">
             <span className="text-16 font-bold">{r.name}</span>
             <span className="text-16">{r.verdict}</span>
             <span className="text-14 text-text-muted">{r.basis}</span>

@@ -236,8 +236,9 @@ export function midsessionPlanned(
 
 /** DEV_FIXTURE=feel: two exercise_feel rows in Python's sentence form (not real verdicts). */
 export const ILLUSTRATIVE_FEEL: readonly ExerciseFeelRow[] = [
-  { exerciseId: -2, name: "Romanian deadlift", ratedN: 6, verdictText: "Du melder oftest som ventet – forslaget rammer trænerens RPE" },
-  { exerciseId: -1, name: "Squat", ratedN: 12, verdictText: "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE" },
+  // Python's own sentences (domain/set_feedback.exercise_feel; tests/fixtures/exercise_feel.json).
+  { exerciseId: -2, name: "Low incline DB press", ratedN: 6, verdictText: "Du melder oftest som foreskrevet." },
+  { exerciseId: -1, name: "Squat", ratedN: 12, verdictText: "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE." },
 ];
 
 /** DEV_FIXTURE=midsession: sets done per session before the skipped one. */

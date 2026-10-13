@@ -23,14 +23,20 @@ export function SessionBlock() {
   // Back from Fortryd of "Begynd træning" (fokus-pause.md §6): say so, focus Begynd once, drop the query.
   useEffect(() => {
     if (!beginUndone(window.location.search)) return;
-    if (status.current !== null) status.current.textContent = BEGIN_UNDONE_TEXT; // once, no re-render
     button.current?.focus();
+    // After the region is in the tree: many screen readers drop text set as it mounts.
+    const timer = window.setTimeout(() => {
+      if (status.current !== null) status.current.textContent = BEGIN_UNDONE_TEXT; // once, no re-render
+    }, 150);
     window.history.replaceState(null, "", window.location.pathname);
+    return () => window.clearTimeout(timer);
   }, []);
   const begin = () => {
-    const first = view.first;
-    if (first === null) return;
-    if (setLog.log.get(setKey(first))?.startedAt == null) setLog.tap("begin", first);
+    // The warm-up of the first exercise when it is open (fokus-pause.md §6), not its set 1:
+    // view.first points a warm-up at set 1 for the checklist's highlight only.
+    const at = view.beginAt;
+    if (at === null) return;
+    if (setLog.log.get(setKey(at))?.startedAt == null) setLog.tap("begin", at);
     void settle(setLog.flush).then(() => router.push("/fokus?view=set")); // the set view (spec §4.5)
   };
   return (

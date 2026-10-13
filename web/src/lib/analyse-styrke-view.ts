@@ -548,13 +548,13 @@ const FEEL_FIRST = ["squat", "bench", "bench press", "bænkpres", "deadlift", "d
  * An empty list means no card.
  */
 export function feelRows(
-  rows: readonly { readonly name: string; readonly ratedN: number; readonly verdictText: string }[],
-): { readonly name: string; readonly verdict: string; readonly basis: string }[] {
+  rows: readonly { readonly exerciseId: number; readonly name: string; readonly ratedN: number; readonly verdictText: string }[],
+): { readonly id: number; readonly name: string; readonly verdict: string; readonly basis: string }[] {
   const rank = (name: string) => {
     const i = FEEL_FIRST.indexOf(name.trim().toLowerCase());
     return i === -1 ? FEEL_FIRST.length : i;
   };
   return rows
     .toSorted((a, b) => rank(a.name) - rank(b.name) || a.name.trim().localeCompare(b.name.trim(), "da-DK"))
-    .map((r) => ({ name: r.name.trim(), verdict: r.verdictText, basis: `Ud fra ${r.ratedN} vurderede sæt` }));
+    .map((r) => ({ id: r.exerciseId, name: r.name.trim(), verdict: r.verdictText, basis: `Ud fra ${r.ratedN} vurderede sæt` }));
 }

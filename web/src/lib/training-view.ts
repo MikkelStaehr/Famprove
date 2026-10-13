@@ -484,6 +484,8 @@ export type ChecklistView = {
   readonly progress: Progress;
   readonly segments: readonly SetState[]; // by position in the session's order
   readonly first: SetRef | null; // the first open set; null when every set is done or skipped
+  /** Where Begynd / Fortsæt writes "begin": the first open entry, an open warm-up included. */
+  readonly beginAt: SetRef | null;
   /** The header's primary action: none touched, some touched, or every set closed. */
   readonly primary: "begin" | "continue" | "finished";
 };
@@ -540,6 +542,7 @@ export function checklistView(
     progress: p,
     segments: order.filter((r) => !isWarmup(r)).map((r) => stateOf(log.get(setKey(r)))),
     first,
+    beginAt: open,
     primary: first === null ? "finished" : p.done + p.skipped > 0 ? "continue" : "begin",
   };
 }

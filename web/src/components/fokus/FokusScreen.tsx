@@ -47,7 +47,17 @@ import {
 } from "@/lib/set-taps";
 
 import { FokusProgress } from "./FokusProgress";
-import { FeelBlock, Footer, NextSetCard, PauseCard, PRIMARY_INK, PrimaryButton, WarmupCard } from "./PauseParts";
+import {
+  FeelBlock,
+  Footer,
+  IN_SLAB_FOCUS,
+  NextSetCard,
+  PauseCard,
+  PRESS,
+  PRIMARY_INK,
+  PrimaryButton,
+  WarmupCard,
+} from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
 
 export type FokusSession = {
@@ -71,10 +81,7 @@ type FokusScreenProps = {
   readonly mainLifts: readonly string[] | null;
 };
 
-const PRESS =
-  "transition-transform duration-120 ease-out active:scale-97 motion-reduce:transition-none motion-reduce:active:scale-100";
 const OUTLINE_PILL = "rounded-pill border-2 border-text-muted text-16 font-semibold text-text";
-const IN_SLAB_FOCUS = "focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-slab-mark";
 const FADE_IN = "transition-opacity duration-180 ease-out starting:opacity-0 motion-reduce:transition-none";
 
 /**
@@ -84,7 +91,7 @@ const FADE_IN = "transition-opacity duration-180 ease-out starting:opacity-0 mot
  * sæt" writes nothing: it only dismisses the current rest.
  */
 export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts }: FokusScreenProps) {
-  const { log, tap, unsaved, retry, rejected, dev, flush } = useSetLog(session.log, session.order, date, session.session);
+  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow } = useSetLog(session.log, session.order, date, session.session);
   const [dismissed, setDismissed] = useState<string | null>(() =>
     enteredFromTraening ? restStart(new Map(session.log.map((l) => [setKey(l), l]))) : null,
   );
@@ -165,7 +172,8 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       // Fortryd of "Begynd træning" (§6): the warm-up row goes, and Træning shows Begynd again.
       if (begun === null) return;
       tap("undo", begun.ref);
-      void settle(flush).then(() => router.push(BEGIN_UNDONE_HREF)); // Træning focuses Begynd and says so
+      // Træning says "not begun" and focuses Begynd only when the undo was saved; else it shows the truth.
+      void settle(flush).then((sent) => router.push(sent && failedNow() === 0 ? BEGIN_UNDONE_HREF : "/"));
       return;
     }
     const undone = at(latest.ref);
@@ -305,7 +313,6 @@ function CheckIcon() {
     </svg>
   );
 }
-
 
 /** §4.2: the current set on a full slab card, Udført inside it, Spring over below. */
 function SetView({

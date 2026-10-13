@@ -33,14 +33,20 @@ export type SetLog = {
   readonly dev: boolean; // the dev switches are on: nothing is saved
   /** Resolves when every queued save has been sent (before leaving a screen). */
   readonly flush: () => Promise<void>;
+  /** Taps whose save failed right now (a ref, not render state: safe after an await). */
+  readonly failedNow: () => number;
 };
 
 /** How long leaving a screen waits for queued saves before it goes anyway (offline, slow). */
 export const FLUSH_WAIT_MS = 3000;
 
 /** Waits for `flush` at most FLUSH_WAIT_MS. */
-export function settle(flush: () => Promise<void>): Promise<void> {
-  return Promise.race([flush(), new Promise<void>((resolve) => setTimeout(resolve, FLUSH_WAIT_MS))]);
+/** Waits for the queued saves, at most FLUSH_WAIT_MS; true when they were all sent in time. */
+export function settle(flush: () => Promise<void>): Promise<boolean> {
+  return Promise.race([
+    flush().then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), FLUSH_WAIT_MS)),
+  ]);
 }
 
 export function useSetLog(
@@ -112,6 +118,7 @@ export function useSetLog(
   }, [send, countFailed]);
 
   const flush = useCallback(() => queue.current, []);
+  const failedNow = useCallback(() => failed.current.length, []);
 
-  return { log, tap, unsaved, retry, rejected, dev, flush };
+  return { log, tap, unsaved, retry, rejected, dev, flush, failedNow };
 }

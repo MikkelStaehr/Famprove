@@ -32,10 +32,10 @@ import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
-const PRESS =
+export const PRESS =
   "transition-transform duration-120 ease-out active:scale-97 motion-reduce:transition-none motion-reduce:active:scale-100";
 export const PRIMARY_INK = `flex min-h-16 w-full items-center justify-center gap-2 rounded-pill bg-text px-4 font-display text-32 font-extrabold text-bg uppercase italic ${PRESS}`;
-const IN_SLAB_FOCUS = "focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-slab-mark";
+export const IN_SLAB_FOCUS = "focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-slab-mark";
 
 function Check({ className }: { readonly className: string }) {
   return (
