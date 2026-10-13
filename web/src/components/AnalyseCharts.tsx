@@ -3,11 +3,13 @@
 import { ComposedChart, CartesianGrid, Line, ReferenceDot, XAxis, YAxis } from "recharts";
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
-import { type AxisTick, type ChartRow, chartRows, formatEf, type LineChartView, type Seam, seamReadout, type WeekBar } from "@/lib/analyse-view";
+import { type AxisTick, type ChartRow, chartRows, eftpDots, formatEf, type LineChartView, type Mark, type Seam, seamReadout, slotCentre, type WeekBar } from "@/lib/analyse-view";
+import { MARKS } from "@/lib/chart-marks";
 import { gapSeam, highestAt, nearestIndex, type Readout, restingReadout, restingWeekIndex, xAtPointer } from "@/lib/chart-readout";
 import { formatLoad } from "@/lib/format";
 import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
+import { ExcludedCross, HollowDot, RingedDot } from "./ChartMarks";
 import { ChartReadout, Marker, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
 import { ChartBoundary, TICK, useHydrated, useWide } from "./TrendChart";
 
@@ -37,7 +39,24 @@ function xCss(axis: { readonly lo: number; readonly hi: number }, x: number): st
 }
 
 function Skeleton({ height }: { readonly height: string }) {
-  return <div className={`${height} w-full rounded-control bg-track motion-safe:animate-pulse`} />;
+  return <div className={`${height} w-full bg-surface motion-safe:animate-pulse`} />;
+}
+
+/**
+ * The red today tick (instrument-analyse.md §1): 2×8 --chart-today, centred on the x baseline at
+ * day `x`. HTML so it shares xCss with the seams and strips; aria-hidden.
+ */
+function TodayMark({ axis, x, bottom }: { readonly axis: { readonly lo: number; readonly hi: number }; readonly x: number; readonly bottom: number }) {
+  const t = MARKS.todayTick;
+  const h = t.height.analyse;
+  return (
+    <div
+      aria-hidden="true"
+      data-mark="today"
+      className="pointer-events-none absolute z-[2]"
+      style={{ left: `calc(${xCss(axis, x)} - ${t.width / 2}px)`, bottom: bottom - h / 2, width: t.width, height: h, background: t.color }}
+    />
+  );
 }
 
 /** Spec §4: dashed edges and a centred "Ingen ture" label in the 18px top strip; aria-hidden. */
@@ -53,7 +72,7 @@ function SeamOverlay({ axis, bottom }: { readonly axis: Axis; readonly bottom: n
               style={{
                 left: xCss(axis, x),
                 bottom,
-                backgroundImage: "repeating-linear-gradient(to bottom, var(--chart-mark) 0 3px, transparent 3px 6px)",
+                backgroundImage: `repeating-linear-gradient(to bottom, ${MARKS.seam.color} 0 3px, transparent 3px 6px)`,
               }}
             />
           ))}
@@ -62,7 +81,7 @@ function SeamOverlay({ axis, bottom }: { readonly axis: Axis; readonly bottom: n
             style={{ left: xCss(axis, s.x0), width: `calc(${xCss(axis, s.x1)} - ${xCss(axis, s.x0)})` }}
           >
             {/* Omitted (not clipped) when the run is narrower than the label. */}
-            <span className="hidden text-12 font-medium whitespace-nowrap text-text-muted @[4.5rem]:inline">Ingen ture</span>
+            <span className="caption hidden whitespace-nowrap @[5.5rem]:inline">Ingen ture</span>
           </div>
         </div>
       ))}
@@ -143,27 +162,38 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
   const ringY = pickedMark === undefined ? null : pickedMark.excluded ? chart.domain[0] : pickedMark.y;
   const segKeys = Array.from({ length: chart.segments }, (_, i) => `s${i}`);
 
-  const pointDot = ({ cx, cy, payload, value }: DotProps) => {
-    if (typeof value !== "number" || cx === undefined || cy === undefined) return <g key={`${cx}-${cy}`} />;
-    const latest = payload?.marks.some((m) => m.latest) ?? false;
-    return latest ? (
-      <circle key={`${cx}-l`} cx={cx} cy={cy} r={4.5} fill="var(--slab)" stroke="var(--surface)" strokeWidth={2} />
-    ) : (
-      <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={2.5} fill="var(--text)" />
-    );
+  // instrument-analyse.md §2: eFTP dots sized by TSS (filled ink; null load = hollow ring), the
+  // latest ride ringed in --bg; EF rides muted dots, the 28-day trend small ink dots. No lines.
+  const dots = variant === "eftp" ? eftpDots(chart) : [];
+  const dotOf = new Map<Mark, { readonly r: number; readonly hollow: boolean } | null>(chart.marks.map((m, i) => [m, dots[i] ?? null]));
+  const none = (k: string) => <g key={k} />;
+  const eftpShape = ({ cx, cy, payload, value }: DotProps) => {
+    const mark = payload?.marks[0];
+    if (typeof value !== "number" || cx === undefined || cy === undefined || mark === undefined) return none(`${cx}-${cy}`);
+    const d = dotOf.get(mark) ?? null;
+    if (d === null) return none(`${cx}-${cy}`);
+    if (d.hollow) return <HollowDot key={`${cx}-${cy}`} cx={cx} cy={cy} r={d.r} stroke={MARKS.eftpDot.fill} strokeWidth={MARKS.eftpDot.missing.stroke} />;
+    return <RingedDot key={`${cx}-${cy}`} cx={cx} cy={cy} r={d.r} fill={MARKS.eftpDot.fill} ring={mark.latest ? MARKS.eftpDot.latestRing : 0} />;
   };
-  const hollow = ({ cx, cy, value }: DotProps) =>
+  const trendShape = ({ cx, cy, value }: DotProps) =>
     typeof value !== "number" || cx === undefined || cy === undefined ? (
-      <g key={`${cx}-e`} />
+      none(`${cx}-t`)
     ) : (
-      <circle key={`${cx}-e`} cx={cx} cy={cy} r={3.5} fill="var(--surface)" stroke="var(--text-muted)" strokeWidth={1.5} />
+      <circle key={`${cx}-${cy}-t`} cx={cx} cy={cy} r={MARKS.efTrend.r} fill={MARKS.efTrend.color} />
+    );
+  const crossShape = ({ cx, cy, value }: DotProps) =>
+    typeof value !== "number" || cx === undefined || cy === undefined ? (
+      none(`${cx}-e`)
+    ) : (
+      <ExcludedCross key={`${cx}-e`} cx={cx} cy={cy - MARKS.excluded.size / 2} />
     );
   const efDot = ({ cx, cy, value }: DotProps) =>
     typeof value !== "number" || cx === undefined || cy === undefined ? (
-      <g key={`${cx}-d`} />
+      none(`${cx}-d`)
     ) : (
-      <circle key={`${cx}-${cy}-d`} cx={cx} cy={cy} r={3} fill="var(--chart-mark)" />
+      <circle key={`${cx}-${cy}-d`} cx={cx} cy={cy} r={MARKS.efRide.r} fill={MARKS.efRide.color} />
     );
+  const latestX = variant === "eftp" && latestMark !== undefined ? axis.hi - 0.5 : null;
 
   return (
     <>
@@ -184,7 +214,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
         title={title}
         accessibilityLayer={false}
       >
-        <CartesianGrid vertical={false} stroke="var(--border)" />
+        <CartesianGrid vertical={false} stroke="var(--border)" strokeWidth={1} />
         <XAxis
           dataKey="x"
           type="number"
@@ -208,26 +238,26 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
         {variant === "ef" && (
           <Line dataKey="dots" stroke="none" dot={efDot} activeDot={false} isAnimationActive={false} legendType="none" />
         )}
+        {/* Marks only (stroke none): no connecting line on eFTP, the EF trend as dots. */}
         {segKeys.map((k) => (
           <Line
             key={k}
             dataKey={k}
             type="linear"
-            connectNulls
-            stroke="var(--text)"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            dot={variant === "eftp" ? pointDot : false}
+            stroke="none"
+            dot={variant === "eftp" ? eftpShape : trendShape}
             activeDot={false}
             isAnimationActive={false}
+            legendType="none"
           />
         ))}
-        <Line dataKey="excl" stroke="none" dot={hollow} activeDot={false} isAnimationActive={false} legendType="none" />
+        <Line dataKey="excl" stroke="none" dot={crossShape} activeDot={false} isAnimationActive={false} legendType="none" />
         {picked !== undefined && ringY !== null && (
-          <ReferenceDot x={picked.x} y={ringY} r={4} fill="var(--text)" stroke="var(--surface)" strokeWidth={2} ifOverflow="visible" />
+          <ReferenceDot x={picked.x} y={ringY} r={4} fill="none" stroke="var(--text)" strokeWidth={1} ifOverflow="visible" />
         )}
       </ComposedChart>
       <SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />
+      {latestX !== null && <TodayMark axis={axis} x={latestX} bottom={X_AXIS_HEIGHT} />}
     </div>
     <ChartReadout readout={readout} all={all} lines={3} cells />
     </>
@@ -289,7 +319,8 @@ function WeekGroup<W extends PickWeek>({
   });
   const active = pick === null ? null : (weeks[pick.index] ?? null);
   const latest = latestIndex < 0 ? undefined : weeks[latestIndex];
-  const markerX = active === null ? null : xCss(axis, (active.x0 + active.x1) / 2);
+  const markerX = active === null ? null : xCss(axis, slotCentre(active));
+  const current = weeks.find((w) => w.current);
   const resting = restingReadout(latest === undefined ? null : readout(latest), "Tryk på grafen for at se en uge");
   const shown = active !== null && pick?.mode !== "mouse" ? readout(active) : resting;
   const all = [resting, ...weeks.map(readout)];
@@ -305,11 +336,12 @@ function WeekGroup<W extends PickWeek>({
         {overlay}
         {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
         {children(active)}
+        {current !== undefined && <TodayMark axis={axis} x={slotCentre(current)} bottom={X_AXIS_HEIGHT} />}
         <div className="relative h-[30px]" aria-hidden="true">
           {ticks.map((t, i) => (
             <span
               key={t.x}
-              className="absolute top-1 font-medium whitespace-nowrap text-text-muted tabular-nums"
+              className="absolute top-1 font-mono whitespace-nowrap text-text-muted tabular-nums"
               style={{
                 ...tickStyle,
                 left: xCss(axis, t.x),
@@ -338,7 +370,11 @@ type StripBar = {
   readonly active: boolean;
 };
 
-/** One bar strip from 0 to niceMax: a bar per week, a 2px zero tick for a zero week, --slab for the current week. */
+/**
+ * One bar strip from 0 to niceMax (instrument-analyse.md §2–§3): a 2px ink bar per week at the slot
+ * centre, a 1×2 muted stub for a zero week, no mark for null. The current week's bar is unchanged;
+ * the group draws the red today tick under it.
+ */
 function Strip({
   axis,
   label,
@@ -357,29 +393,35 @@ function Strip({
   const vMax = niceMax(max);
   return (
     <div className="flex flex-col gap-1">
-      <p className="relative text-14 font-semibold" aria-hidden="true" style={{ marginLeft: Y_AXIS_WIDTH }}>
+      <p className="relative text-14 font-medium" aria-hidden="true" style={{ marginLeft: Y_AXIS_WIDTH }}>
         {label} <span className="font-normal text-text-muted">{unit}</span>
       </p>
       <div className="relative" style={{ height }} aria-hidden="true">
         <div className="absolute border-b border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, bottom: 0 }} />
         <div className="absolute border-t border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: STRIP_TOP }} />
         <span
-          className="absolute left-0 font-medium leading-none text-text-muted tabular-nums"
+          className="absolute left-0 font-mono leading-none text-text-muted tabular-nums"
           style={{ ...tickStyle, top: STRIP_TOP - 6 }}
         >
           {vMax.toLocaleString("da-DK")}
         </span>
-        <span className="absolute bottom-0 left-0 font-medium leading-none text-text-muted" style={tickStyle}>
+        <span className="absolute bottom-0 left-0 font-mono leading-none text-text-muted" style={tickStyle}>
           0
         </span>
         {bars.map((w) => {
           if (w.value === null) return null;
-          const left = xCss(axis, w.x0);
-          const width = `calc(${xCss(axis, w.x1)} - ${xCss(axis, w.x0)} - 1px)`;
-          const color = w.current ? "bg-slab" : w.zero ? "bg-chart-mark" : "bg-text-muted";
-          const h = w.zero ? "2px" : `calc((100% - ${STRIP_TOP}px) * ${w.value / vMax})`;
-          const ring = w.active ? " outline outline-1 outline-text" : "";
-          return <div key={w.x0} className={`absolute bottom-0 ${color}${ring}`} style={{ left, width, height: h }} />;
+          const zero = w.zero || w.value === 0;
+          const bw = zero ? MARKS.zeroStub.width : MARKS.weekBar.width;
+          const left = `calc(${xCss(axis, slotCentre(w))} - ${bw / 2}px)`;
+          const h = zero ? `${MARKS.zeroStub.height}px` : `calc((100% - ${STRIP_TOP}px) * ${w.value / vMax})`;
+          return (
+            <div
+              key={w.x0}
+              data-mark={zero ? "zero" : "bar"}
+              className="absolute bottom-0"
+              style={{ left, width: bw, height: h, background: zero ? MARKS.zeroStub.color : MARKS.weekBar.color }}
+            />
+          );
         })}
       </div>
     </div>
@@ -433,9 +475,32 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
 // --- /analyse/styrke (analyse-styrke.md §5) ------------------------------------------------
 
 type StrengthAxis = XDomain & { readonly ticksNarrow: readonly AxisTick[]; readonly ticksWide: readonly AxisTick[] };
-const HATCH = "repeating-linear-gradient(45deg, var(--chart-mark) 0 1.5px, transparent 1.5px 6px)";
+const BRACKET_Y = 15; // the bracket line in the 18px strip; the label sits above, the 6px end ticks hang below
 
-/** Block ruler (§5): --block-fill spans, deload hatch, "Blok 11" labels in the top strip, phase rules. aria-hidden. */
+/** A 1px horizontal run from x0 to x1 (day numbers) at BRACKET_Y, solid or dashed 3 2. */
+function BracketRun({ axis, x0, x1, dashed }: { readonly axis: XDomain; readonly x0: number; readonly x1: number; readonly dashed: boolean }) {
+  const m = MARKS.bracket;
+  const [on, off] = m.deloadDash.split(" ").map(Number);
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: xCss(axis, x0),
+        width: `calc(${xCss(axis, x1)} - ${xCss(axis, x0)})`,
+        top: BRACKET_Y,
+        height: m.width,
+        background: dashed ? undefined : m.color,
+        backgroundImage: dashed ? `repeating-linear-gradient(to right, ${m.color} 0 ${on}px, transparent ${on}px ${on + off}px)` : undefined,
+      }}
+    />
+  );
+}
+
+/**
+ * Block ruler (instrument-analyse.md §3): a hairline bracket per block in the 18px strip (1px muted
+ * line, 6px end ticks, the deload part dashed 3 2, `Blok 11` mono 12 centred above, omitted when it
+ * doesn't fit), and a 1px solid ink rule at a phase change. aria-hidden.
+ */
 function BlockOverlay({
   axis,
   blocks,
@@ -445,34 +510,44 @@ function BlockOverlay({
   readonly blocks: readonly BlockSpan[];
   readonly phaseRules: readonly number[];
 }) {
+  const m = MARKS.bracket;
   const span = (x0: number, x1: number) => ({ left: xCss(axis, x0), width: `calc(${xCss(axis, x1)} - ${xCss(axis, x0)})` });
   return (
     <div aria-hidden="true">
-      {blocks.map((b) => (
-        <div key={b.x0}>
-          <div className="absolute bg-block-fill" style={{ ...span(b.x0, b.x1), top: BLOCK_ROOM, bottom: X_AXIS_HEIGHT }} />
-          {b.deloadX0 !== null && (
-            <div
-              className="absolute bg-block-fill"
-              style={{ ...span(b.deloadX0, b.x1), top: BLOCK_ROOM, bottom: X_AXIS_HEIGHT, backgroundImage: HATCH }}
-            />
-          )}
-          <div
-            className="@container absolute top-0 flex h-[18px] items-center justify-center overflow-hidden"
-            style={span(b.x0, b.x1)}
-          >
-            {/* Omitted (not clipped) when the span is narrower than the label. */}
-            <span className="hidden font-semibold whitespace-nowrap text-text @[3.5rem]:inline" style={tickStyle}>
-              {b.label}
-            </span>
+      {blocks.map((b) => {
+        const split = b.deloadX0 === null ? b.x1 : Math.min(b.x1, Math.max(b.x0, b.deloadX0));
+        return (
+          <div key={b.x0} data-mark="bracket">
+            {split > b.x0 && <BracketRun axis={axis} x0={b.x0} x1={split} dashed={false} />}
+            {split < b.x1 && <BracketRun axis={axis} x0={split} x1={b.x1} dashed />}
+            {[b.x0, b.x1].map((x, i) => (
+              <div
+                key={x}
+                className="absolute"
+                style={{
+                  left: i === 0 ? xCss(axis, x) : `calc(${xCss(axis, x)} - ${m.width}px)`,
+                  top: BRACKET_Y,
+                  width: m.width,
+                  height: m.endTick,
+                  background: m.color,
+                }}
+              />
+            ))}
+            <div className="@container absolute top-0 flex h-[14px] items-start justify-center overflow-hidden" style={span(b.x0, b.x1)}>
+              {/* Omitted (not clipped) when the bracket is narrower than the label + 4px each side. */}
+              <span className="hidden font-mono leading-none whitespace-nowrap text-text-muted @[3.75rem]:inline" style={tickStyle}>
+                {b.label}
+              </span>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {phaseRules.map((x) => (
         <div
           key={x}
-          className="absolute z-[1] w-[1.5px] -translate-x-1/2 bg-text-muted"
-          style={{ left: xCss(axis, x), top: BLOCK_ROOM, bottom: X_AXIS_HEIGHT }}
+          data-mark="phase"
+          className="absolute z-[1]"
+          style={{ left: `calc(${xCss(axis, x)} - 0.5px)`, width: MARKS.phaseRule.width, top: BLOCK_ROOM, bottom: X_AXIS_HEIGHT, background: MARKS.phaseRule.color }}
         />
       ))}
     </div>
@@ -480,7 +555,7 @@ function BlockOverlay({
 }
 
 const PANEL = 120;
-const HEADROOM = 16; // room for the block-best labels
+const HEADROOM = 24; // room for the block-best tick and label (r 3 + 3 + 6 + 12)
 
 function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1rmPanel }) {
   const [d0, d1] = panel.domain;
@@ -489,7 +564,7 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
   const sx = (x: number) => ((x - axis.lo) / (axis.hi - axis.lo)) * 1000;
   return (
     <div className="flex flex-col gap-1">
-      <p className="relative text-14 font-semibold" aria-hidden="true" style={{ marginLeft: Y_AXIS_WIDTH }}>
+      <p className="relative text-14 font-medium" aria-hidden="true" style={{ marginLeft: Y_AXIS_WIDTH }}>
         {panel.name} <span className="font-normal text-text-muted">kg</span>
       </p>
       {panel.empty !== null ? (
@@ -508,7 +583,7 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
                 style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: top(t) }}
               />
               <span
-                className="absolute left-0 -translate-y-1/2 font-medium leading-none text-text-muted tabular-nums"
+                className="absolute left-0 -translate-y-1/2 font-mono leading-none text-text-muted tabular-nums"
                 style={{ ...tickStyle, top: top(t) }}
               >
                 {t.toLocaleString("da-DK")}
@@ -518,16 +593,17 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
           {panel.sheet.map((s) => (
             <div key={s.x0}>
               <div
-                className="absolute h-[1.5px] -translate-y-1/2"
+                className="absolute -translate-y-1/2"
                 style={{
                   left: xCss(axis, s.x0),
                   width: `calc(${xCss(axis, s.x1)} - ${xCss(axis, s.x0)})`,
                   top: top(s.y),
-                  backgroundImage: "repeating-linear-gradient(to right, var(--text-muted) 0 6px, transparent 6px 10px)",
+                  height: MARKS.e1rm.sheet.width,
+                  backgroundImage: `repeating-linear-gradient(to right, ${MARKS.e1rm.sheet.color} 0 6px, transparent 6px 10px)`,
                 }}
               />
               <span
-                className="absolute -translate-x-full rounded-sm bg-surface px-0.5 font-medium leading-none text-text-muted tabular-nums"
+                className="absolute -translate-x-full bg-bg px-0.5 font-mono leading-none text-text-muted tabular-nums"
                 style={{ ...tickStyle, left: xCss(axis, s.x1), top: `calc(${top(s.y)} - 14px)` }}
               >
                 {s.label}
@@ -550,35 +626,52 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
                 key={seg[0]?.x}
                 points={seg.map((p) => `${sx(p.x)},${(1 - f(p.y)) * 1000}`).join(" ")}
                 fill="none"
-                stroke="var(--text-muted)"
-                strokeWidth={1.5}
+                stroke={MARKS.e1rm.line.color}
+                strokeWidth={MARKS.e1rm.line.width}
                 vectorEffect="non-scaling-stroke"
                 strokeLinejoin="round"
               />
             ))}
           </svg>
-          {panel.points.map((p) => (
-            <div key={p.x}>
-              {p.best && (
-                <>
-                  <span
-                    className="absolute size-[16px] -translate-1/2 rounded-full border-2 border-text"
-                    style={{ left: xCss(axis, p.x), top: top(p.y) }}
-                  />
-                  <span
-                    className="absolute -translate-x-1/2 font-semibold leading-none text-text tabular-nums"
-                    style={{ ...tickStyle, left: xCss(axis, p.x), top: `calc(${top(p.y)} ${p.labelBelow ? "+ 10px" : "- 22px"})` }}
-                  >
-                    {p.label}
-                  </span>
-                </>
-              )}
-              <span
-                className={`absolute -translate-1/2 rounded-full ${p.logged ? "size-[10px] bg-text" : "size-[7px] bg-chart-mark"}`}
-                style={{ left: xCss(axis, p.x), top: top(p.y) }}
-              />
-            </div>
-          ))}
+          {panel.points.map((p) => {
+            const e = MARKS.e1rm;
+            const r = p.logged ? e.logged.r : e.prescribed.r;
+            const x = xCss(axis, p.x);
+            // Block best: a 1×6 ink tick 3px off the point, its value mono 12 beyond it (below when
+            // the point sits under its block's sheet line). No ring.
+            const tickTop = p.labelBelow ? `calc(${top(p.y)} + ${r + e.best.gap}px)` : `calc(${top(p.y)} - ${r + e.best.gap + e.best.height}px)`;
+            const labelTop = p.labelBelow
+              ? `calc(${top(p.y)} + ${r + e.best.gap + e.best.height + 2}px)`
+              : `calc(${top(p.y)} - ${r + e.best.gap + e.best.height + 2 + e.best.labelSize}px)`;
+            return (
+              <div key={p.x}>
+                {p.best && (
+                  <>
+                    <span
+                      data-mark="best"
+                      className="absolute"
+                      style={{ left: `calc(${x} - ${e.best.width / 2}px)`, top: tickTop, width: e.best.width, height: e.best.height, background: e.best.color }}
+                    />
+                    <span
+                      className="absolute -translate-x-1/2 font-mono leading-none text-text tabular-nums"
+                      style={{ ...tickStyle, left: x, top: labelTop }}
+                    >
+                      {p.label}
+                    </span>
+                  </>
+                )}
+                <span
+                  data-mark={p.logged ? "logged" : "prescribed"}
+                  className="absolute -translate-1/2 rounded-full"
+                  style={
+                    p.logged
+                      ? { left: x, top: top(p.y), width: 2 * r, height: 2 * r, background: e.logged.fill }
+                      : { left: x, top: top(p.y), width: 2 * r, height: 2 * r, border: `${e.prescribed.stroke}px solid ${e.prescribed.color}` }
+                  }
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

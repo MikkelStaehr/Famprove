@@ -23,7 +23,7 @@ export function AnswerBlocks({ view }: { readonly view: AnswersView }) {
     );
   }
   return (
-    <div className="mt-3 flex flex-col gap-6 lg:mt-0">
+    <div className="mt-3 flex flex-col gap-10 lg:mt-0">
       {view.blocks.map((b) => (
         <AnswerBlock key={b.question} block={b} />
       ))}
@@ -31,12 +31,16 @@ export function AnswerBlocks({ view }: { readonly view: AnswersView }) {
   );
 }
 
-/** §12a: question row with the "?", figure row, verdict, detail; §12b: the explanation inline below. */
+/**
+ * §12a: question row with the "?", figure row, verdict, detail; §12b: the explanation inline below.
+ * Instrument (instrument-analyse.md §2): question = caption, number Inter 400 tabular (56 / 44), the
+ * caption line an Inter 14 muted sentence, verdict Inter 16; no box.
+ */
 export function AnswerBlock({ block }: { readonly block: AnswerBlockView }) {
   const id = `svar-${block.question}`;
   return (
     <section aria-labelledby={id} className="relative">
-      <h3 id={id} className="pr-12 text-14 font-bold tracking-[0.04em] uppercase">
+      <h3 id={id} className="caption flex min-h-6 items-center pr-12">
         {block.title}
       </h3>
       {block.kind === "missing" ? (
@@ -48,7 +52,7 @@ export function AnswerBlock({ block }: { readonly block: AnswerBlockView }) {
             <span className="sr-only">{block.figure.sr}</span>
             <span
               aria-hidden="true"
-              className={`font-display leading-none font-extrabold italic tabular-nums ${
+              className={`font-sans leading-none font-normal tabular-nums ${
                 block.figure.large ? "text-56" : "text-44"
               }`}
             >
@@ -56,7 +60,7 @@ export function AnswerBlock({ block }: { readonly block: AnswerBlockView }) {
             </span>
             <span className="basis-full text-14 text-text-muted tabular-nums">{block.figure.caption}</span>
           </p>
-          <p className="mt-2 max-w-[60ch] text-16 font-semibold text-text">{block.verdict}</p>
+          <p className="mt-2 max-w-[60ch] text-16 text-text">{block.verdict}</p>
           {block.detail !== null && (
             <p className="mt-1 max-w-[60ch] text-14 text-text-muted tabular-nums">{block.detail}</p>
           )}
@@ -64,11 +68,11 @@ export function AnswerBlock({ block }: { readonly block: AnswerBlockView }) {
       )}
       <details className="group">
         {/* 44×44 target at the end of the question row (absolute to the section), the circle inside. */}
-        <summary className="absolute -top-3 right-0 flex size-11 cursor-pointer list-none items-center justify-center rounded-full focus-visible:outline-3 focus-visible:outline-offset-[-3px] focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
+        <summary className="absolute -top-2.5 -right-2.5 flex size-11 cursor-pointer list-none items-center justify-center focus-visible:outline-3 focus-visible:outline-offset-[-3px] focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
           <span className="sr-only">{`Forklaring: ${block.title}`}</span>
           <span
             aria-hidden="true"
-            className="flex size-6 items-center justify-center rounded-full border-[1.5px] border-text-muted text-14 leading-none font-bold text-text group-open:border-text group-open:bg-text group-open:text-bg"
+            className="flex size-6 items-center justify-center border border-text-muted font-sans text-14 leading-none font-medium text-text group-open:border-text group-open:bg-text group-open:text-bg"
           >
             ?
           </span>
@@ -98,9 +102,9 @@ function Arrow({ direction }: { readonly direction: SummaryDirection }) {
       className="size-6 shrink-0 self-center text-text"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      strokeWidth="1.5"
+      strokeLinecap="square"
+      strokeLinejoin="miter"
     >
       <path d={d} />
     </svg>

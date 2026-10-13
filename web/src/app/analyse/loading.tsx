@@ -4,7 +4,7 @@ import { SkeletonBar as Bar } from "@/components/Skeleton";
 import { QUESTION_TITLE } from "@/lib/analyse-answers";
 import { RAIL_GRID } from "@/lib/rail-grid";
 
-const BLOCK = "w-full rounded-control bg-track motion-safe:animate-pulse";
+const BLOCK = "w-full bg-surface motion-safe:animate-pulse";
 
 /** Skeleton in the shape of page.tsx (analyse.md §8, §11, §12d): real headings, the three answer blocks in the rail, three chart cards and the disclosure in the main column. */
 export default function Loading() {
@@ -19,15 +19,15 @@ export default function Loading() {
         <div className={RAIL_GRID.grid}>
           <div className={RAIL_GRID.railScroll}>
             {/* §12d: three block skeletons, the real question row, a 56/44px bar, two text bars. */}
-            <div className="mt-3 flex flex-col gap-6 lg:mt-0">
+            <div className="mt-3 flex flex-col gap-10 lg:mt-0">
               {(["eftp", "ef", "volume"] as const).map((q) => (
                 <section key={q} aria-labelledby={`svar-${q}`}>
-                  <h3 id={`svar-${q}`} className="pr-12 text-14 font-bold tracking-[0.04em] uppercase">
+                  <h3 id={`svar-${q}`} className="caption flex min-h-6 items-center pr-12">
                     {QUESTION_TITLE[q]}
                   </h3>
                   <div aria-hidden="true">
                     <span
-                      className={`mt-1 block w-1/3 rounded-mark bg-track motion-safe:animate-pulse ${q === "eftp" ? "h-14" : "h-11"}`}
+                      className={`mt-1 block w-1/3 bg-surface motion-safe:animate-pulse ${q === "eftp" ? "h-14" : "h-11"}`}
                     />
                     <Bar className="mt-2 w-3/4 text-16" />
                     <Bar className="mt-1 w-2/3 text-14" />

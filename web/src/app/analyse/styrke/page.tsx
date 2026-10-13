@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import { E1rmPanels, TonnageStrips } from "@/components/AnalyseCharts";
 import { AnalyseTabs } from "@/components/AnalyseTabs";
 import { Card } from "@/components/Card";
+import { BarSwatch, BracketSwatch, HollowDotSwatch, TodayTickSwatch } from "@/components/ChartMarks";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { UpdatedLine } from "@/components/UpdatedLine";
 import { WarningLine } from "@/components/WarningLine";
 import { buildStyrkeView, feelRows, NO_E1RM, type StyrkeView, TONNAGE_EXPLAINER } from "@/lib/analyse-styrke-view";
+import { MARKS } from "@/lib/chart-marks";
 import { LIFT_NAME, LIFTS } from "@/lib/lifts";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { loadExerciseFeel, loadStrengthAnalysis } from "@/lib/db/queries";
@@ -81,29 +83,37 @@ export default async function Page() {
   );
 }
 
-/** §4: the lift board, a meet-board of three big tabular numbers; colour = RPE provenance, words carry it too. */
+/**
+ * §4: the lift board, three big tabular numbers (instrument-analyse.md §3: Inter 400 56, hairline
+ * between rows); colour = RPE provenance (--text logged / --text-muted prescribed), words carry it too.
+ */
 function Board({ view }: { readonly view: Ready }) {
   const { board } = view;
   return (
-    <section aria-label="Bedste e1RM" className="mt-3 lg:mt-0">
+    <section aria-label="Bedste e1RM" className="mt-2 lg:mt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <p className="text-14 font-bold tracking-[0.04em] uppercase">{board.label}</p>
-        {board.phase !== null && <p className="text-14 font-semibold text-text">{board.phase}</p>}
+        <p className="caption">{board.label}</p>
+        {board.phase !== null && <p className="text-14 text-text">{board.phase}</p>}
       </div>
       <p className="sr-only">{board.sr}</p>
-      <dl aria-hidden="true" className="mt-2 flex flex-col gap-3">
+      <dl aria-hidden="true" className="mt-2 flex flex-col">
         {board.rows.map((r) => (
-          <div key={r.lift} className="flex flex-wrap justify-between gap-x-3 [align-items:last_baseline]">
-            <dt className="min-w-0">
-              <span className="block text-20 font-bold">{r.name}</span>
+          // Name and number share the first row (baseline-aligned); the set line and provenance run
+          // full width below, so the three rows and the Squat panel fit the 390 fold (§5.1).
+          <div
+            key={r.lift}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 border-b border-border py-1.5 first:pt-0 last:border-b-0"
+          >
+            <dt className="contents">
+              <span className="col-start-1 row-start-1 block text-20 font-normal">{r.name}</span>
               {r.lines.map((l) => (
-                <span key={l} className="block text-14 leading-[1.25] text-text-muted tabular-nums">
+                <span key={l} className="col-span-2 block text-14 leading-[1.25] text-text-muted tabular-nums">
                   {l}
                 </span>
               ))}
             </dt>
             <dd
-              className={`ml-auto max-w-full text-right font-display text-56 leading-none font-extrabold italic tabular-nums ${
+              className={`col-start-2 row-start-1 text-right font-sans text-56 leading-[0.85] font-normal tabular-nums ${
                 r.logged ? "text-text" : "text-text-muted"
               }`}
             >
@@ -119,7 +129,7 @@ function Board({ view }: { readonly view: Ready }) {
 
 function Cards({ view }: { readonly view: Ready }) {
   const axis = { lo: view.lo, hi: view.hi, ticksNarrow: view.ticksNarrow, ticksWide: view.ticksWide };
-  const deload = view.hasDeload ? [{ swatch: <Hatch />, label: "Deload" }] : [];
+  const deload = view.hasDeload ? [{ swatch: <BracketSwatch deload />, label: "Deload" }] : [];
   return (
     <>
       <Card id="e1rm" variant="calm" level={3} title="Estimeret 1RM pr. uge">
@@ -130,9 +140,9 @@ function Cards({ view }: { readonly view: Ready }) {
             <>
               <Legend
                 items={[
-                  { swatch: <Dot logged />, label: "Logget RPE" },
-                  { swatch: <Dot logged={false} />, label: "Foreskrevet RPE" },
-                  { swatch: <Ring />, label: "Bedst i blokken" },
+                  { swatch: <Dot />, label: "Logget RPE" },
+                  { swatch: <HollowDotSwatch r={MARKS.e1rm.prescribed.r} />, label: "Foreskrevet RPE" },
+                  { swatch: <BestTick />, label: "Bedst i blokken" },
                   ...(view.hasSheet ? [{ swatch: <Dashed />, label: "1RM i arket (ikke testet)" }] : []),
                   ...deload,
                 ]}
@@ -158,9 +168,9 @@ function Cards({ view }: { readonly view: Ready }) {
         <figure className="flex flex-col gap-2">
           <Legend
             items={[
-              { swatch: <Bar className="bg-text-muted" />, label: "Uge med løft" },
-              { swatch: <Bar className="bg-slab" />, label: "Denne uge" },
-              { swatch: <ZeroTick />, label: "Intet løftet" },
+              { swatch: <BarSwatch />, label: "Uge med løft" },
+              { swatch: <BarSwatch zero />, label: "Intet løftet" },
+              { swatch: <TodayTickSwatch />, label: "I dag" },
               ...deload,
             ]}
           />
@@ -207,7 +217,7 @@ function Cards({ view }: { readonly view: Ready }) {
 
 function Legend({ items }: { readonly items: readonly { readonly swatch: React.ReactNode; readonly label: string }[] }) {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-14 text-text" aria-label="Forklaring">
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-14 text-text-muted" aria-label="Forklaring">
       {items.map((i) => (
         <li key={i.label} className="flex items-center gap-2">
           {i.swatch}
@@ -218,44 +228,37 @@ function Legend({ items }: { readonly items: readonly { readonly swatch: React.R
   );
 }
 
-function Dot({ logged }: { readonly logged: boolean }) {
+/** Logged e1RM: a filled ink dot r 3. */
+function Dot() {
+  const m = MARKS.e1rm.logged;
   return (
-    <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center">
-      <span className={`block rounded-full ${logged ? "size-2.5 bg-text" : "size-[7px] bg-chart-mark"}`} />
-    </span>
+    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
+      <circle cx="7" cy="6" r={m.r} fill={m.fill} />
+      <circle cx="17" cy="6" r={m.r} fill={m.fill} />
+    </svg>
   );
 }
 
-function Ring() {
-  return <span aria-hidden="true" className="block size-4 shrink-0 rounded-full border-2 border-text" />;
+/** Block best: the point with a 1×6 ink tick 3px above it. */
+function BestTick() {
+  const b = MARKS.e1rm.best;
+  const r = MARKS.e1rm.logged.r;
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 16" className="h-4 w-6 shrink-0">
+      <rect x={12 - b.width / 2} y={16 - 2 * r - b.gap - b.height} width={b.width} height={b.height} fill={b.color} />
+      <circle cx="12" cy={16 - r} r={r} fill={MARKS.e1rm.logged.fill} />
+    </svg>
+  );
 }
 
+/** The sheet's untested 1RM: dashed 6 4. */
 function Dashed() {
+  const m = MARKS.e1rm.sheet;
   return (
-    <span
-      aria-hidden="true"
-      className="block h-[1.5px] w-6 shrink-0"
-      style={{ backgroundImage: "repeating-linear-gradient(to right, var(--text-muted) 0 6px, transparent 6px 10px)" }}
-    />
+    <svg aria-hidden="true" viewBox="0 0 24 12" className="h-3 w-6 shrink-0">
+      <line x1="0" x2="24" y1="6" y2="6" stroke={m.color} strokeWidth={m.width} strokeDasharray={m.dash} />
+    </svg>
   );
-}
-
-function Hatch() {
-  return (
-    <span
-      aria-hidden="true"
-      className="block size-3 shrink-0 bg-block-fill"
-      style={{ backgroundImage: "repeating-linear-gradient(45deg, var(--chart-mark) 0 1.5px, transparent 1.5px 6px)" }}
-    />
-  );
-}
-
-function Bar({ className }: { readonly className: string }) {
-  return <span aria-hidden="true" className={`h-3 w-2 shrink-0 ${className}`} />;
-}
-
-function ZeroTick() {
-  return <span aria-hidden="true" className="mt-2.5 h-0.5 w-2 shrink-0 bg-chart-mark" />;
 }
 
 /**
@@ -268,7 +271,7 @@ async function FeelCard() {
     return (
       <WarningLine>
         Kunne ikke hente dine vurderinger.{" "}
-        <a href="/analyse/styrke" className="font-semibold text-text underline decoration-1 underline-offset-3">
+        <a href="/analyse/styrke" className="font-medium text-text underline decoration-1 underline-offset-3">
           Prøv igen
         </a>
       </WarningLine>
@@ -281,7 +284,7 @@ async function FeelCard() {
       <ul className="flex flex-col gap-3">
         {items.map((r) => (
           <li key={r.id} className="flex max-w-[60ch] flex-col">
-            <span className="text-16 font-bold">{r.name}</span>
+            <span className="text-16 font-medium">{r.name}</span>
             <span className="text-16">{r.verdict}</span>
             <span className="text-14 text-text-muted">{r.basis}</span>
           </li>

@@ -4,6 +4,7 @@ import { MarkChart, WeekStrips } from "@/components/AnalyseCharts";
 import { AnalyseTabs } from "@/components/AnalyseTabs";
 import { AnswerBlocks } from "@/components/AnswerBlock";
 import { Card } from "@/components/Card";
+import { BarSwatch, CrossSwatch, DotSizesSwatch, DotSwatch, TodayTickSwatch } from "@/components/ChartMarks";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { UpdatedLine } from "@/components/UpdatedLine";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/data-error";
 import { loadCyclingAnalysis } from "@/lib/db/queries";
 import { formatUpdatedAt } from "@/lib/format";
+import { MARKS } from "@/lib/chart-marks";
 import { RAIL_GRID } from "@/lib/rail-grid";
 import { resolveToday } from "@/lib/training-view";
 
@@ -111,11 +113,13 @@ function Cards({ view }: { readonly view: Ready }) {
         ) : (
           <figure className="flex flex-col gap-2">
             {/* The eFTP line's legend item lives in the readout row's cell (DESIGN.md Charts: interaction). */}
-            <Legend items={[{ swatch: <Hollow />, label: "Udeladt tur" }]} />
-            <p
-              className="text-12 font-medium text-text-muted"
-              aria-hidden="true"
-            >
+            <Legend
+              items={[
+                { swatch: <DotSizesSwatch />, label: "eFTP · størrelse = TSS" },
+                { swatch: <CrossSwatch />, label: "Udeladt tur" },
+              ]}
+            />
+            <p className="font-mono text-12 text-text-muted" aria-hidden="true">
               W
             </p>
             <MarkChart
@@ -157,11 +161,14 @@ function Cards({ view }: { readonly view: Ready }) {
         ) : (
           <figure className="flex flex-col gap-2">
             {/* Trend and Tur live in the readout row's cells (DESIGN.md Charts: interaction). */}
-            <Legend items={[{ swatch: <Hollow />, label: "Udeladt tur" }]} />
-            <p
-              className="text-12 font-medium text-text-muted"
-              aria-hidden="true"
-            >
+            <Legend
+              items={[
+                { swatch: <DotSwatch r={MARKS.efTrend.r} fill={MARKS.efTrend.color} />, label: "Trend (median over 28 dage)" },
+                { swatch: <DotSwatch r={MARKS.efRide.r} fill={MARKS.efRide.color} />, label: "Tur" },
+                { swatch: <CrossSwatch />, label: "Udeladt tur" },
+              ]}
+            />
+            <p className="font-mono text-12 text-text-muted" aria-hidden="true">
               EF (W pr. slag/min)
             </p>
             <MarkChart
@@ -196,12 +203,9 @@ function Cards({ view }: { readonly view: Ready }) {
           <figure className="flex flex-col gap-2">
             <Legend
               items={[
-                {
-                  swatch: <Bar className="bg-text-muted" />,
-                  label: "Uge med ture",
-                },
-                { swatch: <Bar className="bg-slab" />, label: "Denne uge" },
-                { swatch: <ZeroTick />, label: "Uge uden ture" },
+                { swatch: <BarSwatch />, label: "Uge med ture" },
+                { swatch: <BarSwatch zero />, label: "Uge uden ture" },
+                { swatch: <TodayTickSwatch />, label: "I dag" },
               ]}
             />
             <WeekStrips axis={axis} weeks={view.weeks} max={view.weekMax} />
@@ -249,12 +253,9 @@ function Excluded({ view }: { readonly view: Ready }) {
       <p className="text-14 text-text-muted">Ingen ture udeladt fra trends.</p>
     );
   return (
-    <section
-      aria-label="Udeladte ture"
-      className="rounded-card bg-surface px-4 py-2 shadow-card lg:px-6"
-    >
+    <section aria-label="Udeladte ture" className="border-y border-border">
       <details className="group">
-        <summary className="flex min-h-11 w-full cursor-pointer list-none items-center justify-between gap-2 rounded-control text-16 font-semibold text-text focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus">
+        <summary className="flex min-h-11 w-full cursor-pointer list-none items-center justify-between gap-2 text-16 font-medium text-text focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
           {view.excluded.summary}
           <svg
             aria-hidden="true"
@@ -276,7 +277,7 @@ function Excluded({ view }: { readonly view: Ready }) {
           <ul className="flex flex-col gap-3 lg:hidden">
             {view.excluded.items.map((it) => (
               <li key={it.key}>
-                <p className="text-16 font-semibold">{`${it.date} · ${it.reason}`}</p>
+                <p className="text-16 font-medium">{`${it.date} · ${it.reason}`}</p>
                 {it.explanation !== null && (
                   <p className="text-14 text-text">{it.explanation}</p>
                 )}
@@ -293,16 +294,16 @@ function Excluded({ view }: { readonly view: Ready }) {
             <caption className="sr-only">Udeladte ture</caption>
             <thead>
               <tr className="border-b border-border">
-                <th scope="col" className="py-2 pr-4 font-bold whitespace-nowrap">Dato</th>
-                <th scope="col" className="py-2 pr-4 font-bold">Årsag</th>
-                <th scope="col" className="py-2 pr-4 font-bold">Forklaring</th>
-                <th scope="col" className="py-2 font-bold">Fakta</th>
+                <th scope="col" className="caption py-2 pr-4 font-medium whitespace-nowrap">Dato</th>
+                <th scope="col" className="caption py-2 pr-4 font-medium">Årsag</th>
+                <th scope="col" className="caption py-2 pr-4 font-medium">Forklaring</th>
+                <th scope="col" className="caption py-2 font-medium">Fakta</th>
               </tr>
             </thead>
             <tbody>
               {view.excluded.items.map((it) => (
                 <tr key={it.key} className="border-b border-border last:border-b-0 align-top">
-                  <th scope="row" className="py-2 pr-4 font-semibold whitespace-nowrap">{it.date}</th>
+                  <th scope="row" className="py-2 pr-4 font-medium whitespace-nowrap">{it.date}</th>
                   <td className="py-2 pr-4 whitespace-nowrap">{it.reason}</td>
                   <td className="py-2 pr-4">{it.explanation}</td>
                   <td className="py-2 whitespace-nowrap text-text-muted tabular-nums">{it.facts}</td>
@@ -326,7 +327,7 @@ function Legend({
 }) {
   return (
     <ul
-      className="flex flex-wrap gap-x-4 gap-y-1 text-14 text-text"
+      className="flex flex-wrap gap-x-4 gap-y-1 text-14 text-text-muted"
       aria-label="Forklaring"
     >
       {items.map((i) => (
@@ -336,35 +337,5 @@ function Legend({
         </li>
       ))}
     </ul>
-  );
-}
-
-function Hollow() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0">
-      <circle
-        cx="6"
-        cy="6"
-        r="3.5"
-        fill="var(--surface)"
-        stroke="var(--text-muted)"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function Bar({ className }: { readonly className: string }) {
-  return (
-    <span aria-hidden="true" className={`h-3 w-2 shrink-0 ${className}`} />
-  );
-}
-
-function ZeroTick() {
-  return (
-    <span
-      aria-hidden="true"
-      className="mt-2.5 h-0.5 w-2 shrink-0 bg-chart-mark"
-    />
   );
 }

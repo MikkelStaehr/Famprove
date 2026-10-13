@@ -8,9 +8,9 @@ const SECTIONS = [
 export type AnalyseSection = (typeof SECTIONS)[number]["key"];
 
 /**
- * DESIGN.md "Section tabs" (analyse-styrke.md §2): the section word is the tab. Plain links with
- * aria-current, no role="tab", no client state. Current = weight 800 + a 4px --text bar + --text,
- * never colour alone; never ScreenNav's pill track, never --slab.
+ * DESIGN.md "Section tabs" (instrument-analyse.md §1): the section word is the tab, Inter 400
+ * text-24. Current = --text 500 + a 2px --text underline (offset 6px), the other --text-muted 400:
+ * weight and the rule carry it, never colour alone. Plain links with aria-current, no role="tab".
  */
 export function AnalyseTabs({ current }: { readonly current: AnalyseSection }) {
   return (
@@ -23,15 +23,11 @@ export function AnalyseTabs({ current }: { readonly current: AnalyseSection }) {
               <Link
                 href={s.href}
                 aria-current={isCurrent ? "page" : undefined}
-                className={`inline-flex min-h-11 flex-col items-stretch rounded-control pt-1 font-display text-32 leading-none uppercase italic focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus ${
-                  isCurrent ? "font-extrabold text-text" : "font-bold text-text-muted hover:text-text"
+                className={`inline-flex min-h-11 items-center font-sans text-24 underline-offset-[6px] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus ${
+                  isCurrent ? "font-medium text-text underline decoration-2" : "font-normal text-text-muted no-underline hover:text-text"
                 }`}
               >
                 {s.label}
-                <span
-                  aria-hidden="true"
-                  className={`mt-1 block h-1 rounded-mark ${isCurrent ? "bg-text" : "bg-transparent"}`}
-                />
               </Link>
             </li>
           );

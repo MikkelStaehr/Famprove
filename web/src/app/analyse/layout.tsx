@@ -2,7 +2,7 @@
 export default function AnalyseLayout({ children }: { readonly children: React.ReactNode }) {
   return (
     <>
-      <h1 className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">Analyse</h1>
+      <h1 className="font-sans text-32 font-normal">Analyse</h1>
       {children}
     </>
   );

@@ -4,6 +4,8 @@ import { test } from "node:test";
 
 import {
   chartRows,
+  eftpDots,
+  slotCentre,
   EF_TREND_MIN_RIDES,
   efWindowRides,
   isEfRow,
@@ -144,7 +146,7 @@ test("page view: summary counts, sr sentences, freshness from the older table", 
   assert.equal(view.eftp?.segments, 2);
   assert.equal(
     view.eftp?.sr,
-    "eFTP fra intervals.icu for 3 ture med watt fra 1. jan. 2025 til 1. okt. 2026. Seneste 184 W den 15. sep. 2026, højeste 233 W den 12. sep. 2025, laveste 181 W den 10. mar. 2026. Pause uden punkter fra 12. sep. 2025 til 10. mar. 2026. 1 tur er udeladt; se listen Udeladte ture.",
+    "eFTP fra intervals.icu for 3 ture med watt fra 1. jan. 2025 til 1. okt. 2026. Punkternes størrelse viser turens TSS. Seneste 184 W den 15. sep. 2026, højeste 233 W den 12. sep. 2025, laveste 181 W den 10. mar. 2026. Pause uden punkter fra 12. sep. 2025 til 10. mar. 2026. 1 tur er udeladt; se listen Udeladte ture.",
   );
   assert.equal(buildAnalyseView({ rides: [], weeks: [] }, new Date(AT), "2026-10-01").kind, "empty");
 });
@@ -152,9 +154,9 @@ test("page view: summary counts, sr sentences, freshness from the older table", 
 test("two rides on one day keep two marks, and the tooltip lists both", () => {
   const chart = {
     marks: [
-      { x: 100, y: 1.2, trend: 1.15, seg: 0, latest: false, excluded: false, tip: ["a"], readout: { head: "a", cells: [], facts: [] } },
-      { x: 100, y: 1.3, trend: 1.16, seg: 0, latest: false, excluded: false, tip: ["b"], readout: { head: "b", cells: [], facts: [] } },
-      { x: 104, y: null, trend: null, seg: 0, latest: false, excluded: true, tip: ["c"], readout: { head: "c", cells: [], facts: [] } },
+      { x: 100, y: 1.2, trend: 1.15, load: null, seg: 0, latest: false, excluded: false, tip: ["a"], readout: { head: "a", cells: [], facts: [] } },
+      { x: 100, y: 1.3, trend: 1.16, load: null, seg: 0, latest: false, excluded: false, tip: ["b"], readout: { head: "b", cells: [], facts: [] } },
+      { x: 104, y: null, trend: null, load: null, seg: 0, latest: false, excluded: true, tip: ["c"], readout: { head: "c", cells: [], facts: [] } },
     ],
     segments: 1,
     domain: [1, 1.5] as const,
@@ -173,7 +175,7 @@ test("two rides on one day keep two marks, and the tooltip lists both", () => {
 
 test("two rides on one day: a tap rings and reads the same (higher) ride, ←/→ visit both", () => {
   const mark = (y: number, head: string) =>
-    ({ x: 100, y, trend: null, seg: 0, latest: false, excluded: false, tip: [head], readout: { head, cells: [], facts: [] } });
+    ({ x: 100, y, trend: null, load: null, seg: 0, latest: false, excluded: false, tip: [head], readout: { head, cells: [], facts: [] } });
   const chart = { marks: [mark(180, "lav"), mark(195, "høj")], segments: 1, domain: [150, 200] as const, ticks: [], sr: "" };
   const rows = chartRows(chart, "eftp");
   const xs = rows.map((r) => r.x);
@@ -259,4 +261,21 @@ test("excluded items: date and reason in their own fields, newest first, a null 
     ],
   );
   assert.equal(items[1].explanation, "Watt-målingen ser forkert ud. Ikke med i eFTP og EF.");
+});
+
+test("eFTP dots: radius follows √load within 1.5–6, null load is a hollow ring r 3, excluded has none", () => {
+  const mark = (load: number | null, excluded = false) =>
+    ({ x: 100, y: excluded ? null : 200, trend: null, load, seg: 0, latest: false, excluded, tip: [], readout: { head: "", cells: [], facts: [] } });
+  const chart = { marks: [mark(100), mark(25), mark(0), mark(null), mark(400, true)], segments: 1, domain: [150, 250] as const, ticks: [], sr: "" };
+  const dots = eftpDots(chart);
+  // The scale's 100 % is the largest plotted (non-excluded) load: 100, not the excluded 400.
+  assert.deepEqual(dots[0], { r: 6, hollow: false });
+  assert.deepEqual(dots[1], { r: 1.5 + 4.5 * Math.sqrt(0.25), hollow: false });
+  assert.deepEqual(dots[2], { r: 1.5, hollow: false });
+  assert.deepEqual(dots[3], { r: 3, hollow: true });
+  assert.equal(dots[4], null);
+});
+
+test("a week bar and the today tick sit at the slot centre", () => {
+  assert.equal(slotCentre({ x0: 10, x1: 17 }), 13.5);
 });

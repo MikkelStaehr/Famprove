@@ -3,6 +3,7 @@
  * Every number is Python's (ride_metrics, cycling_weeks). Allowed here: sorting, filtering,
  * counting rows, date -> x position, choosing a y domain, and formatting. No deltas, no medians.
  */
+import { eftpDot, maxLoadOf } from "./chart-marks.ts";
 import { MISSING, type Readout, viCell } from "./chart-readout.ts";
 import { addDays, dayNumber, isoWeekNumber, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
@@ -116,6 +117,8 @@ export type Mark = {
   readonly x: number;
   readonly y: number | null;
   readonly trend: number | null; // EF only
+  /** eFTP only: the ride's TSS (ride_metrics.load), sizing its dot; null = missing (a hollow ring). */
+  readonly load: number | null;
   readonly seg: number; // line segment (a new one after every break)
   readonly latest: boolean;
   readonly excluded: boolean;
@@ -220,7 +223,7 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
   let prev: RideMetricsRow | null = null;
   for (const r of rows) {
     if (isExcluded(r) && exclusionText(r.exclusion).eftp) {
-      marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year), readout: excludedReadout(r, year) });
+      marks.push({ x: dayNumber(r.date), y: null, trend: null, load: null, seg, latest: false, excluded: true, tip: excludedTip(r, year), readout: excludedReadout(r, year) });
       continue;
     }
     if (!r.eftpOk || r.rollingFtpW === null) continue;
@@ -233,6 +236,7 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
       x: dayNumber(r.date),
       y: r.rollingFtpW,
       trend: null,
+      load: r.load,
       seg,
       latest: r === last,
       excluded: false,
@@ -265,6 +269,7 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
   const loRow = points.reduce((a, b) => (b.rollingFtpW < a.rollingFtpW ? b : a));
   const sr = [
     `eFTP fra intervals.icu for ${points.length} ture med watt fra ${SINCE} til ${dateWithYear(today)}.`,
+    "Punkternes størrelse viser turens TSS.",
     `Seneste ${formatLoad(last.rollingFtpW)} W den ${dateWithYear(last.date)}, højeste ${formatLoad(hiRow.rollingFtpW)} W den ${dateWithYear(hiRow.date)}, laveste ${formatLoad(loRow.rollingFtpW)} W den ${dateWithYear(loRow.date)}.`,
     ...pauses,
     ...(excludedCount > 0 ? [`${rides(excludedCount)} er udeladt; se listen Udeladte ture.`] : []),
@@ -326,7 +331,7 @@ function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView
   let open = false; // the current segment has a trend value
   for (const r of rows) {
     if (isExcluded(r) && exclusionText(r.exclusion).ef) {
-      marks.push({ x: dayNumber(r.date), y: null, trend: null, seg, latest: false, excluded: true, tip: excludedTip(r, year), readout: excludedReadout(r, year) });
+      marks.push({ x: dayNumber(r.date), y: null, trend: null, load: null, seg, latest: false, excluded: true, tip: excludedTip(r, year), readout: excludedReadout(r, year) });
       continue;
     }
     if (!isEfRow(r)) continue;
@@ -340,6 +345,7 @@ function efChart(rows: readonly RideMetricsRow[], today: IsoDate): LineChartView
       x: dayNumber(r.date),
       y: r.ef,
       trend,
+      load: null,
       seg,
       latest: false,
       excluded: false,
@@ -417,6 +423,18 @@ export function chartRows(chart: LineChartView, variant: "eftp" | "ef"): ChartRo
     })
     .sort((a, b) => a.x - b.x);
 }
+
+/**
+ * eFTP dot per mark (instrument-analyse.md §2): the size scale's 100 % is the largest load of the
+ * plotted (non-excluded) rides; a null load is a hollow ring (missing, not small).
+ */
+export function eftpDots(chart: LineChartView): readonly ({ readonly r: number; readonly hollow: boolean } | null)[] {
+  const max = maxLoadOf(chart.marks.filter((m) => !m.excluded).map((m) => m.load));
+  return chart.marks.map((m) => (m.excluded ? null : eftpDot(m.load, max)));
+}
+
+/** A week slot's centre (day number): where its 2px bar and the today tick sit. */
+export const slotCentre = (w: { readonly x0: number; readonly x1: number }): number => (w.x0 + w.x1) / 2;
 
 /** Every mark at an x, for the tooltip (two rides on one day are both listed). */
 export function marksAt(rows: readonly ChartRow[], x: number): readonly Mark[] {
