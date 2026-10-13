@@ -335,7 +335,7 @@ export function formSentence(tsb: number, zone: ZoneKey | null, fromDate?: strin
 }
 
 /** Why a row has no suggestion (spec §6); a missing planned_sets row has no reason. */
-const NO_SUGGESTION: Readonly<Record<Exclude<SuggestionBasis, "rpe_e1rm">, string>> = {
+const NO_SUGGESTION: Readonly<Record<Exclude<SuggestionBasis, "rpe_e1rm" | "progression">, string>> = {
   not_rpe: "Intet forslag til %-sæt",
   no_e1rm: "Intet forslag: ingen e1RM endnu",
   no_lift: "Intet forslag til denne øvelse",
@@ -357,7 +357,10 @@ export function suggestionView(
     return { kg: `${formatKg(e.suggestedKg)} kg`, capped: e.suggestionCapped };
   }
   const basis = e.suggestionBasis;
-  return { kg: null, words: basis === null || basis === "rpe_e1rm" ? "Intet forslag" : NO_SUGGESTION[basis] };
+  return {
+    kg: null,
+    words: basis === null || basis === "rpe_e1rm" || basis === "progression" ? "Intet forslag" : NO_SUGGESTION[basis],
+  };
 }
 
 /** Last week's logged load: undefined in week 1 (no item), null when nothing was logged. */

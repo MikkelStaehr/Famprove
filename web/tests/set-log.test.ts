@@ -105,9 +105,15 @@ test("applyTap: done and skip start the next OPEN set", () => {
 
 test("parseSetTapInput: exact shape only", () => {
   const ok = { kind: "done", date: "2026-10-12", session: 1, row: 25, set: 2, undoes: null };
-  assert.deepEqual(parseSetTapInput(ok), ok);
+  assert.deepEqual(parseSetTapInput(ok), { ...ok, value: null });
   const undo = { ...ok, kind: "undo", undoes: "skip" };
-  assert.deepEqual(parseSetTapInput(undo), undo);
+  assert.deepEqual(parseSetTapInput(undo), { ...undo, value: null });
+  const warmup = { ...ok, set: 0 }; // "Til sæt 1": a done on the warm-up
+  assert.deepEqual(parseSetTapInput(warmup), { ...warmup, value: null });
+  for (const value of [-1, 0, 1, null]) {
+    assert.deepEqual(parseSetTapInput({ ...ok, kind: "feel", value }), { ...ok, kind: "feel", value });
+  }
+  assert.deepEqual(parseSetTapInput({ ...ok, kind: "reps", value: 10 }), { ...ok, kind: "reps", value: 10 });
   for (const bad of [
     null,
     { ...ok, kind: "delete" },
@@ -119,6 +125,13 @@ test("parseSetTapInput: exact shape only", () => {
     { ...ok, undoes: "done" }, // only an undo says what it undoes
     { ...undo, undoes: null }, // and an undo always does
     { ...undo, undoes: "kg" },
+    { ...ok, set: -1 },
+    { ...ok, kind: "feel", value: 2 }, // only -1 / 0 / +1
+    { ...ok, kind: "feel", value: "1" },
+    { ...ok, kind: "reps", value: 0 },
+    { ...ok, kind: "reps", value: 8.5 }, // whole reps
+    { ...ok, kind: "reps", value: null },
+    { ...ok, value: 1 }, // a done carries no value
   ]) {
     assert.equal(parseSetTapInput(bad), null, JSON.stringify(bad));
   }
@@ -153,17 +166,18 @@ function fakeDb(): FakeDb {
     [1, 25, 1, "Squat"],
     [1, 25, 2, "Squat"],
     [1, 26, 1, "Dip"], // the sheet's spelling: an alias of Dips
-    [1, 27, 1, "Facepulls"],
+    [1, 27, 1, "Facepulls", "20 - 30"], // a range: reps done default to 30
     [2, 77, 1, "Dødløft"],
   ];
   return {
     tables: {
-      strength_sets: sheet.map(([session, sheet_row, set_no, name]) => ({
+      strength_sets: sheet.map(([session, sheet_row, set_no, name, reps_text]) => ({
         week_start: "2026-10-12",
         session,
         sheet_row,
         set_no,
         name,
+        reps_text: reps_text ?? "3",
       })),
       exercises: [
         { id: 1, name: "Squat", aliases: [] },
@@ -245,9 +259,53 @@ test("recordSetTap: begin, done and skip write the rules; the server picks the n
   assert.deepEqual(log(db), [
     ["25#1", 1, iso(0), iso(2), false],
     ["25#2", 1, iso(2), iso(5), false],
+    ["26#0", 2, iso(5), null, false], // Squat's last done entered Dips' warm-up
     ["26#1", 2, null, null, true], // "Dip" resolved through its alias
-    ["27#1", 3, iso(6), null, false],
+    ["27#0", 3, iso(6), null, false], // the skip entered Facepulls' warm-up (Dips' is passed over)
   ]);
+  assert.ok(db.tables.exercise_set_log.every(valid));
+  assert.deepEqual(
+    db.tables.exercise_set_log.map((r) => [`${String(r.row_no)}#${String(r.set_no)}`, r.kind]).toSorted(),
+    [["25#1", "set"], ["25#2", "set"], ["26#0", "warmup"], ["26#1", "set"], ["27#0", "warmup"]],
+  );
+});
+
+test("recordSetTap: warm-up - begin opens it, Til sæt 1 ends it and starts set 1, Fortryd undoes begin", async () => {
+  const db = fakeDb();
+  await recordSetTap(tap("begin", 25, 0), at(0), options(db)); // Begynd træning
+  assert.deepEqual(log(db), [["25#0", 1, iso(0), null, false]]);
+  await recordSetTap(tap("undo", 25, 0, { undoes: "begin" }), at(1), options(db)); // Fortryd before any set
+  assert.deepEqual(log(db), []);
+  await recordSetTap(tap("begin", 25, 0), at(2), options(db));
+  await recordSetTap(tap("done", 25, 0), at(9), options(db)); // Til sæt 1
+  assert.deepEqual(log(db), [
+    ["25#0", 1, iso(2), iso(9), false],
+    ["25#1", 1, iso(9), null, false],
+  ]);
+  await recordSetTap(tap("undo", 25, 0), at(10), options(db)); // Fortryd of Til sæt 1
+  assert.deepEqual(log(db), [["25#0", 1, iso(2), null, false]]);
+  assert.deepEqual(await recordSetTap(tap("done", 25, 3), at(11), options(db)), { ok: false, reason: "invalid" });
+  assert.deepEqual(await recordSetTap(tap("begin", 26, 2), at(11), options(db)), { ok: false, reason: "invalid" });
+  assert.deepEqual(await recordSetTap(tap("begin", 25, 2, { set: 0, row: 24 }), at(11), options(db)), { ok: false, reason: "invalid" });
+});
+
+test("recordSetTap: feel and reps on a done set; a range set's done writes the top; never on an open set", async () => {
+  const db = fakeDb();
+  const refused = { ok: false, reason: "invalid" };
+  assert.deepEqual(await recordSetTap(tap("feel", 25, 1, { value: -1 }), at(0), options(db)), refused); // not done
+  await recordSetTap(tap("done", 25, 1), at(1), options(db));
+  await recordSetTap(tap("feel", 25, 1, { value: -1 }), at(2), options(db));
+  await recordSetTap(tap("done", 27, 1), at(3), options(db)); // Facepulls 20 - 30
+  const row = (key: string) => db.tables.exercise_set_log.find((r) => `${String(r.row_no)}#${String(r.set_no)}` === key);
+  assert.deepEqual([row("25#1")?.felt_rpe, row("25#1")?.reps_done ?? null], [-1, null]); // fixed reps: none
+  assert.equal(row("27#1")?.reps_done, 30);
+  await recordSetTap(tap("reps", 27, 1, { value: 24 }), at(4), options(db));
+  await recordSetTap(tap("done", 27, 1), at(5), options(db)); // a retry of the done keeps the stepper's value
+  assert.equal(row("27#1")?.reps_done, 24);
+  assert.deepEqual(await recordSetTap(tap("reps", 27, 1, { value: 41 }), at(6), options(db)), refused); // top + 10
+  assert.deepEqual(await recordSetTap(tap("reps", 25, 1, { value: 5 }), at(6), options(db)), refused); // not a range
+  await recordSetTap(tap("feel", 25, 1, { value: null }), at(7), options(db)); // tapping it again clears
+  assert.equal(row("25#1")?.felt_rpe, null);
   assert.ok(db.tables.exercise_set_log.every(valid));
 });
 

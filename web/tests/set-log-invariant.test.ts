@@ -10,7 +10,7 @@ import {
   type LoggedSet,
   progress,
   restStart,
-  sessionOrder,
+  sessionOrderWithWarmups,
   setKey,
   type SetRef,
   type SetTapKind,
@@ -27,7 +27,7 @@ type Row = Record<string, unknown>;
 type FakeDb = { tables: Record<string, Row[]>; writes: Row[]; failAt?: number; requests: number };
 
 const PK = ["date", "session_no", "row_no", "set_no"];
-const ALLOWED = new Set([...PK, "exercise_id", "started_at", "ended_at", "skipped", "updated_at"]);
+const ALLOWED = new Set([...PK, "exercise_id", "kind", "started_at", "ended_at", "skipped", "updated_at", "felt_rpe", "reps_done"]);
 
 function matches(row: Row, params: URLSearchParams): boolean {
   for (const [column, expression] of params) {
@@ -58,7 +58,9 @@ const SHEET: Array<[number, number, string]> = [
   [13, 2, "Squat"],
   [14, 1, "Dip"],
 ];
-const ORDER = sessionOrder(SHEET.map(([row, set]) => ({ row, set })));
+// Warm-ups (set 0) before rows 10 (Bænkpres), 13 (Squat) and 14 (Dip): the server's order.
+const ORDER = sessionOrderWithWarmups(SHEET.map(([row, set, name]) => ({ ref: { row, set }, name })));
+const SETS = ORDER.filter((ref) => ref.set > 0);
 
 function fakeDb(): FakeDb {
   return {
@@ -158,7 +160,8 @@ function assertTableInvariants(db: FakeDb, ctx: string, partial = false) {
     for (const k of Object.keys(w)) if (k !== "table" && k !== "method") assert.ok(ALLOWED.has(k), `${ctx}: wrote column ${k}`);
   }
   const p = progress(ORDER, dbLog(db));
-  assert.ok(p.done + p.skipped <= p.total && p.total === ORDER.length, `${ctx}: progress out of bounds`);
+  assert.ok(p.done + p.skipped <= p.total && p.total === SETS.length, `${ctx}: progress out of bounds`);
+  for (const r of rows) assert.equal(r.kind, Number(r.set_no) === 0 ? "warmup" : "set", `${ctx}: kind of ${String(r.row_no)}#${String(r.set_no)}`);
 }
 
 /** The taps the screens can send for this log (Fokus, the overview ticks, Fortryd). */
@@ -168,7 +171,7 @@ function uiTaps(log: ReadonlyMap<string, LoggedSet>): Array<[SetTapKind, SetRef]
   if (first !== null) taps.push(["begin", first], ["done", first], ["skip", first]);
   const last = lastTap(log);
   if (last !== null) taps.push(["undo", last.ref]); // Fortryd
-  for (const ref of ORDER) {
+  for (const ref of SETS) {
     const s = stateOf(log.get(setKey(ref)));
     if (s === "open" || s === "skipped") taps.push(["done", ref]); // overview tick
     if (s === "done") taps.push(["undo", ref]); // overview untick

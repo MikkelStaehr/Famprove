@@ -37,6 +37,7 @@ function set(overrides: Partial<PrescribedSetRow>): PrescribedSetRow {
     prescribed: "RPE 5.5",
     loggedKg: null, // missing kg is null (never 0) since the no-silent-defaults change
     bodyweight: false,
+    notes: null,
     ...overrides,
   };
 }
@@ -198,13 +199,13 @@ test("next session: each row lists its sets, Python's suggestion, and today's lo
         set({ session: 1, sheetRow: 27, setNo: 1, prescribed: "-10%" }),
       ],
       plannedSets: [
-        { block: BLOK, sheetRow: 25, week: 1, setNo: 1, suggestedKg: 142.5, basis: "rpe_e1rm", uncappedKg: null },
-        { block: BLOK, sheetRow: 27, week: 1, setNo: 1, suggestedKg: null, basis: "not_rpe", uncappedKg: null },
+        { block: BLOK, sheetRow: 25, week: 1, setNo: 1, suggestedKg: 142.5, basis: "rpe_e1rm", uncappedKg: null, adjustmentKg: null, adjustmentReason: null, restMinS: null, restMaxS: null, ramp: null },
+        { block: BLOK, sheetRow: 27, week: 1, setNo: 1, suggestedKg: null, basis: "not_rpe", uncappedKg: null, adjustmentKg: null, adjustmentReason: null, restMinS: null, restMaxS: null, ramp: null },
       ],
       setLog: [
-        { date: "2026-09-28", session: 1, row: 25, set: 1, startedAt: "2026-09-28T16:00:00Z", endedAt: "2026-09-28T16:03:00Z", skipped: false, updatedAt: "2026-09-28T16:03:00Z" },
-        { date: "2026-09-28", session: 2, row: 40, set: 1, startedAt: null, endedAt: null, skipped: true, updatedAt: "2026-09-28T16:04:00Z" },
-        { date: "2026-09-27", session: 1, row: 25, set: 1, startedAt: null, endedAt: null, skipped: true, updatedAt: "2026-09-27T16:04:00Z" },
+        { date: "2026-09-28", session: 1, row: 25, set: 1, startedAt: "2026-09-28T16:00:00Z", endedAt: "2026-09-28T16:03:00Z", skipped: false, updatedAt: "2026-09-28T16:03:00Z", feltRpe: null, repsDone: null },
+        { date: "2026-09-28", session: 2, row: 40, set: 1, startedAt: null, endedAt: null, skipped: true, updatedAt: "2026-09-28T16:04:00Z", feltRpe: null, repsDone: null },
+        { date: "2026-09-27", session: 1, row: 25, set: 1, startedAt: null, endedAt: null, skipped: true, updatedAt: "2026-09-27T16:04:00Z", feltRpe: null, repsDone: null },
       ],
     }),
     "2026-09-28",
@@ -313,8 +314,9 @@ test("parsers for the Træning rows", () => {
     prescribed: "RPE 5 - 6",
     logged_kg: 0,
     bodyweight: false,
+    notes: "Pause 2 sek. i bunden",
   });
-  assert.deepEqual([row.weekStart, row.session, row.repsText], ["2026-09-28", 1, "8 - 12"]);
+  assert.deepEqual([row.weekStart, row.session, row.repsText, row.notes], ["2026-09-28", 1, "8 - 12", "Pause 2 sek. i bunden"]);
 
   const planned = parseStrengthSessionRow({
     week_start: "2026-09-28",

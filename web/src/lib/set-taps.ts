@@ -16,11 +16,19 @@
  *                     previous set's end or skip time), and the starts it wrote; or a begin.
  * The order of sets is the sheet's: rows by sheet row, sets 1..n. The server derives next and
  * previous from strength_sets itself; the client only names the set it means.
- * Nothing computes from the log. Logging kg stays in the coach's sheet; the app never writes kg.
+ * Warm-ups (2026-10-13, spec fokus-pause.md): set 0 on the first row of each exercise run (rows
+ * in a row with the same exercise) comes before its set 1, so the same rules apply: begin starts
+ * the first warm-up, the done that finishes an exercise starts the next one's warm-up, and a done
+ * on the warm-up ("Til sæt 1") ends it and starts set 1. A warm-up whose set 1 is already done or
+ * skipped (ticked on the overview) is passed over. Warm-ups never count as sets.
+ *   feel   set k   -> k.felt_rpe = value (-1/0/+1, null clears); only on a done set
+ *   reps   set k   -> k.reps_done = value; only on a done set with a range prescription (the done
+ *                     tap itself writes the top of the range when reps_done is empty)
+ * Python reads felt_rpe and reps_done; logging kg stays in the coach's sheet (the app never writes kg).
  */
 
 export type SetRef = { readonly row: number; readonly set: number };
-export type SetTapKind = "begin" | "done" | "skip" | "undo";
+export type SetTapKind = "begin" | "done" | "skip" | "undo" | "feel" | "reps";
 /** What an undo undoes, as the client saw the set: so a retry of a half-done undo only finishes it. */
 export type Undoes = "done" | "skip" | "begin";
 
@@ -32,6 +40,8 @@ export type SetTapInput = {
   readonly row: number; // strength_sets.sheet_row
   readonly set: number; // strength_sets.set_no
   readonly undoes: Undoes | null; // set exactly for kind "undo"
+  /** feel: -1 / 0 / +1, or null to clear; reps: the reps done; absent or null for the others. */
+  readonly value?: number | null;
 };
 
 /** One set's logged state, as read back from the log (or optimistically applied). */
@@ -41,7 +51,16 @@ export type LoggedSet = SetRef & {
   readonly skipped: boolean;
   /** The time of the row's latest write; for a skipped set, the skip's time. */
   readonly updatedAt: string | null;
+  /** How the set felt: -1 Lettere, 0 Som ventet, +1 Hårdere; null or absent = not rated. */
+  readonly feltRpe?: number | null;
+  /** Reps done on a range set; null or absent = none. */
+  readonly repsDone?: number | null;
 };
+
+/** Set 0: the warm-up before set 1 of an exercise run. */
+export function isWarmup(ref: SetRef): boolean {
+  return ref.set === 0;
+}
 
 /** The same instant (the server returns "…+00:00", a tap is written as "…Z"). */
 export function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
@@ -66,6 +85,33 @@ export function sessionOrder(sets: readonly SetRef[]): SetRef[] {
   return [...unique.values()].toSorted((a, b) => a.row - b.row || a.set - b.set);
 }
 
+/** The rows that start an exercise run: a row whose exercise differs from the row before it. */
+export function runStartRows(sets: readonly { readonly ref: SetRef; readonly name: string }[]): Set<number> {
+  const names = new Map<number, string>();
+  for (const s of sets) if (!names.has(s.ref.row)) names.set(s.ref.row, s.name.trim().toLowerCase());
+  const starts = new Set<number>();
+  let previous: string | null = null;
+  for (const row of [...names.keys()].toSorted((a, b) => a - b)) {
+    const name = names.get(row) ?? "";
+    if (name !== previous) starts.add(row);
+    previous = name;
+  }
+  return starts;
+}
+
+/** The sheet's order with a warm-up (set 0) before set 1 of each run's first row. */
+export function sessionOrderWithWarmups(sets: readonly { readonly ref: SetRef; readonly name: string }[]): SetRef[] {
+  const order = sessionOrder(sets.map((s) => s.ref));
+  const starts = runStartRows(sets);
+  return order.flatMap((ref) => (ref.set === 1 && starts.has(ref.row) ? [{ row: ref.row, set: 0 }, ref] : [ref]));
+}
+
+/** A warm-up whose set 1 is done or skipped is passed over (ticked on the overview). */
+function current(ref: SetRef, log: ReadonlyMap<string, LoggedSet>): boolean {
+  if (stateOf(log.get(setKey(ref))) !== "open") return false;
+  return !isWarmup(ref) || stateOf(log.get(setKey({ row: ref.row, set: 1 }))) === "open";
+}
+
 export function neighbours(
   order: readonly SetRef[],
   target: SetRef,
@@ -79,7 +125,7 @@ export function neighbours(
 export function nextOpen(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, target: SetRef): SetRef | null {
   const i = order.findIndex((s) => s.row === target.row && s.set === target.set);
   if (i === -1) return null;
-  return order.slice(i + 1).find((s) => stateOf(log.get(setKey(s))) === "open") ?? null;
+  return order.slice(i + 1).find((s) => current(s, log)) ?? null;
 }
 
 /** When a set that follows `previous` started, by that set's tap: its end, or its skip time. */
@@ -103,7 +149,7 @@ export function startFromAnotherTap(log: ReadonlyMap<string, LoggedSet>, target:
 
 /** The first set that is neither done nor skipped; null when every set is. */
 export function firstOpen(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): SetRef | null {
-  return order.find((s) => stateOf(log.get(setKey(s))) === "open") ?? null;
+  return order.find((s) => current(s, log)) ?? null;
 }
 
 export type Progress = { readonly done: number; readonly skipped: number; readonly total: number };
@@ -111,12 +157,13 @@ export type Progress = { readonly done: number; readonly skipped: number; readon
 export function progress(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): Progress {
   let done = 0;
   let skipped = 0;
-  for (const s of order) {
+  const sets = order.filter((s) => !isWarmup(s));
+  for (const s of sets) {
     const state = stateOf(log.get(setKey(s)));
     if (state === "done") done += 1;
     if (state === "skipped") skipped += 1;
   }
-  return { done, skipped, total: order.length };
+  return { done, skipped, total: sets.length };
 }
 
 /** The session's latest done or skip (what Fortryd undoes): the set, the kind and its time. */
@@ -136,10 +183,10 @@ export function lastTap(log: ReadonlyMap<string, LoggedSet>): LastTap | null {
   return latest;
 }
 
-/** When the rest timer counts from: the latest tap, if it was a done; else null. */
+/** When the rest timer counts from: the latest tap, if it was a done of a set (not "Til sæt 1"). */
 export function restStart(log: ReadonlyMap<string, LoggedSet>): string | null {
   const last = lastTap(log);
-  return last !== null && last.kind === "done" ? last.at : null;
+  return last !== null && last.kind === "done" && !isWarmup(last.ref) ? last.at : null;
 }
 
 /** What an undo of `target` would undo now; null when there is nothing to undo. */
@@ -154,7 +201,10 @@ export function undoesOf(log: ReadonlyMap<string, LoggedSet>, target: SetRef): U
 
 /** Whether the server would refuse the tap (the screens don't offer it). */
 export function refused(log: ReadonlyMap<string, LoggedSet>, kind: SetTapKind, target: SetRef): boolean {
-  return kind === "skip" && stateOf(log.get(setKey(target))) === "done";
+  const state = stateOf(log.get(setKey(target)));
+  if (kind === "skip") return state === "done";
+  if (kind === "feel" || kind === "reps") return state !== "done" || isWarmup(target);
+  return false;
 }
 
 function put(log: Map<string, LoggedSet>, ref: SetRef, change: Partial<LoggedSet>, at: string): void {
@@ -181,6 +231,7 @@ export function applyTap(
   kind: SetTapKind,
   target: SetRef,
   at: string,
+  value: number | null = null,
 ): Map<string, LoggedSet> {
   const next = new Map(log);
   if (refused(log, kind, target)) return next;
@@ -202,6 +253,12 @@ export function applyTap(
       if (following !== null && log.get(setKey(following))?.startedAt == null) put(next, following, { startedAt: t }, at);
       break;
     }
+    case "feel":
+      if (own !== undefined) put(next, target, { feltRpe: value ?? null }, at);
+      break;
+    case "reps":
+      if (own !== undefined && value != null) put(next, target, { repsDone: value }, at);
+      break;
     case "undo": {
       if (own === undefined) break;
       const { previous } = neighbours(order, target);
@@ -222,14 +279,23 @@ export function applyTap(
   return next;
 }
 
-const KINDS: readonly SetTapKind[] = ["begin", "done", "skip", "undo"];
+const KINDS: readonly SetTapKind[] = ["begin", "done", "skip", "undo", "feel", "reps"];
 const UNDOES: readonly Undoes[] = ["done", "skip", "begin"];
 export const MAX_SESSION = 14; // the sheet never plans more; anything above is not a session
 const MAX_ROW = 10_000;
 const MAX_SET = 100;
 
-function whole(value: unknown, max: number): number | null {
-  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= max ? value : null;
+function whole(value: unknown, max: number, min = 1): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : null;
+}
+
+const MAX_REPS = 100;
+
+/** A feel or reps tap's value; null for the other kinds (and to clear a feel). undefined: invalid. */
+function tapValue(kind: SetTapKind, raw: unknown): number | null | undefined {
+  if (kind === "feel") return raw === null ? null : raw === -1 || raw === 0 || raw === 1 ? raw : undefined;
+  if (kind === "reps") return whole(raw, MAX_REPS) ?? undefined;
+  return raw === undefined || raw === null ? null : undefined;
 }
 
 /** The action's input from an untrusted client: exact shape or null (the server checks more). */
@@ -239,10 +305,12 @@ export function parseSetTapInput(raw: unknown): SetTapInput | null {
   const kind = KINDS.find((k) => k === r.kind);
   const session = whole(r.session, MAX_SESSION);
   const row = whole(r.row, MAX_ROW);
-  const set = whole(r.set, MAX_SET);
+  const set = whole(r.set, MAX_SET, 0); // 0: an exercise's warm-up
   const undoes = UNDOES.find((u) => u === r.undoes) ?? null;
+  const value = kind === undefined ? undefined : tapValue(kind, r.value);
   if (
     kind === undefined ||
+    value === undefined ||
     session === null ||
     row === null ||
     set === null ||
@@ -252,5 +320,5 @@ export function parseSetTapInput(raw: unknown): SetTapInput | null {
   ) {
     return null;
   }
-  return { kind, date: r.date, session, row, set, undoes };
+  return { kind, date: r.date, session, row, set, undoes, value };
 }

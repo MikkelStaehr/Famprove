@@ -5,8 +5,9 @@ import {
   type LoggedSet,
   neighbours,
   nextOpen,
+  isWarmup,
   refused,
-  sessionOrder,
+  sessionOrderWithWarmups,
   setKey,
   type SetRef,
   type SetTapInput,
@@ -38,7 +39,10 @@ import { parseSetLogRow, RowError, SET_LOG_SELECT } from "./rows.ts";
  *    here, never from the client;
  *  - timestamps are this server's clock; one tap writes one value T everywhere, which is how an
  *    undo finds what its tap wrote (it clears a start only while it holds T, on a set not done).
- * Python never reads this table; nothing computes from it; the app never writes kg.
+ * Warm-ups are set 0 of an exercise run's first row (kind 'warmup') and follow the same rules
+ * in the order (lib/set-taps.ts). feel and reps write one column on a done set; a done on a range
+ * set writes the top of the range as reps_done when it is empty (the stepper adjusts it).
+ * Python reads felt_rpe and reps_done (since 2026-10-13); the app never writes kg.
  */
 
 export type SetTapResult =
@@ -63,13 +67,19 @@ function nameKey(name: string): string {
   return name.trim().toLowerCase(); // as public.exercises' lower(btrim(name))
 }
 
-/** The session's sets in the sheet (row, set, exercise name). */
+/** The top of a range prescription ("8 - 12" -> 12); null for fixed reps ("3") or none. */
+export function rangeTop(repsText: string | null): number | null {
+  const m = repsText === null ? null : /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(repsText);
+  return m === null ? null : Math.max(Number(m[1]), Number(m[2]));
+}
+
+/** The session's sets in the sheet (row, set, exercise name, reps as written). */
 async function sessionSets(c: PostgrestClient, weekStart: string, session: number) {
   return selectAll(
     c,
     "strength_sets",
     {
-      columns: "sheet_row,set_no,name",
+      columns: "sheet_row,set_no,name,reps_text",
       order: "sheet_id,block,sheet_row,week,set_no",
       filters: [
         ["week_start", `eq.${weekStart}`],
@@ -81,7 +91,8 @@ async function sessionSets(c: PostgrestClient, weekStart: string, session: numbe
       if (typeof r.sheet_row !== "number" || typeof r.set_no !== "number" || typeof r.name !== "string") {
         throw new RowError("strength_sets row must have sheet_row, set_no and name");
       }
-      return { ref: { row: r.sheet_row, set: r.set_no }, name: r.name };
+      const repsText = typeof r.reps_text === "string" ? r.reps_text : null;
+      return { ref: { row: r.sheet_row, set: r.set_no }, name: r.name, repsText };
     },
   );
 }
@@ -131,6 +142,7 @@ async function ensure(c: PostgrestClient, k: Key, values: Readonly<Record<string
       row_no: k.ref.row,
       set_no: k.ref.set,
       exercise_id: k.exerciseId,
+      kind: isWarmup(k.ref) ? "warmup" : "set",
       ...values,
       updated_at: at,
     },
@@ -198,15 +210,18 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
       sessionSets(c, isoWeekStart(input.date), input.session),
       exerciseIds(c),
     ]);
+    const order = sessionOrderWithWarmups(sets);
+    const inOrder = new Set(order.map(setKey)); // the sheet's sets and their exercises' warm-ups
     const names = new Map(sets.map((s) => [setKey(s.ref), s.name]));
-    const order = sessionOrder(sets.map((s) => s.ref));
+    const tops = new Map(sets.map((s) => [setKey(s.ref), rangeTop(s.repsText)]));
+    const nameOf = (ref: SetRef) => names.get(setKey(isWarmup(ref) ? { row: ref.row, set: 1 } : ref)) ?? "";
     const target = { row: input.row, set: input.set };
     const keyOf = (ref: SetRef | null): Key | null => {
       if (ref === null) return null;
-      const id = ids.get(nameKey(names.get(setKey(ref)) ?? ""));
+      const id = ids.get(nameKey(nameOf(ref)));
       return id === undefined ? null : { date: input.date, session: input.session, ref, exerciseId: id };
     };
-    const own = keyOf(names.has(setKey(target)) ? target : null);
+    const own = keyOf(inOrder.has(setKey(target)) ? target : null);
     if (own === null) return { ok: false, reason: "invalid" }; // not in the session, or unknown
     const log = await sessionLog(c, input.date, input.session);
     if (refused(log, input.kind, target)) return { ok: false, reason: "invalid" }; // skip a done set
@@ -223,6 +238,11 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
         // one tap keeps one T everywhere (undo finds it) and the next set still gets its start.
         const t = stateOf(logged) === "done" && logged?.endedAt != null ? logged.endedAt : at;
         if (logged?.skipped === true) await patch(c, own, [], { skipped: false, updated_at: at });
+        const top = tops.get(setKey(target)) ?? null; // a range set: its reps default to the top
+        if (top !== null && logged?.repsDone == null) {
+          await ensure(c, own, { reps_done: top }, t);
+          await patch(c, own, [["reps_done", "is.null"]], { reps_done: top });
+        }
         await setIfNull(c, own, ["started_at", "ended_at"], t);
         if (after !== null) await setIfNull(c, after, ["started_at"], t);
         break;
@@ -235,6 +255,18 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
           await patch(c, own, [], { skipped: true, started_at: null, ended_at: null, updated_at: t });
         }
         if (after !== null) await setIfNull(c, after, ["started_at"], t);
+        break;
+      }
+      case "feel":
+        // One column on a done set (refused above otherwise): -1 / 0 / +1, or null to clear.
+        await patch(c, own, [], { felt_rpe: input.value ?? null, updated_at: at });
+        break;
+      case "reps": {
+        // A range set only, within 1 .. top + 10 (spec fokus-pause.md).
+        const top = tops.get(setKey(target)) ?? null;
+        const reps = input.value ?? null;
+        if (top === null || reps === null || reps < 1 || reps > top + 10) return { ok: false, reason: "invalid" };
+        await patch(c, own, [], { reps_done: reps, updated_at: at });
         break;
       }
       case "undo": {

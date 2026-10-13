@@ -56,11 +56,11 @@ export function midsessionLog(sets: readonly PrescribedSetRow[], today: IsoDate,
     const ordered = rows.toSorted((a, b) => a.sheetRow - b.sheetRow || a.setNo - b.setNo);
     const at = (k: number) => new Date(now.getTime() - 102_000 - (MIDSESSION_DONE - k) * 180_000).toISOString();
     ordered.slice(0, MIDSESSION_DONE).forEach((s, k) =>
-      log.push({ date: today, session, row: s.sheetRow, set: s.setNo, startedAt: at(k), endedAt: at(k + 1), skipped: false, updatedAt: at(k + 1) }),
+      log.push({ date: today, session, row: s.sheetRow, set: s.setNo, startedAt: at(k), endedAt: at(k + 1), skipped: false, updatedAt: at(k + 1), feltRpe: null, repsDone: null }),
     );
     const skipped = ordered[MIDSESSION_DONE];
     if (skipped !== undefined) {
-      log.push({ date: today, session, row: skipped.sheetRow, set: skipped.setNo, startedAt: null, endedAt: null, skipped: true, updatedAt: at(MIDSESSION_DONE - 0.5) });
+      log.push({ date: today, session, row: skipped.sheetRow, set: skipped.setNo, startedAt: null, endedAt: null, skipped: true, updatedAt: at(MIDSESSION_DONE - 0.5), feltRpe: null, repsDone: null });
     }
   }
   return log;

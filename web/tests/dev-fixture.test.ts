@@ -49,6 +49,7 @@ test("DEV_FIXTURE=midsession: per session, 3 sets done 3 min apart, then one ski
     prescribed: "RPE 6",
     loggedKg: null,
     bodyweight: false,
+    notes: null,
   });
   const now = new Date("2026-10-12T16:00:00Z");
   const log = midsessionLog([set(1, 26, 1), set(1, 25, 2), set(1, 25, 1), set(1, 27, 1), set(1, 28, 1), set(2, 77, 1)], "2026-10-12", now);

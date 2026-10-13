@@ -873,6 +873,7 @@ export type PrescribedSetRow = {
   readonly prescribed: string | null; // as written, e.g. "RPE 6 - 7", "-10%"
   readonly loggedKg: number | null; // null: not entered/unreadable; 0 is real only if bodyweight (bodyweight only)
   readonly bodyweight: boolean;
+  readonly notes: string | null; // the coach's NOTES cell as written; null = blank
 };
 
 /** public.app_notices: one current notice per kind (e.g. ftp_mismatch), written by Python. */
@@ -894,8 +895,11 @@ export function parseAppNoticeRow(raw: unknown): AppNoticeRow {
 }
 
 /** Why a planned set has (or has no) suggested kg (python domain/planned_sets.py). */
-export type SuggestionBasis = "rpe_e1rm" | "not_rpe" | "no_e1rm" | "no_lift";
-const SUGGESTION_BASES: readonly SuggestionBasis[] = ["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift"];
+export type SuggestionBasis = "rpe_e1rm" | "not_rpe" | "no_e1rm" | "no_lift" | "progression";
+const SUGGESTION_BASES: readonly SuggestionBasis[] = ["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift", "progression"];
+
+/** One step of a main lift's warm-up ramp (planned_sets.ramp): pct of the first working set's kg. */
+export type RampStep = { readonly pct: number; readonly reps: number; readonly kg: number };
 
 /**
  * public.planned_sets: suggested kg per set of this ISO week and later, computed by Python
@@ -911,11 +915,21 @@ export type PlannedSetRow = {
   readonly basis: SuggestionBasis;
   /** The suggestion before the weekly cap; null = not capped (the web then says nothing). */
   readonly uncappedKg: number | null;
+  /** A progression step (2.5 / 5 kg) or 0 for hold; null = no rule fired. */
+  readonly adjustmentKg: number | null;
+  /** Danish, lowercase, shown after a dash ("de sidste to var lettere"); null exactly with adjustmentKg. */
+  readonly adjustmentReason: string | null;
+  /** Recommended rest after this set, in seconds; null on rows written before 2026-10-13. */
+  readonly restMinS: number | null;
+  readonly restMaxS: number | null;
+  /** The warm-up ramp on a main lift's first set of a run; null = none. */
+  readonly ramp: readonly RampStep[] | null;
 };
 
 export const PLANNED_SETS_SELECT = {
   table: "planned_sets",
-  columns: "sheet_id,block,sheet_row,week,set_no,suggested_kg,basis,uncapped_kg",
+  columns:
+    "sheet_id,block,sheet_row,week,set_no,suggested_kg,basis,uncapped_kg,adjustment_kg,adjustment_reason,rest_min_s,rest_max_s,ramp",
   order: "sheet_id,block,sheet_row,week,set_no", // the primary key
 } as const;
 
@@ -925,8 +939,8 @@ export function parsePlannedSetRow(raw: unknown): PlannedSetRow {
   const known = SUGGESTION_BASES.find((b) => b === basis);
   if (known === undefined) throw new RowError(`planned_sets.basis: unknown value`);
   const suggestedKg = f.numberOrNull("suggested_kg");
-  if (suggestedKg !== null && known !== "rpe_e1rm") {
-    throw new RowError("planned_sets: a suggestion only with basis rpe_e1rm");
+  if (suggestedKg !== null && known !== "rpe_e1rm" && known !== "progression") {
+    throw new RowError("planned_sets: a suggestion only with basis rpe_e1rm or progression");
   }
   const uncappedKg = f.numberOrNull("uncapped_kg");
   if (uncappedKg !== null && (suggestedKg === null || uncappedKg === suggestedKg)) {
@@ -940,7 +954,43 @@ export function parsePlannedSetRow(raw: unknown): PlannedSetRow {
     suggestedKg,
     basis: known,
     uncappedKg,
+    ...adjustmentOf(f),
+    ...restOf(f),
+    ramp: rampOf(f),
   };
+}
+
+function adjustmentOf(f: Fields): { adjustmentKg: number | null; adjustmentReason: string | null } {
+  const adjustmentKg = f.optionalNumber("adjustment_kg");
+  const adjustmentReason = f.optionalString("adjustment_reason");
+  if ((adjustmentKg === null) !== (adjustmentReason === null)) {
+    throw new RowError("planned_sets.adjustment_kg: expected a reason exactly with an adjustment");
+  }
+  if (adjustmentKg !== null && ![0, 2.5, 5].includes(adjustmentKg)) {
+    throw new RowError("planned_sets.adjustment_kg: expected 0, 2.5 or 5");
+  }
+  return { adjustmentKg, adjustmentReason };
+}
+
+function restOf(f: Fields): { restMinS: number | null; restMaxS: number | null } {
+  const restMinS = f.optionalNumber("rest_min_s");
+  const restMaxS = f.optionalNumber("rest_max_s");
+  if ((restMinS === null) !== (restMaxS === null) || (restMinS !== null && restMaxS !== null && (restMinS <= 0 || restMaxS < restMinS))) {
+    throw new RowError("planned_sets.rest_min_s: expected 0 < min <= max, or both null");
+  }
+  return { restMinS, restMaxS };
+}
+
+function rampOf(f: Fields): readonly RampStep[] | null {
+  const raw = f.unknown("ramp");
+  if (raw === null || raw === undefined) return null;
+  if (!Array.isArray(raw)) throw new RowError("planned_sets.ramp: expected an array");
+  return raw.map((step: unknown) => {
+    const s = new Fields("planned_sets.ramp", step);
+    const kg = s.number("kg");
+    if (kg <= 0) throw new RowError("planned_sets.ramp: expected kg > 0");
+    return { pct: s.number("pct"), reps: s.number("reps"), kg };
+  });
 }
 
 /**
@@ -957,11 +1007,13 @@ export type SetLogRow = {
   readonly endedAt: string | null;
   readonly skipped: boolean;
   readonly updatedAt: string; // the row's latest write; for a skipped set, the skip's time
+  readonly feltRpe: number | null; // -1 Lettere, 0 Som ventet, +1 Hårdere; null = not rated
+  readonly repsDone: number | null; // reps done on a range set; null = none
 };
 
 export const SET_LOG_SELECT = {
   table: "exercise_set_log",
-  columns: "date,session_no,row_no,set_no,started_at,ended_at,skipped,updated_at",
+  columns: "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done",
   order: "date,session_no,row_no,set_no", // the primary key
 } as const;
 
@@ -976,17 +1028,27 @@ export function parseSetLogRow(raw: unknown): SetLogRow {
     endedAt: f.timestampOrNull("ended_at"),
     skipped: f.boolean("skipped"),
     updatedAt: f.timestamp("updated_at"),
+    feltRpe: f.optionalNumber("felt_rpe"),
+    repsDone: f.optionalNumber("reps_done"),
   };
   if (row.skipped && (row.startedAt !== null || row.endedAt !== null)) {
     throw new RowError("exercise_set_log: a skipped set has no timestamps");
   }
+  const kind = f.optionalString("kind") ?? "set"; // rows read before the column existed are sets
+  if ((kind === "warmup") !== (row.set === 0) || (kind !== "set" && kind !== "warmup")) {
+    throw new RowError("exercise_set_log.kind: expected warmup exactly on set 0");
+  }
+  if (row.feltRpe !== null && ![-1, 0, 1].includes(row.feltRpe)) {
+    throw new RowError("exercise_set_log.felt_rpe: expected -1, 0 or 1");
+  }
+  if (row.repsDone !== null && row.repsDone <= 0) throw new RowError("exercise_set_log.reps_done: expected > 0");
   return row;
 }
 
 export const PRESCRIBED_SETS_SELECT = {
   table: "strength_sets",
   columns:
-    "week_start,session,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight",
+    "week_start,session,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight,notes",
   order: "week_start,session,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
 } as const;
 
@@ -1006,6 +1068,7 @@ export function parsePrescribedSetRow(raw: unknown): PrescribedSetRow {
     prescribed: f.stringOrNull("prescribed"),
     loggedKg: f.numberOrNull("logged_kg"),
     bodyweight: f.boolean("bodyweight"),
+    notes: f.stringOrNull("notes"),
   };
 }
 
@@ -1083,4 +1146,31 @@ export function parsePlannedTargetRow(raw: unknown): PlannedTargetRow {
     problem: f.stringOrNull("problem"),
     computedAt: f.timestamp("computed_at"),
   };
+}
+
+/**
+ * public.exercise_feel: one Danish line per exercise with 4+ rated sets, written by Python
+ * (domain/set_feedback.py); shown verbatim on Analyse › Styrke.
+ */
+export type ExerciseFeelRow = {
+  readonly exerciseId: number;
+  readonly name: string; // public.exercises.name, embedded
+  readonly ratedN: number;
+  readonly verdictText: string;
+};
+
+export const EXERCISE_FEEL_SELECT = {
+  table: "exercise_feel",
+  columns: "exercise_id,rated_n,verdict_text,exercises(name)",
+  order: "exercise_id",
+} as const;
+
+export function parseExerciseFeelRow(raw: unknown): ExerciseFeelRow {
+  const f = new Fields(EXERCISE_FEEL_SELECT.table, raw);
+  const embedded = new Fields("exercise_feel.exercises", f.unknown("exercises"));
+  const ratedN = f.number("rated_n");
+  if (ratedN < 4) throw new RowError("exercise_feel.rated_n: expected at least 4");
+  const verdictText = f.string("verdict_text");
+  if (verdictText.trim() === "") throw new RowError("exercise_feel.verdict_text: expected a sentence");
+  return { exerciseId: f.number("exercise_id"), name: embedded.string("name"), ratedN, verdictText };
 }
