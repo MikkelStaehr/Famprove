@@ -67,3 +67,4 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | traening | Træning overview: Today renamed, a tick per set, TSB hint, "Begynd træning" | L |
 | fokus | Fokus: one set at a time, rest timer, skip, progress; survives a reload | L |
 | power-checks | Power data checks: spike warning per ride, FTP vs eFTP notice | M |
+| design-desktop | Design pass: desktop layouts for Belastning and Analyse, bottom/top nav | L |
