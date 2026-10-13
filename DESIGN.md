@@ -3,7 +3,7 @@
 Contract between `design-lead` (owns this file) and `ui` (builds). Read before any UI work.
 
 - **Part A: Guardrails.** Fixed. Never traded away, whatever the direction.
-- **Part B: Direction.** The product's visual identity: **Instrument** (chosen 2026-10-13, replacing Spurt of 2026-09-30). Rolling out screen by screen: Fokus first; the other screens follow the Spurt appendix until restyled. Token values live in `web/src/app/globals.css` and come from Part B.
+- **Part B: Direction.** The product's visual identity: **Instrument** (chosen 2026-10-13, replacing Spurt of 2026-09-30). App-wide since Revision 5 (slice `instrument-rest`, 2026-10-13); the Spurt appendix is history. Token values live in `web/src/app/globals.css` (`:root`) and come from Part B.
 
 When Part B and a pattern pack conflict, Part B wins on look and the pack wins on structure. Part A beats both.
 
@@ -132,7 +132,7 @@ Applies to Belastning's trend, Cykel's eFTP, EF and weekly strips, and Styrke's 
 - [ ] `prefers-reduced-motion` respected; every motion has a still alternative.
 
 ## Technical
-- Fonts are self-hosted with `next/font` (never fetched from a third party at runtime), max 2 families: Barlow + Barlow Condensed (Part B).
+- Fonts are self-hosted with `next/font` (never fetched from a third party at runtime), max 2 families: Inter + Chivo Mono (Part B Revision 5).
 - UI library: none yet. If Part B adopts shadcn/ui, it is themed entirely from these tokens. **Never the library's default look.**
 
 ## Don'ts
@@ -211,7 +211,7 @@ Applies to Belastning's trend, Cykel's eFTP, EF and weekly strips, and Styrke's 
 
 **History:** Spurt (chosen 2026-09-30) was replaced by Instrument on 2026-10-13 at the user's request. Spurt's text is kept as the appendix at the end of this file only while the rollout runs; delete it when the last screen is restyled.
 
-**Rollout:** **Fokus (`/fokus`) first** (pilot spec `design/specs/fokus-instrument.md`), so the user can judge it on the phone. Træning, Belastning and Analyse stay on Spurt (appendix) until each gets its own restyle. The new tokens apply only under the scope `[data-direction="instrument"]` on the Fokus root; outside it, `:root` stays Spurt.
+**Rollout:** Fokus first (pilot), then Træning, Belastning and Analyse together in Revision 5 (slice `instrument-rest`). Tokens sit at `:root`; the `[data-direction="instrument"]` scope is removed.
 
 ## Personality
 Editorial, exact, quiet. An instrument panel, not a sports app: monochrome type and hairlines, one red mark that tells you where you are.
@@ -283,6 +283,20 @@ Supersedes Revisions 2–3, [A4], [A8] and the single-accent table below where t
 - **Grain on:** 3 % static feTurbulence noise, both themes, `/fokus` only for now, `pointer-events: none`.
 - **Signature elements** (below) now read: the red "now" tick; the progress barcode; the generative element of each view; registration marks on desktop.
 
+### Revision 5: app-wide rollout (slice `instrument-rest`, 2026-10-13; specs `design/specs/instrument-traening.md`, `instrument-load.md`, `instrument-analyse.md`)
+Supersedes everything above, Part A's Spurt-specific lines (Technical fonts, ScreenNav pill, zone-bar tints) and the Spurt appendix where they differ. Behaviour (chart interaction, desktop grid, bottom bar, states, copy) is unchanged.
+- **Scope:** Instrument is the app's direction. Its tokens move from `[data-direction="instrument"]` to `:root` (both `prefers-color-scheme` themes); the attribute and the Fokus-only scope are removed. **Fonts** load once in `app/layout.tsx`: Inter (400, 500) → `--font-inter`, Chivo Mono (400, 500) → `--font-instrument-mono`; `fokus/layout.tsx` stops loading them. `font-sans` = Inter, `font-mono` = Chivo Mono. **Barlow and Barlow Condensed are retired**; `font-display` and italic are gone.
+- **Type:** h1 Inter 400 `text-32` sentence case; section headings Inter 400 `text-20`; key figures Inter 400 tabular 44–56; prescriptions and watts Inter 500 `text-32`; mono only for `caption` (12px, 14 on Fokus), axis/scale labels and in-chart value labels.
+- **Section, not card:** `Card` becomes a section: heading, 8px, 1px `--border` hairline, 16px, content. No fill, radius 0, no shadow. 40px between sections, 12px inside a group.
+- **Nav (`ScreenNav`):** text tabs, no pill track. Inter 500 `text-16`, three equal 44px tabs. Current: `--text` + a 2px `--text` bar (phone bottom bar: on the tab's top edge, on the hairline; desktop: under the word, offset 6px) + `aria-current`; others Inter 400 `--text-muted`. Weight + bar, never colour alone. Positions and the large-text fallback unchanged. Analyse's section tabs use the same pattern at `text-24`.
+- **Zones are monochrome:** the five `--zone-*` tints are deleted. The zone ruler (`instrument-load.md` §2) shows the active zone by a thicker baseline span plus its **name in words**; Træning shows value + zone name as text only. Part A's "never colour alone" now reads "never colour" for zones.
+- **Red = today:** `--accent` is only the "now/today" tick: Fokus's rest tick, the zone ruler's today tick, each chart's today tick on the x baseline, and Træning's week-column today tick. `--positive`, `--negative` and `--warning` are `--text` with a word and the ◆ glyph; no red text, rule or fill anywhere.
+- **Hollow = estimated or missing**, app-wide: forecast days (Belastning), kg not in the sheet (Fokus), prescribed-RPE e1RM (Styrke), a ride without TSS (Cykel). Excluded rides are a × on the baseline, never hollow.
+- **Chart marks:** lines 1–2px ink, days as ticks, rides as dots, weeks as 2px bars, blocks as hairline brackets (deload part dashed), no areas, fills, hatches, gradients or gridlines. Mark forms live in one constant, `web/src/lib/chart-marks.ts`, read by every chart.
+- **Grain on**, every screen, both themes (`fokus-round4.md` §4, moved from the Fokus root to `body`). **Registration marks** on desktop, every screen.
+- **One living element per screen**, carrying data, drawing scale only, with an sr sentence: Træning the set barcode + week columns; Belastning the marks chart (+ the day barcode in the week card); Cykel the TSS-sized eFTP dots; Styrke the e1RM marks; Fokus as `fokus-round4.md`.
+- **Retired tokens:** `--slab`, `--on-slab`, `--on-slab-muted`, `--slab-mark`, `--zone-*`, `--block-fill`, `--prognose-band`, `--shadow-card`/`--card-shadow`, `--on-accent`, the radius tokens (all 0; classes removed). The foundation step keeps the `--slab*` aliases (unfilled values) so nothing breaks mid-build; the last screen PR deletes them, and a grep for each name must return nothing.
+
 ### Single filled accent per Fokus view (design-lead decision, 2026-10-13; the fill is retired by Revision 2: the same element is the view's one red, as a rule + red label)
 | View | The one filled accent | Everything else |
 |---|---|---|
@@ -294,7 +308,7 @@ Supersedes Revisions 2–3, [A4], [A8] and the single-accent table below where t
 
 Reason: Part A gives each view one dominant primary action; a filled RPE choice would compete with it. The red moving tick and the progress "now" tick are marks, not fills, so they do not count.
 
-## Colour tokens (scope `[data-direction="instrument"]`)
+## Colour tokens (`:root`, app-wide since Revision 5)
 Existing names are reused so later screens change cheaply. Ratios are the main session's 2026-10-13 measurements; `tester` recomputes them at render time.
 
 | Token | Dark (primary) | Light | Role |
@@ -306,19 +320,25 @@ Existing names are reused so later screens change cheaply. Ratios are the main s
 | `--text` | #EAE0D2 | #2D2D2D | text, ink marks, 2px selected outline |
 | `--text-muted` | #8C8578 | #645E54 | muted text, control outlines, minor ticks (Revision 2) |
 | `--caption` (new, Revision 2) | #A68763 | #725B41 | the small uppercase caption labels only |
-| `--accent` | #E0362B | #E0362B | the primary action's rule and label, the rest scale's moving tick (Revision 2) |
-| `--on-accent` (new) | #141414 | #141414 | label on the accent fill (≥ 24px) |
+| `--accent` | #E0362B | #E0362B | **the today/now tick only** (Revision 5): Fokus rest tick, zone-ruler today tick, each chart's today tick, Træning's week-column today tick |
+| `--on-accent` | retired (Revision 4: no accent fill) | | |
 | `--focus` | #EAE0D2 | #2D2D2D | 3px ring, 3px offset (sits on bg) |
-| `--positive`, `--negative` | = `--accent` | = `--accent` | only with a word or glyph |
+| `--positive`, `--negative` | = `--text` | = `--text` | word + glyph (arrow, ◆); never red (Revision 5) |
 | `--warning` | = `--text` | = `--text` | ◆ SVG or dashed mark + a word ([A1]) |
-| `--slab` / `--on-slab` / `--on-slab-muted` / `--slab-mark` | `--bg` / `--text` / `--text-muted` / `--accent` | same | so leftover slab classes render unfilled |
+| `--slab` / `--on-slab` / `--on-slab-muted` / `--slab-mark` | `--bg` / `--text` / `--text-muted` / `--text` | same | transition aliases only; deleted by the last `instrument-rest` PR |
+| `--zone-*`, `--block-fill`, `--prognose-band`, `--shadow-card` | retired (Revision 5) | | zones in words, blocks as brackets, band as a range comb, no shadows |
 | `--card-shadow` | none | none | |
-| `--series-ctl/atl/tsb`, `--chart-mark` | `--text` (CTL 1px solid, ATL 1px dashed 4/4, TSB 2px solid); marks `--text-muted` | same | Belastning rollout; listed now so names are fixed |
+| `--series-ctl` | `--text`, a 3px horizontal tick per day (no line); prognose: hollow dot r 2, stroke 1 | same | fitness, the answer |
+| `--series-atl` | `--text`, a 1.5px horizontal tick per day; prognose: hollow dot r 1.5, stroke 1 | same | fatigue |
+| `--series-tsb` | `--text`, one 1px needle per day from 0; prognose: dashed 1 2 outline needle | same | form |
+| `--chart-mark` | = `--text-muted` | same | zero line, block brackets (1px + 6px end ticks; deload dashed 3 2), seam rules, range comb, ×, zero stubs, minor ticks |
+| `--chart-today` | = `--accent` | same | the 2×12 today tick on a chart's x baseline (2×28 on the zone ruler) |
+| `--chart-height` | 224 / 240 (≥ 640) / 320 (≥ `lg`) | same | unchanged from Spurt |
 
 Theme still follows `prefers-color-scheme` (dark is the design target, light the alternative; no toggle).
 
 ## Type
-- Fonts via `next/font/google`, self-hosted at build, imported in `web/src/app/fokus/layout.tsx` (not the root layout) so other routes don't preload them: **Inter** (400 only) → `--font-inter`; **JetBrains Mono** (400, 500) → `--font-jetbrains-mono`. Subset `latin` (covers æøå, ·, –, U+2212). Glyphs outside it (✓, ◆, ≈, arrows) are inline SVG, never text, so nothing falls back to a system font.
+- Fonts via `next/font/google`, self-hosted at build, imported in `web/src/app/layout.tsx` since Revision 5 (was `fokus/layout.tsx`): **Inter** (400, 500) → `--font-inter`; **Chivo Mono** (400, 500, Revision 2) → `--font-instrument-mono`. Subset `latin` (covers æøå, ·, –, U+2212). Glyphs outside it (✓, ◆, ≈, arrows) are inline SVG, never text, so nothing falls back to a system font.
 - Utilities (add to `@theme inline`): `font-grotesk` = `var(--font-inter), system-ui, sans-serif`; `font-mono` = `var(--font-jetbrains-mono), ui-monospace, monospace`.
 - Scale: the existing `text-12 … text-56` tokens. Grotesk 400 for headings (20, 24, 32) and sentences (16). Mono for every number, label, button and caption; key figures 40–56 mono 400, tabular by nature.
 - **`caption`** utility (new `@utility`): mono 500, uppercase, `letter-spacing: 0.08em`, `--text-muted`; size `text-14` on Fokus, `text-12` minimum elsewhere.
@@ -341,7 +361,7 @@ Instruments step, they don't glide. The rest tick and the timer jump once a seco
 
 ---
 
-# Appendix – Spurt (replaced 2026-10-13; still governs Træning, Belastning and Analyse until each is restyled, see Part B "Rollout")
+# Appendix – Spurt (HISTORY: replaced 2026-10-13, governs nothing since Revision 5; kept until `instrument-rest` ships, then delete)
 
 **Decision:** base **Spurt** (type, light palette, shape, density, motion, the NÆSTE slab, the segmented progress bar) + **Logbog's zone bar** as the one form element on both screens, restyled in Spurt's language + **dark theme derived from Ro's palette**. The Mode 0 samples (Ro, Logbog, Spurt) are local HTML files, git-ignored; this part is the contract, not the samples.
 
