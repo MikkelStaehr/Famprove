@@ -383,6 +383,7 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "strength_weeks": ("week_start", "lift"),
     "planned_sets": ("sheet_id", "block", "sheet_row", "week", "set_no"),
     "app_notices": ("kind",),
+    "analysis_summary": ("question",),
     "strength_set_kg": (
         "sheet_id",
         "block",

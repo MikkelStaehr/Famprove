@@ -61,6 +61,10 @@ MAX_IF_SET: Final = 1.15
 EFTP_BOUNDS_W: Final = (100, 500)
 HR_BOUNDS_BPM: Final = (80, 200)
 EF_TREND_DAYS: Final = 28
+EF_MIN_RIDES: Final = 3
+"""EF rides an EF window needs before its median is an answer (analysis_summary); the same rule
+as the web's trend line (web/src/lib/analyse-view.ts EF_TREND_MIN_RIDES, held to it by the
+analysis_summary contract test)."""
 MAX_GAP_DAYS: Final = 21
 YEAR_AGO_DAYS: Final = (365, 386)
 """The comparison point for an eFTP point: the latest eFTP point this many days earlier."""

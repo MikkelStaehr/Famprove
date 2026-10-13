@@ -15,6 +15,7 @@ from typing import Final
 
 from training_load.config import ConfigError, compute_config, load_dotenv_file
 from training_load.db.activities import all_activities
+from training_load.db.analysis_summary import sync_answers
 from training_load.db.blocks import sync_blocks
 from training_load.db.client import Postgrest
 from training_load.db.daily_load import sync_daily_load
@@ -33,6 +34,7 @@ from training_load.db.strength_analysis import (
 from training_load.db.strength_sessions import sync_strength_sessions
 from training_load.db.strength_sets import all_sets
 from training_load.domain.cycling import daily_cycling_tss
+from training_load.domain.cycling_answers import cycling_answers
 from training_load.domain.daily import build_daily_load
 from training_load.domain.dates import ANALYSIS_START, SERIES_START, today_local
 from training_load.domain.exercises import UNKNOWN_FACTOR, Catalog
@@ -112,7 +114,8 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
        sync_projection; log it with the naive baseline in forecast_log (made_on = today)
     8. the strength analysis: strength_weeks (rebuilt) and the kg history strength_set_kg
        (only changed rows; never rebuilt)
-    9. the ride analysis: every ride since ANALYSIS_START -> ride_metrics + cycling_weeks;
+    9. the ride analysis: every ride since ANALYSIS_START -> ride_metrics + cycling_weeks, and
+       the three Cykel answers -> analysis_summary;
        raises RideDataError afterwards when too many rides lack raw or have unreadable fields
     """
     activities = all_activities(db)
@@ -242,6 +245,10 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     metrics = analyse_rides(facts, z2_days={p.date for p in planned if is_z2(p.name)})
     weeks = weekly_totals(metrics, first=ANALYSIS_START, last=today)
     sync_ride_metrics(db, metrics, weeks, computed_at=computed_at)
+    answers = cycling_answers(metrics, weeks, [p.date for p in planned], today=today)
+    sync_answers(db, answers, today=today, computed_at=computed_at)
+    for answer in answers:
+        log.info("analysis_summary %s: %s (%s)", answer.question, answer.state, answer.verdict_text)
     excluded = Counter(m.exclusion for m in metrics if m.exclusion is not None)
     no_moving = sum(1 for f in facts if f.moving_s is None)
     no_load = sum(1 for f in facts if f.load is None)

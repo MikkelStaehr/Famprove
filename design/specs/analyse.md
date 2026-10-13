@@ -200,8 +200,8 @@ Directly on `--bg` with no card, 24px apart. Each block is a `<section aria-labe
 | 3 `volume` | `value` t, 1 dp (`0,9 t`) | `pr. uge, snit af de sidste 4 hele uger · mål {target} t` |
 
 **State `needs_data`:** no arrow.
-- Block 2's number becomes `{have_n} af {need_n}` (`0 af 2`) with the caption `rolige ture med puls og watt de sidste 28 dage`, and the verdict is Python's "what's needed" sentence.
-- Block 1 (no eFTP 6 weeks ago, or none for now) keeps its number when one exists and gets Python's needed sentence. With no eFTP at all, the number is `–` (sr `ikke registreret`).
+- Block 2's number becomes `{have_n} af {need_n}` (`0 af 3`; need_n = EF_MIN_RIDES = 3, the trend-line rule) with the caption `rolige ture med puls og watt de sidste 28 dage`, and the verdict is Python's "what's needed" sentence.
+- Block 1 (no eFTP 6 weeks ago, or none for now) keeps its number when one exists, with the caption `eFTP nu`, and gets Python's needed sentence. With no eFTP at all, the number is `–` (sr `ikke registreret`).
 - Never `0` for missing, and never a generic EmptyState.
 
 **No plan (block 3):** the number and verdict are as normal. `detail_text` is Python's no-plan sentence (`Ingen planlagte ture de sidste 4 uger.`), never `0 af 0`.
@@ -212,7 +212,7 @@ Directly on `--bg` with no card, 24px apart. Each block is a `<section aria-labe
 - Contents (moved out of body text):
   - Block 1: the §6 honesty note (`eFTP er et skøn fra intervals.icu …`), plus `Sammenligner den seneste eFTP med den seneste fra 6 uger før. Toppen er den højeste eFTP siden 1. jan. 2025.`
   - Block 2: the old §5c explainer (`EF er normaliseret watt (NP) delt med gennemsnitspuls …`), plus `Rolig tur: IF under 0,75, mindst 30 min, med både watt og puls.`
-  - Block 3: `Timer er bevægelsestid på alle cykelture, også udeladte. Målet på 3 t pr. uge er sat {target_since}. Planlagte ture er dem, du har lagt ind i intervals.icu.`
+  - Block 3: `Timer er bevægelsestid på alle cykelture, også udeladte. Målet på 3 t pr. uge er sat {target_since}. Planlagte ture er dem, du har lagt ind i planned_sessions.`
 - **Cut from the body:** the hero delta, the detail and the honesty note (§6 rows `Delta`, `Detail`, `Honesty note`), the EF card's explainer line, and the §5c too-few heading and text. The EF card with fewer than 5 points shows its 1–4 rides as the §5c list plus one muted line `Grafen vises fra 5 rolige ture.`. The §5b `… ture uden watt` note stays, because it is a chart fact.
 
 ### 12c. Layout
@@ -223,7 +223,7 @@ Directly on `--bg` with no card, 24px apart. Each block is a `<section aria-labe
 | State | Treatment |
 |---|---|
 | Loading | Three block skeletons: the real question row, a 56/44px bar at w-1/3, two text bars. |
-| Live today | Block 1 answer: 183 W, down 5 W. Block 2 `needs_data` (`0 af 2`). Block 3 answer 0,9 t with the no-plan detail. |
+| Live today | Block 1 answer: 183 W, flat → (−5 W is inside the 3 % flat band: `Uændret: −5 W på 6 uger …`). Block 2 `needs_data` (`0 af 3`). Block 3 answer 0,9 t with the no-plan detail. |
 | `DEV_FIXTURE=answers` (new, dev only) | Illustrative rows with all three in `answer`, block 2 up and block 3 with plan `3 af 4`, so the normal state can be shot. |
 | `DEV_FIXTURE=ef-few` | Unchanged for the EF card. Block 2 shows `needs_data`. |
 | `DEV_FIXTURE=empty` / `error` | The page EmptyState / ErrorState as §8 (the blocks are hidden too). |
@@ -259,7 +259,7 @@ Directly on `--bg` with no card, 24px apart. Each block is a `<section aria-labe
 
 ### 12f. Acceptance criteria
 1. A `node --test` test feeds `analysis_summary` rows to the view model and asserts that `verdict_text`, `detail_text` and `direction` pass through unchanged, and that no number is derived in the web.
-2. Live (390, light and dark): block 1 shows `183 W` with ↘, block 2 `0 af 2` with no arrow, block 3 `0,9 t` with the no-plan detail. No block shows `0 af 0` or a generic empty state.
+2. Live (390, light and dark): block 1 shows `183 W` with →, block 2 `0 af 3` with no arrow, block 3 `0,9 t` with the no-plan detail. No block shows `0 af 0` or a generic empty state.
 3. Each "?" opens by tap and by Enter/Space, its summary is ≥ 44×44 with a visible focus ring, and the old paragraphs exist only inside the disclosures.
 4. Fold per §12c at 390 × 844. At 1280 the blocks sit in the sticky rail and the charts' `Ingen ture` seams still align (§10.6).
 5. Every chart: on touch there is no floating tooltip, a tap moves the marker and fills the readout, and a tap outside clears it. The readout's height does not change between two taps (measure the element). With the mouse, the tooltip never overlaps the hovered point (screenshots at the left and right plot edges), and it hides on leave. Keyboard ←/→ and Esc work as before.
