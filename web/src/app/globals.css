@@ -196,6 +196,25 @@ body::before {
   background-attachment: fixed;
 }
 
+/* Registration marks (Part B signature 3): 12px + crosses, 1px --text-muted, centred 24px in from
+   each viewport corner, desktop only, never interactive. A mask so the cross takes the token colour. */
+@media (min-width: 1024px) {
+  body::after {
+    --reg-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M6 0v12M0 6h12' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E");
+    content: "";
+    position: fixed;
+    inset: 18px;
+    z-index: 60;
+    pointer-events: none;
+    background: var(--text-muted);
+    mask:
+      var(--reg-mark) left top / 12px 12px no-repeat,
+      var(--reg-mark) right top / 12px 12px no-repeat,
+      var(--reg-mark) left bottom / 12px 12px no-repeat,
+      var(--reg-mark) right bottom / 12px 12px no-repeat;
+  }
+}
+
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
