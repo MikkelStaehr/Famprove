@@ -72,14 +72,15 @@ export default async function TrainingPage() {
   const [form, plan] = await Promise.all([loadFormState(today, now), loadPlanState(today)]);
   const header = form.kind === "ready" ? form.header : null;
   const session = plan.kind === "ready" && plan.plan.strength.state === "next" ? plan.plan.strength.next : null;
+  const columns = plan.kind === "ready" ? plan.plan.strength.columns : [];
   // Phone-first screen: one column at every width, max-w-phone and left-aligned from lg (DESIGN.md Part A).
   const page = (
-    <div className="flex w-full max-w-phone flex-col gap-4">
+    <div className="flex w-full max-w-phone flex-col gap-10">
       <header className="flex flex-col">
         <h1 className="flex flex-wrap items-baseline gap-x-3">
-          <span className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">Træning</span>
+          <span className="font-sans text-32 font-normal">Træning</span>
           <span className="sr-only">, </span>
-          <time dateTime={today} className="text-16 font-medium text-text-muted">
+          <time dateTime={today} className="font-sans text-16 font-normal text-text-muted">
             {formatDay(today)}
           </time>
         </h1>
@@ -92,14 +93,14 @@ export default async function TrainingPage() {
             />
           </div>
         )}
-        <div className="mt-3">
+        <div className="mt-4">
           {form.kind === "error" ? (
             <ZoneBarError retry={plan.kind !== "error"} />
           ) : (
             <ZoneFlagRow header={form.header} today={today} />
           )}
         </div>
-        {session !== null && <SessionBlock />}
+        {session !== null && <SessionBlock columns={columns} />}
       </header>
       {plan.kind === "error" ? <PlanError error={plan.error} at={plan.at} /> : <DayCards plan={plan.plan} />}
     </div>

@@ -27,8 +27,8 @@ export function RestCard({ next, lookaheadDays, doneToday }: RestCardProps) {
         />
       ) : (
         <div className="flex flex-col gap-1">
-          <h3 className="text-14 font-bold tracking-[0.04em] text-text-muted uppercase">Næste tur</h3>
-          <p className="text-20 font-bold">
+          <h3 className="caption">Næste tur</h3>
+          <p className="font-sans text-20 font-medium tabular-nums">
             <time dateTime={next.date}>
               {next.isTomorrow ? `I morgen · ${formatDay(next.date)}` : formatDay(next.date)}
             </time>

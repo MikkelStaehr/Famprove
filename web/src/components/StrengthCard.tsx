@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 
 import { formatDay, stopAfter } from "@/lib/format";
-import type { DoneSession, StrengthSession, StrengthWeek } from "@/lib/training-view";
+import { type DoneSession, type StrengthSession, type StrengthWeek, weekSentence } from "@/lib/training-view";
 
 import { Card } from "./Card";
-import { SaveNotes, SetChecklist, SetCount, SetSegments } from "./SetChecklist";
+import { CheckIcon } from "./fokus/Instrument";
 import { ActivityWords, hasActivityWords } from "./MovingTime";
+import { SetBarcode } from "./SetBarcode";
+import { SaveNotes, SetChecklist, SetCount } from "./SetChecklist";
+import { WeekColumns } from "./WeekColumns";
 
 type StrengthCardProps = {
   readonly id: string;
@@ -21,8 +24,26 @@ type StrengthCardProps = {
 export function StrengthCard({ id, strength }: StrengthCardProps) {
   const next = strength.state === "next" ? strength.next : null;
   return (
-    <Card id={id} variant="session" title="Styrke" action={next !== null ? <SetCount /> : undefined}>
-      {next !== null && <SetSegments />}
+    <Card
+      id={id}
+      variant="session"
+      title="Styrke"
+      action={
+        // A finished week has no session block: the week columns draw here, all done, no red tick (§3).
+        strength.state === "all_done" ? (
+          <>
+            <WeekColumns columns={strength.columns} current={null} className="self-end" />
+            <p className="sr-only">{weekSentence(strength.columns, null)}</p>
+          </>
+        ) : undefined
+      }
+    >
+      {next !== null && (
+        <div className="flex flex-col gap-3">
+          <SetCount />
+          <SetBarcode />
+        </div>
+      )}
       {strength.done.length > 0 && <DoneList done={strength.done} />}
       {next !== null ? (
         <NextSession session={next} />
@@ -51,10 +72,10 @@ export function StrengthCard({ id, strength }: StrengthCardProps) {
   );
 }
 
-/** Strength activities logged this week, in session order, each with a --slab ✓ circle (done = slab). */
+/** Strength activities logged this week, in session order, each with an ink ✓ (inline SVG). */
 function DoneList({ done }: { readonly done: readonly DoneSession[] }) {
   return (
-    <ul aria-label="Udført i denne uge" className="mt-1 flex flex-col gap-1 border-b border-border pb-3 text-16">
+    <ul aria-label="Udført i denne uge" className="flex flex-col gap-1 border-b border-border pb-4 text-16">
       {done.map((d) => (
         <li key={`${d.session}#${d.date}`} className="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-2">
           <span aria-hidden="true" className="flex h-lh items-center">
@@ -77,23 +98,9 @@ function DoneList({ done }: { readonly done: readonly DoneSession[] }) {
   );
 }
 
-/** 20px filled --slab circle with a --slab-mark ✓ (the shape carries the meaning). */
+/** An ink ✓, no container (Revision 5: no fills, no radius). */
 function DoneMark() {
-  return (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-slab text-slab-mark">
-      <svg
-        viewBox="0 0 16 16"
-        className="size-3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="m3.5 8.5 3 3 6-7" />
-      </svg>
-    </span>
-  );
+  return <CheckIcon className="size-5 text-text" />;
 }
 
 /** The next session's sets, as written in the sheet, each with its own tick. */
@@ -117,7 +124,7 @@ function NextSession({ session }: { readonly session: StrengthSession }) {
 function WeekNote({ title, body }: { readonly title: string; readonly body: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-20 font-bold">{title}</p>
+      <p className="text-20 font-medium">{title}</p>
       <p className="text-16">{body}</p>
     </div>
   );

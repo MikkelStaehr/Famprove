@@ -31,13 +31,13 @@ export function RideCard({ id, ride }: RideCardProps) {
       title="Cykel"
       action={
         readable ? (
-          <p className="text-16 font-semibold tabular-nums">
+          <p className="font-sans text-16 font-medium tabular-nums">
             I alt {formatDuration(ride.totalMinutes * 60)} t
           </p>
         ) : undefined
       }
     >
-      <p className="text-20 font-bold">{ride.name}</p>
+      <p className="font-sans text-20 font-medium">{ride.name}</p>
       {ride.notes !== null && ride.notes.trim() !== "" && <p className="text-16">{ride.notes}</p>}
       {ride.problem !== null ? (
         <WarningLine>
@@ -63,12 +63,12 @@ export function RideCard({ id, ride }: RideCardProps) {
                   <StepRow step={item} />
                 ) : (
                   <>
-                    <p id={`${id}-repeat-${i}`} className="pt-3 text-16 font-semibold">
+                    <p id={`${id}-repeat-${i}`} className="caption pt-4 pb-1">
                       Gentag {item.repeat} {item.repeat === 1 ? "gang" : "gange"}
                     </p>
                     <ol
                       aria-labelledby={`${id}-repeat-${i}`}
-                      className="flex flex-col border-l-2 border-(color:--chart-mark) pl-4"
+                      className="flex flex-col border-l border-text-muted pl-4"
                     >
                       {item.steps.map((step, j) => (
                         <li key={j} className={j > 0 ? "border-t border-border" : undefined}>
@@ -88,8 +88,8 @@ export function RideCard({ id, ride }: RideCardProps) {
 }
 
 /**
- * Left: label (text-20 semibold) over the duration (text-20). Right: watts (text-32 Condensed 700) over
- * % FTP (text-16 muted); without watts (no FTP) the % FTP takes the big line.
+ * Left: label (text-20 500) over the duration (text-20). Right: watts (Inter 500 text-32 tabular) over
+ * % FTP (text-14 muted); without watts (no FTP) the % FTP takes the big line.
  */
 function StepRow({ step }: { readonly step: PlanStep }) {
   const duration = formatStepDuration(step.minutes);
@@ -107,12 +107,12 @@ function StepRow({ step }: { readonly step: PlanStep }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-3">
       <span className="sr-only">{spoken}</span>
-      <p aria-hidden="true" className="flex flex-col text-20">
+      <p aria-hidden="true" className="flex flex-col font-sans text-20 tabular-nums">
         {step.label === null ? (
-          <span className="font-bold">{duration}</span>
+          <span className="font-medium">{duration}</span>
         ) : (
           <>
-            <span className="font-bold">{step.label}</span>
+            <span className="font-medium">{step.label}</span>
             <span>{duration}</span>
           </>
         )}
@@ -121,17 +121,17 @@ function StepRow({ step }: { readonly step: PlanStep }) {
         {/* A range never breaks after its en dash ("125–" / "188 W" reads like a 188 W target).
             Only the unit may wrap under it, when the card is narrower than the value (200% text). */}
         {watts === null ? (
-          <span className="font-display text-32 font-bold tabular-nums">
+          <span className="font-sans text-32 font-medium tabular-nums">
             <span className="whitespace-nowrap">{pct}%</span>
             <span className="text-20"> FTP</span>
           </span>
         ) : (
           <>
             {/* Full-size unit: a smaller capital W beside 28px digits reads as a lowercase "w". */}
-            <span className="font-display text-32 font-bold tabular-nums">
+            <span className="font-sans text-32 font-medium tabular-nums">
               <span className="whitespace-nowrap">{watts}</span> W
             </span>
-            <span className="text-16 text-text-muted tabular-nums">{pct}% FTP</span>
+            <span className="text-14 text-text-muted tabular-nums">{pct}% FTP</span>
           </>
         )}
       </p>

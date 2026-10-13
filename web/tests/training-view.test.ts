@@ -148,6 +148,12 @@ test("week 40 example: Wed 30 Sept after one activity on Tue 29 shows session 2 
   assert.deepEqual([week.next?.session, week.next?.of, week.next?.block], [2, 3, BLOK]);
   assert.deepEqual(week.next?.exercises.map((e) => e.name), ["Squat"]);
   assert.equal("date" in (week.next ?? {}), false); // a planned session has no date
+  // The week columns: every prescribed session's set count, done / current / later.
+  assert.deepEqual(week.columns, [
+    { session: 1, sets: 1, status: "done" },
+    { session: 2, sets: 1, status: "current" },
+    { session: 3, sets: 1, status: "future" },
+  ]);
   assert.deepEqual(week.done, [
     {
       session: 1,
