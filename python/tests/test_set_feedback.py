@@ -1,6 +1,7 @@
 """Felt RPE and reps done from the Fokus pause screen (domain.set_feedback, 2026-10-13)."""
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -121,3 +122,19 @@ def test_the_feel_line_needs_four_rated_sets_and_names_the_offset() -> None:
     )
     [harder] = exercise_feel([entry(32, n, felt=1, minute=n) for n in range(4)], {8: None})
     assert harder.verdict_text == "Du melder oftest hårdere end foreskrevet."
+
+
+def test_the_rescore_uses_the_coachs_rpe_on_a_main_lift_as_the_parser_does(
+    make_set: MakeSet,
+) -> None:
+    # The tab's bench 1RM (102.5) would read 10 x 77.5 as RPE 9.2; the parser uses "RPE 5 - 7".
+    s = make_set(
+        week_start=MONDAY, session=1, sheet_row=30, set_no=1, type="BENCH", name="Bænk",
+        reps=6.0, reps_text="5 - 7", prescribed="RPE 5 - 7", logged_kg=77.5, kg=77.5,
+        muscle_factor=1.0, e1rm=102.5, score=6 * 77.5 * 0.6**2,
+    )  # fmt: skip
+    sets, _ = with_reps_done([s], [entry(30, reps=7.0)])
+    assert (sets[0].rpe, sets[0].score) == (6.0, round(7 * 77.5 * 0.6**2, 1))
+    logged = replace(s, logged_rpe=7.5)
+    sets, _ = with_reps_done([logged], [entry(30, reps=7.0)])
+    assert (sets[0].rpe, sets[0].score) == (7.5, round(7 * 77.5 * 0.75**2, 1))

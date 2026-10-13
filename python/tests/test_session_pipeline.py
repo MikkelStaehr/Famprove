@@ -30,7 +30,7 @@ GOOGLE = GoogleSettings(sheet_id=SYNTHETIC_SHEET_ID, service_account_info={})
 INTERVALS = IntervalsSettings(api_key="k", athlete_id="i1")
 TABLES = ("activities", "strength_activities", "strength_sets", "strength_sessions", "daily_load")
 # Synthetic blok 11 week 1 (ISO week of Mon 2026-02-02): session scores from the sheet formula.
-SESSION_1_SCORE = 3 * 336.8 + 3 * 264.6 + 2 * 72.0 + 3 * 86.4
+SESSION_1_SCORE = 3 * 337.5 + 3 * 264.6 + 2 * 72.0 + 3 * 86.4
 SESSION_2_SCORE = 3 * 90.7 + 3 * 307.2
 
 RIDES = [

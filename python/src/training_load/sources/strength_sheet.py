@@ -108,6 +108,7 @@ ROW_WITHOUT_TYPE = "prescribed row without type"
 RPE_NOT_HALF = "RPE not a whole or half value"
 LSRPE_NOT_HALF = "logged RPE not a whole or half value"
 LSRPE_COLUMN_MISSING = "no LSRPE column in the header"
+RPE_UNKNOWN = "RPE unknown, set scored at RPE 6"   # en sæt-score afhænger af UNKNOWN_RPE (kg > 0)
 RAW_KEYS = ("sets", "reps", "load", "weight", "lsrpe", "notes", "mean_weight")  # ugens 7 første kolonner
 
 
@@ -137,20 +138,38 @@ def logged_rpe(cell: object, issues: Counter[str]) -> float | None:
 E1RM_RANGE = (20.0, 400.0)   # kg; et 1RM udenfor er aldrig et rigtigt 1RM
 E1RM_OUT_OF_RANGE = "1RM out of range"
 
-def set_score(typ, name, reps, kg, load, bodyweight_kg, factor, e1rm):
+UNKNOWN_RPE = 6.0   # formlens "RPE ukendt": ingen logget, foreskrevet eller %1RM-RPE (tælles, RPE_UNKNOWN)
+
+def pick_rpe(typ, name, reps, kg, load, e1rm, logged_rpe=None):
+    """Sættets RPE og hvor den kommer fra (fix 2026-10-13: før vandt %1RM-skønnet over trænerens RPE):
+      logged      LSRPE, når brugeren har logget den
+      prescribed  trænerens RPE fra load-cellen ('RPE 5 - 7' -> 6); en ulæselig RPE-celle er 'unknown'
+      pct_1rm     hovedløft uden RPE i cellen (fx '75%', '-10%') med kg: skøn fra fanens 1RM-tabel,
+                  som trænerens % også regner fra. Fanens 1RM er ikke testet, så den bruges ALDRIG,
+                  hvor træneren har foreskrevet en RPE (1 kg for lav 1RM ~ +0.4 RPE ved 77.5 kg x 8)
+      unknown     ellers: (None, 'unknown'); set_score bruger UNKNOWN_RPE"""
+    if logged_rpe is not None:
+        return float(logged_rpe), "logged"
+    if isinstance(load, str) and "RPE" in load:
+        rpe = mid(load) if rpe_readable(load) else None
+        return (rpe, "prescribed") if rpe is not None else (None, "unknown")
+    main = typ in e1rm and "tempo" not in name.lower()   # tempo ≈ 20-25% lettere: aldrig %1RM
+    rpe = rpe_from_pct(kg/e1rm[typ], reps) if (main and kg) else None
+    return (rpe, "pct_1rm") if rpe is not None else (None, "unknown")
+
+def set_score(typ, name, reps, kg, load, bodyweight_kg, factor, e1rm, logged_rpe=None):
     """Score for ét sæt: formlen fra strength_collector.py (flyttet hertil så prognosen kan genbruge
     den). kg = logget kg (0 hvis tom). bodyweight_kg (BODYWEIGHT x fraction, None = ikke en
     kropsvægtøvelse) og factor (muskelfaktor) kommer fra public.exercises; før 2026-10-12 stod de
-    her som navneliste og ben-TYPEs. Returnerer (kg brugt, rpe, score, kropsvægt?)."""
+    her som navneliste og ben-TYPEs. RPE vælges af pick_rpe (load = cellen med decimalpunktum;
+    en ulæselig RPE-celle giver RPE ukendt). Returnerer (kg brugt, rpe, score, kropsvægt?)."""
     bw = bodyweight_kg is not None
     if typ == "ABS":
         score = ABS_SET_SCORE; rpe=None
     else:
         if bw: kg += bodyweight_kg
-        main = typ in e1rm and "tempo" not in name.lower()   # tempo ≈ 20-25% lettere, brug foreskrevet RPE
-        rpe = rpe_from_pct(kg/e1rm[typ], reps) if (main and kg) else None
-        if rpe is None: rpe = mid(load) if isinstance(load,str) and "RPE" in str(load) else None
-        if rpe is None: rpe = 6.0     # ukendt (fx -10% uden kg endnu)
+        rpe = pick_rpe(typ, name, reps, kg, load, e1rm, logged_rpe)[0]
+        if rpe is None: rpe = UNKNOWN_RPE     # ukendt (fx -10% uden kg endnu); tælles i parse_tab
         score = reps * kg * (rpe/10)**2 * factor
     return kg, rpe, score, bw
 
@@ -224,12 +243,13 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
             nsets, reps = int(mid(nsets)), mid(reps)
             kg = float(kg) if isinstance(kg,(int,float)) else 0.0
             logged = kg
-            rpe_ok = rpe_readable(load)
-            if not rpe_ok: issues[RPE_NOT_HALF] += 1   # tælles; cellens RPE bruges aldrig ("RPE ukendt")
-            kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load) if rpe_ok else None,
-                                           exercise.bodyweight_kg, exercise.muscle_factor, e1rm)
-            raw = {key: json_cell(cell) for key, cell in zip(RAW_KEYS, cells)}
+            if not rpe_readable(load): issues[RPE_NOT_HALF] += 1   # tælles; cellens RPE bruges aldrig ("RPE ukendt")
             lsrpe = logged_rpe(cells[4], issues) if lsrpe_ok else None
+            kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load),
+                                           exercise.bodyweight_kg, exercise.muscle_factor, e1rm, lsrpe)
+            if typ != "ABS" and kg and pick_rpe(typ, name, reps, kg, decimal_dots(load), e1rm, lsrpe)[0] is None:
+                issues[RPE_UNKNOWN] += 1   # scoren hviler på UNKNOWN_RPE: logges, aldrig stille
+            raw = {key: json_cell(cell) for key, cell in zip(RAW_KEYS, cells)}
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),

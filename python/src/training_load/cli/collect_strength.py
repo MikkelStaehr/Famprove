@@ -36,6 +36,7 @@ from training_load.sources.strength_sheet import (
     KG_NOT_A_NUMBER,
     LSRPE_NOT_HALF,
     RPE_NOT_HALF,
+    RPE_UNKNOWN,
     ParsedSet,
     notes_text,
     parse_all,
@@ -60,9 +61,10 @@ def check_issues(issues: Counter[str], parsed: Sequence[ParsedSet]) -> None:
     Unreadable kg or RPE still yields sets (kg None / RPE unknown), so those row-weeks are already
     in ``parsed``; the other reasons are row-weeks (or rows) that yielded nothing.
     """
-    total = sum(issues.values())
     for reason, count in sorted(issues.items()):
         log.warning("%d cells unreadable: %s", count, reason)
+    # RPE_UNKNOWN is no unreadable cell (a row without an RPE, e.g. "-10%"): logged, not a failure.
+    total = sum(issues.values()) - issues[RPE_UNKNOWN]
     row_weeks = len({(p["block"], p["row"], p["week"]) for p in parsed})
     # These still yield sets (value None), so their row-weeks are already in ``parsed``.
     yielded = issues[KG_NOT_A_NUMBER] + issues[RPE_NOT_HALF] + issues[LSRPE_NOT_HALF]

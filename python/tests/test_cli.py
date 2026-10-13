@@ -96,7 +96,7 @@ def test_compute_rebuilds_daily_load_and_blocks(
     assert rows["2026-01-08"]["ctl_ramp_7d"] == pytest.approx(jan8_ctl - jan1_ctl)
     assert rows["2026-02-02"]["strength_tss"] == 0.0  # the sheet's DAY 1 date: no activity
     assert rows["2026-02-03"]["strength_tss"] == pytest.approx(
-        (3 * 336.8 + 3 * 264.6 + 2 * 72.0 + 3 * 86.4) * 0.02
+        (3 * 337.5 + 3 * 264.6 + 2 * 72.0 + 3 * 86.4) * 0.02
     )
     assert rows["2026-02-03"]["cycling_tss"] == 0.0  # WeightTraining load never counts as cycling
     feb5 = rows["2026-02-05"]

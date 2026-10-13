@@ -19,12 +19,14 @@ from conftest import (
 )
 from training_load.sources.strength_sheet import (
     RPE_NOT_HALF,
+    RPE_UNKNOWN,
     ParsedSet,
     cell_text,
     decimal_dots,
     parse_all,
     prescribed_text,
     rpe_readable,
+    set_score,
     text_number,
 )
 
@@ -97,9 +99,9 @@ def test_abs_rows_get_fixed_score_and_no_rpe(parsed: list[ParsedSet]) -> None:
     assert abs_sets and all(p["score"] == 72.0 and p["rpe"] is None for p in abs_sets)
 
 
-def test_main_lift_rpe_derived_from_e1rm_percentage(parsed: list[ParsedSet]) -> None:
-    # 120 / 150 = 80 % e1RM at 5 reps -> RPE ~7.49, not the prescribed "RPE 7 - 8" (7.5).
-    assert first(parsed, BLOK_11, "Squat", 1)["rpe"] == pytest.approx(7.492492, abs=1e-6)
+def test_main_lift_uses_the_prescribed_rpe_not_the_tabs_1rm(parsed: list[ParsedSet]) -> None:
+    # "RPE 7 - 8" -> 7.5; the tab's untested 1RM (120 / 150 -> ~7.49) is not used (fix 2026-10-13).
+    assert first(parsed, BLOK_11, "Squat", 1)["rpe"] == 7.5
 
 
 def test_main_lift_without_kg_uses_prescribed_rpe(parsed: list[ParsedSet]) -> None:
@@ -118,13 +120,13 @@ def test_unknown_rpe_defaults_to_6(parsed: list[ParsedSet]) -> None:
 @pytest.mark.parametrize(
     ("block", "name", "week", "score"),
     [
-        (BLOK_11, "Squat", 1, 336.8),  # leg factor 1.0, RPE from e1RM
+        (BLOK_11, "Squat", 1, 337.5),  # leg factor 1.0, prescribed RPE 7.5
         (BLOK_11, "Dips", 1, 264.6),  # upper-body factor 0.6, kg + bodyweight
         (BLOK_11, "Chin-ups", 1, 86.4),  # bodyweight only, RPE fallback 6
         (BLOK_11, "Tempo bench", 1, 90.7),  # tempo -> prescribed RPE
         (BLOK_11, "Leg extension", 1, 307.2),  # QUADS is a leg type
         (BLOK_11, "Squat", 2, 0.0),  # nothing logged
-        (BLOK_12, "Squat", 1, 271.6),
+        (BLOK_12, "Squat", 1, 306.2),  # prescribed RPE 7 (was 125 / 160 via the tab 1RM)
     ],
 )
 def test_score_golden_values_regression(
@@ -246,7 +248,47 @@ def test_rpe_readable_takes_only_whole_or_half_values_from_1_to_10() -> None:
 def test_an_rpe_that_is_not_whole_or_half_is_counted_and_never_used() -> None:
     issues: Counter[str] = Counter()
     bad = tempo_week_1("RPE 7,8", issues)
-    assert issues == Counter({RPE_NOT_HALF: 1})
+    assert issues[RPE_UNKNOWN] >= 1  # the score rests on the assumed RPE 6: logged
+    assert +Counter({k: v for k, v in issues.items() if k != RPE_UNKNOWN}) == Counter(
+        {RPE_NOT_HALF: 1}
+    )
     assert bad["rpe"] == 6.0  # the formula's "RPE unknown", never 7.8 (or 7.5 from "7" and "8")
     assert bad["prescribed"] == "RPE 7,8"  # the cell as written
     assert bad["score"] == tempo_week_1("RPE")["score"]  # scored as a cell with no RPE number
+
+
+# --- RPE input order (fix 2026-10-13): logged, else prescribed, else %1RM on a non-RPE cell ---
+# The live bench rows of week 2026-10-12, as stored: the tab's (untested) bench 1RM is 102.5.
+BENCH_1RM = {"BENCH": 102.5}
+
+
+def bench(reps: float, kg: float, load: object, logged: float | None = None) -> tuple[float, float]:
+    _, rpe, score, _ = set_score("BENCH", "Bænk", reps, kg, load, None, 1.0, BENCH_1RM, logged)  # type: ignore[no-untyped-call]  # untyped legacy module
+    return rpe, round(score, 1)
+
+
+def test_the_bench_backoff_scores_from_its_prescription_not_the_tabs_1rm() -> None:
+    """Row 30 (2 x 8 x 77.5 @ "RPE 5 - 7") read RPE 8.31 from 77.5 / 102.5 and scored 428.4 per set;
+    row 29 (3 x 87.5 @ "RPE 7") read 7.85 and scored 161.8. The coach's RPE is used instead."""
+    assert bench(8, 77.5, "RPE 5 - 7") == (6.0, 223.2)  # 8 x 77.5 x 0.6^2: the midpoint, never more
+    assert bench(8, 77.5, "RPE 5 - 7")[1] <= round(8 * 77.5 * 0.7**2, 1)  # nor above its top, 7
+    assert bench(3, 87.5, "RPE 7") == (7.0, 128.6)  # the top set: its RPE 7
+    assert bench(3, 85, "RPE 6") == (6.0, 91.8)  # row 28
+    assert bench(5, 0.0, "RPE 5 - 7") == (6.0, 0.0)  # row 133: no kg yet
+
+
+def test_a_logged_rpe_beats_the_prescription() -> None:
+    assert bench(3, 87.5, "RPE 7", logged=8.0) == (8.0, round(3 * 87.5 * 0.8**2, 1))
+
+
+def test_the_1rm_estimate_is_only_used_where_no_rpe_is_prescribed() -> None:
+    rpe, _ = bench(5, 76.875, 0.75)  # a "75%" row: the coach's % refers to the tab's 1RM
+    assert rpe == pytest.approx(4.99, abs=0.01)  # 75 % at 5 reps, as before the fix
+    assert bench(8, 77.5, "-10%")[0] == pytest.approx(8.31, abs=0.01)  # a backoff by % only
+    assert bench(8, 77.5, "RPE 7.8")[0] == 6.0  # unreadable RPE: unknown, not the 1RM estimate
+
+
+def test_a_set_scored_at_the_assumed_rpe_is_counted() -> None:
+    issues: Counter[str] = Counter()
+    tempo_week_1("RPE", issues)  # an RPE cell without a number, with kg
+    assert issues[RPE_UNKNOWN] >= 1
