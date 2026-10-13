@@ -70,4 +70,7 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | design-desktop | Design pass: desktop layouts for Belastning and Analyse, bottom/top nav | L |
 | chart-touch | Chart interaction: tap/drag marker with a fixed readout row on touch, a non-covering hover tooltip on pointer | M |
 | cykel-answers | Analyse › Cykel as three answers (stronger? base? enough?) from a Python analysis_summary; charts below, VI in the eFTP readout | L |
-| e1rm-cap | Suggested kg: rolling e1RM from low-rep RPE >= 7 sets only, weekly cap +2.5 / -5 kg with "(begrænset)" | M |
+| e1rm-cap | Suggested kg: rolling e1RM from low-rep RPE >= 7 sets only, weekly rise cap +2.5 kg upper / +5 kg lower body with "(begrænset)" | M |
+| fokus-warmup | Fokus warm-up before set 1 (logged as kind warmup, ramp for main lifts, derived backfill, Fortryd undoes Begynd) | L |
+| fokus-felt-rpe | Felt RPE and reps done after each set; Python uses them for e1RM, set score and suggestion adjustments; Styrke feel line | L |
+| fokus-pause-content | Pause screen content: recommended rest, coach notes, last week on the next-set card, elapsed and remaining time | M |
