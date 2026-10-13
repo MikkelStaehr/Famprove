@@ -229,14 +229,14 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         )}
         {rejected && <WarningLine>Et tryk blev afvist. Genindlæs siden.</WarningLine>}
         {lastLine !== null && (
-          <p className="flex flex-wrap items-center gap-x-2 font-mono text-14 text-text-muted">
-            <span>
+          <p className="flex items-center justify-between gap-x-4 font-mono text-14 text-text-muted">
+            <span className="min-w-0">
               <KeepClock text={lastLine} />
             </span>
             <button
               type="button"
               onClick={onUndo}
-              className={`px-2 ${INK_LINK}`}
+              className={`shrink-0 px-0 ${INK_LINK}`}
             >
               Fortryd
             </button>

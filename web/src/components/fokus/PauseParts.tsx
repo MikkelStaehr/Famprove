@@ -77,7 +77,7 @@ export function FeelBlock({
               aria-pressed={on}
               aria-label={o.label}
               onClick={() => onTap("feel", set.ref, nextFeel(felt, o.value))}
-              className={`flex min-h-14 items-center justify-center gap-2 px-1 font-mono text-16 leading-tight font-medium text-text uppercase ${
+              className={`flex min-h-14 flex-col items-center justify-center gap-1.5 px-2 font-mono text-16 leading-tight font-medium tracking-normal text-text uppercase ${
                 on ? "border-2 border-text" : "border border-text-muted"
               }`}
             >
@@ -213,7 +213,7 @@ function RestScale({ rail, scaleS }: { readonly rail: ReturnType<typeof restRail
   const ticks: number[] = [];
   for (let t = 0; t <= scaleS; t += 30) ticks.push(t);
   return (
-    <div aria-hidden="true" data-scale-s={scaleS} className="relative mt-2 h-14 w-full">
+    <div aria-hidden="true" data-scale-s={scaleS} className="relative mt-2 h-17 w-full">
       <span className="absolute inset-x-0 bottom-4 block h-px bg-text-muted" />
       {ticks.map((t) =>
         t % 60 === 0 ? (
@@ -267,13 +267,13 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
         <div className="@container mt-4 flex flex-col">
           {basis !== null && <p className="caption">{basis}</p>}
           {/* One row of columns while they fit (21rem at 100 % text); stacked at 200 % text. */}
-          <ol aria-label="Opvarmningssæt" className="mt-2 grid gap-4 @min-[21rem]:auto-cols-fr @min-[21rem]:grid-flow-col">
+          <ol aria-label="Opvarmningssæt" className="mt-2 grid gap-x-3 gap-y-4 @min-[21rem]:auto-cols-fr @min-[21rem]:grid-flow-col">
             {exercise.ramp.map((r) => (
-              <li key={r.pct} className="flex flex-col @min-[21rem]:not-first:border-l @min-[21rem]:not-first:border-border @min-[21rem]:not-first:pl-4">
+              <li key={r.pct} className="flex flex-col @min-[21rem]:not-first:border-l @min-[21rem]:not-first:border-border @min-[21rem]:not-first:pl-3">
                 <span className="caption">{Math.round(r.pct)}&nbsp;%</span>
-                <span className="font-mono">
+                <span className="flex flex-wrap items-baseline font-mono">
                   <span className="text-24 text-text">{formatKg(r.kg)}</span>
-                  <span className="text-16 text-text-muted">&nbsp;kg</span>
+                  <span className="text-14 text-text-muted">&nbsp;kg</span>
                 </span>
                 <span className="font-mono text-14 text-text-muted">{r.reps} reps</span>
                 <span aria-hidden="true" className="relative mt-2 block h-px bg-text" style={{ width: `${Math.min(100, r.pct)}%` }}>
