@@ -71,6 +71,7 @@ function set(overrides: Partial<StrengthSetRow>): StrengthSetRow {
     rpe: 7.5,
     prescribed: "RPE 7 - 8",
     score: 336.8,
+    scoreFinal: overrides.score ?? 336.8, // unless a test says otherwise, compute changed nothing
     ...overrides,
   };
 }
@@ -317,4 +318,22 @@ test("contract: the power-check rows Python writes parse (fixtures/power_checks.
     date: "2026-10-13",
     message: "FTP er sat til 230 W, men dine ture peger på 183 W",
   });
+});
+
+test("week view: the score per set is the final one that feeds the TSS; an old row falls back", () => {
+  const w = weekView(
+    { daily: [day("2026-09-28"), day("2026-09-29", 0, 7.0)], blocks: [], weeks: [], projection: [] },
+    week(40, "2026-09-28"),
+  );
+  const detail = dayDetails(w, {
+    activities: [],
+    rideVi: [],
+    sessions: [done(1, "2026-09-29")],
+    sets: [
+      set({ sheetRow: 30, name: "Bænk", type: "BENCH", score: 428.4, scoreFinal: 223.2 }), // rescored
+      set({ sheetRow: 31, name: "Dips", type: "BACK", score: 128.6, scoreFinal: null }), // before the column
+    ],
+  });
+  const [s1] = detail[1]?.strength?.sessions ?? [];
+  assert.deepEqual(s1?.exercises.map((e) => [e.name, e.scorePerSet]), [["Bænk", 223.2], ["Dips", 128.6]]);
 });

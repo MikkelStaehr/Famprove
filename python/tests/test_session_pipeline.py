@@ -143,3 +143,23 @@ def test_weight_training_load_never_reaches_cycling_tss(db: InMemoryPostgrest) -
     cycling = {r["date"]: r["cycling_tss"] for r in db.tables["daily_load"] if r["cycling_tss"]}
     assert cycling == {"2026-01-01": 100.0, "2026-02-05": 60.0}
     assert {r["id"] for r in db.tables["activities"]} == {"r1", "r2"}
+
+
+def test_the_week_view_score_is_what_feeds_the_session_tss(db: InMemoryPostgrest) -> None:
+    """strength_sets.score_final (shown per set in the week view) sums to the session's TSS."""
+    daily_job(db, [*RIDES, *LIFTS])
+    sets = db.tables["strength_sets"]
+    assert all(r["score_final"] is not None for r in sets)
+    done = [
+        r for r in db.tables["strength_sessions"] if r["activity_id"] is not None and r["block"]
+    ]
+    assert done
+    for session in done:
+        own = [
+            r for r in sets
+            if r["week_start"] == session["week_start"] and r["session"] == session["session"]
+        ]  # fmt: skip
+        scores = [r["score_final"] for r in own]
+        assert all(isinstance(x, int | float) for x in scores)
+        total = sum(x for x in scores if isinstance(x, int | float))
+        assert session["tss"] == pytest.approx(K * total)

@@ -19,7 +19,7 @@ GitHub Actions daily.yml at 05, 12, 20 Copenhagen: the droplet's workflow_dispat
                        bodyweight fraction per name)         each set scored with its exercise's values);
                                                           unknown names → exercises (insert only)
   compute            activities + strength_sets + strength_activities
-                                                        → strength_sessions, daily_load, blocks (+ view weekly_load),
+                                                        → strength_sessions, daily_load, blocks (+ view weekly_load), strength_sets.score_final / rpe_final (the final set score),
                                                           daily_projection (the 56-day prognose; + planned_sessions),
                                                           forecast_log (that prognose + a naive baseline, per run day),
                                                           ride_metrics + cycling_weeks (the ride analysis, rides since 2024-12-30),

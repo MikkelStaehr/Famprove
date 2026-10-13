@@ -34,7 +34,7 @@ from training_load.db.strength_analysis import (
     upsert_kg_states,
 )
 from training_load.db.strength_sessions import sync_strength_sessions
-from training_load.db.strength_sets import all_sets
+from training_load.db.strength_sets import all_sets, sync_final_scores
 from training_load.domain.cycling import daily_cycling_tss
 from training_load.domain.cycling_answers import cycling_answers
 from training_load.domain.daily import build_daily_load
@@ -128,7 +128,8 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     """
     activities = all_activities(db)
     logged_sets = all_logged_sets(db)  # felt RPE and reps done from the Fokus pause screen
-    sets, reps_applied = with_reps_done(all_sets(db), logged_sets)
+    stored_sets = all_sets(db)
+    sets, reps_applied = with_reps_done(stored_sets, logged_sets)
     if reps_applied:
         log.info("%d range sets scored with the reps done (exercise_set_log)", reps_applied)
     if legacy := sum(1 for s in sets if s.muscle_factor is None):
@@ -152,6 +153,9 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     sets, pct_rescored = with_rolling_e1rm_rpe(sets, analysis.weeks)
     if pct_rescored:
         log.info("%d main-lift sets without an RPE scored from the rolling e1RM", pct_rescored)
+    # The week view shows the score that feeds the TSS below (strength_sets.score_final).
+    finals = sync_final_scores(db, stored_sets, sets)
+    log.info("strength_sets.score_final: %d sets differ from the parser's score", finals)
     sessions = match_sessions(sets, lifts, strength_k)
     sync_strength_sessions(db, sessions)
     cycling = daily_cycling_tss(activities)

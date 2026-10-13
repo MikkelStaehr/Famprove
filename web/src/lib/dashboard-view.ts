@@ -336,7 +336,8 @@ function exerciseDetails(sets: readonly StrengthSetRow[]): ExerciseDetail[] {
     bodyweight: first.bodyweight,
     effectiveKg: first.bodyweight && first.kg !== (first.loggedKg ?? 0) ? first.kg : null,
     prescribed: first.prescribed,
-    scorePerSet: first.score,
+    // The score that feeds the session's TSS; a row from before 2026-10-13 has only the parser's.
+    scorePerSet: first.scoreFinal ?? first.score,
   }));
 }
 

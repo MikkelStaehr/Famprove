@@ -183,3 +183,24 @@ def test_a_main_lifts_percent_row_is_scored_from_the_rolling_e1rm(make_set: Make
     assert out[1:] == [with_rpe, logged, tempo]
     # No rolling e1RM yet: the tab's 1RM (the parser's estimate) stays.
     assert with_rolling_e1rm_rpe([percent], []) == ([percent], 0)
+
+
+def test_compute_writes_the_final_score_back_and_keeps_the_sheets_reps(make_set: MakeSet) -> None:
+    from conftest import InMemoryPostgrest
+    from training_load.db.strength_sets import sync_final_scores
+
+    db = InMemoryPostgrest()
+    stored = make_set(
+        week_start=MONDAY, session=1, sheet_row=32, set_no=1, type="CHEST/SHOULDERS",
+        name="Low incline DB press", reps=8.0, reps_text="6 - 10", prescribed="RPE 7 - 8",
+        logged_kg=30.0, kg=30.0, muscle_factor=0.6, score=81.0, rpe=7.5,
+    )  # fmt: skip
+    untouched = make_set(week_start=MONDAY, session=1, sheet_row=25, set_no=1, score=100.0)
+    [final, same], _ = with_reps_done([stored, untouched], [entry(32, reps=10.0)])
+    assert sync_final_scores(db, [stored, untouched], [final, same]) == 1
+    rows = {r["sheet_row"]: r for r in db.tables["strength_sets"]}
+    assert (rows[32]["reps"], rows[32]["score"]) == (8.0, 81.0)  # the sheet's own values
+    assert (rows[32]["score_final"], rows[32]["rpe_final"]) == (final.score, final.rpe)
+    assert rows[25]["score_final"] == 100.0
+    with pytest.raises(ValueError):
+        sync_final_scores(db, [stored], [same])  # sets must pair up by key

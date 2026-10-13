@@ -143,7 +143,12 @@ export type ActivityRow = {
   readonly dataWarning: string | null;
 };
 
-/** public.strength_sets, for the week detail. score is the raw per-set score (before K). */
+/**
+ * public.strength_sets, for the week detail. score is the parser's raw per-set score (before K);
+ * scoreFinal is the one that feeds strength_sessions.tss and daily_load (compute: reps done, and
+ * a main lift's %-row at the RPE from the app's rolling e1RM). Null only on rows from before
+ * 2026-10-13.
+ */
 export type StrengthSetRow = {
   readonly weekStart: IsoDate; // Monday of the ISO week
   readonly session: number; // 1..N within the ISO week
@@ -160,6 +165,7 @@ export type StrengthSetRow = {
   readonly rpe: number | null;
   readonly prescribed: string | null;
   readonly score: number;
+  readonly scoreFinal: number | null;
 };
 
 /**
@@ -207,7 +213,7 @@ export const ACTIVITIES_SELECT = {
 export const STRENGTH_SETS_SELECT = {
   table: "strength_sets",
   columns:
-    "week_start,session,sheet_id,block,week,sheet_row,set_no,type,name,reps,logged_kg,kg,bodyweight,rpe,prescribed,score",
+    "week_start,session,sheet_id,block,week,sheet_row,set_no,type,name,reps,logged_kg,kg,bodyweight,rpe,prescribed,score,score_final",
   order: "week_start,session,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
 } as const;
 
@@ -763,6 +769,7 @@ export function parseStrengthSetRow(raw: unknown): StrengthSetRow {
     rpe: f.numberOrNull("rpe"),
     prescribed: f.stringOrNull("prescribed"),
     score: f.number("score"),
+    scoreFinal: f.optionalNumber("score_final"),
   };
 }
 

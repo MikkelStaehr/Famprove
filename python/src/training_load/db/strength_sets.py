@@ -48,9 +48,13 @@ class StrengthSetRow(TypedDict):
     muscle_factor: float | None  # public.exercises at collect time; null on older rows
     notes: str | None  # the coach's NOTES cell; null = blank
     raw: JsonRow | None  # the week's cells as written
+    score_final: float | None  # the score that feeds TSS: collect writes score, compute overwrites
+    rpe_final: float | None  # the RPE behind score_final
 
 
-COLUMNS: Final = ",".join(StrengthSetRow.__annotations__)
+COLUMNS: Final = ",".join(
+    c for c in StrengthSetRow.__annotations__ if c not in ("score_final", "rpe_final")
+)  # read back: compute derives the final values itself
 
 
 def to_row(s: StrengthSet) -> StrengthSetRow:
@@ -78,6 +82,8 @@ def to_row(s: StrengthSet) -> StrengthSetRow:
         muscle_factor=s.muscle_factor,
         notes=s.notes,
         raw=dict(s.raw) if s.raw is not None else None,
+        score_final=s.score,
+        rpe_final=s.rpe,
     )
 
 
@@ -130,3 +136,36 @@ def replace_for_sheet(db: Postgrest, sheet_id: str, sets: Sequence[StrengthSet])
 def all_sets(db: Postgrest) -> list[StrengthSet]:
     """Every stored set, all sheets, paginated with ORDER."""
     return [from_row(row) for row in db.select(TABLE, columns=COLUMNS, order=ORDER)]
+
+
+KEY: Final = "sheet_id,block,sheet_row,week,set_no"  # the primary key
+
+
+def sync_final_scores(
+    db: Postgrest, stored: Sequence[StrengthSet], final: Sequence[StrengthSet]
+) -> int:
+    """Writes compute's final score and RPE per set (score_final, rpe_final), so the week view
+    shows what feeds daily_load. ``stored``: the sets as read; ``final``: the same sets after
+    compute's rescoring, in the same order. Every other column is written back as read, so the
+    row keeps mirroring the sheet. One upsert; returns how many sets differ from the parser's."""
+    if len(stored) != len(final):
+        raise ValueError("stored and final sets must pair up")
+    rows: list[StrengthSetRow] = []
+    changed = 0
+    for s, f in zip(stored, final, strict=True):
+        if (s.sheet_id, s.block, s.sheet_row, s.week, s.set_no) != (
+            f.sheet_id,
+            f.block,
+            f.sheet_row,
+            f.week,
+            f.set_no,
+        ):
+            raise ValueError("stored and final sets must pair up by key")
+        row = to_row(s)
+        row["score_final"] = f.score
+        row["rpe_final"] = f.rpe
+        changed += f.score != s.score
+        rows.append(row)
+    if rows:
+        db.upsert(TABLE, rows, on_conflict=KEY)
+    return changed
