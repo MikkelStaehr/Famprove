@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { dotField, dotRow, drawingReps, FIELD_DOTS, signature } from "../src/lib/fokus-marks.ts";
+import { dotField, dotRow, drawingReps, FIELD_DOTS, showsKgReminder, signature } from "../src/lib/fokus-marks.ts";
 import { prescribedCell, rangeFigure } from "../src/lib/fokus-view.ts";
 import { type LoggedSet, setKey, type SetRef } from "../src/lib/set-taps.ts";
 
@@ -99,6 +99,14 @@ test("signature: a bar per done set, hollow exactly where kg is unknown, warm-up
   // Unknown kg is never drawn as 0 kg: a 0 or null kg row is hollow, by reps.
   const zeroKg = signature([{ ...EX[0], kg: 0 }], ORDER.slice(0, 2), logOf([done(4, 1, 10)]));
   assert.deepEqual(zeroKg.bars.map((b) => [b.hollow, b.h]), [[true, 96]]);
+});
+
+test("signature legend: the kg reminder shows only when a bar is hollow", () => {
+  const log = logOf([done(4, 1, 0), done(4, 2, 180), done(6, 1, 360)]);
+  assert.equal(showsKgReminder(signature(EX, ORDER, log)), true); // row 6 has no sheet kg: hollow
+  const allKg = signature(EX.map((e) => ({ ...e, kg: 100 })), ORDER, log);
+  assert.equal(showsKgReminder(allKg), false); // every set has kg in the sheet: nothing to log
+  assert.equal(showsKgReminder(signature(EX, ORDER, logOf([skip(4, 1, 0)]))), false); // skipped only: no bars
 });
 
 test("drawing reps: reps_done, else the prescription (a range's midpoint), else null", () => {

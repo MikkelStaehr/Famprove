@@ -1,4 +1,4 @@
-import { SIG_BASELINE, SIG_WIDTH, type Signature } from "@/lib/fokus-marks";
+import { SIG_BASELINE, SIG_WIDTH, showsKgReminder, type Signature } from "@/lib/fokus-marks";
 
 /**
  * The finished view's session signature (fokus-round4.md §3.3): one bar per done set, gaps = time
@@ -10,9 +10,21 @@ export function SessionSignature({ marks }: { readonly marks: Signature }) {
     <figure className="mt-4 flex flex-col gap-2">
       <svg aria-hidden="true" viewBox={`0 0 ${SIG_WIDTH} 128`} className="block h-auto w-full" data-signature>
         <rect x={0} y={SIG_BASELINE} width={SIG_WIDTH} height={1} fill="var(--text-muted)" />
-        {marks.stubs.map((st) => (
-          <rect key={`s${st.x}`} x={st.x} y={SIG_BASELINE - 4} width={st.w} height={4} fill="var(--text-muted)" />
-        ))}
+        {/* A skipped set: a small × across the baseline (not a square, which is Hårdere's marker). */}
+        {marks.stubs.map((st) => {
+          const half = st.w / 2;
+          const cy = SIG_BASELINE + 0.5;
+          return (
+            <path
+              key={`s${st.x}`}
+              data-skipped
+              d={`M${st.x} ${cy - half}L${st.x + st.w} ${cy + half}M${st.x + st.w} ${cy - half}L${st.x} ${cy + half}`}
+              fill="none"
+              stroke="var(--text-muted)"
+              strokeWidth={1.25}
+            />
+          );
+        })}
         {marks.bars.map((b) => {
           const colour = b.muted ? "var(--text-muted)" : "var(--text)";
           const mid = b.x + b.w / 2;
@@ -30,23 +42,25 @@ export function SessionSignature({ marks }: { readonly marks: Signature }) {
           );
         })}
       </svg>
-      <div aria-hidden="true" className="caption flex flex-col gap-1 normal-case">
-        <p className="flex flex-wrap items-center gap-x-2">
-          <Glyph kind="ring" /> Lettere · <Glyph kind="dash" /> Som ventet · <Glyph kind="square" /> Hårdere
+      <div className="caption flex flex-col gap-1 normal-case">
+        <p aria-hidden="true" className="flex flex-wrap items-center gap-x-2">
+          <Glyph kind="ring" /> Lettere · <Glyph kind="dash" /> Som ventet · <Glyph kind="square" /> Hårdere ·{" "}
+          <Glyph kind="cross" /> sprunget over
         </p>
-        <p>Hul søjle: kg ikke i arket endnu</p>
+        {showsKgReminder(marks) && <p>Hul søjle: kg ikke i arket endnu. Husk at logge den.</p>}
       </div>
       <figcaption className="sr-only">{marks.sentence}</figcaption>
     </figure>
   );
 }
 
-function Glyph({ kind }: { readonly kind: "ring" | "dash" | "square" }) {
+function Glyph({ kind }: { readonly kind: "ring" | "dash" | "square" | "cross" }) {
   return (
     <svg viewBox="0 0 10 10" className="inline-block size-2.5 shrink-0">
       {kind === "ring" && <circle cx={5} cy={5} r={4} fill="none" stroke="currentColor" strokeWidth={1.25} />}
       {kind === "dash" && <rect x={0} y={4.5} width={10} height={1.25} fill="currentColor" />}
       {kind === "square" && <rect x={1} y={1} width={8} height={8} fill="currentColor" />}
+      {kind === "cross" && <path d="M1.5 1.5L8.5 8.5M8.5 1.5L1.5 8.5" fill="none" stroke="currentColor" strokeWidth={1.25} />}
     </svg>
   );
 }

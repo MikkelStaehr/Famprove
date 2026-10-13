@@ -136,7 +136,7 @@ function RepsStepper({
         <span className="font-grotesk text-16">Reps i sæt {set.number}</span>
         {/* A small tabular number, not a caption label: mono in the muted grey (Barley Corn is for captions only). */}
         <span className="font-mono text-14 text-text-muted">
-          {low} - {top}
+          {low}–{top}
         </span>
       </p>
       <div className="flex items-center gap-2">

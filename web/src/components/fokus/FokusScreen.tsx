@@ -358,7 +358,11 @@ function SetView({
               </p>
             )}
             {kg !== null && (
-              <p className="col-span-2 flex flex-col [overflow-wrap:anywhere] @min-[21rem]:col-span-1">
+              <p
+                className={`flex flex-col [overflow-wrap:anywhere] ${
+                  hasWords(kg.figure) ? "col-span-full @min-[21rem]:col-span-full" : "col-span-2 @min-[21rem]:col-span-1"
+                }`}
+              >
                 <span className="caption">{kg.label}</span>
                 <span>
                   {kg.kind === "suggestion" ? <span className="text-44">{kg.figure}</span> : <FigureWithWords figure={kg.figure} />}
@@ -527,7 +531,6 @@ function FinishedView({
           {card.times !== null && <p className="caption">{card.times}</p>}
           {footer}
         </div>
-        <p className="mt-10 text-20">Husk at logge kg i arket.</p>
       </section>
       <div className={`mt-10 ${PRIMARY_DOCK}`}>
         <HomeLink ref={primary} flush={flush} className={PRIMARY_BOX}>
@@ -551,9 +554,13 @@ function CountsFigure({ text }: { readonly text: string }) {
   );
 }
 
+/** A kg figure with words in it ("kropsvægt + 10"), not a plain number. */
+const hasWords = (figure: string): boolean => /\p{L}/u.test(figure);
+
 /**
  * A kg figure that may start with words ("kropsvægt + 10"): the words in text-24 so only the
- * number is 44px and the line doesn't wrap at 390 (round 4); a plain number is all 44px.
+ * number is 44px; its cell takes the full row under REPS/RPE (col-span-full), so "kropsvægt + 10 kg"
+ * sits on one line instead of wrapping in the third column. A plain number is all 44px.
  */
 function FigureWithWords({ figure }: { readonly figure: string }) {
   const m = /^(\D+?)\s*(\d[\d,.]*)$/.exec(figure);

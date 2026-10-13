@@ -6,7 +6,7 @@
  */
 import type { Freshness } from "./dashboard-view.ts";
 import { formatKg, formatSetLoad, formatTimeOfDay, formatUpdatedAt, spokenRange } from "./format.ts";
-import type { ExerciseCategoryRow, SuggestionBasis } from "./db/rows.ts";
+import type { ExerciseCategoryRow } from "./db/rows.ts";
 import {
   firstOpen,
   isWarmup,
@@ -227,7 +227,8 @@ function suggestionWords(e: FokusExercise): string {
 
 /**
  * The next-set block (round 3): line 1 "Squat · sæt 2 af 2" (in a warm-up, whose heading names
- * the exercise: "Sæt 1 af 4"); line 2 "5 reps · RPE 7" and `kg`: the suggestion, else last week's
+ * the exercise: "Sæt 1 af 4"); line 2 "5 reps · RPE 7" (ranges as the set view writes them,
+ * rangeFigure: "6–10 reps · RPE 7–8"; spoken sentences keep "til") and `kg`: the suggestion, else last week's
  * logged kg ("kropsvægt + 10 kg"), else null (nothing shown). `kg.source` is its sr-only prefix.
  */
 export type NextKg = { readonly source: "forslag" | "sidste uge"; readonly text: string };
@@ -240,9 +241,10 @@ export function nextSetSummary(
   const parts: string[] = [];
   if (e.repsText !== null) {
     const word = repsWord(e.repsText);
-    parts.push(word === null ? e.repsText : `${e.repsText} ${word}`);
+    const figure = rangeFigure(e.repsText);
+    parts.push(word === null ? figure : `${figure} ${word}`);
   }
-  if (e.prescribed !== null) parts.push(e.prescribed);
+  if (e.prescribed !== null) parts.push(rangeFigure(e.prescribed));
   const kg: NextKg | null =
     e.suggestedKg !== null
       ? { source: "forslag", text: `${formatKg(e.suggestedKg)}\u00a0kg` }

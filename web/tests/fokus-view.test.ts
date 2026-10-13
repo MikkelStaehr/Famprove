@@ -227,9 +227,16 @@ test("nextSetSummary line 2: neither -> no kg and never 'intet forslag'", () => 
   const pull = setInContext(EXERCISES, { row: 7, set: 1 });
   assert.ok(pull !== null);
   const summary = nextSetSummary(pull);
-  assert.equal(summary.line, "8 - 12 reps · -12.5%");
+  assert.equal(summary.line, "8–12 reps · -12.5%"); // ranges as the set view writes them (rangeFigure)
   assert.equal(summary.kg, null);
   assert.doesNotMatch(summary.line, /forslag/i);
+});
+
+test("nextSetSummary line 2: reps and RPE ranges with an en dash, no spaces (as the set view)", () => {
+  const dips = setInContext([{ ...PULLDOWN, repsText: "6 - 10", prescribed: "RPE 7 - 8" }], { row: 7, set: 1 });
+  assert.ok(dips !== null);
+  assert.equal(nextSetSummary(dips).line, "6–10 reps · RPE 7–8");
+  assert.match(setSentence(dips, 1), /6 til 10 reps ved RPE 7 til 8/); // spoken: still "til"
 });
 
 test("setSentence: the spoken set, ranges as words, week 1 without last week", () => {

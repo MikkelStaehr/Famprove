@@ -149,7 +149,7 @@ const seconds = (a: string, b: string): number | null => {
  * The finished view's signature: walk the session in sheet order (warm-ups included). Each done
  * tap is preceded by a gap of 2 + 14 × min(Δ, 6 min) / 6 min units, Δ = time since the previous
  * done tap (unknown: 2); a done set then draws a 4-unit bar, a warm-up's done nothing; a skipped
- * set is a 2-unit gap and a 4-unit stub. x is scaled by min(360 / total, 2), left-aligned.
+ * set is a 2-unit gap and a 4-unit stub (drawn as a × across the baseline). x is scaled by min(360 / total, 2), left-aligned.
  * Height: reps × kg over the session's max where the sheet has kg for the row (solid), else reps
  * over the max reps (hollow).
  */
@@ -214,6 +214,14 @@ export function signature(exercises: readonly SigExercise[], order: readonly Set
 }
 
 const round = (v: number): number => Math.round(v * 100) / 100;
+
+/**
+ * The legend's kg line ("Hul søjle: … Husk at logge den.") shows only when a bar is hollow. Every
+ * done set draws a bar and every bar without sheet kg is hollow, so no hollow bar = no kg to log.
+ */
+export function showsKgReminder(sig: Signature): boolean {
+  return sig.bars.some((b) => b.hollow);
+}
 
 export function signatureSentence(
   done: number,
