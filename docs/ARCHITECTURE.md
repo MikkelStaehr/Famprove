@@ -26,7 +26,8 @@ GitHub Actions daily.yml at 05, 12, 20 Copenhagen: the droplet's workflow_dispat
                                                           blocks.phase, strength_weeks (e1RM + tonnage per week and lift),
                                                           strength_set_kg (planned/lifted kg history; updated, never rebuilt),
                                                           planned_sets (suggested kg per set, this ISO week on)
-  collect-plan       planned_sessions (hand-filled) + FTP from intervals.icu → planned_targets
+  collect-plan       planned_sessions (hand-filled) + FTP from intervals.icu → planned_targets;
+                     FTP vs eFTP → app_notices (ftp_mismatch)
 
 Next.js (web/), server components only
   /       Træning ← daily_load (TSB flag), strength_sessions + strength_sets (this ISO week, last week), planned_targets
@@ -59,7 +60,7 @@ Next.js (web/), server components only
 | `.claude/skills/run-web/` | The only way to run and screenshot the web app (port 3100) |
 
 ## Tables
-`activities` (rides) · `strength_activities` (WeightTraining from intervals.icu) ·
+`activities` (rides; `data_warning` = the power-data check, domain/power_check.py) · `strength_activities` (WeightTraining from intervals.icu) ·
 `strength_sets` (every prescribed set: plan + logged kg + effective kg + cells as written; ISO week + session number; the muscle_factor it was scored with) ·
 `exercises` (hand-edited catalogue: muscle factor, bodyweight fraction, category per exercise name and its aliases) ·
 `strength_sessions` (derived: per ISO week and session number, the activity that did it, its date, TSS) ·
@@ -72,6 +73,7 @@ Next.js (web/), server components only
 `strength_weeks` (derived: every ISO week x SQUAT/BENCH/DEADLIFT from the first block: tonnage, best e1RM, block best) ·
 `strength_set_kg` (persistent: planned and lifted kg per set with timestamps; like forecast_log it can't be rebuilt) ·
 `exercise_set_log` (persistent: start/end/skip of each set per session from the Træning screens' taps; can't be rebuilt; written only by the web; read back on reload) ·
+`app_notices` (one current notice per kind, e.g. ftp_mismatch from collect-plan; shown on /load) ·
 `planned_sets` (derived by compute: suggested kg per set of this ISO week and later, rolling e1RM of the parent lift x the RPE relation, rounded to 2.5). `activities.raw` / `strength_activities.raw` hold the intervals.icu object as delivered.
 
 ## Plan

@@ -135,6 +135,7 @@ export type RideDetail = {
   readonly viWarning: boolean; // ride_metrics.vi_warning (Python: VI > 1.15 on a Z2 day)
   readonly tss: number | null;
   readonly device: string | null; // intervals.icu device_name, e.g. "HAMMERHEAD Karoo"
+  readonly dataWarning: string | null; // Python's power-data warning (which rule fired); null = none
 };
 
 /** One exercise row of the sheet on that date; every set of a row has the same values. */
@@ -310,6 +311,7 @@ function rideDetail(a: ActivityRow, vi: RideViRow | undefined): RideDetail {
     viWarning: vi?.viWarning === true,
     tss: a.trainingLoad,
     device: a.deviceName,
+    dataWarning: a.dataWarning,
   };
 }
 

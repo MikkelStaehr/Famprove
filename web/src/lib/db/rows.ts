@@ -139,6 +139,8 @@ export type ActivityRow = {
   readonly intensityPct: number | null; // IF as a percent (85.3 == 0.853)
   readonly trainingLoad: number | null; // TSS (intervals.icu load)
   readonly deviceName: string | null;
+  /** Python's power-data warning (which rule fired, Danish); null = none. */
+  readonly dataWarning: string | null;
 };
 
 /** public.strength_sets, for the week detail. score is the raw per-set score (before K). */
@@ -198,7 +200,7 @@ export type WeekDetailData = {
 export const ACTIVITIES_SELECT = {
   table: "activities",
   columns:
-    "id,start_date_local,type,name,moving_time_s,weighted_avg_watts,intensity_pct,training_load,device_name",
+    "id,start_date_local,type,name,moving_time_s,weighted_avg_watts,intensity_pct,training_load,device_name,data_warning",
   order: "start_date_local,id", // unique (includes the primary key)
 } as const;
 
@@ -626,6 +628,7 @@ export function parseActivityRow(raw: unknown): ActivityRow {
     intensityPct: f.numberOrNull("intensity_pct"),
     trainingLoad: f.numberOrNull("training_load"),
     deviceName: f.stringOrNull("device_name"),
+    dataWarning: f.stringOrNull("data_warning"),
   };
 }
 
@@ -758,6 +761,24 @@ export type PrescribedSetRow = {
   readonly loggedKg: number | null; // null: not entered/unreadable; 0 is real only if bodyweight (bodyweight only)
   readonly bodyweight: boolean;
 };
+
+/** public.app_notices: one current notice per kind (e.g. ftp_mismatch), written by Python. */
+export type AppNoticeRow = {
+  readonly kind: string;
+  readonly date: IsoDate;
+  readonly message: string; // Danish, shown as is
+};
+
+export const APP_NOTICES_SELECT = {
+  table: "app_notices",
+  columns: "kind,date,message",
+  order: "kind", // the primary key
+} as const;
+
+export function parseAppNoticeRow(raw: unknown): AppNoticeRow {
+  const f = new Fields(APP_NOTICES_SELECT.table, raw);
+  return { kind: f.string("kind"), date: f.date("date"), message: f.string("message") };
+}
 
 /** Why a planned set has (or has no) suggested kg (python domain/planned_sets.py). */
 export type SuggestionBasis = "rpe_e1rm" | "not_rpe" | "no_e1rm" | "no_lift";

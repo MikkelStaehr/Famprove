@@ -33,6 +33,7 @@ class ActivityRow(TypedDict):
     power_load: int | None
     hr_load: int | None
     device_name: str | None
+    data_warning: str | None  # domain.power_check; null = no rule fired (or not checked yet)
     raw: JsonRow | None  # the intervals.icu object as delivered
 
 
@@ -56,6 +57,7 @@ def to_row(activity: CyclingActivity) -> ActivityRow:
         power_load=activity.power_load,
         hr_load=activity.hr_load,
         device_name=activity.device_name,
+        data_warning=activity.data_warning,
         raw=dict(activity.raw) if activity.raw is not None else None,
     )
 
@@ -76,6 +78,7 @@ def from_row(row: JsonRow) -> CyclingActivity:
         power_load=opt_int(row, "power_load"),
         hr_load=opt_int(row, "hr_load"),
         device_name=opt_str(row, "device_name"),
+        data_warning=opt_str(row, "data_warning"),
         raw=opt_object(row, "raw"),
     )
 

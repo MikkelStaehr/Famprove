@@ -3,14 +3,13 @@ import { test } from "node:test";
 
 import { recordSetTap, type RecordOptions } from "../src/lib/db/set-log.ts";
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
-import { type LoggedSet, sessionOrder, setKey, type SetTapInput } from "../src/lib/set-taps.ts";
+import { type LoggedSet, setKey, type SetTapInput } from "../src/lib/set-taps.ts";
 
 // Retry safety (tester, re-check on 7c8f5af): every split point of a tap, then Gem igen once or twice.
 type Row = Record<string, unknown>;
 type FakeDb = { tables: Record<string, Row[]>; writes: Row[]; failAt?: number; requests: number };
 
 const PK = ["date", "session_no", "row_no", "set_no"];
-const ALLOWED = new Set([...PK, "exercise_id", "started_at", "ended_at", "skipped", "updated_at"]);
 
 function matches(row: Row, params: URLSearchParams): boolean {
   for (const [column, expression] of params) {
@@ -41,7 +40,6 @@ const SHEET: Array<[number, number, string]> = [
   [13, 2, "Squat"],
   [14, 1, "Dip"],
 ];
-const ORDER = sessionOrder(SHEET.map(([row, set]) => ({ row, set })));
 
 function fakeDb(): FakeDb {
   return {

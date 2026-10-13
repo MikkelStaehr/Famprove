@@ -162,7 +162,10 @@ function Cycling({ date, tss, rides }: CyclingProps) {
         {rides.map((ride) => (
           <li key={ride.id} className="flex flex-col gap-1 border-t border-border py-2 first:border-t-0">
             <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14">
-              <span className="font-semibold">{ride.name ?? "Tur uden navn"}</span>
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-semibold">{ride.name ?? "Tur uden navn"}</span>
+                {ride.dataWarning !== null && <DataWarningBadge warning={ride.dataWarning} />}
+              </span>
               <span className="text-14 text-text-muted">
                 Start kl. <time dateTime={`${date}T${ride.startTime}`}>{ride.startTime.replace(":", ".")}</time>
               </span>
@@ -182,6 +185,23 @@ function Cycling({ date, tss, rides }: CyclingProps) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * Python flagged the ride's power data (spike rules, domain.power_check): a small --warning badge
+ * with a triangle (never colour alone); the rule that fired is its tooltip and, for screen
+ * readers, part of its text.
+ */
+function DataWarningBadge({ warning }: { readonly warning: string }) {
+  return (
+    <span title={warning} className="inline-flex items-center gap-1 text-14 font-semibold text-warning">
+      <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="currentColor">
+        <path d="M6 1 11 11H1Z" />
+      </svg>
+      Tjek effektdata
+      <span className="sr-only">: {warning}</span>
+    </span>
   );
 }
 

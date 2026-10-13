@@ -209,8 +209,13 @@ def fetch_wellness(
 RIDE_TYPES_FOR_FTP: Final = frozenset({"Ride", "VirtualRide"})
 
 
-def parse_ride_ftp(athlete: object) -> int | None:
-    """The FTP (W) of the first sport-settings entry covering Ride or VirtualRide, else None."""
+@dataclass(frozen=True, slots=True)
+class RideFtp:
+    ftp: int | None  # the FTP set in intervals.icu (sportSettings.ftp)
+    eftp: int | None  # intervals.icu's own estimate (sportSettings.mmp_model.ftp)
+
+
+def _ride_settings(athlete: object) -> Mapping[str, object] | None:
     if not isinstance(athlete, dict):
         raise ValueError("intervals.icu athlete: expected a JSON object")
     for settings in json_objects(athlete.get("sportSettings") or [], "intervals.icu sportSettings"):
@@ -218,16 +223,66 @@ def parse_ride_ftp(athlete: object) -> int | None:
         if isinstance(types, list) and RIDE_TYPES_FOR_FTP & {
             t for t in types if isinstance(t, str)
         }:
-            return opt_int(settings, "ftp")
+            return settings
     return None
 
 
-def fetch_ride_ftp(send: HttpSend, *, api_key: str, athlete_id: str) -> int | None:
-    """GET /athlete/{athlete_id} -> ride FTP from sportSettings (read-only)."""
+def parse_ride_ftp(athlete: object) -> int | None:
+    """The FTP (W) of the first sport-settings entry covering Ride or VirtualRide, else None."""
+    settings = _ride_settings(athlete)
+    return None if settings is None else opt_int(settings, "ftp")
+
+
+def parse_ride_ftps(athlete: object) -> RideFtp:
+    """FTP and eFTP of the ride sport settings; eFTP from its power model (mmp_model.ftp)."""
+    settings = _ride_settings(athlete)
+    if settings is None:
+        return RideFtp(ftp=None, eftp=None)
+    model = settings.get("mmp_model")
+    eftp = opt_int(model, "ftp") if isinstance(model, dict) else None
+    return RideFtp(ftp=opt_int(settings, "ftp"), eftp=eftp)
+
+
+def fetch_ride_ftps(send: HttpSend, *, api_key: str, athlete_id: str) -> RideFtp:
+    """GET /athlete/{athlete_id} -> the ride FTP and eFTP from sportSettings (read-only)."""
     response = request(
         send,
         "GET",
         f"{BASE_URL}/athlete/{quote(athlete_id, safe='')}",
         headers={"Authorization": basic_auth_header(api_key), "Accept": "application/json"},
     )
-    return parse_ride_ftp(response.json())
+    return parse_ride_ftps(response.json())
+
+
+def parse_power_stream(payload: object) -> tuple[list[int | None], list[int | None]] | None:
+    """(watts, times) from GET /activity/{id}/streams?types=time,watts; None without a watts
+    stream. A sample that isn't a number stays None (never 0)."""
+
+    def ints(values: object) -> list[int | None]:
+        if not isinstance(values, list):
+            return []
+        return [
+            round(v) if isinstance(v, int | float) and not isinstance(v, bool) else None
+            for v in values
+        ]
+
+    if not isinstance(payload, list):
+        raise ValueError("intervals.icu streams: expected a JSON array")
+    by_type = {s.get("type"): s.get("data") for s in payload if isinstance(s, dict)}
+    if "watts" not in by_type:
+        return None
+    return ints(by_type["watts"]), ints(by_type.get("time"))
+
+
+def fetch_power_stream(
+    send: HttpSend, *, api_key: str, activity_id: str
+) -> tuple[list[int | None], list[int | None]] | None:
+    """GET /activity/{id}/streams?types=time,watts (read-only): (watts, times) or None."""
+    response = request(
+        send,
+        "GET",
+        f"{BASE_URL}/activity/{quote(activity_id, safe='')}/streams",
+        headers={"Authorization": basic_auth_header(api_key), "Accept": "application/json"},
+        params=[("types", "time,watts")],
+    )
+    return parse_power_stream(response.json())

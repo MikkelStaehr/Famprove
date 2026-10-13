@@ -5,6 +5,7 @@ import { dayDetails, selectWeek, weekParam, weekView } from "../src/lib/dashboar
 import { addDays } from "../src/lib/dates.ts";
 import {
   parseActivityRow,
+  parseAppNoticeRow,
   parseStrengthSetRow,
   RowError,
 } from "../src/lib/db/rows.ts";
@@ -84,6 +85,7 @@ function ride(overrides: Partial<ActivityRow>): ActivityRow {
     intensityPct: 85.3,
     trainingLoad: 80,
     deviceName: "HAMMERHEAD Karoo",
+    dataWarning: null,
     ...overrides,
   };
 }
@@ -196,6 +198,7 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
   assert.equal(wed.strength, null); // no strength until intervals logs it
   assert.equal(wed.rides[0]?.device, null);
   assert.deepEqual([wed.rides[0]?.vi, wed.rides[0]?.viWarning], [1.18, true]); // Python's, as stored
+  assert.equal(wed.rides[0]?.dataWarning, null); // no power-data warning on this ride
   assert.equal(wed.rest, false);
 
   const extra = thu.strength?.sessions[0];
@@ -241,6 +244,7 @@ test("parseActivityRow and parseStrengthSetRow map and validate", () => {
       intensity_pct: 79.4,
       training_load: 101,
       device_name: "HAMMERHEAD Karoo",
+      data_warning: "Maks 1.700 W er over 1,3 × din ePmax (1.210 W).",
     }),
     {
       id: "i1",
@@ -252,6 +256,7 @@ test("parseActivityRow and parseStrengthSetRow map and validate", () => {
       intensityPct: 79.4,
       trainingLoad: 101,
       deviceName: "HAMMERHEAD Karoo",
+      dataWarning: "Maks 1.700 W er over 1,3 × din ePmax (1.210 W).",
     },
   );
   const raw = {
@@ -291,4 +296,10 @@ test("a ride without ride_metrics (before 2024-12-30) has no VI and no warning",
     sets: [],
   });
   assert.deepEqual([wed.rides[0]?.vi, wed.rides[0]?.viWarning], [null, false]);
+});
+
+test("app_notices rows parse; a notice without a message is rejected", () => {
+  const row = { kind: "ftp_mismatch", date: "2026-10-13", message: "FTP er sat til 230 W, men dine ture peger på 183 W" };
+  assert.deepEqual(parseAppNoticeRow(row), row);
+  assert.throws(() => parseAppNoticeRow({ ...row, message: null }), RowError);
 });

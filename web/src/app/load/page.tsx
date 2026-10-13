@@ -7,6 +7,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { LoadExplainer } from "@/components/LoadExplainer";
 import { TrendChart } from "@/components/TrendChart";
 import { UpdatedLine } from "@/components/UpdatedLine";
+import { WarningLine } from "@/components/WarningLine";
 import { ZoneBar } from "@/components/ZoneBar";
 import { WeekDays, WeekDaysSkeleton } from "@/components/WeekDays";
 import { LatestWeekLink, weekHref, WeekSwitcher } from "@/components/WeekSwitcher";
@@ -19,7 +20,7 @@ import {
   type WeekNav,
 } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
-import { loadDashboardData, loadWeekDetail } from "@/lib/db/queries";
+import { loadAppNotices, loadDashboardData, loadWeekDetail } from "@/lib/db/queries";
 import {
   formatDate,
   formatDay,
@@ -85,7 +86,10 @@ async function loadWeekState(nav: WeekNav): Promise<WeekState> {
 
 export default async function Page({ searchParams }: PageProps<"/load">) {
   const { week } = await searchParams;
-  const state = await loadPageState(typeof week === "string" ? week : undefined);
+  const [state, notices] = await Promise.all([
+    loadPageState(typeof week === "string" ? week : undefined),
+    loadAppNotices(),
+  ]);
   return (
     <>
       <header className="flex flex-col">
@@ -101,6 +105,12 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
             />
           </div>
         )}
+        {/* Python's notices (app_notices), e.g. the FTP sanity check: one line each. */}
+        {notices.map((n) => (
+          <div key={n.kind} className="mt-2">
+            <WarningLine>{n.message}</WarningLine>
+          </div>
+        ))}
         {state.kind === "ready" && <Hero view={state} />}
       </header>
       {state.kind === "error" && <LoadError error={state.error} at={state.at} />}

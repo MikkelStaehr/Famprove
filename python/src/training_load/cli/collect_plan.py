@@ -18,11 +18,14 @@ from training_load.config import (
     load_dotenv_file,
     mask_in_ci,
 )
+from training_load.db.app_notices import set_notice
 from training_load.db.client import Postgrest
 from training_load.db.planned import PlannedSession, PlannedTarget, all_sessions, sync_targets
+from training_load.domain.dates import LOCAL_TZ
 from training_load.domain.plan import PlanError, parse_steps, targets, total_minutes
+from training_load.domain.power_check import FTP_NOTICE_KIND, ftp_notice
 from training_load.http import HttpSend, requests_send
-from training_load.sources.intervals import fetch_ride_ftp
+from training_load.sources.intervals import fetch_ride_ftps
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +57,17 @@ def to_target(session: PlannedSession, ftp: int | None) -> PlannedTarget:
 def run(
     intervals: IntervalsSettings, *, send: HttpSend, db: Postgrest, computed_at: datetime
 ) -> PlanRunSummary:
-    ftp = fetch_ride_ftp(send, api_key=intervals.api_key, athlete_id=intervals.athlete_id)
+    ftps = fetch_ride_ftps(send, api_key=intervals.api_key, athlete_id=intervals.athlete_id)
+    ftp = ftps.ftp
+    # The FTP sanity check (domain.power_check): a notice on /load while FTP and eFTP disagree.
+    notice = ftp_notice(ftps.ftp, ftps.eftp)
+    set_notice(
+        db, FTP_NOTICE_KIND, notice, today=computed_at.astimezone(LOCAL_TZ).date(), now=computed_at
+    )
+    if notice is not None:
+        log.warning(
+            "FTP %s W and intervals.icu's eFTP %s W differ by more than 15 %%", ftps.ftp, ftps.eftp
+        )
     if ftp is None:
         log.warning("intervals.icu has no ride FTP: planned targets get no watts")
     planned = [to_target(s, ftp) for s in all_sessions(db)]

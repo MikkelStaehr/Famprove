@@ -18,6 +18,8 @@ import { createClient, selectAll, selectFirst } from "./postgrest.ts";
 import { addDays, isoWeekStart } from "../dates.ts";
 import {
   ACTIVITIES_SELECT,
+  APP_NOTICES_SELECT,
+  parseAppNoticeRow,
   BLOCKS_SELECT,
   CYCLING_WEEKS_SELECT,
   DAILY_LOAD_SELECT,
@@ -54,6 +56,7 @@ import {
   WEEKLY_LOAD_SELECT,
 } from "./rows.ts";
 import type {
+  AppNoticeRow,
   CyclingAnalysisData,
   StrengthAnalysisData,
   DashboardData,
@@ -112,6 +115,23 @@ export async function loadDashboardData(): Promise<DashboardData> {
     return { daily: daily.map((d) => ({ ...d, computedAt })), blocks, weeks, projection };
   }
   return { daily, blocks, weeks, projection };
+}
+
+/**
+ * The current notices (app_notices, e.g. FTP vs eFTP). Advisory: a failed read is logged and
+ * shows no notice instead of failing /load. Under DEV_FIXTURE empty / error: none.
+ */
+export async function loadAppNotices(): Promise<readonly AppNoticeRow[]> {
+  await connection();
+  const fixture = devFixture();
+  if (fixture === "empty" || fixture === "error") return [];
+  try {
+    return await selectAll(client(), APP_NOTICES_SELECT.table, APP_NOTICES_SELECT, parseAppNoticeRow);
+  } catch (error) {
+    if (!isDataError(error)) throw error;
+    console.error("load: reading app_notices failed", error);
+    return [];
+  }
 }
 
 /**

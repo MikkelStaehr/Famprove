@@ -25,6 +25,8 @@ class CyclingActivity:
     power_load: int | None
     hr_load: int | None
     device_name: str | None = None  # intervals.icu device_name; display only
+    # domain.power_check: which power-data rule fired (Danish, the week view's tooltip); None = none
+    data_warning: str | None = None
     raw: Mapping[str, object] | None = field(default=None, compare=False)
     """The intervals.icu object as delivered; None for rows stored before raw was kept."""
 

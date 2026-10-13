@@ -9,7 +9,7 @@ import argparse
 import logging
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final
 
@@ -23,9 +23,12 @@ from training_load.config import (
 from training_load.db import strength_activities
 from training_load.db.activities import delete_ids, ids_between, upsert_activities
 from training_load.db.client import Postgrest
+from training_load.domain.cycling import CyclingActivity
 from training_load.domain.dates import ANALYSIS_START, today_local
-from training_load.http import HttpSend, requests_send
-from training_load.sources.intervals import fetch_activities, parse_activities
+from training_load.domain.power_check import data_warning, largest_spike, needs_stream
+from training_load.http import HttpError, HttpSend, requests_send
+from training_load.narrow import opt_float, opt_int
+from training_load.sources.intervals import fetch_activities, fetch_power_stream, parse_activities
 
 DEFAULT_LOOKBACK_DAYS: Final = 14
 
@@ -41,6 +44,38 @@ class IntervalsRunSummary:
     stubs_skipped: int
     excluded: int
     missing_load: int
+    data_warnings: int = 0  # rides with a power-data warning (domain.power_check)
+    streams_read: int = 0  # power streams fetched for the single-sample rule
+    streams_unread: int = 0  # stream fetches that failed: those rides were checked on the peak only
+
+
+def with_power_checks(
+    rides: Sequence[CyclingActivity], *, send: HttpSend, api_key: str
+) -> tuple[list[CyclingActivity], int, int]:
+    """Each ride with its data_warning (domain.power_check). The power stream is fetched only
+    where the max power is above 2 x the ride's FTP; a fetch that fails is counted, and that
+    ride is judged on the peak rule alone (never silently "no spike"). Returns (rides, read,
+    unread)."""
+    out: list[CyclingActivity] = []
+    read = unread = 0
+    for a in rides:
+        raw = a.raw or {}
+        try:
+            max_w = opt_int(raw, "icu_pm_p_max")
+            epmax = opt_float(raw, "icu_rolling_p_max")
+        except ValueError:
+            max_w, epmax = None, None  # unreadable raw: counted by compute's ride analysis
+        spike = None
+        if needs_stream(max_w, a.ftp):
+            try:
+                stream = fetch_power_stream(send, api_key=api_key, activity_id=a.id)
+                read += 1
+                if stream is not None:
+                    spike = largest_spike(stream[0], stream[1])
+            except HttpError, ValueError:
+                unread += 1
+        out.append(replace(a, data_warning=data_warning(max_w, epmax, spike)))
+    return out, read, unread
 
 
 def parse_since(argv: Sequence[str] | None, today: date) -> date:
@@ -93,7 +128,15 @@ def run(
     if parsed.missing_load_ids:
         log.warning("%d rides have no training load; counted as 0", len(parsed.missing_load_ids))
 
-    upsert_activities(db, parsed.cycling)
+    rides, streams_read, streams_unread = with_power_checks(
+        parsed.cycling, send=send, api_key=intervals.api_key
+    )
+    if streams_unread:
+        log.warning(
+            "%d power streams could not be read: those rides were checked on max power only",
+            streams_unread,
+        )
+    upsert_activities(db, rides)
     strength_activities.upsert_strength_activities(db, parsed.strength)
     stubs = set(parsed.stub_ids)
     stale = ids_between(db, since, today) - {a.id for a in parsed.cycling} - stubs
@@ -111,6 +154,9 @@ def run(
         stubs_skipped=len(parsed.stub_ids),
         excluded=sum(parsed.excluded_types.values()),
         missing_load=len(parsed.missing_load_ids),
+        data_warnings=sum(1 for a in rides if a.data_warning is not None),
+        streams_read=streams_read,
+        streams_unread=streams_unread,
     )
 
 

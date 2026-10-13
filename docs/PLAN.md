@@ -66,3 +66,4 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | suggested-kg | Suggested kg per planned set (rolling e1RM x RPE relation) in planned_sets | L |
 | traening | Træning overview: Today renamed, a tick per set, TSB hint, "Begynd træning" | L |
 | fokus | Fokus: one set at a time, rest timer, skip, progress; survives a reload | L |
+| power-checks | Power data checks: spike warning per ride, FTP vs eFTP notice | M |
