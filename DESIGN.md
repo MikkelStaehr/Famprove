@@ -82,7 +82,7 @@ Two usage modes, two layouts. **Phone** (390px): in the gym and on the bike; Tr�
 ## Components (minimum set)
 - `KeyFigure` – label, value, delta (with direction), status colour.
 - `Card` – title, optional action, content slot.
-- `TrendChart` – one series or a few, responsive, axis labels readable at 390px, tooltip on tap/hover, empty state built in.
+- `TrendChart` – one series or a few, responsive, axis labels readable at 390px, marker + readout row on touch, tooltip on hover ("Charts: interaction"), empty state built in.
 - `StatusBadge` – text + semantic colour.
 - `EmptyState` – icon, one sentence, optional action.
 - `ErrorState` – what failed, when, retry.
@@ -95,6 +95,32 @@ Two usage modes, two layouts. **Phone** (390px): in the gym and on the bike; Tr�
 - Loading: skeleton in the exact shape of the content, never a spinner in a card.
 - Data freshness: show "updated <time>" wherever data comes from a job; mark stale (> expected interval) in `--warning` with text and an icon.
 - Undo over confirm: tapping a done set again reopens it; Fokus has Fortryd for the latest tap; Afslut needs no confirm (progress is kept).
+
+## Charts: interaction (every chart, decided 2026-10-13)
+Applies to Belastning's trend, Cykel's eFTP, EF and weekly strips, and Styrke's e1RM panels and tonnage strips. It replaces each spec's tooltip.
+- **Marker.** Selecting a day, ride or week draws a 1px `--text` vertical rule the full height of the card's plot stack. On a point chart it snaps to the nearest point and that point gets a 2px `--surface` ring. On week strips it sits at the slot centre. It is drawn in `--text`, not `--slab` (slab means "you are here").
+- **Touch and pen** (`pointerType` ≠ `mouse`): there is **no floating tooltip**. Tap or drag moves the marker, and the values show in the **readout row**. The plot has `touch-action: pan-y`, so a vertical drag still scrolls the page and a horizontal drag scrubs. A tap outside the card's plot clears the selection (a document `pointerdown` outside it), and so does Esc.
+- **Readout row.** It sits directly under the x labels, 8px down, inside the card and above the notes, at every width. It reserves a **fixed height**: the chart's line count × the `text-14` line height, as `min-height` in rem, so nothing jumps between days. At 200% text it may grow, because reflow beats no-jump. It is `aria-live="polite"` and is updated at most once per 150ms while dragging.
+  - Line 1 is `text-14` 600 `--text`: the date or week, then ` · ` and a status when one applies.
+  - Line 2 holds the value cells, `text-16` 600 tabular. Each cell is the series' legend swatch, then its label in `--text-muted`, then the value. The cells are 16px apart and wrap.
+  - Further lines are `text-14` `--text-muted` facts.
+  - **The line-series legend items move into the cells**, because a swatch next to a value is the legend. Only items that have no value stay in the legend above the plot: block, deload, excluded, prognose and slab.
+- **Readout at rest** (nothing selected): it shows the **latest** day, ride or week in the same layout, with line 1 starting `Seneste · ` and no marker drawn. It is never blank. If there is no latest value, it shows `Tryk på grafen for at se en dag` (Belastning) or `… en uge` (week strips) in `--text-muted`.
+- **Pointer** (`pointerType = mouse`): the marker follows the hover, and a floating tooltip (`rounded-control`, `max-w-72`, `pointer-events: none`) shows the same lines as the readout. It is **top-aligned 8px under the plot top and sits 12px to the right of the marker. It flips to the left of the marker when it would cross the plot's right edge**, so it never covers the marker or the hovered point. It hides on `pointerleave`. The readout row stays at rest, so the values never appear twice.
+- **Keyboard: keep what exists.** The chart is one focusable group. ←/→ steps a day, ride or week (Recharts' `accessibilityLayer` on `/load`, `WeekStrips` on Analyse), and Esc clears. A keyboard selection uses the **readout row**, not the floating box. The focus ring sits on the card's plot.
+- **Prognose days:** line 1 reads `tors. 8. okt. · Prognose` (` · efter blokken` and ` · dag anslået` as `load.md` §10c), every value has `≈ `, and ranges go to a facts line. Measured days never show `≈`.
+- **Gaps:** a gap is never read as 0. On a point chart, if the marker would snap to a point more than 14 days from the tap and the tap lies inside an `Ingen ture` seam, it stays at the tap and line 1 reads the seam: `Ingen ture · 30. sep. 2025 – 10. mar. 2026`. A week with no rides reads `Ingen ture`, and a week between blocks reads `mellem blokke`. A missing value is `–`, spoken `ikke registreret`.
+- **Readout per chart** (copy and number formats as each spec: decimal comma, U+2212, W whole, EF 2 dp, hours `h:mm t`):
+
+| Chart | Lines | Line 1 | Cells (line 2) | Facts (line 3+) |
+|---|---|---|---|---|
+| Belastning trend (`load.md`) | 3 | `ons. 30. sep.` (+ ` · Prognose …`) | `Fitness 45` · `Træthed 41` · `Form +4` | `Program - blok 12 (offseason)` (+ ` · deload`); prognose: the `Cykel ≈ …` / `Styrke ≈ …` basis lines and the range `Spænd: fitness 44 til 49` |
+| eFTP pr. tur | 3 | `tirs. 3. jun. 2025 · Udendørs tur` (`Virtuel tur`) | `eFTP 212 W` · `NP 182 W` · `VI 1,08` | `1:45 t · 48,2 km`. Excluded: line 1 `… · Udeladt: For kort`, facts as `analyse.md` §5e |
+| VI cell | | | Flagged: value `--warning` + `WarningLine` triangle, sr `, ujævn effekt på en Z2-dag`. No VI: `VI –` (the cell is kept, so nothing shifts) | |
+| EF (rolige ture) | 3 | `tirs. 3. jun. 2025` | `EF 1,24` · `Trend 1,22` (`Trend –` when null) | `NP 165 W · puls 133 · 1:45 t` |
+| Timer og belastning | 3 | `Uge 23 · 2.–8. jun. 2025` (+ ` · indtil videre`) | `Timer 4:30 t` · `Belastning 210 TSS` · `Ture 3` | `1 udeladt fra trends`; zero week: line 2 `Ingen ture`; null load: `Belastning –` + fact `Belastning ikke beregnet` |
+| Styrke e1RM | 4 | `Uge 39 · 22.–28. sep. · blok 12, uge 1` (+ suffixes per `analyse-styrke.md` §5c) | none: one line per lift, `Squat 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet` (` · bedst i blokken`) | the lift lines are lines 2–4 |
+| Styrke tonnage | 4 | as e1RM | none: one line per lift, `Squat 2.100 kg · 12 sæt` / `Squat ikke trænet` | lines 2–4 |
 
 ## Accessibility checklist (run before merge)
 - [ ] WCAG 2.2 AA in every theme: text ≥ 4.5:1; large text, icons, check rings and control borders ≥ 3:1.
