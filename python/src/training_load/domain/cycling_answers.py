@@ -13,8 +13,8 @@ eftp ("Er jeg stærkere?"): points = (day, rolling_ftp_w) of eftp_ok rides, the 
   the first eftp_ok ride (ties: the earliest day).
 ef ("Bliver min base bedre?"): points = (day, ef) of ef_ok rides. now = the median of
   ef_window(today), then = the median of ef_window(today - 42); each needs EF_MIN_RIDES rides
-  (the web's trend-line rule). flat when |delta| / then < FLAT_SHARE. The detail counts why the
-  rides of the last 28 days did not count: too hard (IF >= ENDURANCE_MAX_IF) or without HR.
+  (the web's trend-line rule). flat when |delta| / then < FLAT_SHARE. The detail gives each ride
+  of the last 28 days that did not count one reason: no watt, under 30 min, too hard, no HR.
 volume ("Træner jeg nok?"): complete ISO weeks (Sunday < today). now = the mean moving hours of
   the last 4, then = the 4 before (weeks without rides are 0 h). flat when |delta| <
   VOLUME_FLAT_H. Planned = planned_sessions dated in the last 4 weeks; per date, done =
@@ -31,10 +31,12 @@ from typing import Final, Literal
 from training_load.domain.ride_analysis import (
     EF_MIN_RIDES,
     ENDURANCE_MAX_IF,
+    LONG_RIDE_S,
     MAX_GAP_DAYS,
     CyclingWeek,
     RideMetrics,
     ef_window,
+    is_power_ride,
 )
 
 Question = Literal["eftp", "ef", "volume"]
@@ -159,28 +161,45 @@ def _ef_median(day: date, points: Sequence[tuple[date, float]]) -> float | None:
     return round(statistics.median(values), 2) if len(values) >= EF_MIN_RIDES else None
 
 
+_REASONS: Final = (  # (singular, plural), in the order the sentence lists them
+    ("for hård", "for hårde"),
+    ("uden puls", "uden puls"),
+    ("uden watt", "uden watt"),
+    ("under 30 min", "under 30 min"),
+)
+
+
+def _why_not_ef(m: RideMetrics) -> int | None:
+    """Index into _REASONS for a ride that is not an EF ride, checked in this order: no power,
+    short, too hard (IF >= ENDURANCE_MAX_IF), no HR. None: it counted, or no reason is known."""
+    f = m.facts
+    if m.ef_ok:
+        return None
+    if not is_power_ride(f):
+        return 2
+    if f.moving_s is None or f.moving_s < LONG_RIDE_S:
+        return 3
+    if f.if_set is not None and f.if_set >= ENDURANCE_MAX_IF:
+        return 0
+    return 1 if f.avg_hr is None else None
+
+
 def _ef_detail(metrics: Sequence[RideMetrics], today: date) -> str | None:
-    """Why the rides of the last 28 days did not count: too hard, or without HR (disjoint)."""
+    """Why the rides of the last 28 days were not easy rides with watt and HR, one reason each."""
     since = today - timedelta(days=27)
     rides = [m for m in metrics if since <= m.facts.day <= today and m.exclusion is None]
-    hard = sum(
-        1 for m in rides if m.facts.if_set is not None and m.facts.if_set >= ENDURANCE_MAX_IF
-    )
-    no_hr = sum(
-        1
-        for m in rides
-        if not (m.facts.if_set is not None and m.facts.if_set >= ENDURANCE_MAX_IF)
-        and m.facts.avg_hr is None
-    )
-    if hard + no_hr == 0:
+    reasons = Counter(r for r in map(_why_not_ef, rides) if r is not None)
+    if not reasons:
         return None
     if len(rides) == 1:
-        return "Din seneste tur var for hård." if hard else "Din seneste tur var uden puls."
+        return f"Din seneste tur var {_REASONS[next(iter(reasons))][0]}."
     parts = [
-        *([f"{hard} for hård" if hard == 1 else f"{hard} for hårde"] if hard else []),
-        *([f"{no_hr} uden puls"] if no_hr else []),
+        f"{n} {_REASONS[i][0] if n == 1 else _REASONS[i][1]}"
+        for i in range(len(_REASONS))
+        if (n := reasons[i])
     ]
-    return f"Af dine {len(rides)} seneste ture var {' og '.join(parts)}."
+    listed = parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} og {parts[-1]}"
+    return f"Af dine {len(rides)} seneste ture var {listed}."
 
 
 def ef_answer(metrics: Sequence[RideMetrics], *, today: date) -> Answer:

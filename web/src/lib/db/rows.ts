@@ -607,8 +607,12 @@ export function parseAnalysisSummaryRow(raw: unknown): AnalysisSummaryRow {
   }
   const value = f.numberOrNull("value");
   const compare = f.numberOrNull("compare");
-  if (state === "answer" && (value === null || compare === null)) {
-    throw new RowError(`${t}.value: expected value and compare when state is answer`);
+  const delta = f.numberOrNull("delta");
+  if (state === "answer" && (value === null || compare === null || delta === null)) {
+    throw new RowError(`${t}.value: expected value, compare and delta when state is answer`);
+  }
+  if (question === "eftp" && [value, compare].some((w) => w !== null && !Number.isInteger(w))) {
+    throw new RowError(`${t}.value: expected whole watts for eftp`);
   }
   const haveN = f.numberOrNull("have_n");
   const needN = f.numberOrNull("need_n");
@@ -616,8 +620,13 @@ export function parseAnalysisSummaryRow(raw: unknown): AnalysisSummaryRow {
     throw new RowError(`${t}.have_n: expected have_n and need_n for ef`);
   }
   const target = f.numberOrNull("target");
-  if (question === "volume" && (target === null || value === null)) {
-    throw new RowError(`${t}.target: expected value and target for volume`);
+  if (question === "volume" && (state !== "answer" || target === null || value === null)) {
+    throw new RowError(`${t}.target: expected an answer with value and target for volume`);
+  }
+  const plannedN = f.numberOrNull("planned_n");
+  const doneN = f.numberOrNull("done_n");
+  if ((plannedN === null) !== (doneN === null) || (plannedN !== null && doneN !== null && doneN > plannedN)) {
+    throw new RowError(`${t}.done_n: expected done_n exactly with planned_n, and never above it`);
   }
   const verdictText = f.string("verdict_text");
   if (verdictText.trim() === "") throw new RowError(`${t}.verdict_text: expected a sentence`);
@@ -631,13 +640,13 @@ export function parseAnalysisSummaryRow(raw: unknown): AnalysisSummaryRow {
     valueDate: f.dateOrNull("value_date"),
     compare,
     compareDate: f.dateOrNull("compare_date"),
-    delta: f.numberOrNull("delta"),
+    delta,
     haveN,
     needN,
     target,
     targetSince: f.dateOrNull("target_since"),
-    plannedN: f.numberOrNull("planned_n"),
-    doneN: f.numberOrNull("done_n"),
+    plannedN,
+    doneN,
     verdictText,
     detailText: f.stringOrNull("detail_text"),
   };

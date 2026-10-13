@@ -186,6 +186,15 @@ def test_ef_detail_counts_why_recent_rides_did_not_count() -> None:
     assert one.detail_text == "Din seneste tur var for hård."
     no_hr = ef_answer(rides((TODAY - timedelta(days=2), {"avg_hr": None})), today=TODAY)
     assert no_hr.detail_text == "Din seneste tur var uden puls."
+    mixed = rides(
+        (TODAY - timedelta(days=1), {"if_set": 0.85}),
+        (TODAY - timedelta(days=2), {"np_w": None, "device_watts": None, "if_set": 0.9}),  # no watt
+        (TODAY - timedelta(days=3), {"moving_s": 1200}),  # under 30 min
+        (TODAY - timedelta(days=4), {}),  # an EF ride: counted in N, no reason
+    )
+    assert ef_answer(mixed, today=TODAY).detail_text == (
+        "Af dine 4 seneste ture var 1 for hård, 1 uden watt og 1 under 30 min."
+    )
 
 
 MONDAYS = [TODAY - timedelta(days=1 + 7 * k) for k in range(8, 0, -1)]  # 8 complete weeks

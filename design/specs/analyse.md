@@ -250,7 +250,7 @@ Directly on `--bg` with no card, 24px apart. Each block is a `<section aria-labe
   - flat: `Uændret: EF {now} mod {then} for 6 uger siden.`
   - needs (now window short): `Kør {n} rolige ture mere med puls og watt, så kan basen måles.`
   - needs (now OK, then short): `EF er {now} nu. Der er ingen rolige ture fra for 6 uger siden at sammenligne med før {compare_from_date}.`
-  - detail (why recent rides didn't count, counts from the last 28 days, omitted when 0): `Af dine {k} seneste ture var {a} for hårde og {b} uden puls.` One part is dropped when it is 0, e.g. `… var 3 for hårde.`
+  - detail (why recent rides didn't count, counts from the last 28 days, omitted when 0): `Af dine {k} seneste ture var {a} for hårde, {b} uden puls, {c} uden watt og {d} under 30 min.` Each ride gets one reason (checked: no watt, under 30 min, too hard, no HR); a part is dropped when it is 0, e.g. `… var 3 for hårde.`
 - **`volume` verdict:**
   - under: `Nej: {hours} t pr. uge mod målet på {target} t.`
   - at or over: `Ja: {hours} t pr. uge mod målet på {target} t.`

@@ -119,6 +119,13 @@ test("the parser refuses a row that breaks the contract instead of guessing", ()
   assert.throws(() => parseAnalysisSummaryRow(raw({ value: "183" })), RowError);
   assert.throws(() => parseAnalysisSummaryRow(raw({ verdict_text: " " })), RowError);
   assert.throws(() => parseAnalysisSummaryRow({ ...(fixture.live[1] as object), need_n: null }), RowError);
+  assert.throws(() => parseAnalysisSummaryRow(raw({ delta: null })), RowError); // an answer needs its delta
+  assert.throws(() => parseAnalysisSummaryRow(raw({ value: 183.5 })), RowError); // eFTP is whole W
+  const volume = (patch: Record<string, unknown>) => ({ ...(fixture.edges.volume_plan as object), ...patch });
+  assert.throws(() => parseAnalysisSummaryRow(volume({ state: "needs_data", direction: null })), RowError);
+  assert.throws(() => parseAnalysisSummaryRow(volume({ done_n: null })), RowError); // planned without done
+  assert.throws(() => parseAnalysisSummaryRow(volume({ done_n: 5 })), RowError); // more done than planned
+  assert.throws(() => parseAnalysisSummaryRow(volume({ planned_n: null })), RowError); // done without planned
 });
 
 test("DEV_FIXTURE=answers: the contract fixture's rows, all three answered, real computed_at kept", () => {
