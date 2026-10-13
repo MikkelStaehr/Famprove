@@ -185,7 +185,7 @@ The top of Cykel is three answer blocks. Charts follow them unchanged except for
 ### 12a. Anatomy (one block, all three identical)
 Directly on `--bg` with no card, 24px apart. Each block is a `<section aria-labelledby>`, top to bottom:
 1. **Question row**, `h3` in `text-14` 700 uppercase +0.04em (the old hero label style), space-between with the **"?"** button: `Er jeg stærkere?` · `Bliver min base bedre?` · `Træner jeg nok?`.
-2. **Figure row**, 4px down: the direction arrow and the number on one baseline.
+2. **Figure row**, 4px down: the direction arrow and the number on one row, the arrow centred on the numerals' cap height (they have no descenders; on the baseline it looks like it sinks).
    - The arrow is 24px, `--text`, `aria-hidden`: ↗ up, ↘ down, → flat, and none when `direction` is null. It is neutral, never coloured, because the sentence carries the meaning.
    - The number is Condensed 800 italic tabular. Block 1 uses `text-56`, the largest on the page. Blocks 2–3 use `text-44`. The unit is the same size.
    - The caption follows, `text-14` `--text-muted`, wrapping under the number at 390.
@@ -200,7 +200,7 @@ Directly on `--bg` with no card, 24px apart. Each block is a `<section aria-labe
 | 3 `volume` | `value` t, 1 dp (`0,9 t`) | `pr. uge, snit af de sidste 4 hele uger · mål {target} t` |
 
 **State `needs_data`:** no arrow.
-- Block 2's number becomes `{have_n} af {need_n}` (`0 af 3`; need_n = EF_MIN_RIDES = 3, the trend-line rule) with the caption `rolige ture med puls og watt de sidste 28 dage`, and the verdict is Python's "what's needed" sentence.
+- Block 2's number becomes `{have_n} af {need_n}` (`0 af 3`; need_n = EF_MIN_RIDES = 3, the trend-line rule) when `value` is null. With a value but nothing to compare (edge `ef_now_only`) it keeps the number (`1,20`) with the caption `EF på rolige ture nu`, as block 1 keeps `eFTP nu`; `3 af 3` would read as done with the caption `rolige ture med puls og watt de sidste 28 dage`, and the verdict is Python's "what's needed" sentence.
 - Block 1 (no eFTP 6 weeks ago, or none for now) keeps its number when one exists, with the caption `eFTP nu`, and gets Python's needed sentence. With no eFTP at all, the number is `–` (sr `ikke registreret`).
 - Never `0` for missing, and never a generic EmptyState.
 
