@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -12,9 +12,12 @@ from training_load.domain.set_feedback import (
     exercise_feel,
     progressions,
     range_top,
+    rolling_e1rm_at,
     with_reps_done,
+    with_rolling_e1rm_rpe,
 )
 from training_load.domain.strength import StrengthSet
+from training_load.domain.strength_analysis import StrengthWeek
 
 MakeSet = Callable[..., StrengthSet]
 MONDAY = date(2026, 10, 12)
@@ -138,3 +141,45 @@ def test_the_rescore_uses_the_coachs_rpe_on_a_main_lift_as_the_parser_does(
     logged = replace(s, logged_rpe=7.5)
     sets, _ = with_reps_done([logged], [entry(30, reps=7.0)])
     assert (sets[0].rpe, sets[0].score) == (7.5, round(7 * 77.5 * 0.75**2, 1))
+
+
+def week_of(lift: str, start: date, e1rm_kg: float | None) -> StrengthWeek:
+    return StrengthWeek(
+        week_start=start, lift=lift, block=None, block_no=None, phase=None,
+        status="lifted" if e1rm_kg is not None else None, sets_lifted=1, tonnage_kg=0.0,
+        e1rm_kg=e1rm_kg, e1rm_load_kg=None, e1rm_reps=None, e1rm_rpe=None,
+        e1rm_rpe_source=None, is_block_best=False,
+    )  # fmt: skip
+
+
+def test_the_rolling_e1rm_is_the_best_week_of_the_four_ending_with_the_sets_week() -> None:
+    weeks = [
+        week_of("SQUAT", MONDAY - timedelta(weeks=4), 190.0),  # outside the window
+        week_of("SQUAT", MONDAY - timedelta(weeks=3), 170.0),
+        week_of("SQUAT", MONDAY, 175.7),
+        week_of("SQUAT", MONDAY + timedelta(weeks=1), 200.0),  # after the set: never used
+        week_of("BENCH", MONDAY, 105.0),
+    ]
+    assert rolling_e1rm_at(weeks, "SQUAT", MONDAY) == 175.7
+    assert rolling_e1rm_at(weeks, "DEADLIFT", MONDAY) is None
+
+
+def test_a_main_lifts_percent_row_is_scored_from_the_rolling_e1rm(make_set: MakeSet) -> None:
+    """A -10% squat row of 5 x 130 kg: against the tab's 180 kg it reads 72 % (RPE 4, the floor);
+    against the app's rolling e1RM of 160 kg, 81 % (RPE 8.1). Rows with an RPE are left alone."""
+    base = {"week_start": MONDAY, "session": 1, "type": "SQUAT", "name": "Squat", "reps": 5.0,
+            "logged_kg": 130.0, "kg": 130.0, "muscle_factor": 1.0, "e1rm": 180.0}  # fmt: skip
+    percent = make_set(**base, sheet_row=27, prescribed="-10%", rpe=4.0, score=0.0)
+    with_rpe = make_set(**base, sheet_row=25, prescribed="RPE 7", rpe=7.0, score=0.0)
+    logged = make_set(**base, sheet_row=26, prescribed="-10%", logged_rpe=8.0, rpe=8.0, score=0.0)
+    tempo = make_set(**{**base, "name": "3.0.0 Tempo squat"}, sheet_row=28, prescribed="-10%",
+                     rpe=6.0, score=0.0)  # fmt: skip
+    weeks = [week_of("SQUAT", MONDAY - timedelta(weeks=1), 160.0)]
+    out, changed = with_rolling_e1rm_rpe([percent, with_rpe, logged, tempo], weeks)
+    assert changed == 1
+    rpe = 10 - ((160.0 / 130.0 - 1) / 0.0333 - 5)  # 8.07
+    assert out[0].rpe == pytest.approx(rpe)
+    assert out[0].score == pytest.approx(round(5 * 130 * (rpe / 10) ** 2, 1))
+    assert out[1:] == [with_rpe, logged, tempo]
+    # No rolling e1RM yet: the tab's 1RM (the parser's estimate) stays.
+    assert with_rolling_e1rm_rpe([percent], []) == ([percent], 0)

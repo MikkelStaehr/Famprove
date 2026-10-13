@@ -58,7 +58,12 @@ from training_load.domain.ride_analysis import (
     weekly_totals,
 )
 from training_load.domain.sessions import daily_strength_tss, match_sessions
-from training_load.domain.set_feedback import exercise_feel, progressions, with_reps_done
+from training_load.domain.set_feedback import (
+    exercise_feel,
+    progressions,
+    with_reps_done,
+    with_rolling_e1rm_rpe,
+)
 from training_load.domain.strength import derive_blocks, iso_week_start
 from training_load.domain.strength_analysis import (
     PHASES_CONFIRMED_TO,
@@ -134,6 +139,19 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
             UNKNOWN_FACTOR,
         )
     lifts = all_strength_activities(db)
+    # Which sessions are done (matching never depends on scores), then the e1RM weeks /analyse
+    # shows, then the %-rows of main lifts scored from that rolling e1RM; then the sessions' TSS.
+    done = {
+        (s.week_start, s.session)
+        for s in match_sessions(sets, lifts, strength_k)
+        if s.block is not None and s.activity_id is not None
+    }
+    statuses = kg_statuses(sets, done, today)
+    blocks = derive_blocks(sets, today)
+    analysis = strength_weeks(sets, statuses, blocks, today=today)
+    sets, pct_rescored = with_rolling_e1rm_rpe(sets, analysis.weeks)
+    if pct_rescored:
+        log.info("%d main-lift sets without an RPE scored from the rolling e1RM", pct_rescored)
     sessions = match_sessions(sets, lifts, strength_k)
     sync_strength_sessions(db, sessions)
     cycling = daily_cycling_tss(activities)
@@ -145,7 +163,6 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
 
     days = build_daily_load(cycling, strength, start=SERIES_START, end=today, decay=DECAY)
     sync_daily_load(db, days, start=SERIES_START, end=today, computed_at=computed_at)
-    blocks = derive_blocks(sets, today)
     sync_blocks(db, blocks)
     for b in blocks:
         if b.block_no > PHASES_CONFIRMED_TO:
@@ -155,13 +172,6 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
                 phase_of(b.block_no),
             )
 
-    done = {
-        (s.week_start, s.session)
-        for s in sessions
-        if s.block is not None and s.activity_id is not None
-    }
-    statuses = kg_statuses(sets, done, today)
-    analysis = strength_weeks(sets, statuses, blocks, today=today)
     sync_strength_weeks(db, analysis.weeks, computed_at=computed_at)
     # Træning: suggested kg per set of this week and later, from the rolling e1RM just computed.
     rules = progressions(logged_sets, sets)

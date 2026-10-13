@@ -19,10 +19,11 @@ import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, timedelta
 from typing import Final, Literal
 
 from training_load.domain.strength import StrengthSet, iso_week_start
+from training_load.domain.strength_analysis import StrengthWeek
 from training_load.sources.strength_sheet import decimal_dots, set_score
 
 MIN_RATED: Final = 4
@@ -95,20 +96,24 @@ def with_reps_done(
         if reps is None or range_top(s.reps_text) is None or s.muscle_factor is None:
             out.append(s)
             continue
-        rpe, score = _rescore(s, reps, s.muscle_factor)
+        rpe, score = rescore(s, reps, s.muscle_factor)
         out.append(replace(s, reps=reps, rpe=rpe, score=round(score, 1)))
         applied += 1
     return out, applied
 
 
-def _rescore(s: StrengthSet, reps: float, factor: float) -> tuple[float | None, float]:
+def rescore(
+    s: StrengthSet, reps: float, factor: float, e1rm_kg: float | None = None
+) -> tuple[float | None, float]:
     """(rpe, score) of ``s`` at ``reps`` with the sheet formula, unchanged. s.kg is already the
-    effective kg (bodyweight included), so no bodyweight is added again. A typed wrapper around
-    the untyped legacy module, as domain.planned_load does."""
+    effective kg (bodyweight included), so no bodyweight is added again. ``e1rm_kg``: the 1RM a
+    %1RM RPE estimate divides by (default: the tab's, s.e1rm). A typed wrapper around the
+    untyped legacy module, as domain.planned_load does."""
     # RPE as in the parser (strength_sheet.pick_rpe): logged, else prescribed (an unreadable
     # cell such as "RPE 7,8" is RPE unknown), else the %1RM estimate on a cell without an RPE.
     load = decimal_dots(s.prescribed)
-    e1rm = {s.type: s.e1rm} if s.e1rm is not None else {}
+    one_rm = s.e1rm if e1rm_kg is None else e1rm_kg
+    e1rm = {s.type: one_rm} if one_rm is not None else {}
     result: object = set_score(s.type, s.name, reps, s.kg, load, None, factor, e1rm, s.logged_rpe)  # type: ignore[no-untyped-call]  # untyped legacy module
     assert isinstance(result, tuple)
     rpe = result[1]
@@ -189,3 +194,47 @@ def exercise_feel(logged: Iterable[LoggedSet], offsets: Mapping[int, float | Non
             tail = f" – forslaget følger {COACH_RPE}"  # noqa: RUF001  # Danish dash
         out.append(Feel(exercise_id, rated, lighter, expected, harder, f"{head}{tail}."))
     return out
+
+
+ROLLING_E1RM_WEEKS: Final = 4
+_MAIN_LIFTS: Final = ("SQUAT", "BENCH", "DEADLIFT")
+
+
+def rolling_e1rm_at(weeks: Iterable[StrengthWeek], lift: str, week_start: date) -> float | None:
+    """The app's rolling e1RM as /analyse shows it: the best weekly e1RM of ``lift`` in the
+    ROLLING_E1RM_WEEKS ISO weeks ending with ``week_start``; None when there is none."""
+    first = week_start - timedelta(weeks=ROLLING_E1RM_WEEKS - 1)
+    values = [
+        w.e1rm_kg
+        for w in weeks
+        if w.lift == lift and w.e1rm_kg is not None and first <= w.week_start <= week_start
+    ]
+    return max(values, default=None)
+
+
+def with_rolling_e1rm_rpe(
+    sets: Sequence[StrengthSet], weeks: Sequence[StrengthWeek]
+) -> tuple[list[StrengthSet], int]:
+    """Main-lift sets whose cell prescribes no RPE (e.g. "-10%", "75%") and with no logged RPE
+    get their %1RM RPE estimate from the app's rolling e1RM (user, 2026-10-13) instead of the
+    tab's untested 1RM, which the parser used; the tab's stays only where no rolling e1RM
+    exists. Scored again with the sheet formula, unchanged. Returns the sets and how many."""
+    out: list[StrengthSet] = []
+    changed = 0
+    for s in sets:
+        estimated = (
+            s.type in _MAIN_LIFTS
+            and "tempo" not in s.name.lower()
+            and s.logged_rpe is None
+            and (s.prescribed is None or "RPE" not in s.prescribed)
+            and s.kg > 0
+            and s.muscle_factor is not None
+        )
+        one_rm = rolling_e1rm_at(weeks, s.type, s.week_start) if estimated else None
+        if one_rm is None or s.muscle_factor is None:
+            out.append(s)
+            continue
+        rpe, score = rescore(s, s.reps, s.muscle_factor, one_rm)
+        out.append(replace(s, rpe=rpe, score=round(score, 1)))
+        changed += 1
+    return out, changed
