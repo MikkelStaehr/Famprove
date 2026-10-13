@@ -75,3 +75,4 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | fokus-felt-rpe | Felt RPE and reps done after each set; Python uses them for e1RM, set score and suggestion adjustments; Styrke feel line | L |
 | fokus-pause-content | Pause screen content: recommended rest, coach notes, last week on the next-set card, elapsed and remaining time | M |
 | score-rpe | Set score RPE: logged, then prescribed, then %1RM only without an RPE cell (bug: backoff 428 vs top set 162) | S |
+| score-final | Persist compute's final set score (strength_sets.score_final) so the week view shows what feeds daily_load | S |
