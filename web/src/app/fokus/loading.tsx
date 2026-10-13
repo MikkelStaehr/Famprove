@@ -8,7 +8,7 @@ import Link from "next/link";
  */
 export default function Loading() {
   return (
-    <div className="flex flex-col">
+    <div className="mx-auto flex w-full max-w-phone flex-col">
       <h1 className="sr-only">Fokus</h1>
       <p className="sr-only" role="status">
         Henter sættet …

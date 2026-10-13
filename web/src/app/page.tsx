@@ -72,8 +72,9 @@ export default async function TrainingPage() {
   const [form, plan] = await Promise.all([loadFormState(today, now), loadPlanState(today)]);
   const header = form.kind === "ready" ? form.header : null;
   const session = plan.kind === "ready" && plan.plan.strength.state === "next" ? plan.plan.strength.next : null;
+  // Phone-first screen: one column at every width, max-w-phone and left-aligned from lg (DESIGN.md Part A).
   const page = (
-    <>
+    <div className="flex w-full max-w-phone flex-col gap-4">
       <header className="flex flex-col">
         <h1 className="flex flex-wrap items-baseline gap-x-3">
           <span className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">Træning</span>
@@ -101,7 +102,7 @@ export default async function TrainingPage() {
         {session !== null && <SessionBlock />}
       </header>
       {plan.kind === "error" ? <PlanError error={plan.error} at={plan.at} /> : <DayCards plan={plan.plan} />}
-    </>
+    </div>
   );
   return session === null ? (
     page

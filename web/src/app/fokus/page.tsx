@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import type { ReactNode } from "react";
 
 import { FokusError, NoSessionNote } from "@/components/fokus/FokusNotes";
 import { FokusScreen } from "@/components/fokus/FokusScreen";
@@ -56,31 +57,50 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
   const now = new Date();
   const today = resolveToday(now, process.env);
   const [stale, state, params] = await Promise.all([staleNote(today, now), planState(today), searchParams]);
-  if (state.kind === "error") return <FokusError error={state.error} at={state.at} />;
+  if (state.kind === "error") {
+    return (
+      <FokusColumn>
+        <FokusError error={state.error} at={state.at} />
+      </FokusColumn>
+    );
+  }
   const { strength } = state.plan;
   const devSwitches = devSwitchesOn();
   if (strength.state !== "next" || strength.next === null) {
     return (
-      <NoSessionNote
-        sentence={noSessionSentence(strength.state === "next" ? "all_done" : strength.state, strength.planned)}
-        devSwitches={devSwitches}
-      />
+      <FokusColumn>
+        <NoSessionNote
+          sentence={noSessionSentence(strength.state === "next" ? "all_done" : strength.state, strength.planned)}
+          devSwitches={devSwitches}
+        />
+      </FokusColumn>
     );
   }
   const next = strength.next;
   return (
-    <FokusScreen
-      session={{
-        session: next.session,
-        week: next.week,
-        exercises: next.exercises,
-        order: next.order,
-        log: next.log,
-      }}
-      date={today}
-      staleNote={stale}
-      devSwitches={devSwitches}
-      enteredFromTraening={params.view === "set"}
-    />
+    <FokusColumn>
+      <FokusScreen
+        session={{
+          session: next.session,
+          week: next.week,
+          exercises: next.exercises,
+          order: next.order,
+          log: next.log,
+        }}
+        date={today}
+        staleNote={stale}
+        devSwitches={devSwitches}
+        enteredFromTraening={params.view === "set"}
+      />
+    </FokusColumn>
   );
+}
+
+/**
+ * Phone-first screen (DESIGN.md Part A): one max-w-phone column at every width, centred from lg
+ * (no nav, no edge to hang from). main's top padding puts the top bar 12px (or the safe-area
+ * inset) from the top.
+ */
+function FokusColumn({ children }: { readonly children: ReactNode }) {
+  return <div className="mx-auto flex w-full max-w-phone flex-col">{children}</div>;
 }

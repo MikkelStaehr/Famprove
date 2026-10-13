@@ -12,7 +12,7 @@ const LINES = 2;
  */
 export default function Loading() {
   return (
-    <>
+    <div className="flex w-full max-w-phone flex-col gap-4">
       <header className="flex flex-col">
         <h1 className="flex items-baseline gap-x-3">
           <span className="font-display text-44 font-extrabold tracking-[-0.01em] uppercase italic">Træning</span>
@@ -62,6 +62,6 @@ export default function Loading() {
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }

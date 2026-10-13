@@ -13,6 +13,8 @@ type CardProps = {
   readonly variant: "session" | "calm";
   /** Heading level; 3 under a section h2 (/analyse "Cykel"). Default 2. */
   readonly level?: 2 | 3;
+  /** Extra classes on the section, e.g. desktop grid placement (`lg:col-span-8`). */
+  readonly className?: string;
   readonly children: ReactNode;
 };
 
@@ -21,11 +23,17 @@ const TITLE = {
   calm: "text-20 font-bold",
 } as const;
 
-/** DESIGN.md Card. Part B: --surface, light --shadow-card (dark: tone only), no border, 24/16 padding. */
-export function Card({ id, title, action, variant, level = 2, children }: CardProps) {
+/**
+ * DESIGN.md Card. Part B: --surface, light --shadow-card (dark: tone only), no border, 24/16
+ * padding; 24px on all sides from lg (Part A "Spacing and type on desktop").
+ */
+export function Card({ id, title, action, variant, level = 2, className, children }: CardProps) {
   const Heading = level === 3 ? "h3" : "h2";
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-3 rounded-card bg-surface px-4 pt-6 pb-4 shadow-card">
+    <section
+      aria-labelledby={id}
+      className={`flex flex-col gap-3 rounded-card bg-surface px-4 pt-6 pb-4 shadow-card lg:px-6 lg:pb-6${className === undefined ? "" : ` ${className}`}`}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <Heading id={id} className={TITLE[variant]}>
           {title}

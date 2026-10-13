@@ -62,7 +62,18 @@ export default async function Page() {
             />
           </div>
         )}
-        {state.kind === "ready" && <Hero view={state} />}
+        {state.kind === "ready" && (
+          // §11: header row above, full width; from lg a 12-column grid, rail = hero (sticky), main = the cards,
+          // one width so the seams line up. DOM order stays the phone order.
+          <div className="flex flex-col gap-4 lg:mt-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
+            <div className="lg:sticky lg:top-6 lg:col-span-4">
+              <Hero view={state} />
+            </div>
+            <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6">
+              <Cards view={state} />
+            </div>
+          </div>
+        )}
       </div>
       {state.kind === "error" && (
         <ErrorState
@@ -79,7 +90,6 @@ export default async function Page() {
       {state.kind === "empty" && (
         <EmptyState message="Der er ingen cykelture siden 1. jan. 2025 endnu. Det daglige job henter dem omkring kl. 05.00." />
       )}
-      {state.kind === "ready" && <Cards view={state} />}
     </>
   );
 }
@@ -87,7 +97,7 @@ export default async function Page() {
 function Hero({ view }: { readonly view: Ready }) {
   const { hero } = view;
   return (
-    <div className="mt-3">
+    <div className="mt-3 lg:mt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <p className="text-14 font-bold tracking-[0.04em] uppercase">
           Estimeret FTP
@@ -320,7 +330,7 @@ function Excluded({ view }: { readonly view: Ready }) {
   return (
     <section
       aria-label="Udeladte ture"
-      className="rounded-card bg-surface px-4 py-2 shadow-card"
+      className="rounded-card bg-surface px-4 py-2 shadow-card lg:px-6"
     >
       <details className="group">
         <summary className="flex min-h-11 w-full cursor-pointer list-none items-center justify-between gap-2 rounded-control text-16 font-semibold text-text focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus">
@@ -342,10 +352,10 @@ function Excluded({ view }: { readonly view: Ready }) {
           <p className="text-14 text-text-muted">
             De tæller stadig med i timer og belastning.
           </p>
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-3 lg:hidden">
             {view.excluded.items.map((it) => (
               <li key={it.key}>
-                <p className="text-16 font-semibold">{it.title}</p>
+                <p className="text-16 font-semibold">{`${it.date} · ${it.reason}`}</p>
                 {it.explanation !== null && (
                   <p className="text-14 text-text">{it.explanation}</p>
                 )}
@@ -357,6 +367,28 @@ function Excluded({ view }: { readonly view: Ready }) {
               </li>
             ))}
           </ul>
+          {/* §11: from lg the same rows as a real table; a dropped fact stays dropped. */}
+          <table className="hidden w-full text-left text-14 lg:table">
+            <caption className="sr-only">Udeladte ture</caption>
+            <thead>
+              <tr className="border-b border-border">
+                <th scope="col" className="py-2 pr-4 font-bold whitespace-nowrap">Dato</th>
+                <th scope="col" className="py-2 pr-4 font-bold">Årsag</th>
+                <th scope="col" className="py-2 pr-4 font-bold">Forklaring</th>
+                <th scope="col" className="py-2 font-bold">Fakta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {view.excluded.items.map((it) => (
+                <tr key={it.key} className="border-b border-border last:border-b-0 align-top">
+                  <th scope="row" className="py-2 pr-4 font-semibold whitespace-nowrap">{it.date}</th>
+                  <td className="py-2 pr-4 whitespace-nowrap">{it.reason}</td>
+                  <td className="py-2 pr-4">{it.explanation}</td>
+                  <td className="py-2 whitespace-nowrap text-text-muted tabular-nums">{it.facts}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </details>
     </section>

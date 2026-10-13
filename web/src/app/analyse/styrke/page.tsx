@@ -50,7 +50,18 @@ export default async function Page() {
             />
           </div>
         )}
-        {state.kind === "ready" && <Board view={state} />}
+        {state.kind === "ready" && (
+          // §11: header row above, full width; from lg a 12-column grid, rail = the board (sticky), main = the cards,
+          // one width so the block ruler and week columns align. DOM order stays the phone order.
+          <div className="flex flex-col gap-4 lg:mt-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
+            <div className="lg:sticky lg:top-6 lg:col-span-4">
+              <Board view={state} />
+            </div>
+            <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6">
+              <Cards view={state} />
+            </div>
+          </div>
+        )}
       </div>
       {state.kind === "error" && (
         <ErrorState
@@ -64,7 +75,6 @@ export default async function Page() {
       {state.kind === "empty" && (
         <EmptyState message="Der er ingen styrkeuger endnu. Det daglige job læser arket omkring kl. 05.00." />
       )}
-      {state.kind === "ready" && <Cards view={state} />}
     </>
   );
 }
@@ -73,7 +83,7 @@ export default async function Page() {
 function Board({ view }: { readonly view: Ready }) {
   const { board } = view;
   return (
-    <section aria-label="Bedste e1RM" className="mt-3">
+    <section aria-label="Bedste e1RM" className="mt-3 lg:mt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <p className="text-14 font-bold tracking-[0.04em] uppercase">{board.label}</p>
         {board.phase !== null && <p className="text-14 font-semibold text-text">{board.phase}</p>}

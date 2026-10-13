@@ -156,7 +156,14 @@ export type WeekBar = {
 export type Seam = { readonly x0: number; readonly x1: number };
 export type AxisTick = { readonly x: number; readonly label: string };
 
-export type ExcludedItem = { readonly key: string; readonly title: string; readonly explanation: string | null; readonly facts: string };
+/** One excluded ride; the phone list joins `date · reason`, the desktop table puts each in its own cell. */
+export type ExcludedItem = {
+  readonly key: string;
+  readonly date: string; // "lør. 20. sep. 2025"
+  readonly reason: string; // the short Danish reason, "Udeladt" for an unknown code
+  readonly explanation: string | null;
+  readonly facts: string; // "" when every fact is null (dropped, never "0")
+};
 
 export type AnalyseView =
   | { readonly kind: "empty" }
@@ -550,7 +557,8 @@ export function buildAnalyseView(data: CyclingAnalysisData, now: Date, today: Is
             summary: `${rides(excludedRows.length)} udeladt fra trends`,
             items: [...excludedRows].reverse().map((r) => ({
               key: r.activityId,
-              title: `${dayText(r.date, year)} · ${exclusionText(r.exclusion).short}`,
+              date: dayText(r.date, year),
+              reason: exclusionText(r.exclusion).short,
               explanation: exclusionText(r.exclusion).explanation,
               facts: exclusionFacts(r),
             })),

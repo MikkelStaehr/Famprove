@@ -26,7 +26,9 @@
   --block-fill: #efeee9;
   --chart-mark: #807e78;
   --prognose-band: rgb(18 18 18 / 0.16); /* CTL band after the block (load.md §10a) */
-  --chart-height: 224px; /* 240px from 640px, below (load.md §9a fold fix) */
+  --chart-height: 224px; /* 240px from 640px, 320px from lg, below (load.md §9a fold fix, §11a) */
+  /* Phone bottom bar (ScreenNav): 8 + 44 + 8 + 8px (pill + padding) + the home-indicator inset. */
+  --bottom-bar: calc(4.25rem + env(safe-area-inset-bottom));
 
   --zone-risk: #f0b9aa;
   --zone-optimal: #c3e0b0;
@@ -76,6 +78,20 @@
 @media (min-width: 640px) {
   :root {
     --chart-height: 240px;
+  }
+}
+
+/* Desktop (lg): the chart gets the main column's height (load.md §11a). */
+@media (min-width: 1024px) {
+  :root {
+    --chart-height: 320px;
+  }
+}
+
+/* Below lg the nav is a fixed bottom bar: a focused element is never hidden under it (WCAG 2.4.11). */
+@media (max-width: 1023.98px) {
+  html {
+    scroll-padding-bottom: var(--bottom-bar);
   }
 }
 
@@ -143,6 +159,10 @@
   --shadow-card: var(--card-shadow);
 
   --container-content: 720px;
+  /* DESIGN.md Part A "Layout: phone and desktop": the lg frame (1200px content + 32px gutters), and
+     the phone-first screens' column on desktop. */
+  --container-wide: 79rem;
+  --container-phone: 35rem;
 }
 
 body {

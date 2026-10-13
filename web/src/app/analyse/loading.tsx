@@ -4,7 +4,7 @@ import { SkeletonBar as Bar } from "@/components/Skeleton";
 
 const BLOCK = "w-full rounded-control bg-track motion-safe:animate-pulse";
 
-/** Skeleton in the shape of page.tsx (analyse.md §8): real headings, hero, three chart cards, disclosure. */
+/** Skeleton in the shape of page.tsx (analyse.md §8, §11): real headings, hero in the rail, three chart cards and the disclosure in the main column. */
 export default function Loading() {
   return (
     <>
@@ -14,28 +14,34 @@ export default function Loading() {
         <div aria-hidden="true" className="mt-2">
           <Bar className="w-1/3 text-14" />
         </div>
-        <div className="mt-3">
-          <p className="text-14 font-bold tracking-[0.04em] uppercase">Estimeret FTP</p>
-          <div aria-hidden="true">
-            <span className="mt-2 block h-14 w-1/3 rounded-mark bg-track motion-safe:animate-pulse" />
-            <Bar className="mt-3 w-3/4 text-16" />
-            <Bar className="mt-1 w-2/3 text-14" />
+        <div className="flex flex-col gap-4 lg:mt-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
+          <div className="lg:sticky lg:top-6 lg:col-span-4">
+            <div className="mt-3 lg:mt-0">
+              <p className="text-14 font-bold tracking-[0.04em] uppercase">Estimeret FTP</p>
+              <div aria-hidden="true">
+                <span className="mt-2 block h-14 w-1/3 rounded-mark bg-track motion-safe:animate-pulse" />
+                <Bar className="mt-3 w-3/4 text-16" />
+                <Bar className="mt-1 w-2/3 text-14" />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6">
+            <Card id="eftp" variant="calm" level={3} title="eFTP pr. tur">
+              <div aria-hidden="true" className={`h-(--chart-height) ${BLOCK}`} />
+            </Card>
+            <Card id="ef" variant="calm" level={3} title="Effektivitet på rolige ture">
+              <div aria-hidden="true" className={`h-(--chart-height) ${BLOCK}`} />
+            </Card>
+            <Card id="weeks" variant="calm" level={3} title="Timer og belastning pr. uge">
+              <div aria-hidden="true" className={`h-[232px] ${BLOCK}`} />
+            </Card>
+            <div aria-hidden="true" className={`h-11 ${BLOCK}`} />
           </div>
         </div>
       </div>
       <p className="sr-only" role="status">
         Henter cykeldata…
       </p>
-      <Card id="eftp" variant="calm" level={3} title="eFTP pr. tur">
-        <div aria-hidden="true" className={`h-(--chart-height) ${BLOCK}`} />
-      </Card>
-      <Card id="ef" variant="calm" level={3} title="Effektivitet på rolige ture">
-        <div aria-hidden="true" className={`h-(--chart-height) ${BLOCK}`} />
-      </Card>
-      <Card id="weeks" variant="calm" level={3} title="Timer og belastning pr. uge">
-        <div aria-hidden="true" className={`h-[232px] ${BLOCK}`} />
-      </Card>
-      <div aria-hidden="true" className={`h-11 ${BLOCK}`} />
     </>
   );
 }

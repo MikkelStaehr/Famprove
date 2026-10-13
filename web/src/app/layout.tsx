@@ -6,13 +6,15 @@ import { ScreenNav } from "@/components/ScreenNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Training load",
-  description: "Daily fitness, fatigue and form from cycling and strength training.",
+  title: "Træning",
+  description: "Daglig fitness, træthed og form fra cykling og styrke.",
   robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
   colorScheme: "light dark",
+  // Safe areas are handled in CSS (env(safe-area-inset-*)): the bottom bar and the top padding.
+  viewportFit: "cover",
 };
 
 // Self-hosted: next/font downloads the files at build time; the browser never calls Google.
@@ -31,16 +33,17 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 /**
- * The nav sits outside the pages, so it also shows while a page loads or fails. Not sticky, and
- * absent on /fokus (ScreenNav renders nothing there). Its header ends with 4px, so the page's
- * title is 16px under the nav and Fokus's top bar 12px from the top.
+ * The nav sits outside the pages, so it also shows while a page loads or fails; absent on /fokus
+ * (ScreenNav renders nothing there). DESIGN.md Part A "Layout: phone and desktop": below lg it is
+ * a fixed bottom bar, so main starts 12px (or the safe-area inset) from the top and ends with the
+ * bar's height + 48px; from lg it is a static top bar and main is the 1200px frame.
  */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="da" className={`${barlow.variable} ${barlowCondensed.variable}`}>
       <body className="bg-bg font-sans text-16 text-text antialiased">
         <ScreenNav />
-        <main className="mx-auto flex w-full max-w-content flex-col gap-4 px-3 pt-3 pb-12">{children}</main>
+        <main className="mx-auto flex w-full max-w-content flex-col gap-4 px-3 pt-[max(12px,env(safe-area-inset-top))] pb-[calc(var(--bottom-bar)+3rem)] lg:max-w-wide lg:gap-6 lg:px-8 lg:pb-12">{children}</main>
       </body>
     </html>
   );

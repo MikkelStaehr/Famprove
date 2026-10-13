@@ -153,7 +153,8 @@ test("page view: summary counts, sr sentences, freshness from the older table", 
   if (view.kind !== "ready") return;
   assert.equal(view.freshness.kind, "stale");
   assert.equal(view.excluded?.summary, "1 tur udeladt fra trends");
-  assert.equal(view.excluded?.items[0].title, "lør. 20. sep. 2025 · For kort");
+  assert.equal(view.excluded?.items[0].date, "lør. 20. sep. 2025");
+  assert.equal(view.excluded?.items[0].reason, "For kort");
   assert.equal(view.noWattNote, "1 tur uden watt er ikke med her, men tæller i timer og belastning.");
   assert.equal(view.eftp?.segments, 2);
   assert.equal(
@@ -244,4 +245,26 @@ test("contract: the web's EF-ride count equals Python's ef_window on Python's ro
     assert.equal(shownEfTrend(p, points), typeof n === "number" && n >= EF_TREND_MIN_RIDES ? p.efTrend : null);
   }
   assert.ok(rows.some((r) => !isEfRow(r)), "non-EF rows are in the fixture and never counted");
+});
+
+test("excluded items: date and reason in their own fields, newest first, a null fact dropped (never 0)", () => {
+  const rides = [
+    ride("2025-09-20", { exclusion: "too_short", movingS: 240, distanceM: 800 }),
+    ride("2026-02-03", { exclusion: "power_outlier", npW: null, movingS: null }),
+    ride("2026-09-15", { eftpOk: true, rollingFtpW: 184 }),
+    ride("2026-09-16", { exclusion: "no_raw", movingS: null, distanceM: null }),
+  ];
+  const view = buildAnalyseView({ rides, weeks: [week("2026-09-28", 0)] }, new Date(AT), "2026-10-01");
+  assert.equal(view.kind, "ready");
+  if (view.kind !== "ready") return;
+  const items = view.excluded?.items ?? [];
+  assert.deepEqual(
+    items.map((it) => [it.date, it.reason, it.facts]),
+    [
+      ["ons. 16. sep.", "Ikke hentet endnu", ""],
+      ["tirs. 3. feb.", "Usandsynlige watt", ""],
+      ["lør. 20. sep. 2025", "For kort", "4 min · 0,8 km"],
+    ],
+  );
+  assert.equal(items[1].explanation, "Watt-målingen ser forkert ud. Ikke med i eFTP og EF.");
 });

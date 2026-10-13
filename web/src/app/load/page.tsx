@@ -21,6 +21,7 @@ import {
 } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { loadAppNotices, loadDashboardData, loadWeekDetail } from "@/lib/db/queries";
+import { LOAD_GRID, LOAD_PLACE, noticeText } from "@/lib/load-grid";
 import {
   formatDate,
   formatDay,
@@ -108,16 +109,29 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
         {/* Python's notices (app_notices), e.g. the FTP sanity check: one line each. */}
         {notices.map((n) => (
           <div key={n.kind} className="mt-2">
-            <WarningLine>{n.message}</WarningLine>
+            <WarningLine>{noticeText(n.kind, n.message)}</WarningLine>
           </div>
         ))}
-        {state.kind === "ready" && <Hero view={state} />}
       </header>
-      {state.kind === "error" && <LoadError error={state.error} at={state.at} />}
-      {state.kind === "empty" && (
-        <EmptyState message="Der er ikke beregnet nogen træningsbelastning endnu. Det daglige job udfylder den omkring kl. 05.00." />
+      {/* States replace the whole grid, full width under the header row, text capped at 60ch. */}
+      {state.kind === "error" && (
+        <div className="max-w-[60ch]">
+          <LoadError error={state.error} at={state.at} />
+        </div>
       )}
-      {state.kind === "ready" && <Dashboard view={state} />}
+      {state.kind === "empty" && (
+        <div className="max-w-[60ch]">
+          <EmptyState message="Der er ikke beregnet nogen træningsbelastning endnu. Det daglige job udfylder den omkring kl. 05.00." />
+        </div>
+      )}
+      {state.kind === "ready" && (
+        // load.md §11a: phone order hero → chart → week; from lg hero and week in the rail (cols 1–4),
+        // the chart in the main column (cols 5–12, rows 1–2). Grid placement only; DOM order stays.
+        <div className={LOAD_GRID}>
+          <Hero view={state} />
+          <Dashboard view={state} />
+        </div>
+      )}
     </>
   );
 }
@@ -130,7 +144,7 @@ function Hero({ view }: { readonly view: ReadyView }) {
   const { hero } = view;
   const delta = fitnessDelta(hero.ctlRamp7d);
   return (
-    <div className="mt-3">
+    <div className={LOAD_PLACE.hero}>
       <ZoneBar
         header={{ date: hero.date, tsb: hero.tsb, zone: hero.zone, freshness: view.freshness }}
         today={resolveToday(new Date(), process.env)}
@@ -143,10 +157,6 @@ function Hero({ view }: { readonly view: ReadyView }) {
       </p>
       <p className="mt-1 text-14 text-text-muted tabular-nums">
         Fitness (CTL) {formatLoad(hero.ctl)} − træthed (ATL) {formatLoad(hero.atl)}
-      </p>
-      {/* User, 2026-10-02: STRENGTH_K = 0.035 is an anchor (~60 TSS per heavy session), not a calibration. */}
-      <p className="mt-1 text-14 text-text-muted">
-        {STRENGTH_ESTIMATE_NOTE} {COARSE_ZONES_NOTE}
       </p>
     </div>
   );
@@ -176,7 +186,7 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
   const { week } = view;
   return (
     <>
-      <Card id="trend" variant="calm" title={CHART_TITLE}>
+      <Card id="trend" variant="calm" title={CHART_TITLE} className={LOAD_PLACE.chart}>
         <figure className="flex flex-col gap-2">
           <TrendChart
             points={view.chart}
@@ -192,6 +202,11 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
         {view.projection === "ready" && view.typicalRides !== null && (
           <p className="mt-2 max-w-[60ch] text-14 text-text-muted">{typicalRidesNote(view.typicalRides)}</p>
         )}
+        {/* User, 2026-10-02: STRENGTH_K = 0.035 is an anchor (~60 TSS per heavy session), not a
+            calibration. In the chart card's foot since load.md §11b (phone fold with the bottom bar). */}
+        <p className="max-w-[60ch] text-14 text-text-muted">
+          {STRENGTH_ESTIMATE_NOTE} {COARSE_ZONES_NOTE}
+        </p>
       </Card>
 
       <Card
@@ -199,6 +214,7 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
         variant="calm"
         title={weekTitle(week)}
         action={week !== null && !week.isLatest ? <LatestWeekLink /> : undefined}
+        className={LOAD_PLACE.week}
       >
         {week === null ? (
           <EmptyState message="Ingen ugetotal for denne uge endnu." />

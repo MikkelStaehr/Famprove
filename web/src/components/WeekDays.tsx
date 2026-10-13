@@ -193,7 +193,8 @@ function Cycling({ date, tss, rides }: CyclingProps) {
  */
 function DataWarning({ warning }: { readonly warning: string }) {
   return (
-    <details className="text-14">
+    // Named group: this <details> sits inside a day row's (also a group), which is always open here.
+    <details className="group/data text-14">
       <summary
         title={warning}
         className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 font-semibold text-warning"
@@ -202,8 +203,21 @@ function DataWarning({ warning }: { readonly warning: string }) {
           <path d="M6 1 11 11H1Z" />
         </svg>
         Tjek effektdata
+        {/* The day rows' 16px chevron, pointing down; it flips without transition when open. */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className="size-4 shrink-0 text-text-muted group-open/data:rotate-180"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m3 6 5 5 5-5" />
+        </svg>
       </summary>
-      <p className="text-text-muted">{warning}</p>
+      <p className="mt-1 max-w-[60ch] text-text-muted">{warning}</p>
     </details>
   );
 }

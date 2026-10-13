@@ -50,7 +50,7 @@ type TrendChartProps = {
   readonly projection: Projection;
   /** Accessible name of the SVG; the page renders the text alternative (figcaption). */
   readonly title: string;
-  /** Rendered under the legend, above the plot, whenever the legend is (load.md §8b). */
+  /** Rendered under the plot's x labels, before the notes, whenever the legend is (load.md §8b, §11b). */
   readonly explainer?: ReactNode;
 };
 
@@ -129,7 +129,6 @@ export function TrendChart(props: TrendChartProps) {
   return (
     <div className="flex flex-col gap-2">
       <Legend />
-      {props.explainer !== undefined && <div className="mb-1">{props.explainer}</div>}
       <p className="text-12 font-medium text-text-muted" aria-hidden="true">
         {TSS_PER_DAY}
       </p>
@@ -142,6 +141,8 @@ export function TrendChart(props: TrendChartProps) {
           title={props.title}
         />
       </ChartBoundary>
+      {/* "Hvad betyder det?" under the x labels, before the notes (load.md §11b). */}
+      {props.explainer}
       {!hasPrognose && props.projection === "error" && (
         <WarningLine>
           Prognosen kunne ikke hentes, så grafen viser kun målte dage. Genindlæs siden for at prøve igen.
@@ -238,7 +239,7 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
                 x2={x2}
                 fill="var(--block-fill)"
                 fillOpacity={1}
-                label={{ value: `B${b.blockNo}`, position: "top", ...TICK }}
+                label={{ value: wide ? `Blok ${b.blockNo}` : `B${b.blockNo}`, position: "top", ...TICK }}
               />
             );
           })}
