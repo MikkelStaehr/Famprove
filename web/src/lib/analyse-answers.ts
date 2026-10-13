@@ -95,11 +95,17 @@ function numberOf(row: AnalysisSummaryRow): { readonly number: string; readonly 
     return { number, sr: number, caption };
   }
   if (row.question === "ef") {
-    if (row.state === "needs_data" || value === null) {
+    if (value === null) {
       const number = `${row.haveN ?? "–"} af ${row.needN ?? "–"}`;
       return { number, sr: number, caption: "rolige ture med puls og watt de sidste 28 dage" };
     }
-    const caption = compare === null ? "EF på rolige ture" : `EF på rolige ture · for 6 uger siden ${formatEf(compare)}`;
+    // needs_data with a value keeps the number (like block 1's "eFTP nu"); no arrow (answerBlock).
+    const caption =
+      row.state === "needs_data"
+        ? "EF på rolige ture nu"
+        : compare === null
+          ? "EF på rolige ture"
+          : `EF på rolige ture · for 6 uger siden ${formatEf(compare)}`;
     return { number: formatEf(value), sr: formatEf(value), caption };
   }
   // volume: value and target are never null (parser); 0 is a real zero.

@@ -91,6 +91,14 @@ test("eFTP needs_data: the number kept with caption eFTP nu; none at all is – 
   assert.equal(none.figure.sr, "ikke registreret");
 });
 
+test("EF needs_data with a value: the number kept with caption EF på rolige ture nu, no arrow", () => {
+  const now = block(edge("ef_now_only"));
+  assert.equal(now.figure.number, "1,20");
+  assert.equal(now.figure.caption, "EF på rolige ture nu");
+  assert.equal(now.figure.arrow, null);
+  assert.equal(now.figure.sr, "1,20");
+});
+
 test("a missing row says so; a failed read is an error in place of the blocks", () => {
   const view = buildAnswers(live.filter((r) => r.question !== "volume"), null, 2026);
   assert.ok(view.kind === "ready");
