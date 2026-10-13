@@ -158,7 +158,7 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     analysis = strength_weeks(sets, statuses, blocks, today=today)
     sync_strength_weeks(db, analysis.weeks, computed_at=computed_at)
     # Træning: suggested kg per set of this week and later, from the rolling e1RM just computed.
-    suggestions = planned_sets(sets, Catalog(all_exercises(db)), analysis.weeks, today=today)
+    suggestions = planned_sets(sets, Catalog(all_exercises(db)), statuses, today=today)
     sync_planned_sets(db, suggestions, computed_at=computed_at)
     log.info(
         "planned_sets: %d sets from this week on, %d with a suggested kg (%s)",

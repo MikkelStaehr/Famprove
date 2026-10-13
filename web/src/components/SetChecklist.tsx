@@ -2,6 +2,7 @@
 
 import type { SetState } from "@/lib/set-taps";
 import {
+  CAPPED_WORD,
   lastWeekText,
   repsText,
   type SetGroupView,
@@ -123,6 +124,7 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
           <span>
             <span className={`font-normal ${label}`}>Forslag</span>{" "}
             <span className="font-bold whitespace-nowrap">{suggestion.kg}</span>
+            {suggestion.capped && <span className={`font-normal ${label}`}> {CAPPED_WORD}</span>}
           </span>
         ) : (
           <span className={label}>{suggestion.words}</span>

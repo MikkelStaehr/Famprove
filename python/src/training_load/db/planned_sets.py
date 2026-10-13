@@ -28,6 +28,7 @@ class PlannedSetRow(TypedDict):
     pct: float | None
     suggested_kg: float | None  # null: no suggestion (basis says why), never 0
     basis: Basis
+    uncapped_kg: float | None  # the suggestion before the weekly cap; null: the cap didn't apply
     computed_at: str  # ISO timestamptz (UTC), the same on every row of one compute run
 
 
@@ -48,6 +49,7 @@ def to_row(p: PlannedSet, computed_at: datetime) -> PlannedSetRow:
         pct=p.pct,
         suggested_kg=p.suggested_kg,
         basis=p.basis,
+        uncapped_kg=p.uncapped_kg,
         computed_at=computed_at.isoformat(),
     )
 

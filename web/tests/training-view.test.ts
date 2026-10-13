@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { isoWeekNumber, isoWeekStart } from "../src/lib/dates.ts";
 import type { TrainingPlanData } from "../src/lib/db/queries.ts";
 import {
+  parsePlannedSetRow,
   parsePlannedTargetRow,
   parsePrescribedSetRow,
   parseStrengthSessionRow,
@@ -196,8 +198,8 @@ test("next session: each row lists its sets, Python's suggestion, and today's lo
         set({ session: 1, sheetRow: 27, setNo: 1, prescribed: "-10%" }),
       ],
       plannedSets: [
-        { block: BLOK, sheetRow: 25, week: 1, setNo: 1, suggestedKg: 142.5, basis: "rpe_e1rm" },
-        { block: BLOK, sheetRow: 27, week: 1, setNo: 1, suggestedKg: null, basis: "not_rpe" },
+        { block: BLOK, sheetRow: 25, week: 1, setNo: 1, suggestedKg: 142.5, basis: "rpe_e1rm", uncappedKg: null },
+        { block: BLOK, sheetRow: 27, week: 1, setNo: 1, suggestedKg: null, basis: "not_rpe", uncappedKg: null },
       ],
       setLog: [
         { date: "2026-09-28", session: 1, row: 25, set: 1, startedAt: "2026-09-28T16:00:00Z", endedAt: "2026-09-28T16:03:00Z", skipped: false, updatedAt: "2026-09-28T16:03:00Z" },
@@ -360,4 +362,18 @@ test("parsers for the Træning rows", () => {
       }),
     RowError,
   );
+});
+
+test("contract: the planned_sets rows Python writes parse; a capped row keeps its uncapped kg", () => {
+  const rows: Record<string, unknown> = JSON.parse(
+    readFileSync(new URL("./fixtures/planned_sets.json", import.meta.url), "utf8"),
+  );
+  const parsed = Object.fromEntries(Object.entries(rows).map(([k, v]) => [k, parsePlannedSetRow(v)]));
+  assert.deepEqual(
+    [parsed.suggestion?.suggestedKg, parsed.suggestion?.uncappedKg, parsed.capped?.suggestedKg, parsed.capped?.uncappedKg],
+    [82.5, null, 75, 72.5],
+  );
+  assert.equal(parsed.none?.basis, "not_rpe");
+  assert.throws(() => parsePlannedSetRow({ ...(rows.suggestion as object), uncapped_kg: 82.5 }), RowError); // same as suggested
+  assert.throws(() => parsePlannedSetRow({ ...(rows.none as object), uncapped_kg: 72.5 }), RowError); // no suggestion
 });

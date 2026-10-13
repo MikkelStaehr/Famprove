@@ -80,6 +80,8 @@ export type ExerciseView = {
   /** Python's suggested kg for this row's sets (planned_sets; all sets of a row share it). */
   readonly suggestedKg: number | null;
   readonly suggestionBasis: SuggestionBasis | null; // null: no planned_sets row (yet)
+  /** The weekly cap changed Python's suggestion (planned_sets.uncapped_kg set): "(begrænset)". */
+  readonly suggestionCapped: boolean;
   readonly sets: readonly SetRef[]; // this row's sets, 1..n (each has its own tick)
 };
 
@@ -207,6 +209,7 @@ function exercisesOf(
         row: s.sheetRow,
         suggestedKg: suggestion?.suggestedKg ?? null,
         suggestionBasis: suggestion?.basis ?? null,
+        suggestionCapped: suggestion !== undefined && suggestion.uncappedKg !== null,
         sets: [],
       });
     }
@@ -338,11 +341,21 @@ const NO_SUGGESTION: Readonly<Record<Exclude<SuggestionBasis, "rpe_e1rm">, strin
   no_lift: "Intet forslag til denne øvelse",
 };
 
-/** Python's suggested kg ("142,5 kg"), or the words for its absence. "0 kg" never shows. */
-export type SuggestionView = { readonly kg: string } | { readonly kg: null; readonly words: string };
+/** Python's suggested kg ("142,5 kg"), or the words for its absence. "0 kg" never shows.
+ * `capped`: the weekly cap changed it, shown as "(begrænset)" (CAPPED_WORD). */
+export type SuggestionView =
+  | { readonly kg: string; readonly capped: boolean }
+  | { readonly kg: null; readonly words: string };
 
-export function suggestionView(e: Pick<ExerciseView, "suggestedKg" | "suggestionBasis">): SuggestionView {
-  if (e.suggestedKg !== null && e.suggestedKg > 0) return { kg: `${formatKg(e.suggestedKg)} kg` };
+/** After a suggestion the weekly cap changed (planned_sets.uncapped_kg, user 2026-10-13). */
+export const CAPPED_WORD = "(begrænset)";
+
+export function suggestionView(
+  e: Pick<ExerciseView, "suggestedKg" | "suggestionBasis" | "suggestionCapped">,
+): SuggestionView {
+  if (e.suggestedKg !== null && e.suggestedKg > 0) {
+    return { kg: `${formatKg(e.suggestedKg)} kg`, capped: e.suggestionCapped };
+  }
   const basis = e.suggestionBasis;
   return { kg: null, words: basis === null || basis === "rpe_e1rm" ? "Intet forslag" : NO_SUGGESTION[basis] };
 }

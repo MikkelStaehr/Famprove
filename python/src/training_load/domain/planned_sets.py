@@ -4,9 +4,18 @@
                  rounded to ROUND_TO_KG
 
 - The lift: the exercise's parent_lift in public.exercises (a main lift is its own parent).
-- Rolling e1RM: the highest weekly best e1RM (strength_weeks, the numbers /analyse shows) of that
-  lift in the ROLLING_E1RM_WEEKS ISO weeks ending with the run day's week: one light week doesn't
-  drag it down, an old peak doesn't linger.
+- Rolling e1RM: the highest e1RM of a qualifying lifted set of that lift in the
+  ROLLING_E1RM_WEEKS ISO weeks ending with the run day's week (one light week doesn't drag it
+  down, an old peak doesn't linger). Qualifying (user, 2026-10-13): the competition lift, at most
+  ROLLING_MAX_REPS reps and a prescribed RPE of at least ROLLING_MIN_RPE, because back-off and
+  high-rep sets inflate the estimate (an 8-rep back-off at RPE 5-7 put bench at 110 kg against
+  a top set of 85 x 3 @ 7). RPE = the set's logged RPE when present, else the prescribed one.
+  /analyse keeps its own, wider rule (strength_analysis.MAX_E1RM_REPS) for the e1RM history.
+- Weekly cap (user, 2026-10-13): against last week's logged kg for the same prescription (the
+  same sheet row the week before, same reps and prescribed RPE: what Træning shows as "Sidste
+  uge"), a suggestion rises at most CAP_UP_KG and falls at most CAP_DOWN_KG, both rounded inward
+  to ROUND_TO_KG. A capped set keeps its uncapped suggestion in uncapped_kg (the web shows
+  "(begrænset)"); None when the cap didn't apply or there is no such logged kg.
 - pct(RPE, reps) = 1 / (1 + E1RM_FACTOR x (reps + 10 - RPE)): the relation /analyse uses to get an
   e1RM from a lifted set, so a suggestion is its exact inverse. The coach's sheet has no RPE table
   (checked 2026-10-12: Home has an RPE word scale; the only 1RM formula is Brzycki, without RPE).
@@ -21,7 +30,7 @@ Only the run day's ISO week and later get rows: past weeks were lifted with what
 """
 
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Final, Literal
@@ -29,9 +38,21 @@ from typing import Final, Literal
 from training_load.domain.exercises import Catalog
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.strength import StrengthSet, iso_week_start
-from training_load.domain.strength_analysis import E1RM_FACTOR, StrengthWeek
+from training_load.domain.strength_analysis import (
+    E1RM_BOUNDS_KG,
+    E1RM_FACTOR,
+    KgStatus,
+    SetKey,
+    e1rm,
+    is_competition_lift,
+    set_key,
+)
 
 ROLLING_E1RM_WEEKS: Final = 4
+ROLLING_MAX_REPS: Final = 5
+ROLLING_MIN_RPE: Final = 7.0
+CAP_UP_KG: Final = 2.5
+CAP_DOWN_KG: Final = 5.0
 ROUND_TO_KG: Final = 2.5
 
 type Basis = Literal["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift"]
@@ -56,6 +77,7 @@ class PlannedSet:
     pct: float | None  # 1 / (1 + E1RM_FACTOR x (reps + 10 - RPE))
     suggested_kg: float | None  # a multiple of ROUND_TO_KG; None: no suggestion (see basis)
     basis: Basis
+    uncapped_kg: float | None = None  # the suggestion before the weekly cap; None: not capped
 
 
 def pct_of_e1rm(reps: float, rpe: float) -> float:
@@ -68,28 +90,89 @@ def round_to_step(kg: float, step: float = ROUND_TO_KG) -> float:
     return math.floor(kg / step + 0.5) * step
 
 
-def rolling_e1rm(weeks: Iterable[StrengthWeek], lift: str, run_week: date) -> float | None:
-    """The highest weekly best e1RM of ``lift`` in the ROLLING_E1RM_WEEKS weeks ending with
-    ``run_week`` (an ISO Monday); None when there is none."""
+def counts_for_rolling_e1rm(s: StrengthSet, status: KgStatus) -> bool:
+    """A lifted competition-lift set of at most ROLLING_MAX_REPS reps at a prescribed RPE of at
+    least ROLLING_MIN_RPE, with logged kg."""
+    rpe = prescribed_rpe(s.prescribed)
+    return (
+        status != "planned"
+        and is_competition_lift(s)
+        and s.reps <= ROLLING_MAX_REPS
+        and rpe is not None
+        and rpe >= ROLLING_MIN_RPE
+        and s.logged_kg is not None
+        and s.logged_kg > 0
+    )
+
+
+def rolling_e1rm(
+    sets: Iterable[StrengthSet], statuses: Mapping[SetKey, KgStatus], lift: str, run_week: date
+) -> float | None:
+    """The highest e1RM of ``lift``'s qualifying sets in the ROLLING_E1RM_WEEKS weeks ending with
+    ``run_week`` (an ISO Monday); None when there is none. Implausible values are left out."""
     first = run_week - timedelta(weeks=ROLLING_E1RM_WEEKS - 1)
-    values = [
-        w.e1rm_kg
-        for w in weeks
-        if w.lift == lift and w.e1rm_kg is not None and first <= w.week_start <= run_week
-    ]
+    low, high = E1RM_BOUNDS_KG
+    values = []
+    for s in sets:
+        if s.type != lift or not first <= s.week_start <= run_week:
+            continue
+        if not counts_for_rolling_e1rm(s, statuses[set_key(s)]):
+            continue
+        rpe = s.logged_rpe if s.logged_rpe is not None else prescribed_rpe(s.prescribed)
+        assert rpe is not None and s.logged_kg is not None  # counts_for_rolling_e1rm
+        value = e1rm(s.logged_kg, s.reps, rpe)
+        if low <= value <= high:
+            values.append(value)
     return max(values, default=None)
+
+
+def _step_up(kg: float) -> float:
+    return math.ceil(kg / ROUND_TO_KG - 1e-9) * ROUND_TO_KG
+
+
+def _step_down(kg: float) -> float:
+    return math.floor(kg / ROUND_TO_KG + 1e-9) * ROUND_TO_KG
+
+
+def weekly_cap(suggested: float, last_kg: float | None) -> tuple[float, float | None]:
+    """(the suggestion within CAP_UP_KG / CAP_DOWN_KG of last week's kg, the uncapped
+    suggestion when the cap changed it, else None)."""
+    if last_kg is None:
+        return suggested, None
+    capped = min(max(suggested, _step_up(last_kg - CAP_DOWN_KG)), _step_down(last_kg + CAP_UP_KG))
+    return (capped, suggested) if capped != suggested else (suggested, None)
+
+
+def last_week_kg(
+    sets: Iterable[StrengthSet],
+) -> dict[tuple[str, int, date], tuple[float, float, float]]:
+    """(block, sheet_row, week_start) -> (reps, prescribed RPE, logged kg) of every RPE set with
+    logged kg; the highest kg when a row has several sets."""
+    out: dict[tuple[str, int, date], tuple[float, float, float]] = {}
+    for s in sets:
+        rpe = prescribed_rpe(s.prescribed)
+        if rpe is None or s.logged_kg is None or s.logged_kg <= 0:
+            continue
+        key = (s.block, s.sheet_row, s.week_start)
+        if key not in out or s.logged_kg > out[key][2]:
+            out[key] = (s.reps, rpe, s.logged_kg)
+    return out
 
 
 def planned_sets(
     sets: Sequence[StrengthSet],
     catalog: Catalog,
-    weeks: Sequence[StrengthWeek],
+    statuses: Mapping[SetKey, KgStatus],
     *,
     today: date,
 ) -> list[PlannedSet]:
     """One PlannedSet per set of the run day's ISO week and later, in strength_sets order."""
     run_week = iso_week_start(today)
-    e1rms = {lift: rolling_e1rm(weeks, lift, run_week) for lift in ("SQUAT", "BENCH", "DEADLIFT")}
+    e1rms = {
+        lift: rolling_e1rm(sets, statuses, lift, run_week)
+        for lift in ("SQUAT", "BENCH", "DEADLIFT")
+    }
+    logged = last_week_kg(sets)
     out: list[PlannedSet] = []
     for s in sets:
         if s.week_start < run_week:
@@ -114,6 +197,11 @@ def planned_sets(
             if basis == "rpe_e1rm" and e1rm_kg is not None and pct is not None
             else None
         )
+        uncapped = None
+        if suggested is not None and suggested > 0:
+            before = logged.get((s.block, s.sheet_row, s.week_start - timedelta(days=7)))
+            same = before is not None and before[0] == s.reps and before[1] == rpe
+            suggested, uncapped = weekly_cap(suggested, before[2] if same and before else None)
         out.append(
             PlannedSet(
                 sheet_id=s.sheet_id,
@@ -131,6 +219,7 @@ def planned_sets(
                 pct=pct,
                 suggested_kg=suggested if suggested is not None and suggested > 0 else None,
                 basis=basis,
+                uncapped_kg=uncapped,
             )
         )
     return out

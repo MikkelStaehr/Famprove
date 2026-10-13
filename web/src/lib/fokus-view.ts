@@ -16,12 +16,21 @@ import {
   setKey,
   type SetRef,
 } from "./set-taps.ts";
-import { type ExerciseView, type Reference, runPositions } from "./training-view.ts";
+import { CAPPED_WORD, type ExerciseView, type Reference, runPositions } from "./training-view.ts";
 
 /** What Fokus needs of one sheet row (a subset of ExerciseView, so fixtures stay small). */
 export type FokusExercise = Pick<
   ExerciseView,
-  "name" | "repsText" | "prescribed" | "bodyweight" | "reference" | "row" | "suggestedKg" | "suggestionBasis" | "sets"
+  | "name"
+  | "repsText"
+  | "prescribed"
+  | "bodyweight"
+  | "reference"
+  | "row"
+  | "suggestedKg"
+  | "suggestionBasis"
+  | "suggestionCapped"
+  | "sets"
 >;
 
 /**
@@ -108,7 +117,13 @@ export function referenceText(reference: Reference): string {
  *   none        label Kg, "Intet forslag", + the reason
  */
 export type KgBlock =
-  | { readonly kind: "suggestion"; readonly label: "Forslag"; readonly figure: string; readonly unit: "kg" }
+  | {
+      readonly kind: "suggestion";
+      readonly label: "Forslag";
+      readonly figure: string;
+      readonly unit: "kg";
+      readonly capped: boolean; // the weekly cap changed it: "(begrænset)"
+    }
   | {
       readonly kind: "last_week";
       readonly label: "Sidste uge";
@@ -120,7 +135,7 @@ export type KgBlock =
 
 export function kgBlock(e: FokusExercise): KgBlock {
   if (e.suggestedKg !== null) {
-    return { kind: "suggestion", label: "Forslag", figure: formatKg(e.suggestedKg), unit: "kg" };
+    return { kind: "suggestion", label: "Forslag", figure: formatKg(e.suggestedKg), unit: "kg", capped: e.suggestionCapped };
   }
   const reason = suggestionReason(e.suggestionBasis);
   if (e.reference !== null) {
@@ -193,6 +208,15 @@ export function unsavedText(n: number): string {
   return `${n} sæt er ikke gemt.`;
 }
 
+/**
+ * "forslag 82,5 kg", "forslag 75 kg (begrænset)" or "intet forslag". `space` goes before "kg":
+ * a no-break space on screen, a plain one in the spoken sentence.
+ */
+function suggestionWords(e: FokusExercise, space: "\u00a0" | " "): string {
+  if (e.suggestedKg === null) return "intet forslag";
+  return `forslag ${formatKg(e.suggestedKg)}${space}kg${e.suggestionCapped ? ` ${CAPPED_WORD}` : ""}`;
+}
+
 /** The rest view's next set (§4.3): "Squat · sæt 2 af 2" and "5 reps · RPE 7 · forslag 142,5 kg". */
 export function nextSetSummary(s: SetInContext): { readonly title: string; readonly line: string } {
   const e = s.exercise;
@@ -202,7 +226,7 @@ export function nextSetSummary(s: SetInContext): { readonly title: string; reado
     parts.push(word === null ? e.repsText : `${e.repsText} ${word}`);
   }
   if (e.prescribed !== null) parts.push(e.prescribed);
-  parts.push(e.suggestedKg === null ? "intet forslag" : `forslag ${formatKg(e.suggestedKg)} kg`);
+  parts.push(suggestionWords(e, "\u00a0"));
   return { title: `${exerciseName(e)} · sæt ${s.number} af ${s.count}`, line: parts.join(" · ") };
 }
 
@@ -218,7 +242,7 @@ export function setSentence(s: SetInContext, week: number): string {
   const what = reps !== null && load !== null ? `${reps} ved ${load}` : (reps ?? load);
   const parts: string[] = [];
   if (what !== null) parts.push(what);
-  parts.push(e.suggestedKg === null ? "intet forslag" : `forslag ${formatKg(e.suggestedKg)} kg`);
+  parts.push(suggestionWords(e, " "));
   if (week > 1) parts.push(e.reference === null ? "intet logget sidste uge" : `sidste uge ${referenceText(e.reference)}`);
   return `${exerciseName(e)}, ${setTitle(s).toLowerCase()}: ${parts.join(", ")}.`;
 }

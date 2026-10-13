@@ -26,6 +26,7 @@ import {
   undoSentence,
   unsavedText,
 } from "@/lib/fokus-view";
+import { CAPPED_WORD } from "@/lib/training-view";
 import {
   applyTap,
   lastTap,
@@ -281,6 +282,9 @@ function SetView({
               <span className="text-56">{kg.figure}</span>
               <span className="text-32">{" "}kg</span>
             </p>
+          )}
+          {kg.kind === "suggestion" && kg.capped && (
+            <p className="text-16 text-on-slab-muted">{CAPPED_WORD}: højst 2,5 kg op og 5 kg ned fra sidste uge</p>
           )}
           {kg.kind === "last_week" && (
             <>

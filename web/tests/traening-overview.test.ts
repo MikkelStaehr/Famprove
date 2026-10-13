@@ -30,6 +30,7 @@ function row(row: number, overrides: Partial<ExerciseView> = {}, sets = 2): Exer
     row,
     suggestedKg: 142.5,
     suggestionBasis: "rpe_e1rm",
+    suggestionCapped: false,
     sets: Array.from({ length: sets }, (_, i) => ({ row, set: i + 1 })),
     ...overrides,
   };
@@ -64,7 +65,8 @@ test("form sentence: zone, no zone, an old row", () => {
 });
 
 test("suggestion: kg, reasons per basis, never 0 kg", () => {
-  assert.deepEqual(suggestionView(row(1)), { kg: "142,5 kg" });
+  assert.deepEqual(suggestionView(row(1)), { kg: "142,5 kg", capped: false });
+  assert.deepEqual(suggestionView(row(1, { suggestedKg: 75, suggestionCapped: true })), { kg: "75 kg", capped: true });
   assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: "not_rpe" })), { kg: null, words: "Intet forslag til %-sæt" });
   assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: "no_e1rm" })), { kg: null, words: "Intet forslag: ingen e1RM endnu" });
   assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: "no_lift" })), { kg: null, words: "Intet forslag til denne øvelse" });

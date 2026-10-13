@@ -909,11 +909,13 @@ export type PlannedSetRow = {
   readonly setNo: number;
   readonly suggestedKg: number | null;
   readonly basis: SuggestionBasis;
+  /** The suggestion before the weekly cap; null = not capped (the web then says nothing). */
+  readonly uncappedKg: number | null;
 };
 
 export const PLANNED_SETS_SELECT = {
   table: "planned_sets",
-  columns: "sheet_id,block,sheet_row,week,set_no,suggested_kg,basis",
+  columns: "sheet_id,block,sheet_row,week,set_no,suggested_kg,basis,uncapped_kg",
   order: "sheet_id,block,sheet_row,week,set_no", // the primary key
 } as const;
 
@@ -926,6 +928,10 @@ export function parsePlannedSetRow(raw: unknown): PlannedSetRow {
   if (suggestedKg !== null && known !== "rpe_e1rm") {
     throw new RowError("planned_sets: a suggestion only with basis rpe_e1rm");
   }
+  const uncappedKg = f.numberOrNull("uncapped_kg");
+  if (uncappedKg !== null && (suggestedKg === null || uncappedKg === suggestedKg)) {
+    throw new RowError("planned_sets.uncapped_kg: only on a suggestion the cap changed");
+  }
   return {
     block: f.string("block"),
     sheetRow: f.number("sheet_row"),
@@ -933,6 +939,7 @@ export function parsePlannedSetRow(raw: unknown): PlannedSetRow {
     setNo: f.number("set_no"),
     suggestedKg,
     basis: known,
+    uncappedKg,
   };
 }
 

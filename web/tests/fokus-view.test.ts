@@ -36,6 +36,7 @@ const SQUAT: FokusExercise = {
   row: 4,
   suggestedKg: 142.5,
   suggestionBasis: "rpe_e1rm",
+  suggestionCapped: false,
   sets: [
     { row: 4, set: 1 },
     { row: 4, set: 2 },
@@ -50,6 +51,7 @@ const PULLDOWN: FokusExercise = {
   row: 7,
   suggestedKg: null,
   suggestionBasis: "not_rpe",
+  suggestionCapped: false,
   sets: [{ row: 7, set: 1 }],
 };
 const EXERCISES = [SQUAT, PULLDOWN];
@@ -136,7 +138,16 @@ test("repsWord: rep after 1, reps after counts, nothing after a cell without a d
 });
 
 test("kgBlock: suggestion first, italic figure with kg", () => {
-  assert.deepEqual(kgBlock(SQUAT), { kind: "suggestion", label: "Forslag", figure: "142,5", unit: "kg" });
+  assert.deepEqual(kgBlock(SQUAT), { kind: "suggestion", label: "Forslag", figure: "142,5", unit: "kg", capped: false });
+});
+
+test("a suggestion the weekly cap changed says (begrænset), on screen and in the summary lines", () => {
+  const capped = { ...SQUAT, suggestedKg: 145, suggestionCapped: true };
+  assert.deepEqual(kgBlock(capped), { kind: "suggestion", label: "Forslag", figure: "145", unit: "kg", capped: true });
+  const s = setInContext([capped], { row: 4, set: 2 });
+  assert.ok(s !== null);
+  assert.match(setSentence(s, 2), /forslag 145 kg \(begrænset\), sidste uge 140/);
+  assert.match(nextSetSummary(s).line, /forslag 145\u00a0kg \(begrænset\)$/);
 });
 
 test("kgBlock: no suggestion -> last week upright with the reason; both null -> Kg / Intet forslag", () => {
