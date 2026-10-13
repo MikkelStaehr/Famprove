@@ -179,8 +179,9 @@ body:has([data-direction="instrument"]) {
   --font-sans: var(--font-barlow), system-ui, sans-serif;
   --font-display: var(--font-barlow-condensed), system-ui, sans-serif;
   /* Instrument (Part B Type): loaded by app/fokus/layout.tsx only. */
-  --font-grotesk: var(--font-inter), system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  /* Fallbacks inside var(): outside /fokus the next/font variables are undefined. */
+  --font-grotesk: var(--font-inter, system-ui), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono, ui-monospace), ui-monospace, monospace;
 
   --text-12: 0.75rem;
   --text-12--line-height: 1.4;
@@ -230,7 +231,7 @@ summary::-webkit-details-marker {
 
 /* Instrument caption (Part B Type): mono 500, uppercase, +0.08em, muted; 14px on Fokus. */
 @utility caption {
-  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: --theme(--text-14);
   line-height: --theme(--text-14--line-height);
