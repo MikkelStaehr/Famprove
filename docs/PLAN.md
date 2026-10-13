@@ -76,3 +76,5 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | fokus-pause-content | Pause screen content: recommended rest, coach notes, last week on the next-set card, elapsed and remaining time | M |
 | score-rpe | Set score RPE: logged, then prescribed, then %1RM only without an RPE cell (bug: backoff 428 vs top set 162) | S |
 | score-final | Persist compute's final set score (strength_sets.score_final) so the week view shows what feeds daily_load | S |
+| instrument-fokus | New direction (editorial instrument panel, replaces Spurt): DESIGN.md Part B + Fokus restyled as the pilot | M |
+| instrument-rest | Restyle Træning, Belastning and Analyse to the instrument direction (after the Fokus pilot) | L |
