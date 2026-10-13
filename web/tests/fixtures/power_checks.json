@@ -13,7 +13,7 @@
     "power_load": 139,
     "hr_load": null,
     "device_name": "HAMMERHEAD Karoo",
-    "data_warning": "Maks 1.650 W er over 1,3 × din ePmax (1.210 W); Ét sample på 1.650 W ligger 900 W over begge naboer efter 1:02:05.",
+    "data_warning": "Maks 1.650 W er over 1,3 × din ePmax (1.210 W); Ét sample på 1.650 W ligger 900 W over begge naboer og over 0,8 × din ePmax efter 1:02:05.",
     "raw": null
   },
   "notice": {

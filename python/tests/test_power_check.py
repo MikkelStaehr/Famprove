@@ -17,6 +17,7 @@ from training_load.domain.power_check import (
     ftp_notice,
     largest_spike,
     needs_stream,
+    spike_floor,
 )
 from training_load.sources.intervals import parse_power_stream, parse_ride_ftps
 
@@ -39,13 +40,34 @@ def test_a_spike_stands_more_than_300_w_above_both_neighbours() -> None:
     assert largest_spike([1500]) is None
 
 
+def test_a_spike_must_also_be_above_0_8_x_epmax() -> None:
+    floor = spike_floor(1210.0)  # 968 W
+    assert floor == pytest.approx(968.0)
+    assert largest_spike([0, 450, 0], floor_w=floor or 0) is None  # a lone pedal stroke: no spike
+    # The biggest jump (700 above 200) is below the floor; the qualifying sample (1000) is reported.
+    watts = [200, 900, 200, 600, 1000, 650]
+    assert largest_spike(watts, floor_w=floor or 0) == Spike(watts=1000, above=350, at_s=None)
+    assert spike_floor(None) is None and spike_floor(0) is None
+
+
+def test_without_an_epmax_the_stream_is_not_fetched() -> None:
+    send = stream_send({})
+    result = with_power_checks([ride("i5", ftp=230, pmax=981, epmax=None)], send=send, api_key="k")
+    assert (len(send.calls), result.read, result.unread, result.rides[0].data_warning) == (
+        0,
+        0,
+        0,
+        None,
+    )
+
+
 def test_the_warning_says_which_rule_fired_with_danish_numbers() -> None:
     assert data_warning(1650, 1210.0, None) == "Maks 1.650 W er over 1,3 × din ePmax (1.210 W)."  # noqa: RUF001
     assert data_warning(1500, 1210.0, None) is None  # 1500 <= 1573
     spike = Spike(watts=1180, above=640, at_s=2533)
     assert (
-        data_warning(981, 1210.0, spike)
-        == "Ét sample på 1.180 W ligger 640 W over begge naboer efter 42:13."
+        data_warning(981, 1210.0, spike) == "Ét sample på 1.180 W ligger 640 W over begge naboer "
+        "og over 0,8 × din ePmax efter 42:13."  # noqa: RUF001
     )
     both = data_warning(1650, 1210.0, Spike(watts=1650, above=900, at_s=3725))
     assert both is not None and both.count(";") == 1 and "1:02:05" in both
@@ -138,7 +160,8 @@ def test_collect_checks_every_ride_and_fetches_streams_only_for_candidates() -> 
     assert checked[0].data_warning is None
     assert checked[1].data_warning == "Maks 1.700 W er over 1,3 × din ePmax (1.210 W)."  # noqa: RUF001
     assert (
-        checked[2].data_warning == "Ét sample på 981 W ligger 721 W over begge naboer efter 0:01."
+        checked[2].data_warning
+        == "Ét sample på 981 W ligger 721 W over begge naboer og over 0,8 × din ePmax efter 0:01."  # noqa: RUF001
     )
 
 

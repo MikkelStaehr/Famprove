@@ -27,7 +27,7 @@ from training_load.db.activities import delete_ids, ids_between, stored_warnings
 from training_load.db.client import Postgrest
 from training_load.domain.cycling import CyclingActivity
 from training_load.domain.dates import ANALYSIS_START, today_local
-from training_load.domain.power_check import data_warning, largest_spike, needs_stream
+from training_load.domain.power_check import data_warning, largest_spike, needs_stream, spike_floor
 from training_load.http import HttpError, HttpSend, requests_send
 from training_load.narrow import opt_float, opt_int
 from training_load.sources.intervals import fetch_activities, fetch_power_stream, parse_activities
@@ -89,9 +89,10 @@ def with_power_checks(
     stored: Mapping[str, str | None] | None = None,
 ) -> PowerChecks:
     """Each ride with its data_warning (domain.power_check). The power stream is fetched only
-    where the max power is above 2 x the ride's FTP. A stream that fails, or has no watts, is
-    counted as unread and the ride keeps its ``stored`` warning (it may hold a single-sample
-    finding); without one it is judged on the peak rule. Unreadable power fields are counted."""
+    where the max power is above 2 x the ride's FTP and the ePmax is known. A stream that fails,
+    or has no watts, is counted as unread and the ride keeps its ``stored`` warning (it may hold
+    a single-sample finding); without one it is judged on the peak rule. Unreadable power fields
+    are counted."""
     stored = stored or {}
     out: list[CyclingActivity] = []
     read = unread = unreadable = 0
@@ -102,7 +103,8 @@ def with_power_checks(
         unreadable += bad_max or bad_epmax
         spike = None
         stream_unread = False
-        if needs_stream(max_w, a.ftp):
+        floor = spike_floor(epmax)
+        if floor is not None and needs_stream(max_w, a.ftp):
             try:
                 stream = fetch_power_stream(send, api_key=api_key, activity_id=a.id)
             except HttpError, ValueError, requests.RequestException:
@@ -112,7 +114,7 @@ def with_power_checks(
                 unread += 1
             else:
                 read += 1
-                spike = largest_spike(stream[0], stream[1])
+                spike = largest_spike(stream[0], stream[1], floor_w=floor)
         warning = data_warning(max_w, epmax, spike)
         if stream_unread and stored.get(a.id) is not None:
             warning = stored[a.id]

@@ -5,8 +5,10 @@ Spike warning per ride (activities.data_warning, shown as "Tjek effektdata" in t
   equals the stream's maximum) > MAX_OVER_EPMAX x the athlete's ePmax on that day
   (icu_rolling_p_max).
 - Rule B, single sample: one power sample more than SPIKE_ABOVE_NEIGHBOURS_W above both of its
-  neighbours. It needs the power stream, which is fetched only for rides whose max power is
-  above STREAM_IF_MAX_OVER_FTP x the ride's FTP (to keep API calls down).
+  neighbours AND above SPIKE_MIN_SHARE_OF_EPMAX x the ePmax of that day (user, 2026-10-13: a
+  lone 450 W sample between zeros is a pedal stroke, not a spike). It needs the power stream,
+  which is fetched only for rides whose max power is above STREAM_IF_MAX_OVER_FTP x the ride's
+  FTP and whose ePmax is known (to keep API calls down).
 The text says which rule fired, with the numbers, in Danish (it is the badge's tooltip).
 
 FTP sanity (app_notices, kind ftp_mismatch, a line on /load): the FTP set in intervals.icu
@@ -20,6 +22,7 @@ from typing import Final
 
 MAX_OVER_EPMAX: Final = 1.3
 SPIKE_ABOVE_NEIGHBOURS_W: Final = 300
+SPIKE_MIN_SHARE_OF_EPMAX: Final = 0.8
 STREAM_IF_MAX_OVER_FTP: Final = 2.0
 FTP_MISMATCH_SHARE: Final = 0.15
 FTP_NOTICE_KIND: Final = "ftp_mismatch"
@@ -42,15 +45,25 @@ def needs_stream(max_w: int | None, ftp_w: int | None) -> bool:
     )
 
 
+def spike_floor(epmax_w: float | None) -> float | None:
+    """The watts a spike sample must exceed (0.8 x ePmax); None without an ePmax: rule B can't
+    be decided, so it isn't checked."""
+    return None if epmax_w is None or epmax_w <= 0 else SPIKE_MIN_SHARE_OF_EPMAX * epmax_w
+
+
 def largest_spike(
-    watts: Sequence[int | None], times: Sequence[int | None] | None = None
+    watts: Sequence[int | None],
+    times: Sequence[int | None] | None = None,
+    *,
+    floor_w: float = 0.0,
 ) -> Spike | None:
-    """The sample that stands highest above BOTH neighbours by more than the limit; None if none.
-    A missing sample (None) or a missing neighbour never makes a spike."""
+    """Among samples more than SPIKE_ABOVE_NEIGHBOURS_W above BOTH neighbours and above
+    ``floor_w`` (spike_floor), the one standing highest above them; None if none. A missing
+    sample (None) or a missing neighbour never makes a spike."""
     best: Spike | None = None
     for i in range(1, len(watts) - 1):
         before, here, after = watts[i - 1], watts[i], watts[i + 1]
-        if before is None or here is None or after is None:
+        if before is None or here is None or after is None or here <= floor_w:
             continue
         above = here - max(before, after)
         if above > SPIKE_ABOVE_NEIGHBOURS_W and (best is None or above > best.above):
@@ -83,8 +96,11 @@ def data_warning(max_w: int | None, epmax_w: float | None, spike: Spike | None) 
         parts.append(f"Maks {_w(max_w)} er over {factor} × din ePmax ({_w(epmax_w)})")  # noqa: RUF001  # Danish UI text
     if spike is not None:
         when = "" if spike.at_s is None else f" efter {_clock(spike.at_s)}"
+        share = f"{SPIKE_MIN_SHARE_OF_EPMAX:g}".replace(".", ",")
+        epmax_text = "" if epmax_w is None else f" og over {share} × din ePmax"  # noqa: RUF001  # Danish UI text
         parts.append(
-            f"Ét sample på {_w(spike.watts)} ligger {_w(spike.above)} over begge naboer{when}"
+            f"Ét sample på {_w(spike.watts)} ligger {_w(spike.above)} over begge naboer"
+            f"{epmax_text}{when}"
         )
     return "; ".join(parts) + "." if parts else None
 
