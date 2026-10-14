@@ -62,7 +62,10 @@ def _legacy_score(s: StrengthSet, kg: float, e1rm: dict[str, float]) -> float:
     load = decimal_dots(s.prescribed)  # "RPE 7,5" is 7.5, as in the parser
     factor = UNKNOWN_FACTOR if s.muscle_factor is None else s.muscle_factor
     # bodyweight None: bodyweight sets never get here (their stored score already includes it).
-    result: object = set_score(s.type, s.name, s.reps, kg, load, None, factor, e1rm)  # type: ignore[no-untyped-call]  # untyped legacy module, see above
+    # As the parser: reps per side count both sides, kg per dumbbell both hands (user, 2026-10-14).
+    result: object = set_score(
+        s.type, s.name, s.reps * s.sides, kg * s.kg_factor, load, None, factor, e1rm
+    )  # type: ignore[no-untyped-call]  # untyped legacy module, see above
     assert isinstance(result, tuple)
     return float(result[2])
 

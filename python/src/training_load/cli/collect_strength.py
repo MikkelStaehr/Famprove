@@ -127,6 +127,8 @@ def to_domain(parsed: ParsedSet, sheet_id: str, slot: SessionSlot) -> StrengthSe
         raw=parsed["raw"],
         logged_rpe=parsed["logged_rpe"],
         muscle_factor=parsed["muscle_factor"],
+        sides=parsed["sides"],
+        kg_factor=parsed["kg_factor"],
         notes=notes_text(parsed["raw"]),
     )
 

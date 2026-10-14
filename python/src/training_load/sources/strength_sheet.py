@@ -28,6 +28,8 @@ class ParsedSet(TypedDict):
     kg: float             # effektiv kg brugt i scoren (logged_kg + BODYWEIGHT x bodyweight_fraction for kropsvægtøvelser)
     bodyweight: bool      # øvelsen har en bodyweight_fraction i public.exercises
     muscle_factor: float  # øvelsens muskelfaktor fra public.exercises (ukendt navn: 0.6)
+    sides: int            # 2: reps står pr. side og scoren tæller begge (exercises.per_side), ellers 1
+    kg_factor: int        # 2: logget kg er pr. håndvægt, to holdes (exercises.kg_per_dumbbell), ellers 1
     rpe: float | None
     prescribed: str | None  # foreskrevet load-celle som tekst (fx 'RPE 7 - 8'), kun til visning
     sets_text: str | None   # sets-cellen som skrevet (fx '2'), kun til visning
@@ -245,7 +247,9 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
             logged = kg
             if not rpe_readable(load): issues[RPE_NOT_HALF] += 1   # tælles; cellens RPE bruges aldrig ("RPE ukendt")
             lsrpe = logged_rpe(cells[4], issues) if lsrpe_ok else None
-            kg, rpe, score, bw = set_score(typ, name, reps, kg, decimal_dots(load),
+            # Brugerens input pr. øvelse (2026-10-14): reps pr. side tælles for begge sider, kg pr.
+            # håndvægt for begge hænder. Formlen er uændret; kun dens input ganges op.
+            kg, rpe, score, bw = set_score(typ, name, reps * exercise.sides, kg * exercise.kg_factor, decimal_dots(load),
                                            exercise.bodyweight_kg, exercise.muscle_factor, e1rm, lsrpe)
             if typ != "ABS" and kg and pick_rpe(typ, name, reps, kg, decimal_dots(load), e1rm, lsrpe)[0] is None:
                 issues[RPE_UNKNOWN] += 1   # scoren hviler på UNKNOWN_RPE: logges, aldrig stille
@@ -253,7 +257,7 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
-                                      muscle_factor=exercise.muscle_factor,
+                                      muscle_factor=exercise.muscle_factor, sides=exercise.sides, kg_factor=exercise.kg_factor,
                                       prescribed=prescribed_text(load),
                                       sets_text=sets_text, reps_text=reps_text,
                                       e1rm=e1rm.get(typ), raw=raw, logged_rpe=lsrpe))

@@ -12,6 +12,7 @@ from training_load.domain.set_feedback import (
     exercise_feel,
     progressions,
     range_top,
+    rescore,
     with_reps_done,
     with_rolling_e1rm_rpe,
 )
@@ -203,3 +204,10 @@ def test_compute_writes_the_final_score_back_and_keeps_the_sheets_reps(make_set:
     assert rows[25]["score_final"] == 100.0
     with pytest.raises(ValueError):
         sync_final_scores(db, [stored], [same])  # sets must pair up by key
+
+
+def test_rescoring_reps_done_counts_both_sides_of_a_per_side_set(make_set: MakeSet) -> None:
+    """User, 2026-10-14: reps done (per side) of a per-side set count both sides, as the parser."""
+    one = make_set(type="QUADS", name="RFE split squat", reps=8.0, kg=113.75, prescribed="RPE 7")
+    both = replace(one, sides=2)
+    assert rescore(both, 8.0, 0.6)[1] == pytest.approx(2 * rescore(one, 8.0, 0.6)[1])

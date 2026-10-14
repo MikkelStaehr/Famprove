@@ -82,6 +82,20 @@ def test_accessory_kg_from_the_same_row_then_the_same_name(make_set: MakeSet) ->
     assert result.score == pytest.approx(8 * 48 * 0.49 * 0.6 + 10 * 40 * 0.49 * 0.6)
 
 
+def test_a_planned_set_per_side_and_per_dumbbell_scores_both_legs_and_both_hands(
+    make_set: MakeSet,
+) -> None:
+    """User, 2026-10-14: as the parser, a per-side set counts both sides and a per-dumbbell kg
+    both hands (25 kg logged last week -> 50 kg, 8 reps -> 16)."""
+    earlier = plan(make_set, type="QUADS", name="RFE split squat", week=1,
+                   week_start=date(2026, 9, 28), logged_kg=25.0, sheet_row=40, sides=2,
+                   kg_factor=2)  # fmt: skip
+    rfe = plan(make_set, type="QUADS", name="RFE split squat", reps=8.0, prescribed="RPE 7",
+               sheet_row=40, sides=2, kg_factor=2, muscle_factor=0.6)  # fmt: skip
+    result = planned_session_score([rfe], [earlier])
+    assert result.score == pytest.approx(16 * 50 * 0.49 * 0.6)
+
+
 def test_a_set_without_any_kg_rule_is_unscored_not_zero(make_set: MakeSet) -> None:
     unknown = plan(make_set, type="BACK", name="New exercise", prescribed="RPE 7")
     result = planned_session_score([unknown], [])

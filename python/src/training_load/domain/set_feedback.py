@@ -114,7 +114,10 @@ def rescore(
     load = decimal_dots(s.prescribed)
     one_rm = s.e1rm if e1rm_kg is None else e1rm_kg
     e1rm = {s.type: one_rm} if one_rm is not None else {}
-    result: object = set_score(s.type, s.name, reps, s.kg, load, None, factor, e1rm, s.logged_rpe)  # type: ignore[no-untyped-call]  # untyped legacy module
+    # s.kg already holds kg_factor (and bodyweight); reps per side count both sides (s.sides).
+    result: object = set_score(
+        s.type, s.name, reps * s.sides, s.kg, load, None, factor, e1rm, s.logged_rpe
+    )  # type: ignore[no-untyped-call]  # untyped legacy module
     assert isinstance(result, tuple)
     rpe = result[1]
     return (float(rpe) if isinstance(rpe, int | float) else None), float(result[2])

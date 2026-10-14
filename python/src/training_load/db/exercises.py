@@ -10,7 +10,7 @@ from training_load.narrow import opt_float, opt_str, req_bool, req_float, req_in
 TABLE: Final = "exercises"
 COLUMNS: Final = (
     "id,name,aliases,category,parent_lift,muscle_factor,bodyweight_fraction,tracks_e1rm,"
-    "suggestion_scale"
+    "suggestion_scale,per_side,kg_per_dumbbell"
 )
 
 
@@ -35,6 +35,8 @@ def from_row(row: JsonRow) -> Exercise:
         bodyweight_fraction=opt_float(row, "bodyweight_fraction"),
         tracks_e1rm=req_bool(row, "tracks_e1rm"),
         suggestion_scale=req_float(row, "suggestion_scale"),
+        per_side=req_bool(row, "per_side"),
+        kg_per_dumbbell=req_bool(row, "kg_per_dumbbell"),
     )
 
 

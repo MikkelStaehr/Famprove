@@ -151,6 +151,8 @@ def ok_set(**overrides: object) -> ParsedSet:
         "raw": {},
         "logged_rpe": None,
         "muscle_factor": 0.6,
+        "sides": 1,
+        "kg_factor": 1,
     }
     return cast(ParsedSet, base | overrides)
 

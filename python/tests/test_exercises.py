@@ -23,7 +23,13 @@ GOOGLE = GoogleSettings(sheet_id=SYNTHETIC_SHEET_ID, service_account_info={})
 
 
 def exercise(
-    id: int, name: str, *aliases: str, factor: float = 0.6, fraction: float | None = None
+    id: int,
+    name: str,
+    *aliases: str,
+    factor: float = 0.6,
+    fraction: float | None = None,
+    per_side: bool = False,
+    per_dumbbell: bool = False,
 ) -> Exercise:
     return Exercise(
         id=id,
@@ -34,6 +40,8 @@ def exercise(
         muscle_factor=factor,
         bodyweight_fraction=fraction,
         tracks_e1rm=False,
+        per_side=per_side,
+        kg_per_dumbbell=per_dumbbell,
     )
 
 
@@ -77,6 +85,71 @@ def test_dips_with_10_kg_extra_lift_86_5_kg_effective() -> None:
     assert isinstance(result, tuple)
     kg_used, _rpe, _score, bodyweight = result
     assert bodyweight is True and abs(float(kg_used) - 86.5) < 1e-9
+
+
+def test_per_side_and_per_dumbbell_reach_the_scoring() -> None:
+    catalog = Catalog(
+        [exercise(1, "RFE split squat", fraction=0.75, per_side=True, per_dumbbell=True)]
+    )
+    assert catalog.scoring("rfe split squat", 85.0) == Scoring(0.6, 63.75, sides=2, kg_factor=2)
+    assert Catalog([exercise(2, "Squat")]).scoring("Squat", 85.0) == Scoring(0.6, None)
+
+
+def test_rfe_split_squat_counts_both_legs_and_both_dumbbells() -> None:
+    """User, 2026-10-14 (reading C): reps are per leg, kg per dumbbell. 25 kg x 8 reps at fraction
+    0.75 and BODYWEIGHT 85 (test values) is 2 x 25 + 63.75 = 113.75 kg effective, scored for 16
+    reps: exactly twice the one-leg score at that kg. The formula is unchanged; its inputs are."""
+    rfe = Catalog([exercise(1, "RFE split squat", fraction=0.75, per_side=True, per_dumbbell=True)])
+    s = rfe.scoring("RFE split squat", 85.0)
+    both: object = set_score(  # type: ignore[no-untyped-call]  # untyped legacy module
+        "QUADS",
+        "RFE split squat",
+        8 * s.sides,
+        25.0 * s.kg_factor,
+        "RPE 7",
+        s.bodyweight_kg,
+        0.6,
+        None,
+    )
+    one: object = set_score(  # type: ignore[no-untyped-call]  # untyped legacy module
+        "QUADS", "RFE split squat", 8, 113.75 - 63.75, "RPE 7", 63.75, 0.6, None
+    )
+    assert isinstance(both, tuple) and isinstance(one, tuple)
+    assert abs(float(both[0]) - 113.75) < 1e-9
+    assert abs(float(both[2]) - 2 * float(one[2])) < 1e-9
+
+
+def test_the_parser_doubles_reps_per_side_and_kg_per_dumbbell() -> None:
+    plain = [
+        p
+        for p in parse_all(
+            build_workbook(),
+            Catalog([*(from_row(r) for r in legacy_catalog_rows())]).scorer(BODYWEIGHT),
+        )
+        if p["name"] == "Dips"
+    ]
+    rows = [r for r in legacy_catalog_rows() if r["name"] != "Dips"]
+    marked = Catalog(
+        [
+            *(from_row(r) for r in rows),
+            exercise(999, "Dips", fraction=0.5, per_side=True, per_dumbbell=True),
+        ]
+    )
+    dips = [
+        p for p in parse_all(build_workbook(), marked.scorer(BODYWEIGHT)) if p["name"] == "Dips"
+    ]
+    first = dips[0]  # week 1, 10 kg logged
+    assert (first["logged_kg"], first["kg"], first["sides"], first["kg_factor"]) == (
+        10.0,
+        60.0,
+        2,
+        2,
+    )
+    assert first["reps"] == plain[0]["reps"]  # stored as written: per side
+    rpe = first["rpe"]
+    assert rpe is not None
+    expected = 2 * first["reps"] * 60.0 * (rpe / 10) ** 2 * first["muscle_factor"]
+    assert abs(first["score"] - round(expected, 1)) < 1e-9
 
 
 def test_an_unknown_name_scores_as_an_accessory_without_bodyweight() -> None:

@@ -233,6 +233,8 @@ def legacy_catalog_rows() -> tuple[JsonRow, ...]:
             "bodyweight_fraction": 1.0 if _legacy_bodyweight(name) else None,
             "tracks_e1rm": False,
             "suggestion_scale": 1.0,
+            "per_side": False,
+            "kg_per_dumbbell": False,
         }
         for i, (sheet_type, name) in enumerate(sorted(seen.values(), key=lambda v: v[1]), start=1)
     )
@@ -494,6 +496,8 @@ class InMemoryPostgrest(Postgrest):
                     "bodyweight_fraction": None,
                     "tracks_e1rm": False,
                     "suggestion_scale": 1.0,
+                    "per_side": False,  # the column defaults (2026-10-14)
+                    "kg_per_dumbbell": False,
                     **stored,
                 }
             self.tables[table].append(stored)

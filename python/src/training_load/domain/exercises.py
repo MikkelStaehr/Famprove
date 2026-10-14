@@ -36,6 +36,10 @@ class Exercise:
     bodyweight_fraction: float | None  # None: not a bodyweight exercise (0 would add nothing)
     tracks_e1rm: bool  # stored for later; nothing reads it yet
     suggestion_scale: float = 1.0  # multiplies the suggested kg (tempo variants 0.8)
+    per_side: bool = (
+        False  # the sheet's reps are per side: the score counts both (user, 2026-10-14)
+    )
+    kg_per_dumbbell: bool = False  # the logged kg is per dumbbell, two held: external load x 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +48,8 @@ class Scoring:
 
     muscle_factor: float
     bodyweight_kg: float | None  # BODYWEIGHT x fraction; None: not a bodyweight exercise
+    sides: int = 1  # 2: reps are per side, the score counts both (exercises.per_side)
+    kg_factor: int = 1  # 2: the logged kg is per dumbbell, two held (exercises.kg_per_dumbbell)
 
 
 type Scorer = Callable[[str, str], Scoring]
@@ -89,6 +95,8 @@ class Catalog:
         return Scoring(
             muscle_factor=exercise.muscle_factor,
             bodyweight_kg=None if fraction is None else bodyweight * fraction,
+            sides=2 if exercise.per_side else 1,
+            kg_factor=2 if exercise.kg_per_dumbbell else 1,
         )
 
     def scorer(self, bodyweight: float) -> Scorer:
