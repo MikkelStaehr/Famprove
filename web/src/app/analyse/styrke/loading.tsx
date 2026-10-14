@@ -1,47 +1,43 @@
-import { AnalyseTabs } from "@/components/AnalyseTabs";
+import { AnalyseHeaderSkeleton } from "@/components/AnalyseTabs";
 import { Card } from "@/components/Card";
-import { SkeletonBar as Bar } from "@/components/Skeleton";
-import { E1RM_PANELS_HEIGHT } from "@/lib/analyse-styrke-view";
-import { RAIL_GRID } from "@/lib/rail-grid";
+import { MonoCaption } from "@/components/MonoCaption";
+import { ANALYSE_GRID } from "@/lib/analyse-grid";
 
-const BLOCK = "w-full bg-raised motion-safe:animate-pulse";
+const BAR = "block rounded-control bg-track motion-safe:animate-pulse";
 
-/** Skeleton in the shape of styrke/page.tsx (analyse-styrke.md §8, §11): real tabs, the board in the rail, card titles in the main column. */
+/**
+ * Skeleton in the shape of styrke/page.tsx (reset-analyse-styrke.md §8): header and tabs real; the
+ * hero with its real caption and three rows (two 12px bars left, a 40px bar right); the chart cards
+ * with real titles and --track blocks 18 + 3 × 122 and 18 + 3 × 82 + 30. Same grid as the page.
+ */
 export default function Loading() {
   return (
     <>
-      <div className="flex flex-col">
-        <AnalyseTabs current="styrke" />
-        <h2 className="sr-only">Styrke</h2>
-        <div aria-hidden="true" className="mt-2">
-          <Bar className="w-1/3 text-14" />
-        </div>
-        <div className={RAIL_GRID.grid}>
-          <div className={RAIL_GRID.rail}>
-            <div className="mt-3 lg:mt-0">
-              <p className="caption">Bedste e1RM</p>
-              <div aria-hidden="true" className="mt-2 flex flex-col gap-3">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="flex items-end justify-between gap-3">
-                    <div className="flex w-1/2 flex-col">
-                      <Bar className="w-2/3 text-20" />
-                      <Bar className="mt-1 w-full text-14" />
-                    </div>
-                    <span className="block h-14 w-1/3 bg-raised motion-safe:animate-pulse" />
-                  </div>
-                ))}
+      <AnalyseHeaderSkeleton current="styrke" />
+      <div className={ANALYSE_GRID.grid}>
+        <section
+          aria-label="Bedste e1RM"
+          className={`flex flex-col gap-3 rounded-hero border border-border bg-card px-5 pt-5.5 pb-4 ${ANALYSE_GRID.styrkeHero}`}
+        >
+          <MonoCaption size={12}>Bedste e1RM</MonoCaption>
+          <div aria-hidden="true" className="flex flex-col">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-end justify-between gap-3 border-t border-border py-3 first:border-t-0 first:pt-0">
+                <div className="flex w-1/2 flex-col gap-1.5">
+                  <span className={`${BAR} h-3 w-2/3`} />
+                  <span className={`${BAR} h-3 w-full`} />
+                </div>
+                <span className={`${BAR} h-10 w-1/3`} />
               </div>
-            </div>
+            ))}
           </div>
-          <div className={RAIL_GRID.main}>
-            <Card id="e1rm" variant="calm" level={3} title="Estimeret 1RM pr. uge">
-              <div aria-hidden="true" className={`${E1RM_PANELS_HEIGHT} ${BLOCK}`} />
-            </Card>
-            <Card id="tonnage" variant="calm" level={3} title="Tonnage pr. uge">
-              <div aria-hidden="true" className={`h-[372px] ${BLOCK}`} />
-            </Card>
-          </div>
-        </div>
+        </section>
+        <Card id="e1rm" level={3} title="Estimeret 1RM pr. uge" className={`${ANALYSE_GRID.styrkeChart} lg:row-start-1`}>
+          <div aria-hidden="true" className={`${BAR} h-[384px] w-full`} />
+        </Card>
+        <Card id="tonnage" level={3} title="Tonnage pr. uge" className={`${ANALYSE_GRID.styrkeChart} lg:row-start-2`}>
+          <div aria-hidden="true" className={`${BAR} h-[294px] w-full`} />
+        </Card>
       </div>
       <p className="sr-only" role="status">
         Henter styrkedata…

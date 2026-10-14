@@ -17,7 +17,7 @@ import { formatDate, formatDateRange, formatKg, LOCALE, stopAfter } from "./form
 import { LIFT_NAME, LIFTS, perLift, type StrengthLift } from "./lifts.ts";
 
 /** The e1RM panels' height: the client chart's hydration skeleton and loading.tsx share it. */
-export const E1RM_PANELS_HEIGHT = "h-[492px]";
+export const E1RM_PANELS_HEIGHT = "h-[408px]";
 
 /** A week row with an e1RM (and, for block bests, a block). */
 type E1rmRow = StrengthWeekRow & { readonly e1rmKg: number };
@@ -147,6 +147,7 @@ export type StyrkeView =
       readonly hi: number;
       readonly ticksNarrow: readonly AxisTick[];
       readonly ticksWide: readonly AxisTick[];
+      readonly todayX: number; // today's day number: the --today line in both chart cards
       readonly blocks: readonly BlockSpan[];
       readonly phaseRules: readonly number[];
       readonly board: LiftBoard;
@@ -512,6 +513,7 @@ export function buildStyrkeView(data: StrengthAnalysisData, now: Date, today: Is
     freshness: freshness(latestComputedAt(weeks), now),
     lo,
     hi,
+    todayX: dayNumber(today),
     ticksNarrow,
     ticksWide,
     blocks: spans,

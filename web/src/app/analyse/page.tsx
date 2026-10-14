@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 
 import { MarkChart, WeekStrips } from "@/components/AnalyseCharts";
-import { AnalyseTabs } from "@/components/AnalyseTabs";
-import { AnswerBlocks } from "@/components/AnswerBlock";
+import { BarSwatch, CrossSwatch, DotSizesSwatch, Legend, LineSwatch, RideDotSwatch, TodaySwatch } from "@/components/AnalyseLegend";
+import { AnalyseHeader } from "@/components/AnalyseTabs";
+import { ANSWER_CARD, AnswerBlocks } from "@/components/AnswerBlock";
 import { Card } from "@/components/Card";
-import { BarSwatch, CrossSwatch, DotSizesSwatch, DotSwatch, TodayTickSwatch } from "@/components/ChartMarks";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import { UpdatedLine } from "@/components/UpdatedLine";
+import { Icon } from "@/components/icons";
+import { MonoCaption } from "@/components/MonoCaption";
 import { type AnswersView, buildAnswers } from "@/lib/analyse-answers";
+import { ANALYSE_GRID } from "@/lib/analyse-grid";
 import { type AnalyseView, buildAnalyseView } from "@/lib/analyse-view";
 import {
   type DataError,
@@ -17,8 +19,6 @@ import {
 } from "@/lib/data-error";
 import { loadCyclingAnalysis } from "@/lib/db/queries";
 import { formatUpdatedAt } from "@/lib/format";
-import { MARKS } from "@/lib/chart-marks";
-import { RAIL_GRID } from "@/lib/rail-grid";
 import { resolveToday } from "@/lib/training-view";
 
 export const metadata: Metadata = { title: "Analyse" };
@@ -50,47 +50,35 @@ export default async function Page() {
   const state = await loadPageState();
   return (
     <>
-      <div className="flex flex-col">
-        <AnalyseTabs current="cykel" />
-        <h2 className="sr-only">Cykel</h2>
+      <AnalyseHeader current="cykel" freshness={state.kind === "ready" ? state.freshness : null} />
+      <div className={ANALYSE_GRID.grid}>
         {state.kind === "ready" && (
-          <div className="mt-2">
-            <UpdatedLine
-              freshness={state.freshness}
-              staleNote="Jobbet skal køre dagligt omkring kl. 05.00."
-              unknownNote="Opdateringstidspunkt ukendt, så data kan være forældet."
+          // §6: DOM order = phone order (answers, charts, excluded); grid placement does the rest.
+          <>
+            <AnswerBlocks view={state.answers} />
+            <Cards view={state} />
+          </>
+        )}
+        {state.kind === "error" && (
+          <div className={`${ANSWER_CARD} ${ANALYSE_GRID.full}`}>
+            <ErrorState
+              title="Kunne ikke hente cykeldata"
+              what={describeDataError(state.error)}
+              detail={state.error.message}
+              at={{
+                iso: state.at.toISOString(),
+                text: formatUpdatedAt(state.at.toISOString()),
+              }}
+              retry={{ href: "/analyse" }}
             />
           </div>
         )}
-        {state.kind === "ready" && (
-          // §11/§12c: header row above, full width; from lg a 12-column grid, rail = the three answers
-          // (sticky, scrolls on its own), main = the cards, one width so the seams line up. DOM order
-          // stays the phone order: answers, then charts.
-          <div className={RAIL_GRID.grid}>
-            <div className={RAIL_GRID.railScroll}>
-              <AnswerBlocks view={state.answers} />
-            </div>
-            <div className={RAIL_GRID.main}>
-              <Cards view={state} />
-            </div>
+        {state.kind === "empty" && (
+          <div className={`${ANSWER_CARD} ${ANALYSE_GRID.full}`}>
+            <EmptyState message="Der er ingen cykelture siden 1. jan. 2025 endnu. Det daglige job henter dem omkring kl. 05.00." />
           </div>
         )}
       </div>
-      {state.kind === "error" && (
-        <ErrorState
-          title="Kunne ikke hente cykeldata"
-          what={describeDataError(state.error)}
-          detail={state.error.message}
-          at={{
-            iso: state.at.toISOString(),
-            text: formatUpdatedAt(state.at.toISOString()),
-          }}
-          retry={{ href: "/analyse" }}
-        />
-      )}
-      {state.kind === "empty" && (
-        <EmptyState message="Der er ingen cykelture siden 1. jan. 2025 endnu. Det daglige job henter dem omkring kl. 05.00." />
-      )}
     </>
   );
 }
@@ -103,15 +91,28 @@ const axisOf = (v: Ready) => ({
   seams: v.seams,
 });
 
+/** The unit at the right of a chart card's header (MonoCaption 11). */
+function Unit({ children }: { readonly children: string }) {
+  return (
+    <MonoCaption size={11} uppercase={false}>
+      {children}
+    </MonoCaption>
+  );
+}
+
 function Cards({ view }: { readonly view: Ready }) {
   const axis = axisOf(view);
   return (
     <>
-      <Card id="eftp" variant="calm" level={3} title="eFTP pr. tur">
+      <Card id="eftp" level={3} title="eFTP pr. tur" action={<Unit>W</Unit>} className={ANALYSE_GRID.cykelChart}>
         {view.eftp === null ? (
-          <EmptyState message="Trenden vises, når der er mindst to ture med watt." />
+          <div className="flex h-(--chart-height) items-center rounded-button border border-dashed border-border px-4 font-sans text-15 text-text-muted">
+            Trenden vises, når der er mindst to ture med watt.
+          </div>
         ) : (
-          <figure className="flex flex-col gap-2">
+          <figure className="flex flex-col gap-3.5">
+            <MarkChart axis={axis} chart={view.eftp} title="eFTP pr. tur" variant="eftp" />
+            {view.noWattNote !== null && <p className="max-w-[60ch] font-sans text-13 text-text-muted">{view.noWattNote}</p>}
             {/* The eFTP line's legend item lives in the readout row's cell (DESIGN.md Charts: interaction). */}
             <Legend
               items={[
@@ -119,75 +120,47 @@ function Cards({ view }: { readonly view: Ready }) {
                 { swatch: <CrossSwatch />, label: "Udeladt tur" },
               ]}
             />
-            <p className="font-mono text-12 text-text-muted" aria-hidden="true">
-              W
-            </p>
-            <MarkChart
-              axis={axis}
-              chart={view.eftp}
-              title="eFTP pr. tur"
-              variant="eftp"
-            />
-            {view.noWattNote !== null && (
-              <p className="max-w-[60ch] text-14 text-text-muted">
-                {view.noWattNote}
-              </p>
-            )}
             <figcaption className="sr-only">{view.eftp.sr}</figcaption>
           </figure>
         )}
       </Card>
 
-      <Card
-        id="ef"
-        variant="calm"
-        level={3}
-        title="Effektivitet på rolige ture"
-      >
+      <Card id="ef" level={3} title="Effektivitet på rolige ture" action={<Unit>EF</Unit>} className={ANALYSE_GRID.cykelChart}>
         {"kind" in view.ef ? (
-          // §12b: the explainer moved into block 2's "?"; the ride list stays, with one line.
+          // ef-few (§4b): no plot; the note, then the rides as ListRows (date left, EF right).
           <div className="flex flex-col gap-2">
+            <p className="max-w-[60ch] font-sans text-13 text-text-muted">{view.ef.note}</p>
             {view.ef.list.length > 0 && (
-              <ul className="flex flex-col gap-1 text-16 tabular-nums">
-                {view.ef.list.map((l) => (
-                  <li key={l}>{l}</li>
-                ))}
+              <ul className="flex flex-col">
+                {view.ef.list.map((l) => {
+                  const [date, value] = l.split(" · ");
+                  return (
+                    <li key={l} className="flex min-h-11 items-center justify-between gap-3 border-t border-border">
+                      <span className="font-mono text-12 text-text-muted">{date}</span>
+                      <span className="font-mono text-15 text-text">{value}</span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
-            <p className="max-w-[60ch] text-14 text-text-muted">
-              {view.ef.note}
-            </p>
           </div>
         ) : (
-          <figure className="flex flex-col gap-2">
-            {/* Trend and Tur live in the readout row's cells (DESIGN.md Charts: interaction). */}
+          <figure className="flex flex-col gap-3.5">
+            <MarkChart axis={axis} chart={view.ef} title="Effektivitet på rolige ture" variant="ef" />
+            {/* Trend and Tur also live in the readout row's cells (DESIGN.md Charts: interaction). */}
             <Legend
               items={[
-                { swatch: <DotSwatch r={MARKS.efTrend.r} fill={MARKS.efTrend.color} />, label: "Trend (median over 28 dage)" },
-                { swatch: <DotSwatch r={MARKS.efRide.r} fill={MARKS.efRide.color} />, label: "Tur" },
+                { swatch: <LineSwatch />, label: "Trend (median over 28 dage)" },
+                { swatch: <RideDotSwatch />, label: "Tur" },
                 { swatch: <CrossSwatch />, label: "Udeladt tur" },
               ]}
-            />
-            <p className="font-mono text-12 text-text-muted" aria-hidden="true">
-              EF (W pr. slag/min)
-            </p>
-            <MarkChart
-              axis={axis}
-              chart={view.ef}
-              title="Effektivitet på rolige ture"
-              variant="ef"
             />
             <figcaption className="sr-only">{view.ef.sr}</figcaption>
           </figure>
         )}
       </Card>
 
-      <Card
-        id="weeks"
-        variant="calm"
-        level={3}
-        title="Timer og belastning pr. uge"
-      >
+      <Card id="weeks" level={3} title="Timer og belastning pr. uge" className={ANALYSE_GRID.cykelChart}>
         {view.weeks === null ? (
           <ErrorState
             title="Kunne ikke hente ugerne"
@@ -200,15 +173,15 @@ function Cards({ view }: { readonly view: Ready }) {
             retry={{ href: "/analyse" }}
           />
         ) : (
-          <figure className="flex flex-col gap-2">
+          <figure className="flex flex-col gap-3.5">
+            <WeekStrips axis={axis} weeks={view.weeks} max={view.weekMax} />
             <Legend
               items={[
                 { swatch: <BarSwatch />, label: "Uge med ture" },
-                { swatch: <BarSwatch zero />, label: "Uge uden ture" },
-                { swatch: <TodayTickSwatch />, label: "I dag" },
+                { swatch: <BarSwatch kind="zero" />, label: "Uge uden ture" },
+                { swatch: <TodaySwatch />, label: "I dag" },
               ]}
             />
-            <WeekStrips axis={axis} weeks={view.weeks} max={view.weekMax} />
             <div className="sr-only">
               <table>
                 <caption>Cykling pr. uge</caption>
@@ -249,64 +222,50 @@ function Cards({ view }: { readonly view: Ready }) {
 
 function Excluded({ view }: { readonly view: Ready }) {
   if (view.excluded === null)
-    return (
-      <p className="text-14 text-text-muted">Ingen ture udeladt fra trends.</p>
-    );
+    return <p className={`px-1 font-sans text-13 text-text-muted ${ANALYSE_GRID.cykelSide}`}>Ingen ture udeladt fra trends.</p>;
   return (
-    <section aria-label="Udeladte ture" className="border-y border-border">
+    <section aria-label="Udeladte ture" className={`rounded-card border border-border bg-card px-5 ${ANALYSE_GRID.cykelSide}`}>
       <details className="group">
-        <summary className="flex min-h-11 w-full cursor-pointer list-none items-center justify-between gap-2 text-16 font-medium text-text focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-14 w-full cursor-pointer list-none items-center justify-between gap-2 font-sans text-16 font-medium text-text [&::-webkit-details-marker]:hidden">
           {view.excluded.summary}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            className="size-5 shrink-0 text-text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-180 motion-safe:ease-out"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m5 7.5 5 5 5-5" />
-          </svg>
+          <Icon
+            name="chevron-down"
+            size={20}
+            className="text-text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-180 motion-safe:ease-out"
+          />
         </summary>
-        <div className="mt-2 flex flex-col gap-3 pb-3">
-          <p className="text-14 text-text-muted">
-            De tæller stadig med i timer og belastning.
-          </p>
-          <ul className="flex flex-col gap-3 lg:hidden">
+        <div className="flex flex-col gap-2 pb-4">
+          <p className="font-sans text-13 text-text-muted">De tæller stadig med i timer og belastning.</p>
+          <ul className="flex flex-col lg:hidden">
             {view.excluded.items.map((it) => (
-              <li key={it.key}>
-                <p className="text-16 font-medium">{`${it.date} · ${it.reason}`}</p>
-                {it.explanation !== null && (
-                  <p className="text-14 text-text">{it.explanation}</p>
-                )}
-                {it.facts !== "" && (
-                  <p className="text-14 text-text-muted tabular-nums">
-                    {it.facts}
-                  </p>
-                )}
+              <li key={it.key} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 border-t border-border py-3">
+                <span className="font-mono text-12 text-text-muted">{it.date}</span>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <p className="font-sans text-15 font-medium text-text">{it.reason}</p>
+                  {it.explanation !== null && <p className="font-sans text-13 text-text">{it.explanation}</p>}
+                  {it.facts !== "" && <p className="font-mono text-12 text-text-muted">{it.facts}</p>}
+                </div>
               </li>
             ))}
           </ul>
-          {/* §11: from lg the same rows as a real table; a dropped fact stays dropped. */}
-          <table className="hidden w-full text-left text-14 lg:table">
+          {/* §6: from lg the same rows as a real table; a dropped fact stays dropped. */}
+          <table className="hidden w-full text-left lg:table">
             <caption className="sr-only">Udeladte ture</caption>
             <thead>
               <tr className="border-b border-border">
-                <th scope="col" className="caption py-2 pr-4 font-medium whitespace-nowrap">Dato</th>
-                <th scope="col" className="caption py-2 pr-4 font-medium">Årsag</th>
-                <th scope="col" className="caption py-2 pr-4 font-medium">Forklaring</th>
-                <th scope="col" className="caption py-2 font-medium">Fakta</th>
+                <th scope="col" className="py-2 pr-3 font-mono text-11 font-normal whitespace-nowrap text-text-muted uppercase">Dato</th>
+                <th scope="col" className="py-2 pr-3 font-mono text-11 font-normal text-text-muted uppercase">Årsag</th>
+                <th scope="col" className="py-2 pr-3 font-mono text-11 font-normal text-text-muted uppercase">Forklaring</th>
+                <th scope="col" className="py-2 font-mono text-11 font-normal text-text-muted uppercase">Fakta</th>
               </tr>
             </thead>
             <tbody>
               {view.excluded.items.map((it) => (
-                <tr key={it.key} className="border-b border-border last:border-b-0 align-top">
-                  <th scope="row" className="py-2 pr-4 font-medium whitespace-nowrap">{it.date}</th>
-                  <td className="py-2 pr-4 whitespace-nowrap">{it.reason}</td>
-                  <td className="py-2 pr-4">{it.explanation}</td>
-                  <td className="py-2 whitespace-nowrap text-text-muted tabular-nums">{it.facts}</td>
+                <tr key={it.key} className="border-b border-border align-top last:border-b-0">
+                  <th scope="row" className="py-2 pr-3 font-mono text-12 font-normal whitespace-nowrap text-text-muted">{it.date}</th>
+                  <td className="py-2 pr-3 font-sans text-13 font-medium text-text">{it.reason}</td>
+                  <td className="py-2 pr-3 font-sans text-13 text-text">{it.explanation}</td>
+                  <td className="py-2 font-mono text-12 text-text-muted">{it.facts}</td>
                 </tr>
               ))}
             </tbody>
@@ -314,28 +273,5 @@ function Excluded({ view }: { readonly view: Ready }) {
         </div>
       </details>
     </section>
-  );
-}
-
-function Legend({
-  items,
-}: {
-  readonly items: readonly {
-    readonly swatch: React.ReactNode;
-    readonly label: string;
-  }[];
-}) {
-  return (
-    <ul
-      className="flex flex-wrap gap-x-4 gap-y-1 text-14 text-text-muted"
-      aria-label="Forklaring"
-    >
-      {items.map((i) => (
-        <li key={i.label} className="flex items-center gap-2">
-          {i.swatch}
-          {i.label}
-        </li>
-      ))}
-    </ul>
   );
 }

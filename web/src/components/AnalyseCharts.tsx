@@ -1,25 +1,30 @@
 "use client";
 
-import { ComposedChart, Line, ReferenceDot, XAxis, YAxis } from "recharts";
+import { CartesianGrid, ComposedChart, Line, ReferenceDot, XAxis, YAxis } from "recharts";
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
 import { type AxisTick, type ChartRow, chartRows, eftpDots, formatEf, type LineChartView, type Mark, type Seam, seamReadout, slotCentre, type WeekBar } from "@/lib/analyse-view";
+import { AMARKS, dashGradient, hatchGradient, isDeloadWeek } from "@/lib/analyse-marks";
 import { MARKS } from "@/lib/chart-marks";
 import { gapSeam, highestAt, nearestIndex, type Readout, restingReadout, restingWeekIndex, xAtPointer } from "@/lib/chart-readout";
 import { formatLoad } from "@/lib/format";
 import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
-import { ExcludedCross, HollowDot, RingedDot } from "./ChartMarks";
+import { HollowDot } from "./ChartMarks";
 import { ChartReadout, Marker, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
-import { ChartBoundary, TICK, useHydrated, useWide } from "./TrendChart";
+import { ChartBoundary, useHydrated, useWide } from "./TrendChart";
 
 /**
  * /analyse charts (design/specs/analyse.md §4-§5). One x domain [lo, hi] for all three, the pause
  * seams drawn the same way in each, no motion. Plots the view model's values as-is.
  */
 
-const Y_AXIS_WIDTH = 36;
-const MARGIN_RIGHT = 16;
+// Ember (reset-analyse-cykel.md §4, C): no left axis, the plot runs from the card's left edge; the
+// y labels are right-aligned in a 36px column at the right edge, centred on their gridlines, so the
+// today line (today = the domain's right end) never runs through them. Every card uses the same
+// two numbers, so dates, seams and the today line align down the page.
+const Y_AXIS_WIDTH = 0;
+const MARGIN_RIGHT = 36;
 const X_AXIS_HEIGHT = 30;
 const SEAM_ROOM = 18;
 const CHART_FAILED = "Grafen kunne ikke tegnes. De andre tal på siden er ikke berørt.";
@@ -38,24 +43,34 @@ function xCss(axis: { readonly lo: number; readonly hi: number }, x: number): st
   return `calc(${Y_AXIS_WIDTH}px + (100% - ${Y_AXIS_WIDTH + MARGIN_RIGHT}px) * ${f})`;
 }
 
+/** Axis labels: Geist Mono 11 muted, tabular (DESIGN.md Part B "Chart marks"). */
+const TICK = { fill: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-mono)" } as const;
+
 function Skeleton({ height }: { readonly height: string }) {
-  return <div className={`${height} w-full bg-raised motion-safe:animate-pulse`} />;
+  return <div className={`${height} w-full rounded-control bg-track motion-safe:animate-pulse`} />;
 }
 
 /**
- * The red today tick (instrument-analyse.md §1): 2×8 --today, centred on the x baseline at
- * day `x`. HTML so it shares xCss with the seams and strips; aria-hidden.
+ * Today (reset-analyse-cykel.md §4): a 1.5px --today line the full plot height at today's x, with
+ * `I DAG` Geist Mono 11 in --today (4.91:1 on --card) under it, end-anchored 4px left of the line.
+ * HTML so it shares xCss with the seams and strips, the same x in every card; aria-hidden.
  */
-function TodayMark({ axis, x, bottom }: { readonly axis: { readonly lo: number; readonly hi: number }; readonly x: number; readonly bottom: number }) {
-  const t = MARKS.todayTick;
-  const h = t.height.analyse;
+function TodayLine({ axis, x, top = 0 }: { readonly axis: { readonly lo: number; readonly hi: number }; readonly x: number; readonly top?: number }) {
+  const t = AMARKS.today;
   return (
-    <div
-      aria-hidden="true"
-      data-mark="today"
-      className="pointer-events-none absolute z-[2]"
-      style={{ left: `calc(${xCss(axis, x)} - ${t.width / 2}px)`, bottom: bottom - h / 2, width: t.width, height: h, background: t.color }}
-    />
+    <div aria-hidden="true" data-mark="today">
+      {/* Through the plot and the x-label row; the label sits under the tick labels, left of the line. */}
+      <div
+        className="pointer-events-none absolute bottom-0 z-[2]"
+        style={{ left: `calc(${xCss(axis, x)} - ${t.width / 2}px)`, top, width: t.width, background: t.color }}
+      />
+      <span
+        className="pointer-events-none absolute bottom-0 z-[2] -translate-x-full font-mono text-11 leading-none whitespace-nowrap text-today"
+        style={{ left: `calc(${xCss(axis, x)} - ${t.labelGap}px)` }}
+      >
+        I DAG
+      </span>
+    </div>
   );
 }
 
@@ -72,7 +87,7 @@ function SeamOverlay({ axis, bottom }: { readonly axis: Axis; readonly bottom: n
               style={{
                 left: xCss(axis, x),
                 bottom,
-                backgroundImage: `repeating-linear-gradient(to bottom, ${MARKS.seam.color} 0 3px, transparent 3px 6px)`,
+                backgroundImage: dashGradient("to bottom", AMARKS.seam.color, AMARKS.seam.on, AMARKS.seam.off),
               }}
             />
           ))}
@@ -81,7 +96,7 @@ function SeamOverlay({ axis, bottom }: { readonly axis: Axis; readonly bottom: n
             style={{ left: xCss(axis, s.x0), width: `calc(${xCss(axis, s.x1)} - ${xCss(axis, s.x0)})` }}
           >
             {/* Omitted (not clipped) when the run is narrower than the label. */}
-            <span className="caption hidden whitespace-nowrap @[5.5rem]:inline">Ingen ture</span>
+            <span className="hidden font-mono text-11 whitespace-nowrap text-text-muted uppercase @[5.5rem]:inline">Ingen ture</span>
           </div>
         </div>
       ))}
@@ -97,7 +112,7 @@ function DateTick({ x, y, payload, ticks, hi }: TickProps & { readonly ticks: re
   if (tick === undefined) return <g />;
   const anchor = tick === ticks[0] ? "start" : hi - tick.x < 30 ? "end" : "middle";
   return (
-    <text x={Number(x)} y={Number(y)} dy={12} textAnchor={anchor} {...TICK} style={{ fontVariantNumeric: "tabular-nums" }}>
+    <text x={Number(x)} y={Number(y)} dy={12} textAnchor={anchor} {...TICK}>
       {tick.label}
     </text>
   );
@@ -172,28 +187,36 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
     if (typeof value !== "number" || cx === undefined || cy === undefined || mark === undefined) return none(`${cx}-${cy}`);
     const d = dotOf.get(mark) ?? null;
     if (d === null) return none(`${cx}-${cy}`);
+    if (mark.latest) {
+      const l = AMARKS.latest;
+      return <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={l.r} fill={l.fill} stroke={l.color} strokeWidth={l.stroke} />;
+    }
     if (d.hollow) return <HollowDot key={`${cx}-${cy}`} cx={cx} cy={cy} r={d.r} stroke={MARKS.eftpDot.fill} strokeWidth={MARKS.eftpDot.missing.stroke} />;
-    return <RingedDot key={`${cx}-${cy}`} cx={cx} cy={cy} r={d.r} fill={MARKS.eftpDot.fill} ring={mark.latest ? MARKS.eftpDot.latestRing : 0} />;
+    return <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={d.r} fill={AMARKS.line.color} />;
   };
-  const trendShape = ({ cx, cy, value }: DotProps) =>
-    typeof value !== "number" || cx === undefined || cy === undefined ? (
-      none(`${cx}-t`)
-    ) : (
-      <circle key={`${cx}-${cy}-t`} cx={cx} cy={cy} r={MARKS.efTrend.r} fill={MARKS.efTrend.color} />
+  const crossShape = ({ cx, cy, value }: DotProps) => {
+    if (typeof value !== "number" || cx === undefined || cy === undefined) return none(`${cx}-e`);
+    const c = AMARKS.cross;
+    const h = c.size / 2;
+    const y = cy - h;
+    return (
+      <path
+        key={`${cx}-e`}
+        d={`M${cx - h} ${y - h}L${cx + h} ${y + h}M${cx + h} ${y - h}L${cx - h} ${y + h}`}
+        stroke={c.color}
+        strokeWidth={c.width}
+        fill="none"
+      />
     );
-  const crossShape = ({ cx, cy, value }: DotProps) =>
-    typeof value !== "number" || cx === undefined || cy === undefined ? (
-      none(`${cx}-e`)
-    ) : (
-      <ExcludedCross key={`${cx}-e`} cx={cx} cy={cy - MARKS.excluded.size / 2} />
-    );
+  };
   const efDot = ({ cx, cy, value }: DotProps) =>
     typeof value !== "number" || cx === undefined || cy === undefined ? (
       none(`${cx}-d`)
     ) : (
-      <circle key={`${cx}-${cy}-d`} cx={cx} cy={cy} r={MARKS.efRide.r} fill={MARKS.efRide.color} />
+      <circle key={`${cx}-${cy}-d`} cx={cx} cy={cy} r={AMARKS.efRide.r} fill={AMARKS.efRide.color} />
     );
-  const latestX = variant === "eftp" && latestMark !== undefined ? axis.hi - 0.5 : null;
+  // Today = the domain's last day (analyse-view: hi = today + 0.5); the same x in all three cards.
+  const todayX = axis.hi - 0.5;
 
   return (
     <>
@@ -210,7 +233,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
         responsive
         style={{ width: "100%", height: "100%" }}
         data={rows}
-        margin={{ top: SEAM_ROOM, right: MARGIN_RIGHT, bottom: 0, left: 0 }}
+        margin={{ top: SEAM_ROOM, right: 0, bottom: 0, left: 0 }}
         title={title}
         accessibilityLayer={false}
       >
@@ -223,31 +246,43 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
           height={X_AXIS_HEIGHT}
           tick={(p: TickProps) => <DateTick {...p} ticks={ticks} hi={axis.hi} />}
           tickLine={false}
-          axisLine={{ stroke: "var(--border)" }}
+          axisLine={false}
         />
+        {/* C: dashed --border gridlines at the y ticks, no axis lines, y labels inside the right edge. */}
+        <CartesianGrid vertical={false} stroke={AMARKS.grid.color} strokeDasharray={AMARKS.grid.dash} />
         <YAxis
-          width={Y_AXIS_WIDTH}
+          orientation="right"
+          width={MARGIN_RIGHT}
           domain={[chart.domain[0], chart.domain[1]]}
           ticks={[...chart.ticks]}
-          tickFormatter={format}
-          tick={TICK}
+          tickSize={0}
+          tickMargin={0}
+          tick={(p: TickProps) => (
+            <text x={Number(p.x) + MARGIN_RIGHT} y={Number(p.y)} textAnchor="end" dominantBaseline="central" {...TICK}>
+              {typeof p.payload?.value === "number" ? format(p.payload.value) : ""}
+            </text>
+          )}
           tickLine={false}
           axisLine={false}
         />
         {variant === "ef" && (
           <Line dataKey="dots" stroke="none" dot={efDot} activeDot={false} isAnimationActive={false} legendType="none" />
         )}
-        {/* Marks only (stroke none): no connecting line on eFTP, the EF trend as dots. */}
+        {/* One segment per run: the 2px --text line breaks after > 21 days (eftpGapBefore / efGapBefore).
+            eFTP draws its TSS-sized dots on it; the EF trend is the line alone. */}
         {segKeys.map((k) => (
           <Line
             key={k}
             dataKey={k}
             type="linear"
-            stroke="none"
-            dot={variant === "eftp" ? eftpShape : trendShape}
+            stroke={AMARKS.line.color}
+            strokeWidth={AMARKS.line.width}
+            strokeLinejoin="round"
+            dot={variant === "eftp" ? eftpShape : false}
             activeDot={false}
             isAnimationActive={false}
             legendType="none"
+            connectNulls={false}
           />
         ))}
         <Line dataKey="excl" stroke="none" dot={crossShape} activeDot={false} isAnimationActive={false} legendType="none" />
@@ -256,7 +291,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
         )}
       </ComposedChart>
       <SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />
-      {latestX !== null && <TodayMark axis={axis} x={latestX} bottom={X_AXIS_HEIGHT} />}
+      <TodayLine axis={axis} x={todayX} />
     </div>
     <ChartReadout readout={readout} all={all} lines={3} cells />
     </>
@@ -267,8 +302,6 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
 
 type XDomain = { readonly lo: number; readonly hi: number };
 type PickWeek = { readonly x0: number; readonly x1: number; readonly current: boolean };
-// 200 % text: tick labels keep TICK's fixed px size (the 12px exception, analyse.md §8).
-const tickStyle = { fontSize: TICK.fontSize } as const;
 const STRIP_TOP = 8; // room for the max label inside a strip
 const BLOCK_ROOM = 18; // the block-label strip on top (analyse-styrke.md §5)
 
@@ -294,6 +327,7 @@ function WeekGroup<W extends PickWeek>({
   padTop = 0,
   hasData,
   children,
+  todayX,
 }: {
   readonly axis: XDomain;
   readonly weeks: readonly W[];
@@ -305,6 +339,8 @@ function WeekGroup<W extends PickWeek>({
   readonly padTop?: number;
   readonly hasData?: (w: W) => boolean; // rest on the latest week with data (Cykel: a week with rides)
   readonly children: (active: W | null) => React.ReactNode;
+  /** Today's day number: the --today line runs through the ruler and every strip/panel. */
+  readonly todayX?: number;
 }) {
   const latestIndex = restingWeekIndex(weeks, hasData);
   const { pick, plotProps } = useChartPick({
@@ -320,6 +356,7 @@ function WeekGroup<W extends PickWeek>({
   const latest = latestIndex < 0 ? undefined : weeks[latestIndex];
   const markerX = active === null ? null : xCss(axis, slotCentre(active));
   const current = weeks.find((w) => w.current);
+  const today = todayX ?? (current === undefined ? undefined : slotCentre(current));
   const resting = restingReadout(latest === undefined ? null : readout(latest), "Tryk på grafen for at se en uge");
   const shown = active !== null && pick?.mode !== "mouse" ? readout(active) : resting;
   const all = [resting, ...weeks.map(readout)];
@@ -335,12 +372,12 @@ function WeekGroup<W extends PickWeek>({
         {overlay}
         {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
         {children(active)}
-        {current !== undefined && <TodayMark axis={axis} x={slotCentre(current)} bottom={X_AXIS_HEIGHT} />}
+        {today !== undefined && <TodayLine axis={axis} x={today} />}
         <div className="relative h-[30px]" aria-hidden="true">
           {ticks.map((t, i) => (
             <span
               key={t.x}
-              className="absolute top-1 font-sans text-12 whitespace-nowrap text-text-muted tabular-nums"
+              className="absolute top-1 font-mono text-11 whitespace-nowrap text-text-muted"
               style={{
                 left: xCss(axis, t.x),
                 transform: i === 0 ? undefined : axis.hi - t.x < 30 ? "translateX(-100%)" : "translateX(-50%)",
@@ -366,57 +403,62 @@ type StripBar = {
   readonly zero: boolean;
   readonly current: boolean;
   readonly active: boolean;
+  readonly deload?: boolean;
 };
 
 /**
- * One bar strip from 0 to niceMax (instrument-analyse.md §2–§3): a 2px ink bar per week at the slot
- * centre, a 1×2 muted stub for a zero week, no mark for null. The current week's bar is unchanged;
- * the group draws the red today tick under it.
+ * One bar strip from 0 to niceMax (reset-analyse-cykel.md §4c, B's bars): label MonoCaption 11 left,
+ * the max label right; a week = a solid --text bar the slot minus 2px wide, 2px top corners; a
+ * deload week the same bar hatched (Styrke); a zero week a 2px --axis stub; null = no mark.
  */
 function Strip({
   axis,
   label,
-  unit,
   height,
   bars,
   max,
 }: {
   readonly axis: XDomain;
   readonly label: string;
-  readonly unit: string;
   readonly height: number;
   readonly bars: readonly StripBar[];
   readonly max: number;
 }) {
   const vMax = niceMax(max);
+  const g = AMARKS.bar.gap;
   return (
-    <div className="flex flex-col gap-1">
-      <p className="relative text-14 font-medium" aria-hidden="true" style={{ marginLeft: Y_AXIS_WIDTH }}>
-        {label} <span className="font-normal text-text-muted">{unit}</span>
-      </p>
-      <div className="relative" style={{ height }} aria-hidden="true">
-        <div className="absolute border-b border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, bottom: 0 }} />
-        <span
-          className="absolute left-0 font-mono leading-none text-text-muted tabular-nums"
-          style={{ ...tickStyle, top: STRIP_TOP - 6 }}
-        >
-          {vMax.toLocaleString("da-DK")}
-        </span>
-        <span className="absolute bottom-0 left-0 font-mono leading-none text-text-muted" style={tickStyle}>
-          0
-        </span>
+    <div className="flex flex-col gap-1" aria-hidden="true">
+      <div className="flex items-baseline justify-between">
+        <span className="font-mono text-11 text-text-muted uppercase">{label}</span>
+        <span className="font-mono text-11 text-text-muted">{vMax.toLocaleString("da-DK")}</span>
+      </div>
+      <div className="relative" style={{ height }}>
+        <div className="absolute border-t border-dashed border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: STRIP_TOP }} />
+        <div className="absolute h-px" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, bottom: 0, background: AMARKS.baseline.color }} />
         {bars.map((w) => {
           if (w.value === null) return null;
           const zero = w.zero || w.value === 0;
-          const bw = zero ? MARKS.zeroStub.width : MARKS.weekBar.width;
-          const left = `calc(${xCss(axis, slotCentre(w))} - ${bw / 2}px)`;
-          const h = zero ? `${MARKS.zeroStub.height}px` : `calc((100% - ${STRIP_TOP}px) * ${w.value / vMax})`;
+          const left = `calc(${xCss(axis, w.x0)} + ${g / 2}px)`;
+          const width = `max(1px, calc(${xCss(axis, w.x1)} - ${xCss(axis, w.x0)} - ${g}px))`;
+          if (zero)
+            return (
+              <div key={w.x0} data-mark="zero" className="absolute bottom-0" style={{ left, width, height: AMARKS.stub.height, background: AMARKS.stub.color }} />
+            );
+          const h = `calc((100% - ${STRIP_TOP}px) * ${w.value / vMax})`;
           return (
             <div
               key={w.x0}
-              data-mark={zero ? "zero" : "bar"}
+              data-mark={w.deload ? "deload" : "bar"}
               className="absolute bottom-0"
-              style={{ left, width: bw, height: h, background: zero ? MARKS.zeroStub.color : MARKS.weekBar.color }}
+              style={{
+                left,
+                width,
+                height: h,
+                borderRadius: `${AMARKS.bar.radius}px ${AMARKS.bar.radius}px 0 0`,
+                ...(w.deload
+                  ? { backgroundImage: hatchGradient(), border: `${AMARKS.hatch.outline}px solid ${AMARKS.hatch.color}` }
+                  : { background: AMARKS.bar.color }),
+              }}
             />
           );
         })}
@@ -425,7 +467,7 @@ function Strip({
   );
 }
 
-const STRIP = 112;
+const STRIP = 96;
 
 type WeeksProps = {
   readonly axis: Axis;
@@ -444,7 +486,7 @@ export function WeekStrips(props: WeeksProps) {
 function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
   const hydrated = useHydrated();
   const wide = useWide();
-  if (!hydrated) return <Skeleton height="h-[232px]" />;
+  if (!hydrated) return <Skeleton height="h-[262px]" />;
   const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
   const bars = (active: WeekBar | null, value: (w: WeekBar) => number): StripBar[] =>
     weeks.map((w) => ({ x0: w.x0, x1: w.x1, value: value(w), zero: w.zero, current: w.current, active: w === active }));
@@ -461,8 +503,9 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
     >
       {(active) => (
         <>
-          <Strip axis={axis} label="Timer" unit="t" height={STRIP} bars={bars(active, (w) => w.hours)} max={max.hours} />
-          <Strip axis={axis} label="Belastning" unit="TSS" height={STRIP} bars={bars(active, (w) => w.load)} max={max.load} />
+          <Strip axis={axis} label="Timer" height={STRIP} bars={bars(active, (w) => w.hours)} max={max.hours} />
+          <div className="h-1" />
+          <Strip axis={axis} label="TSS" height={STRIP} bars={bars(active, (w) => w.load)} max={max.load} />
         </>
       )}
     </WeekGroup>
@@ -472,12 +515,11 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
 // --- /analyse/styrke (analyse-styrke.md §5) ------------------------------------------------
 
 type StrengthAxis = XDomain & { readonly ticksNarrow: readonly AxisTick[]; readonly ticksWide: readonly AxisTick[] };
-const BRACKET_Y = 15; // the bracket line in the 18px strip; the label sits above, the 6px end ticks hang below
+const BRACKET_Y = AMARKS.bracket.y; // the bracket line in the 18px strip; the label above, the 4px end ticks below
 
-/** A 1px horizontal run from x0 to x1 (day numbers) at BRACKET_Y, solid or dashed 3 2. */
+/** A 1px horizontal run from x0 to x1 (day numbers) at BRACKET_Y, solid or dashed 2 3 (deload). */
 function BracketRun({ axis, x0, x1, dashed }: { readonly axis: XDomain; readonly x0: number; readonly x1: number; readonly dashed: boolean }) {
-  const m = MARKS.bracket;
-  const [on, off] = m.deloadDash.split(" ").map(Number);
+  const m = AMARKS.bracket;
   return (
     <div
       className="absolute"
@@ -487,16 +529,16 @@ function BracketRun({ axis, x0, x1, dashed }: { readonly axis: XDomain; readonly
         top: BRACKET_Y,
         height: m.width,
         background: dashed ? undefined : m.color,
-        backgroundImage: dashed ? `repeating-linear-gradient(to right, ${m.color} 0 ${on}px, transparent ${on}px ${on + off}px)` : undefined,
+        backgroundImage: dashed ? dashGradient("to right", m.color, m.on, m.off) : undefined,
       }}
     />
   );
 }
 
 /**
- * Block ruler (instrument-analyse.md §3): a hairline bracket per block in the 18px strip (1px muted
- * line, 6px end ticks, the deload part dashed 3 2, `Blok 11` mono 12 centred above, omitted when it
- * doesn't fit), and a 1px solid ink rule at a phase change. aria-hidden.
+ * Block ruler (reset-analyse-styrke.md §4): a 1px --axis bracket per block in the 18px strip (4px
+ * end ticks, the deload part dashed 2 3, `BLOK 11` Geist Mono 11 muted centred above, omitted when
+ * it doesn't fit), and a 1.5px --shade-2 rule at a phase change through every panel. aria-hidden.
  */
 function BlockOverlay({
   axis,
@@ -507,7 +549,7 @@ function BlockOverlay({
   readonly blocks: readonly BlockSpan[];
   readonly phaseRules: readonly number[];
 }) {
-  const m = MARKS.bracket;
+  const m = AMARKS.bracket;
   const span = (x0: number, x1: number) => ({ left: xCss(axis, x0), width: `calc(${xCss(axis, x1)} - ${xCss(axis, x0)})` });
   return (
     <div aria-hidden="true">
@@ -525,16 +567,14 @@ function BlockOverlay({
                   left: i === 0 ? xCss(axis, x) : `calc(${xCss(axis, x)} - ${m.width}px)`,
                   top: BRACKET_Y,
                   width: m.width,
-                  height: m.endTick,
+                  height: m.tick,
                   background: m.color,
                 }}
               />
             ))}
-            <div className="@container absolute top-0 flex h-[14px] items-start justify-center overflow-hidden" style={span(b.x0, b.x1)}>
+            <div className="@container absolute top-0 flex h-[13px] items-start justify-center overflow-hidden" style={span(b.x0, b.x1)}>
               {/* Omitted (not clipped) when the bracket is narrower than the label + 4px each side. */}
-              <span className="hidden font-mono leading-none whitespace-nowrap text-text-muted @[3.75rem]:inline" style={tickStyle}>
-                {b.label}
-              </span>
+              <span className="hidden font-mono text-11 leading-none whitespace-nowrap text-text-muted uppercase @[4.25rem]:inline">{b.label}</span>
             </div>
           </div>
         );
@@ -544,43 +584,40 @@ function BlockOverlay({
           key={x}
           data-mark="phase"
           className="absolute z-[1]"
-          style={{ left: `calc(${xCss(axis, x)} - 0.5px)`, width: MARKS.phaseRule.width, top: BLOCK_ROOM, bottom: X_AXIS_HEIGHT, background: MARKS.phaseRule.color }}
+          style={{ left: `calc(${xCss(axis, x)} - ${AMARKS.phase.width / 2}px)`, width: AMARKS.phase.width, top: 0, bottom: X_AXIS_HEIGHT, background: AMARKS.phase.color }}
         />
       ))}
     </div>
   );
 }
 
-const PANEL = 120;
-const HEADROOM = 24; // room for the block-best tick and label (r 3 + 3 + 6 + 12)
+const PANEL = 112;
+const HEADROOM = 24; // room for the block-best tick and label (r 3.5 + 3 + 6 + 11)
 
 function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1rmPanel }) {
   const [d0, d1] = panel.domain;
   const f = (v: number) => (v - d0) / (d1 - d0);
   const top = (v: number) => `calc(${HEADROOM}px + (100% - ${HEADROOM}px) * ${1 - f(v)})`;
   const sx = (x: number) => ((x - axis.lo) / (axis.hi - axis.lo)) * 1000;
+  const e = AMARKS.e1rm;
   return (
-    <div className="flex flex-col gap-1">
-      <p className="relative text-14 font-medium" aria-hidden="true" style={{ marginLeft: Y_AXIS_WIDTH }}>
-        {panel.name} <span className="font-normal text-text-muted">kg</span>
-      </p>
+    <div className="relative">
+      <span className="absolute top-0 left-0 z-[1] font-mono text-11 text-text-muted uppercase" aria-hidden="true">
+        {panel.name}
+      </span>
       {panel.empty !== null ? (
-        <p
-          className="relative flex items-center text-14 text-text-muted"
-          style={{ height: PANEL, marginLeft: Y_AXIS_WIDTH }}
-        >
+        <p className="flex items-center pt-4 font-sans text-13 text-text-muted" style={{ height: PANEL }}>
           {panel.empty}
         </p>
       ) : (
         <div className="relative" style={{ height: PANEL }} aria-hidden="true">
           {panel.ticks.map((t) => (
-            <span
-              key={t}
-              className="absolute left-0 -translate-y-1/2 font-mono leading-none text-text-muted tabular-nums"
-              style={{ ...tickStyle, top: top(t) }}
-            >
-              {t.toLocaleString("da-DK")}
-            </span>
+            <div key={t}>
+              <div className="absolute border-t border-dashed border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: top(t) }} />
+              <span className="absolute right-0 -translate-y-1/2 font-mono text-11 leading-none text-text-muted" style={{ top: top(t) }}>
+                {t.toLocaleString("da-DK")}
+              </span>
+            </div>
           ))}
           {panel.sheet.map((s) => (
             <div key={s.x0}>
@@ -590,13 +627,13 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
                   left: xCss(axis, s.x0),
                   width: `calc(${xCss(axis, s.x1)} - ${xCss(axis, s.x0)})`,
                   top: top(s.y),
-                  height: MARKS.e1rm.sheet.width,
-                  backgroundImage: `repeating-linear-gradient(to right, ${MARKS.e1rm.sheet.color} 0 6px, transparent 6px 10px)`,
+                  height: e.sheet.width,
+                  backgroundImage: dashGradient("to right", e.sheet.color, e.sheet.on, e.sheet.off),
                 }}
               />
               <span
-                className="absolute -translate-x-full bg-bg px-0.5 font-mono leading-none text-text-muted tabular-nums"
-                style={{ ...tickStyle, left: xCss(axis, s.x1), top: `calc(${top(s.y)} - 14px)` }}
+                className="absolute -translate-x-full bg-card px-0.5 font-mono text-11 leading-none text-text-muted"
+                style={{ left: xCss(axis, s.x1), top: `calc(${top(s.y)} - 14px)` }}
               >
                 {s.label}
               </span>
@@ -618,18 +655,17 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
                 key={seg[0]?.x}
                 points={seg.map((p) => `${sx(p.x)},${(1 - f(p.y)) * 1000}`).join(" ")}
                 fill="none"
-                stroke={MARKS.e1rm.line.color}
-                strokeWidth={MARKS.e1rm.line.width}
+                stroke={e.line.color}
+                strokeWidth={e.line.width}
                 vectorEffect="non-scaling-stroke"
                 strokeLinejoin="round"
               />
             ))}
           </svg>
           {panel.points.map((p) => {
-            const e = MARKS.e1rm;
             const r = p.logged ? e.logged.r : e.prescribed.r;
             const x = xCss(axis, p.x);
-            // Block best: a 1×6 ink tick 3px off the point, its value mono 12 beyond it (below when
+            // Block best: a 1×6 --text tick 3px off the point, its value mono 11 beyond it (below when
             // the point sits under its block's sheet line). No ring.
             const tickTop = p.labelBelow ? `calc(${top(p.y)} + ${r + e.best.gap}px)` : `calc(${top(p.y)} - ${r + e.best.gap + e.best.height}px)`;
             const labelTop = p.labelBelow
@@ -644,21 +680,18 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
                       className="absolute"
                       style={{ left: `calc(${x} - ${e.best.width / 2}px)`, top: tickTop, width: e.best.width, height: e.best.height, background: e.best.color }}
                     />
-                    <span
-                      className="absolute -translate-x-1/2 font-mono leading-none text-text tabular-nums"
-                      style={{ ...tickStyle, left: x, top: labelTop }}
-                    >
+                    <span className="absolute -translate-x-1/2 font-mono text-11 leading-none text-text" style={{ left: x, top: labelTop }}>
                       {p.label}
                     </span>
                   </>
                 )}
                 <span
                   data-mark={p.logged ? "logged" : "prescribed"}
-                  className="absolute -translate-1/2 rounded-full"
+                  className="absolute -translate-1/2 rounded-pill"
                   style={
                     p.logged
                       ? { left: x, top: top(p.y), width: 2 * r, height: 2 * r, background: e.logged.fill }
-                      : { left: x, top: top(p.y), width: 2 * r, height: 2 * r, border: `${e.prescribed.stroke}px solid ${e.prescribed.color}` }
+                      : { left: x, top: top(p.y), width: 2 * r, height: 2 * r, background: e.prescribed.fill, border: `${e.prescribed.stroke}px solid ${e.prescribed.color}` }
                   }
                 />
               </div>
@@ -675,6 +708,8 @@ type StrengthProps = {
   readonly blocks: readonly BlockSpan[];
   readonly phaseRules: readonly number[];
   readonly weeks: readonly StrengthWeek[];
+  /** Today's day number (the --today line). */
+  readonly todayX: number;
 };
 
 type PanelsProps = StrengthProps & { readonly panels: readonly E1rmPanel[] };
@@ -687,7 +722,7 @@ export function E1rmPanels(props: PanelsProps) {
   );
 }
 
-function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProps) {
+function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels, todayX }: PanelsProps) {
   const hydrated = useHydrated();
   const wide = useWide();
   if (!hydrated) return <Skeleton height={E1RM_PANELS_HEIGHT} />;
@@ -701,6 +736,7 @@ function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProp
       cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
       padTop={BLOCK_ROOM}
+      todayX={todayX}
     >
       {() => panels.map((p) => <E1rmPlot key={p.lift} axis={axis} panel={p} />)}
     </WeekGroup>
@@ -717,12 +753,12 @@ export function TonnageStrips(props: TonnageProps) {
   );
 }
 
-const TONNAGE_STRIP = 80;
+const TONNAGE_STRIP = 72;
 
-function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnageProps) {
+function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max, todayX }: TonnageProps) {
   const hydrated = useHydrated();
   const wide = useWide();
-  if (!hydrated) return <Skeleton height="h-[372px]" />;
+  if (!hydrated) return <Skeleton height="h-[324px]" />;
   return (
     <WeekGroup
       axis={axis}
@@ -733,6 +769,7 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnagePro
       cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
       padTop={BLOCK_ROOM}
+      todayX={todayX}
     >
       {(active) =>
         LIFTS.map((lift) => (
@@ -740,7 +777,6 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnagePro
             key={lift}
             axis={axis}
             label={LIFT_NAME[lift]}
-            unit="kg"
             height={TONNAGE_STRIP}
             max={max[lift]}
             bars={weeks.map((w) => ({
@@ -750,6 +786,7 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnagePro
               zero: w.tonnage[lift] === 0,
               current: w.current,
               active: w === active,
+              deload: isDeloadWeek(w, blocks),
             }))}
           />
         ))
