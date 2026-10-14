@@ -320,6 +320,8 @@ test("1a/1c answers-round §1: the cycling basis sentences, singular and plural,
     "Cyklingen i prognosen bygger på 1 planlagt tur i intervals.icu i 1 uge. De andre uger bygger på 1 tur de sidste 28 dage.",
   );
   assert.equal(cyclingBasisNote(null, { rides: 9, weeks: 8, noLoad: 0 }, true), "Cyklingen i prognosen bygger kun på dine 9 planlagte ture i intervals.icu.");
+  // The spec's singular after a possessive is definite (tester, 2026-10-14).
+  assert.equal(cyclingBasisNote(null, { rides: 1, weeks: 1, noLoad: 0 }, true), "Cyklingen i prognosen bygger kun på din 1 planlagte tur i intervals.icu.");
   assert.equal(
     cyclingBasisNote(12, { rides: 3, weeks: 2, noLoad: 1 }, false),
     "Cyklingen i prognosen bygger på 3 planlagte ture i intervals.icu i 2 uger. De andre uger bygger på 12 ture de sidste 28 dage. 1 planlagt tur har ingen belastning i intervals.icu, så den dag bruger din typiske uge.",

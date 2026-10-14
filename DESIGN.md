@@ -127,7 +127,7 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 | VI cell | | | Flagged: value `--warning` + warning icon, sr `, ujævn effekt på en Z2-dag`. No VI: `VI –` | |
 | EF (rolige ture) | 3 | `tirs. 3. jun. 2025` | `EF 1,24` · `Trend 1,22` (`Trend –` when null) | `NP 165 W · puls 133 · 1:45 t` |
 | Timer og belastning | 3 | `Uge 23 · 2.–8. jun. 2025` (+ ` · indtil videre`) | `Timer 4:30 t` · `Belastning 210 TSS` · `Ture 3` | `1 udeladt fra trends`; zero week: line 2 `Ingen ture`; null load: `Belastning –` + fact `Belastning ikke beregnet` |
-| Styrke e1RM | 5 | `Uge 39 · 22.–28. sep. · blok 12, uge 1` (+ suffixes per `analyse-styrke.md` §5c) | none: one line per lift, `Squat 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet` (` · blokkens bedste`) | the lift lines are lines 2–4; last fact `1RM i arket: squat 180 kg, bænkpres 102,5 kg (ikke testet)` (omitted when none) |
+| Styrke e1RM | 5 | `Uge 39 · 22.–28. sep. · blok 12, uge 1` (+ suffixes per `analyse-styrke.md` §5c) | none: one line per lift, `Squat 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet` (` · blokkens bedste`) | the lift lines are lines 2–4; last fact `1RM i arket: squat 150 kg, bænkpres 100 kg (ikke testet)` (illustrative numbers) (omitted when none) |
 | Styrke tonnage | 4 | as e1RM | none: one line per lift, `Squat 2.100 kg · 12 sæt` / `Squat ikke trænet` | lines 2–4 |
 
 ## Accessibility checklist (run before merge)

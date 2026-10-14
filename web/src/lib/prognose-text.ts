@@ -95,8 +95,9 @@ export function cyclingBasisNote(
         ? " 1 planlagt tur har ingen belastning i intervals.icu, så den dag bruger din typiske uge."
         : ` ${calendar.noLoad} planlagte ture har ingen belastning i intervals.icu, så de dage bruger din typiske uge.`;
   if (allCalendar) {
-    const dine = calendar.rides === 1 ? "din" : "dine";
-    return `Cyklingen i prognosen bygger kun på ${dine} ${planlagteTure(calendar.rides)} i intervals.icu.${noLoad}`;
+    // After a possessive the adjective is definite: "din 1 planlagte tur" (tester, 2026-10-14).
+    const rides = calendar.rides === 1 ? "din 1 planlagte tur" : `dine ${calendar.rides} planlagte ture`;
+    return `Cyklingen i prognosen bygger kun på ${rides} i intervals.icu.${noLoad}`;
   }
   const weeks = `${calendar.weeks} ${calendar.weeks === 1 ? "uge" : "uger"}`;
   const others = typicalRides === null ? "" : ` De andre uger bygger på ${tur(typicalRides)} de sidste 28 dage.`;

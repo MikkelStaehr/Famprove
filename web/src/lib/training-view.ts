@@ -104,12 +104,12 @@ export type ExerciseView = {
   readonly sets: readonly SetRef[]; // this row's sets, 1..n (each has its own tick)
 };
 
-/** The next session to do: session k + 1 of this ISO week. It has no date until it's done. */
 /** answers-round.md §4: the "Forslag er et skøn …" footnote only when a shown set has a suggested kg. */
 export function hasSuggestion(session: Pick<StrengthSession, "exercises">): boolean {
   return session.exercises.some((e) => e.suggestedKg !== null && e.suggestedKg > 0);
 }
 
+/** The next session to do: session k + 1 of this ISO week. It has no date until it's done. */
 export type StrengthSession = {
   readonly session: number; // n
   readonly of: number; // N, sessions the sheet prescribes this ISO week
