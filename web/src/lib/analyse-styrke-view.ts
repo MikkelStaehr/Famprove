@@ -4,7 +4,7 @@
  * (latest block, block best, the sheet 1RM per block and lift), counting rows, date -> x, choosing
  * a y domain, and formatting. No deltas, no sums, no block totals.
  */
-import { addDays, dayNumber, isoWeekNumber, isoWeekStart } from "./dates.ts";
+import { addDays, dayNumber, isoWeek, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
 import type {
   IsoDate,
@@ -423,7 +423,7 @@ export function strengthWeeks(
     const isCurrent = ws === current;
     const where = blockNo === null ? "mellem blokke" : `${blockLabel(blockNo)}, uge ${blockWeekOf(weeks, blockNo, ws)}`;
     const head = [
-      `Uge ${isoWeekNumber(ws)} · ${yearOf(end) === year ? range : `${range} ${yearOf(end)}`} · ${where}`,
+      `Uge ${isoWeek(ws).week} · ${yearOf(end) === year ? range : `${range} ${yearOf(end)}`} · ${where}`,
       ...(block !== undefined && block.deloadStart !== null && block.deloadStart <= ws ? ["deload"] : []),
       ...(rows.some((r) => r.status === "pre_log") ? ["før aktivitetslog"] : []),
       ...(isCurrent ? ["indtil videre"] : []),
@@ -456,7 +456,7 @@ export function strengthWeeks(
       tonnageTip,
       tonnage,
       srRow: [
-        `Uge ${isoWeekNumber(ws)} · ${range}`,
+        `Uge ${isoWeek(ws).week} · ${range}`,
         where,
         tonnageText(tonnage.SQUAT),
         tonnageText(tonnage.BENCH),

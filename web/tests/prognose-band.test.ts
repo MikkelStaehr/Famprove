@@ -85,7 +85,7 @@ function row(date: string, bands: Partial<Pick<DailyProjectionRow, "ctlBand" | "
 
 function data(projection: readonly DailyProjectionRow[]): DashboardData {
   const daily = Array.from({ length: 10 }, (_, i) => day(addDays(LAST, i - 9)));
-  return { daily, blocks: [], weeks: [], projection };
+  return { daily, blocks: [], weeks: [], projection, weeklyPlan: [] };
 }
 
 function fixtureRows(): DailyProjectionRow[] {

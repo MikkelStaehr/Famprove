@@ -75,6 +75,7 @@ test("currentWeek follows the latest row's date, not the clock", () => {
     blocks: [],
     weeks: [WEEK_40],
     projection: [],
+    weeklyPlan: [],
   };
   const week = currentWeek(data, "2026-09-29");
   assert.ok(week);
@@ -85,9 +86,9 @@ test("currentWeek follows the latest row's date, not the clock", () => {
 
 test("buildDashboardView: empty without rows, hero from the latest row otherwise", () => {
   const now = new Date("2026-09-28T12:00:00Z");
-  assert.deepEqual(buildDashboardView({ daily: [], blocks: [], weeks: [], projection: [] }, now), { kind: "empty" });
+  assert.deepEqual(buildDashboardView({ daily: [], blocks: [], weeks: [], projection: [], weeklyPlan: [] }, now), { kind: "empty" });
   const view = buildDashboardView(
-    { daily: [day("2026-09-27", { tsb: -12 }), day("2026-09-28", { tsb: 10.8, formZone: "fresh" })], blocks: [], weeks: [WEEK_40], projection: [] },
+    { daily: [day("2026-09-27", { tsb: -12 }), day("2026-09-28", { tsb: 10.8, formZone: "fresh" })], blocks: [], weeks: [WEEK_40], projection: [], weeklyPlan: [] },
     now,
   );
   assert.equal(view.kind, "ready");
@@ -134,7 +135,7 @@ test("chart: every actual day (the Sæson range), prognose up to 56 days, only a
   const daily = Array.from({ length: 80 }, (_, i) => day(addDays("2026-07-12", i)));
   const last = daily.at(-1)?.date ?? "";
   const projection = [projected(last, 1), ...Array.from({ length: 60 }, (_, i) => projected(addDays(last, i + 1), 10))];
-  const view = buildDashboardView({ daily, blocks: [], weeks: [], projection }, new Date(`${last}T12:00:00Z`));
+  const view = buildDashboardView({ daily, blocks: [], weeks: [], projection, weeklyPlan: [] }, new Date(`${last}T12:00:00Z`));
   assert.equal(view.kind, "ready");
   if (view.kind !== "ready") return;
   const actual = view.chart.filter((p) => p.kind === "actual");
@@ -146,8 +147,8 @@ test("chart: every actual day (the Sæson range), prognose up to 56 days, only a
   assert.equal(future[0]?.estimate?.sessions[0]?.dayEstimated, true);
   assert.equal(view.lastActual, last);
   assert.equal(view.projection, "ready");
-  const none = buildDashboardView({ daily, blocks: [], weeks: [], projection: [] }, new Date());
-  const failed = buildDashboardView({ daily, blocks: [], weeks: [], projection: null }, new Date());
+  const none = buildDashboardView({ daily, blocks: [], weeks: [], projection: [], weeklyPlan: [] }, new Date());
+  const failed = buildDashboardView({ daily, blocks: [], weeks: [], projection: null, weeklyPlan: [] }, new Date());
   assert.equal(none.kind === "ready" && none.projection, "none");
   assert.equal(failed.kind === "ready" && failed.projection, "error");
 });

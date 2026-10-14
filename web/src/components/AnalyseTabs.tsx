@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import type { Freshness } from "@/lib/dashboard-view";
-import { formatUpdatedAt } from "@/lib/format";
+import { updatedText } from "@/lib/format";
 
 import { UpdatedLine } from "./UpdatedLine";
 
@@ -60,7 +60,7 @@ export function AnalyseHeader({
     <div className="-mt-1 flex flex-col gap-3 lg:col-span-3">
       {freshness === null ? null : freshness.kind === "fresh" ? (
         <p className="px-1 font-mono text-12 text-text-muted">
-          opdateret <time dateTime={freshness.computedAt}>{formatUpdatedAt(freshness.computedAt)}</time>
+          opdateret <time dateTime={freshness.computedAt}>{updatedText(freshness.computedAt, null).sentence}</time>
         </p>
       ) : (
         <div className="px-1">

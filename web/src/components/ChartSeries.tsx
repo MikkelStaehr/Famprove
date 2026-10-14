@@ -4,8 +4,8 @@ import { formatLoad, formatSigned } from "@/lib/format";
 import { CombSwatch, HollowDotSwatch, LineSwatch, NeedleSwatch } from "./ChartMarks";
 
 /**
- * The chart's three series and their stroke sample, shared by TrendChart (client) and the
- * /load explainer (server). No hooks, no "use client": it renders in either.
+ * The load chart's three series and their stroke sample, used by the /load explainer (server).
+ * No hooks, no "use client": it renders in either.
  */
 export type SeriesKey = "ctl" | "atl" | "tsb";
 
@@ -35,7 +35,7 @@ export function SeriesSwatch({ series }: { readonly series: Series }) {
   return series.form === "needle" ? <NeedleSwatch /> : <LineSwatch dash={series.dash} />;
 }
 
-/** Former name of SeriesSwatch (TrendChart, LoadExplainer); same mark-form swatch. */
+/** Former name of SeriesSwatch (LoadExplainer); same mark-form swatch. */
 export const LineSample = SeriesSwatch;
 
 /** Legend / explainer name of the prognose region (load.md §9b). */

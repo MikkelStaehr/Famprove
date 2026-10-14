@@ -5,7 +5,7 @@
  */
 import { freshness, zoneDisplay } from "./dashboard-view.ts";
 import type { Freshness, Hero } from "./dashboard-view.ts";
-import { addDays, isoWeekNumber, isoWeekStart } from "./dates.ts";
+import { addDays, isoWeek, isoWeekStart } from "./dates.ts";
 import type { TrainingPlanData } from "./db/queries.ts";
 import type {
   DailyLoadRow,
@@ -24,7 +24,7 @@ import {
   formatKg,
   formatSetLoad,
   formatSetsReps,
-  formatUpdatedAt,
+  updatedText,
   spokenRange,
   spokenSigned,
 } from "./format.ts";
@@ -275,7 +275,7 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
   const current = slot !== undefined && slot.block !== null && slot.week !== null ? slot.session : null;
   const thisWeek = data.sets.filter((s) => s.weekStart === data.weekStart);
   const base = {
-    isoWeek: isoWeekNumber(data.weekStart),
+    isoWeek: isoWeek(data.weekStart).week,
     planned: planned.length,
     done,
     nextWeekStart: addDays(data.weekStart, 7),
@@ -662,8 +662,8 @@ export function sessionSummary(
  */
 export function updatedCaption(freshness: Freshness, today: IsoDate): string {
   if (freshness.kind === "unknown") return "opdatering ukendt";
-  const [date, time] = formatUpdatedAt(freshness.computedAt).split(" kl. ");
-  const when = date === formatDay(today).split(" ").slice(1).join(" ") ? time : `${date} ${time}`;
+  const at = updatedText(freshness.computedAt, today);
+  const when = at.sameDay === true ? at.time : `${at.date} ${at.time}`;
   return `${freshness.kind === "stale" ? "forældet · " : ""}opdateret ${when}`;
 }
 

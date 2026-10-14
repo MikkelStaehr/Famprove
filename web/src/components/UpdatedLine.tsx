@@ -1,5 +1,5 @@
 import type { Freshness } from "@/lib/dashboard-view";
-import { formatUpdatedAt } from "@/lib/format";
+import { updatedText } from "@/lib/format";
 
 import { WarningLine } from "./WarningLine";
 
@@ -16,7 +16,7 @@ export function UpdatedLine({ freshness, staleNote, unknownNote }: UpdatedLinePr
   if (freshness.kind === "fresh") {
     return (
       <p className="font-mono text-12 text-text-muted">
-        opdateret <time dateTime={freshness.computedAt}>{formatUpdatedAt(freshness.computedAt)}</time>
+        opdateret <time dateTime={freshness.computedAt}>{updatedText(freshness.computedAt, null).sentence}</time>
       </p>
     );
   }
@@ -25,7 +25,7 @@ export function UpdatedLine({ freshness, staleNote, unknownNote }: UpdatedLinePr
       {freshness.kind === "stale" ? (
         <>
           Forældet: sidst opdateret{" "}
-          <time dateTime={freshness.computedAt}>{formatUpdatedAt(freshness.computedAt)}</time>.{" "}
+          <time dateTime={freshness.computedAt}>{updatedText(freshness.computedAt, null).sentence}</time>.{" "}
           {staleNote}
         </>
       ) : (

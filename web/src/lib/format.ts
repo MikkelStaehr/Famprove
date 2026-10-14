@@ -74,10 +74,30 @@ export function formatDayLong(date: IsoDate): string {
   return DAY_LONG_FORMAT.format(new Date(`${date}T00:00:00Z`));
 }
 
-/** computed_at (ISO timestamptz) in LOCAL_TZ, e.g. "28. sep. kl. 05.03". */
-export function formatUpdatedAt(computedAt: string): string {
+/** An "opdateret" time in parts, so no caller splits a sentence apart again. */
+export type UpdatedText = {
+  readonly date: string; // "28. sep." (LOCAL_TZ)
+  readonly time: string; // "05.03" (LOCAL_TZ)
+  readonly sentence: string; // "28. sep. kl. 05.03"
+  /** computed_at falls on `today` (LOCAL_TZ); null when the caller has no day to compare with. */
+  readonly sameDay: boolean | null;
+};
+
+/**
+ * The one "opdateret" formatter: computed_at (ISO timestamptz) in LOCAL_TZ as parts. `today` is
+ * the screen's local date (DEV_TODAY-aware, so a date, not a clock), or null when the screen
+ * doesn't need `sameDay`.
+ */
+export function updatedText(computedAt: string, today: IsoDate | null): UpdatedText {
   const at = new Date(computedAt);
-  return `${UPDATED_DATE_FORMAT.format(at)} kl. ${UPDATED_TIME_FORMAT.format(at)}`;
+  const date = UPDATED_DATE_FORMAT.format(at);
+  const time = UPDATED_TIME_FORMAT.format(at);
+  return { date, time, sentence: `${date} kl. ${time}`, sameDay: today === null ? null : date === formatDate(today) };
+}
+
+/** computed_at (ISO timestamptz) in LOCAL_TZ, e.g. "28. sep. kl. 05.03" (updatedText's sentence). */
+export function formatUpdatedAt(computedAt: string): string {
+  return updatedText(computedAt, null).sentence;
 }
 
 /** A time (ISO timestamptz) as a time of day in LOCAL_TZ: "18.42". */

@@ -52,6 +52,7 @@ const DATA: DashboardData = {
   blocks: [],
   weeks: [week(39, "2026-09-21"), week(38, "2026-09-14"), week(40, "2026-09-28")],
   projection: [],
+  weeklyPlan: [],
 };
 
 function set(overrides: Partial<StrengthSetRow>): StrengthSetRow {
@@ -153,6 +154,7 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
       blocks: [],
       weeks: [],
       projection: [],
+      weeklyPlan: [],
     },
     week(40, "2026-09-28"),
   );
@@ -211,7 +213,7 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
 
 test("effective kg: a bodyweight exercise with nothing logged shows its bodyweight share", () => {
   const w = weekView(
-    { daily: [day("2026-09-29", 0, 10)], blocks: [], weeks: [], projection: [] },
+    { daily: [day("2026-09-29", 0, 10)], blocks: [], weeks: [], projection: [], weeklyPlan: [] },
     week(40, "2026-09-28"),
   );
   const [tue] = dayDetails(w, {
@@ -294,7 +296,7 @@ test("parseActivityRow and parseStrengthSetRow map and validate", () => {
 
 test("a ride without ride_metrics (before 2024-12-30) has no VI and no warning", () => {
   const w = weekView(
-    { daily: [day("2026-09-30", 60, 0)], blocks: [], weeks: [], projection: [] },
+    { daily: [day("2026-09-30", 60, 0)], blocks: [], weeks: [], projection: [], weeklyPlan: [] },
     week(40, "2026-09-28"),
   );
   const [wed] = dayDetails(w, {
@@ -328,7 +330,7 @@ test("contract: the power-check rows Python writes parse (fixtures/power_checks.
 
 test("week view: the score per set is the final one that feeds the TSS; an old row falls back", () => {
   const w = weekView(
-    { daily: [day("2026-09-28"), day("2026-09-29", 0, 7.0)], blocks: [], weeks: [], projection: [] },
+    { daily: [day("2026-09-28"), day("2026-09-29", 0, 7.0)], blocks: [], weeks: [], projection: [], weeklyPlan: [] },
     week(40, "2026-09-28"),
   );
   const detail = dayDetails(w, {

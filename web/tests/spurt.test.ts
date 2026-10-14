@@ -50,7 +50,7 @@ test("DESIGN.md Part B lists the Ember tokens this test checks", () => {
   assert.equal(radii.length, 8, `parsed ${radii.length} radius tokens`);
   assert.deepEqual(
     sizes.map((s) => s.px),
-    [56, 48, 44, 40, 32, 28, 24, 22, 20, 16, 15, 14, 13, 12, 11],
+    [56, 48, 44, 40, 32, 28, 24, 22, 20, 16, 15, 14, 13, 12, 11, 10],
   );
 });
 

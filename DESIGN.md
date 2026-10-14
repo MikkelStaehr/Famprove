@@ -264,8 +264,8 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 | `text-14` (1.4) | Geist 400 · Mono 400/500 | `ListRow` text; row values (mono); readout cells (mono) |
 | `text-13` (1.4) | Geist 400 | supporting sentences, notes, readout line 1 and facts |
 | `text-12` (1.3) | Mono 400 | `MonoCaption` large: card captions (`FORM I DAG`), date ranges, the updated line, `ListRow` day, segment labels, `ZonePill` |
-| `text-10` (1.2) | Mono 400/500 | only the training-day grid's ISO week numbers, [A9] |
 | `text-11` (1.3) | Mono 400/500 | `MonoCaption` small: tile labels and tile supporting lines, legends, axis labels, `ZoneBar` labels, `I DAG`, tab labels (Geist) |
+| `text-10` (1.2) | Mono 400/500 | only the training-day grid's ISO week numbers, [A9] |
 
 - Nothing smaller than 11px anywhere (the mockup's 10px axis labels become 11px), with one exception: **[A9] user override (2026-10-14):** the training-day grid's ISO week numbers are `text-10` Geist Mono, because 12 two-digit numbers must sit centred on 20px cells. Guardrail kept: they are `--text-muted` / `--text` on `--card` (≥ 4.5:1, computed by `ui` at render), decorative (`aria-hidden`; the hidden table holds the dates), and carry no meaning alone (the current week also differs by weight). Captions: labels uppercase (`FORM I DAG`, `FITNESS`, `UGE 42`); values in a caption slot (date ranges, `12 uger`, `- - - prognose`) as written; no letter-spacing. Numbers: tabular (`font-variant-numeric: tabular-nums`, Geist Mono is tabular by nature).
 

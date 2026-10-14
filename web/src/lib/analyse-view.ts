@@ -5,7 +5,7 @@
  */
 import { eftpDot, maxLoadOf } from "./chart-marks.ts";
 import { MISSING, type Readout, viCell } from "./chart-readout.ts";
-import { addDays, dayNumber, isoWeekNumber, isoWeekStart } from "./dates.ts";
+import { addDays, dayNumber, isoWeek, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
 import type { DataError } from "./data-error.ts";
 import type { CyclingAnalysisData, CyclingWeekRow, IsoDate, RideExclusion, RideMetricsRow } from "./db/rows.ts";
@@ -450,7 +450,7 @@ export function weekBars(weeks: readonly CyclingWeekRow[], today: IsoDate, lo: n
     const end = addDays(w.weekStart, 6);
     const isCurrent = w.weekStart === current;
     const range = formatDateRange(w.weekStart, end);
-    const head = `Uge ${isoWeekNumber(w.weekStart)} · ${yearOf(end) === year ? range : `${range} ${yearOf(end)}`}`;
+    const head = `Uge ${isoWeek(w.weekStart).week} · ${yearOf(end) === year ? range : `${range} ${yearOf(end)}`}`;
     const tip =
       w.rides === 0
         ? [isCurrent ? `${head} · indtil videre` : head, "Ingen ture"]

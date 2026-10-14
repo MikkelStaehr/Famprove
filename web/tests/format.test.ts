@@ -13,6 +13,7 @@ import {
   formatSetLoad,
   formatSigned,
   formatUpdatedAt,
+  updatedText,
   formatWatts,
   formatWeekParam,
   stopAfter,
@@ -108,3 +109,18 @@ test("formatDateRange shares the month when it can", () => {
   assert.equal(formatDateRange("2026-09-28", "2026-10-04"), "28. sep.–4. okt.");
 });
 
+
+test("updatedText returns parts (Copenhagen time), never a sentence to split", () => {
+  assert.deepEqual(updatedText("2026-09-28T03:05:00Z", null), {
+    date: "28. sep.",
+    time: "05.05",
+    sentence: "28. sep. kl. 05.05",
+    sameDay: null,
+  });
+  // 23:30 UTC in winter is the next local day (CET): the date follows Copenhagen, not UTC.
+  assert.equal(updatedText("2026-01-15T23:30:00Z", "2026-01-16").sameDay, true);
+  assert.equal(updatedText("2026-01-15T23:30:00Z", "2026-01-15").sameDay, false);
+  assert.equal(updatedText("2026-10-14T03:00:00Z", "2026-10-14").sameDay, true);
+  assert.equal(updatedText("2026-10-13T18:00:00Z", "2026-10-14").sameDay, false);
+  assert.equal(formatUpdatedAt("2026-10-13T18:00:00Z"), updatedText("2026-10-13T18:00:00Z", null).sentence);
+});

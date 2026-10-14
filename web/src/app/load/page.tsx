@@ -37,9 +37,10 @@ import {
   formatLoad,
   formatSigned,
   formatUpdatedAt,
+  updatedText,
   stopAfter,
 } from "@/lib/format";
-import { isoWeekNumber } from "@/lib/dates";
+import { isoWeek } from "@/lib/dates";
 import {
   COARSE_ZONES_NOTE,
   prognoseSentence,
@@ -112,7 +113,7 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
         line={
           state.kind === "ready" && state.freshness.kind === "fresh" ? (
             <>
-              opdateret <time dateTime={state.freshness.computedAt}>{formatUpdatedAt(state.freshness.computedAt)}</time>
+              opdateret <time dateTime={state.freshness.computedAt}>{updatedText(state.freshness.computedAt, null).sentence}</time>
             </>
           ) : undefined
         }
@@ -191,7 +192,7 @@ function Tiles({ view }: { readonly view: ReadyView }) {
   const { hero, thisWeek } = view;
   const delta = fitnessDelta(hero.ctlRamp7d);
   const ramp = hero.ctlRamp7d === null ? null : formatSigned(hero.ctlRamp7d).replace("+", "");
-  const weekNo = thisWeek?.isoWeek ?? isoWeekNumber(hero.date);
+  const weekNo = thisWeek?.isoWeek ?? isoWeek(hero.date).week;
   return (
     <dl className={`grid grid-cols-3 gap-3 ${LOAD_PLACE.tiles}`}>
       <Tile

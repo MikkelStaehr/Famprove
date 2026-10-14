@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { isoWeekNumber, isoWeekStart } from "../src/lib/dates.ts";
+import { isoWeek, isoWeekStart } from "../src/lib/dates.ts";
 import type { TrainingPlanData } from "../src/lib/db/queries.ts";
 import {
   parsePlannedSetRow,
@@ -124,9 +124,9 @@ test("ISO week helpers", () => {
   assert.equal(isoWeekStart("2026-09-30"), WEEK_40);
   assert.equal(isoWeekStart("2026-10-04"), WEEK_40); // Sunday belongs to the week before
   assert.equal(isoWeekStart(WEEK_40), WEEK_40);
-  assert.equal(isoWeekNumber("2026-09-30"), 40);
-  assert.equal(isoWeekNumber("2027-01-01"), 53); // Friday: still ISO 2026-W53
-  assert.equal(isoWeekNumber("2026-01-01"), 1);
+  assert.equal(isoWeek("2026-09-30").week, 40);
+  assert.equal(isoWeek("2027-01-01").week, 53); // Friday: still ISO 2026-W53
+  assert.equal(isoWeek("2026-01-01").week, 1);
 });
 
 test("week 40 example: Wed 30 Sept after one activity on Tue 29 shows session 2 of 3, undated", () => {

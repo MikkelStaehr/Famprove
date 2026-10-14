@@ -22,9 +22,14 @@ export function isoWeekStart(date: IsoDate): IsoDate {
   return addDays(date, -weekday);
 }
 
-/** ISO week number of `date`, e.g. isoWeekNumber("2026-09-30") -> 40. */
-export function isoWeekNumber(date: IsoDate): number {
-  const thursday = addDays(isoWeekStart(date), 3); // the ISO year is the Thursday's year
-  const jan1 = `${thursday.slice(0, 4)}-01-01`;
-  return Math.floor((Date.parse(`${thursday}T00:00:00Z`) - Date.parse(`${jan1}T00:00:00Z`)) / (7 * MS_PER_DAY)) + 1;
+/**
+ * ISO year and week of `date` (the week belongs to the year of its Thursday), e.g.
+ * isoWeek("2026-09-30") -> { year: 2026, week: 40 }, isoWeek("2027-01-01") -> { year: 2026, week: 53 }.
+ * The one ISO-week computation in the web; SQL views (weekly_load, weekly_plan) carry their own.
+ */
+export function isoWeek(date: IsoDate): { readonly year: number; readonly week: number } {
+  const thursday = addDays(isoWeekStart(date), 3);
+  const year = Number(thursday.slice(0, 4));
+  const jan1 = Date.parse(`${year}-01-01T00:00:00Z`);
+  return { year, week: Math.floor((Date.parse(`${thursday}T00:00:00Z`) - jan1) / (7 * MS_PER_DAY)) + 1 };
 }

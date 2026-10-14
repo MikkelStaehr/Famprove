@@ -10,10 +10,9 @@ import { gapSeam, highestAt, nearestIndex, type Readout, restingReadout, resting
 import { formatLoad } from "@/lib/format";
 import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
-import { useWidth } from "./chart-hooks";
+import { ChartBoundary, useHydrated, useWide, useWidth } from "./chart-hooks";
 import { HollowDot } from "./ChartMarks";
 import { ChartReadout, Marker, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
-import { ChartBoundary, useHydrated, useWide } from "./TrendChart";
 
 /**
  * /analyse charts (design/specs/analyse.md §4-§5). One x domain [lo, hi] for all three, the pause
