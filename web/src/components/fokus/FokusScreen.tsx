@@ -338,7 +338,7 @@ function SetView({
       <section aria-labelledby="fokus-set" className="mt-4 flex flex-1 flex-col">
         {/* reset-fokus.md §3: the figure block in a hero Card (26, padding 20); its old margins are the card's. */}
         <div className="mb-10 flex flex-col rounded-hero border border-border bg-card p-5">
-        <h2 id="fokus-set" className="font-sans text-28 font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">
+        <h2 id="fokus-set" className="font-sans text-32 font-semibold [overflow-wrap:anywhere]">
           {exerciseName(e)}
         </h2>
         <p className={`${CAPTION} mt-3`}>{setTitle(current)}</p>
@@ -571,8 +571,8 @@ function CountsFigure({ text }: { readonly text: string }) {
   );
 }
 
-/** Reps, RPE and kg (DESIGN.md text-56: Fokus reps / kg / timer): Geist Mono 500, −0.03em, tabular. */
-const FIGURE = "font-mono text-56 font-medium tabular-nums";
+/** Reps, RPE and kg (DESIGN.md text-44: Fokus reps / kg figures; the timer is text-56): Geist Mono 500, −0.03em, tabular. */
+const FIGURE = "font-mono text-44 font-medium tabular-nums";
 
 /** A kg figure with words in it ("kropsvægt + 10"), not a plain number. */
 const hasWords = (figure: string): boolean => /\p{L}/u.test(figure);

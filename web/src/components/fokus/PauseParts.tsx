@@ -159,7 +159,7 @@ function RepsStepper({
           <Icon name="minus" size={22} />
           <span className="sr-only">Færre reps</span>
         </button>
-        <output aria-live="polite" className="min-w-[3ch] text-center font-mono text-28 font-medium tabular-nums">
+        <output aria-live="polite" className="min-w-[3ch] text-center font-mono text-32 font-medium tabular-nums">
           {value}
         </output>
         <button type="button" disabled={value >= max} aria-disabled={value >= max} onClick={() => change(1)} className={stepButton}>
@@ -268,7 +268,7 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
   const basis = rampBasis(exercise);
   return (
     <section aria-labelledby="fokus-warmup" className={CARD}>
-      <h2 id="fokus-warmup" className="font-sans text-28 font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">
+      <h2 id="fokus-warmup" className="font-sans text-32 font-semibold [overflow-wrap:anywhere]">
         {warmupTitle(exercise)}
       </h2>
       <div className="mt-14">

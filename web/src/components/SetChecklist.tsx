@@ -97,9 +97,9 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
           )}
         </p>
       )}
-      <div aria-hidden="true" className={`mt-2.5 flex min-w-0 flex-wrap gap-x-6 gap-y-2 ${shared}`}>
+      <div aria-hidden="true" className={`mt-2.5 grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 ${shared}`}>
         {suggestion.kg !== null ? (
-          <p className="flex flex-col gap-1">
+          <p className="flex min-w-0 flex-col gap-1">
             <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
             <span className="font-mono text-16 tabular-nums">
               <span className="whitespace-nowrap">{suggestion.kg}</span>
@@ -107,15 +107,15 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
             </span>
           </p>
         ) : (
-          <p className="text-14 text-text-muted">{suggestion.words}</p>
+          <p className="min-w-0 text-14 text-text-muted">{suggestion.words}</p>
         )}
         {lastWeek !== undefined &&
           (lastWeek === null ? (
-            <p className="text-14 text-text-muted">Intet logget sidste uge</p>
+            <p className="col-start-2 min-w-0 text-14 text-text-muted">Intet logget sidste uge</p>
           ) : (
-            <p className="flex flex-col gap-1">
+            <p className="col-start-2 flex min-w-0 flex-col gap-1">
               <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
-              <span className="font-mono text-16 whitespace-nowrap tabular-nums">{lastWeek}</span>
+              <span className="font-mono text-16 tabular-nums">{lastWeek}</span>
             </p>
           ))}
       </div>
