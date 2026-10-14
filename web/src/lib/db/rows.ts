@@ -82,6 +82,23 @@ export type ProjectedRide = {
   readonly reason: string | null; // why tss is null (the steps couldn't be read)
 };
 
+/** Where Python took a prognose day's cycling from (answers-round.md §1). */
+export type CyclingSource = "planned" | "typical_week" | "calendar";
+
+/** A planned ride in intervals.icu on a calendar prognose day; tss null = no load estimate. */
+export type ProjectedEvent = {
+  readonly name: string | null;
+  readonly tss: number | null;
+  readonly reason: string | null;
+};
+
+/** Python's counts over the prognose horizon (calendar days only); whole numbers >= 0. */
+export type CalendarCounts = {
+  readonly rides: number; // calendar_rides: events in the horizon
+  readonly weeks: number; // calendar_weeks: ISO weeks with >= 1 event
+  readonly noLoad: number | null; // calendar_no_load: events without a load (null: not written)
+};
+
 /** A low-high range Python computed; the web draws it, never recomputes it. */
 export type Band = { readonly low: number; readonly high: number };
 
@@ -108,8 +125,14 @@ export type DailyProjectionRow = {
   readonly ctl: number;
   readonly atl: number;
   readonly tsb: number;
-  readonly cyclingSource: "planned" | "typical_week";
+  readonly cyclingSource: CyclingSource;
   readonly typicalRides: number | null; // typical-week days: rides in the 28 days the week is built from
+  // Calendar days (answers-round.md §1): the planned rides in intervals.icu that day ([] otherwise),
+  // Python's horizon counts (null when the day is not a calendar day or the writer left them out),
+  // and whether the day's event had no load, so it uses the typical week.
+  readonly events: readonly ProjectedEvent[];
+  readonly calendar: CalendarCounts | null;
+  readonly typicalFallback: boolean;
   readonly rides: readonly ProjectedRide[];
   readonly sessions: readonly ProjectedSession[];
   readonly strengthMethod: StrengthMethod;
@@ -405,6 +428,10 @@ export type StrengthWeekRow = {
   readonly e1rmRpe: number | null;
   readonly e1rmRpeSource: RpeSource | null;
   readonly isBlockBest: boolean;
+  // answers-round.md §3: the best e1RM of the 4 ISO weeks ending with this one (the number the
+  // suggestions use) and the week its set is from; both null together (no qualifying set).
+  readonly rollingE1rmKg: number | null;
+  readonly rollingE1rmWeek: IsoDate | null;
   readonly computedAt: string;
 };
 
@@ -435,7 +462,7 @@ export type StrengthAnalysisData = {
 export const STRENGTH_WEEKS_SELECT = {
   table: "strength_weeks",
   columns:
-    "week_start,lift,block,block_no,phase,status,sets_lifted,tonnage_kg,e1rm_kg,e1rm_load_kg,e1rm_reps,e1rm_rpe,e1rm_rpe_source,is_block_best,computed_at",
+    "week_start,lift,block,block_no,phase,status,sets_lifted,tonnage_kg,e1rm_kg,e1rm_load_kg,e1rm_reps,e1rm_rpe,e1rm_rpe_source,is_block_best,rolling_e1rm_kg,rolling_e1rm_week,computed_at",
   order: "week_start,lift", // the primary key
 } as const;
 
@@ -708,8 +735,19 @@ export function parseStrengthWeekRow(raw: unknown): StrengthWeekRow {
     e1rmRpe: f.numberOrNull("e1rm_rpe"),
     e1rmRpeSource: oneOf(t, "e1rm_rpe_source", f.stringOrNull("e1rm_rpe_source"), RPE_SOURCES),
     isBlockBest: f.boolean("is_block_best"),
+    ...rollingE1rm(f),
     computedAt: f.timestamp("computed_at"),
   };
+}
+
+/** rolling_e1rm_kg / rolling_e1rm_week: both or neither (a key the writer left out reads as null). */
+function rollingE1rm(f: Fields): { readonly rollingE1rmKg: number | null; readonly rollingE1rmWeek: IsoDate | null } {
+  const kg = f.optionalNumber("rolling_e1rm_kg");
+  const week = f.optionalString("rolling_e1rm_week") === null ? null : f.date("rolling_e1rm_week");
+  if ((kg === null) !== (week === null)) {
+    throw new RowError(`${STRENGTH_WEEKS_SELECT.table}.rolling_e1rm_kg and rolling_e1rm_week must both be set or both be null`);
+  }
+  return { rollingE1rmKg: kg, rollingE1rmWeek: week };
 }
 
 export function parseStrengthBlockRow(raw: unknown): StrengthBlockRow {
@@ -865,9 +903,22 @@ export function parseProjectionRow(raw: unknown): DailyProjectionRow {
   const f = new Fields(table, raw);
   const basis = new Fields(`${table}.basis`, f.unknown("basis"));
   const source = basis.string("cycling");
-  if (source !== "planned" && source !== "typical_week") {
+  if (source !== "planned" && source !== "typical_week" && source !== "calendar") {
     throw new RowError(`${table}.basis.cycling: unexpected value`);
   }
+  const fallback = basis.optionalString("fallback");
+  if (fallback !== null && fallback !== "typical_week") throw new RowError(`${table}.basis.fallback: unexpected value`);
+  const calendarRides = rideCount(basis.optionalNumber("calendar_rides"), `${table}.basis.calendar_rides`);
+  const calendarWeeks = rideCount(basis.optionalNumber("calendar_weeks"), `${table}.basis.calendar_weeks`);
+  const calendarNoLoad = rideCount(basis.optionalNumber("calendar_no_load"), `${table}.basis.calendar_no_load`);
+  const rawEvents = basis.unknown("events");
+  const events: ProjectedEvent[] =
+    rawEvents === undefined || rawEvents === null
+      ? []
+      : basis.array("events").map((e, i) => {
+          const event = new Fields(`${table}.basis.events[${i}]`, e);
+          return { name: event.optionalString("name"), tss: event.optionalNumber("tss"), reason: event.optionalString("reason") };
+        });
   return {
     date: f.date("date"),
     cyclingTss: f.number("cycling_tss"),
@@ -877,6 +928,12 @@ export function parseProjectionRow(raw: unknown): DailyProjectionRow {
     tsb: f.number("tsb"),
     cyclingSource: source,
     typicalRides: rideCount(basis.optionalNumber("typical_rides"), `${table}.basis.typical_rides`),
+    events,
+    calendar:
+      source === "calendar" && calendarRides !== null && calendarWeeks !== null
+        ? { rides: calendarRides, weeks: calendarWeeks, noLoad: calendarNoLoad }
+        : null,
+    typicalFallback: fallback === "typical_week",
     rides: basis.array("rides").map((r, i) => {
       const ride = new Fields(`${PROJECTION_SELECT.table}.basis.rides[${i}]`, r);
       return { name: ride.string("name"), tss: ride.numberOrNull("tss"), reason: ride.optionalString("reason") };

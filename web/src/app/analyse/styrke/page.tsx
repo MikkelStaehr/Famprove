@@ -18,7 +18,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { MonoCaption } from "@/components/MonoCaption";
 import { WarningLine } from "@/components/WarningLine";
 import { ANALYSE_GRID } from "@/lib/analyse-grid";
-import { buildStyrkeView, feelRows, NO_E1RM, type StyrkeView, TONNAGE_EXPLAINER } from "@/lib/analyse-styrke-view";
+import { BOARD_NOTE, buildStyrkeView, feelRows, NO_E1RM, type StyrkeView, TONNAGE_EXPLAINER } from "@/lib/analyse-styrke-view";
 import { LIFT_NAME, LIFTS } from "@/lib/lifts";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { loadExerciseFeel, loadStrengthAnalysis } from "@/lib/db/queries";
@@ -92,7 +92,7 @@ function Board({ view }: { readonly view: Ready }) {
   const { board } = view;
   return (
     <section
-      aria-label="Bedste e1RM"
+      aria-label="E1RM de sidste 4 uger"
       className={`flex min-w-0 flex-col gap-3 rounded-hero border border-border bg-card px-5 pt-5.5 pb-4 ${ANALYSE_GRID.styrkeHero}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
@@ -137,6 +137,7 @@ function Board({ view }: { readonly view: Ready }) {
       {board.firstNote !== null && (
         <p className="max-w-[60ch] border-t border-border pt-3 font-sans text-13 text-text-muted">{board.firstNote}</p>
       )}
+      <p className="max-w-[60ch] font-sans text-13 text-text-muted">{BOARD_NOTE}</p>
     </section>
   );
 }
@@ -170,7 +171,7 @@ function Cards({ view }: { readonly view: Ready }) {
                 items={[
                   { swatch: <LoggedSwatch />, label: "Logget RPE" },
                   { swatch: <PrescribedSwatch />, label: "Foreskrevet RPE" },
-                  { swatch: <BestSwatch />, label: "Bedst i blokken" },
+                  { swatch: <BestSwatch />, label: "Blokkens bedste" },
                   ...(view.hasSheet ? [{ swatch: <SheetSwatch />, label: "1RM i arket (ikke testet)" }] : []),
                   ...(view.hasDeload ? [{ swatch: <DeloadBracketSwatch />, label: "Deload" }] : []),
                 ]}

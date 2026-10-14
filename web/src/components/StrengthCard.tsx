@@ -1,4 +1,4 @@
-import type { StrengthSession } from "@/lib/training-view";
+import { hasSuggestion, type StrengthSession } from "@/lib/training-view";
 
 import { SetBarcode } from "./SetBarcode";
 import { SaveNotes, SetChecklist, SetCount } from "./SetChecklist";
@@ -32,8 +32,8 @@ export function StrengthCard({ session, className }: StrengthCardProps) {
       <SetChecklist />
       <SaveNotes />
       <p className="text-13 text-text-muted">
-        Forslag er et skøn ud fra din e1RM og RPE, ikke trænerens tal. Hvert sæt gemmes, når du sætter flueben; kg
-        logger du i arket.
+        {hasSuggestion(session) && "Forslag er et skøn ud fra din e1RM og RPE, ikke trænerens tal. "}Hvert sæt gemmes, når
+        du sætter flueben; kg logger du i arket.
       </p>
     </section>
   );

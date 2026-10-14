@@ -73,6 +73,9 @@ function row(date: string, bands: Partial<Pick<DailyProjectionRow, "ctlBand" | "
     tsb: -2.2,
     cyclingSource: "typical_week",
     typicalRides: null,
+    events: [],
+    calendar: null,
+    typicalFallback: false,
     rides: [],
     sessions: [],
     strengthMethod: "recent",
@@ -151,6 +154,8 @@ test("§10c: tooltip status", () => {
   const estimate = (method: "plan" | "recent", dayEstimated: boolean): ChartPoint["estimate"] => ({
     cyclingTss: 0,
     cyclingSource: "typical_week",
+    events: [],
+    typicalFallback: false,
     strengthTss: 0,
     rides: [],
     sessions: [session({ dayEstimated })],
@@ -225,7 +230,7 @@ test("§10d: the sr sentence, with and without a range", () => {
 test("§10f.5: disclosure copy verbatim", () => {
   assert.equal(
     PROGNOSE_TEXT,
-    "Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer. Cykling: dit gennemsnit for hver ugedag de sidste 28 dage (en planlagt tur erstatter dagen). Styrke: resten af blokken ud fra trænerens plan, og efter blokken dit gennemsnit pr. uge fra de seneste 4 hele uger uden deload. Det er et skøn, ikke en plan.",
+    "Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer. Cykling: i uger med planlagte ture i intervals.icu kun de ture, ellers dit gennemsnit for hver ugedag de sidste 28 dage. Styrke: resten af blokken ud fra trænerens plan, og efter blokken dit gennemsnit pr. uge fra de seneste 4 hele uger uden deload. Det er et skøn, ikke en plan.",
   );
   assert.equal(BAND_LABEL, "Spænd efter blokken");
   assert.equal(
@@ -300,4 +305,35 @@ test("the prognose names its cycling basis and the hero its strength estimate", 
   for (const bad of [2.5, -1]) {
     assert.throws(() => parseProjectionRow({ ...first, basis: { ...first.basis, typical_rides: bad } }), /whole number/);
   }
+});
+
+test("1a/1c answers-round §1: the cycling basis sentences, singular and plural, never '0 planlagte'", async () => {
+  const { cyclingBasisNote, calendarDayFact } = await import("../src/lib/prognose-text.ts");
+  assert.equal(cyclingBasisNote(12, null, false), "Cyklingen i prognosen bygger på 12 ture de sidste 28 dage.");
+  assert.equal(cyclingBasisNote(null, null, false), null);
+  assert.equal(
+    cyclingBasisNote(12, { rides: 3, weeks: 2, noLoad: 0 }, false),
+    "Cyklingen i prognosen bygger på 3 planlagte ture i intervals.icu i 2 uger. De andre uger bygger på 12 ture de sidste 28 dage.",
+  );
+  assert.equal(
+    cyclingBasisNote(1, { rides: 1, weeks: 1, noLoad: null }, false),
+    "Cyklingen i prognosen bygger på 1 planlagt tur i intervals.icu i 1 uge. De andre uger bygger på 1 tur de sidste 28 dage.",
+  );
+  assert.equal(cyclingBasisNote(null, { rides: 9, weeks: 8, noLoad: 0 }, true), "Cyklingen i prognosen bygger kun på dine 9 planlagte ture i intervals.icu.");
+  assert.equal(
+    cyclingBasisNote(12, { rides: 3, weeks: 2, noLoad: 1 }, false),
+    "Cyklingen i prognosen bygger på 3 planlagte ture i intervals.icu i 2 uger. De andre uger bygger på 12 ture de sidste 28 dage. 1 planlagt tur har ingen belastning i intervals.icu, så den dag bruger din typiske uge.",
+  );
+  assert.equal(
+    cyclingBasisNote(null, { rides: 9, weeks: 8, noLoad: 2 }, true),
+    "Cyklingen i prognosen bygger kun på dine 9 planlagte ture i intervals.icu. 2 planlagte ture har ingen belastning i intervals.icu, så de dage bruger din typiske uge.",
+  );
+  // A zero count is no calendar: the typical-week sentence, never "0 planlagte" / "0 af 0".
+  const zero = cyclingBasisNote(12, { rides: 0, weeks: 0, noLoad: 0 }, false) ?? "";
+  assert.equal(zero, "Cyklingen i prognosen bygger på 12 ture de sidste 28 dage.");
+  assert.doesNotMatch(zero, /0 planlagte|0 af 0/);
+  const day = { cyclingTss: 45, cyclingSource: "calendar", events: [{}], typicalFallback: false };
+  assert.equal(calendarDayFact(day), "Cykel ≈ 45 TSS · planlagt i intervals.icu");
+  assert.equal(calendarDayFact({ ...day, cyclingTss: 30, typicalFallback: true }), "Cykel ≈ 30 TSS · typisk ugedag (planlagt tur uden belastning)");
+  assert.equal(calendarDayFact({ ...day, cyclingSource: "typical_week" }), null);
 });

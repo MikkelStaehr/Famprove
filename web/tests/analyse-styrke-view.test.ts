@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   blockSpans,
+  BOARD_NOTE,
   buildBoard,
   buildStyrkeView,
   kgDomain,
@@ -38,6 +39,8 @@ function row(weekStart: string, lift: StrengthLift, o: Partial<StrengthWeekRow> 
     e1rmRpe: null,
     e1rmRpeSource: null,
     isBlockBest: false,
+    rollingE1rmKg: null,
+    rollingE1rmWeek: null,
     computedAt: AT,
     ...o,
   };
@@ -106,51 +109,69 @@ test("latest block is the highest block_no with rows", () => {
   assert.equal(latestBlockNo([row("2026-08-24", "SQUAT", GAP)]), null);
 });
 
-test("lift board: block-best rows of the latest block, SBD order, prescribed muted, no delta", () => {
-  const b = buildBoard(weeks(), BLOCKS, 12);
-  assert.equal(b.label, "Bedste e1RM · blok 12");
+/** weeks() with Python's rolling e1RM on the current week (2026-09-28): squat and bench, no deadlift. */
+function rollingWeeks(squatWeek = "2026-09-21", squatKg = 174.1): StrengthWeekRow[] {
+  return weeks().map((r) => {
+    if (r.weekStart !== "2026-09-28") return r;
+    if (r.lift === "SQUAT") return { ...r, rollingE1rmKg: squatKg, rollingE1rmWeek: squatWeek };
+    if (r.lift === "BENCH") return { ...r, rollingE1rmKg: 106.2, rollingE1rmWeek: "2026-09-21" };
+    return r;
+  });
+}
+
+test("3a/3b lift board: values are rolling_e1rm_kg of the latest week, not the block best", () => {
+  const b = buildBoard(rollingWeeks(), BLOCKS, 12, TODAY);
+  assert.equal(b.label, "E1RM · SIDSTE 4 UGER");
   assert.equal(b.phase, "uden for sæson");
   assert.deepEqual(
     b.rows.map((r) => [r.name, r.value, r.logged]),
     [
       ["Squat", "174,1 kg", false],
       ["Bænkpres", "106,2 kg", false],
-      ["Dødløft", "174,1 kg", false],
+      ["Dødløft", "–", false], // block best 174,1 exists, but no rolling e1RM
     ],
   );
   assert.deepEqual(b.rows[0].lines, ["140 kg × 5 · RPE 6,5 · uge 1", "baseret på foreskrevet RPE"]);
-  assert.equal(b.rows[2].lines[0], "140 kg × 5 · RPE 6,5 · uge 2");
+  assert.deepEqual(b.rows[2].lines, ["Intet e1RM de sidste 4 uger"]);
   assert.equal(b.firstNote, "Blok 12 er den første blok uden for sæson, så der er ingen blok at sammenligne med endnu.");
   assert.equal(
     b.sr,
-    "Bedste estimerede 1RM i blok 12, uden for sæson: squat 174,1 kilo, bænkpres 106,2 kilo, dødløft 174,1 kilo. Alle tre er baseret på foreskrevet RPE.",
+    "Estimeret 1RM de sidste 4 uger: squat 174,1 kilo, bænkpres 106,2 kilo, dødløft intet. Baseret på foreskrevet RPE.",
   );
+  assert.equal(BOARD_NOTE, "Samme e1RM som de foreslåede kg: bedste sæt med højst 5 reps ved RPE 7 eller mere de sidste 4 uger.");
 });
 
-test("lift board: logged rows turn ink and the sr names them", () => {
-  const w = weeks().map((r) => (r.weekStart === "2026-09-21" && r.lift === "SQUAT" ? { ...r, e1rmRpeSource: "logged" as const } : r));
-  const b = buildBoard(w, BLOCKS, 12);
-  assert.equal(b.rows[0].logged, true);
-  assert.equal(b.rows[0].lines[1], "logget RPE");
-  assert.match(b.sr, /Squat er baseret på logget RPE, de andre på foreskrevet\.$/);
+test("lift board: a source week in an earlier block names the block; logged rows turn ink", () => {
+  const w = rollingWeeks("2026-08-17", 179.6).map((r) => (r.weekStart === "2026-09-21" && r.lift === "BENCH" ? { ...r, e1rmRpeSource: "logged" as const } : r));
+  const b = buildBoard(w, BLOCKS, 12, TODAY);
+  assert.equal(b.rows[0].value, "179,6 kg");
+  assert.equal(b.rows[0].lines[0], "140 kg × 5 · RPE 6,5 · blok 11, uge 2");
+  assert.equal(b.rows[1].logged, true);
+  assert.equal(b.rows[1].lines[1], "logget RPE");
+  assert.match(b.sr, /Bænkpres er baseret på logget RPE, de andre på foreskrevet\.$/);
 });
 
-test("lift board: no block best gives a dash and the 'Intet e1RM' line", () => {
-  const w = weeks().filter((r) => !(r.blockNo === 12 && r.lift === "BENCH"));
-  const b = buildBoard(w, BLOCKS, 12);
-  assert.equal(b.rows[1].value, "–");
-  assert.deepEqual(b.rows[1].lines, ["Intet e1RM i blok 12 endnu"]);
-  assert.match(b.sr, /bænkpres ikke registreret/);
+test("lift board: no rolling columns (before Python writes them) gives the empty text per lift", () => {
+  const b = buildBoard(weeks(), BLOCKS, 12, TODAY);
+  assert.deepEqual(b.rows.map((r) => r.value), ["–", "–", "–"]);
+  assert.equal(b.sr, "Estimeret 1RM de sidste 4 uger: squat intet, bænkpres intet, dødløft intet.");
 });
 
-test("lift board: an earlier block in the same phase is shown as a reference, not a delta", () => {
+test("3c lift board: 'endnu' only while the block runs (end_date >= today)", () => {
+  const ended = BLOCKS.map((x) => (x.blockNo === 12 ? { ...x, endDate: "2026-09-30" } : x));
+  assert.equal(buildBoard(rollingWeeks(), ended, 12, TODAY).firstNote, "Blok 12 er den første blok uden for sæson, så der er ingen blok at sammenligne med.");
+  const running = BLOCKS.map((x) => (x.blockNo === 12 ? { ...x, endDate: "2026-10-01" } : x));
+  assert.match(buildBoard(rollingWeeks(), running, 12, TODAY).firstNote ?? "", /sammenligne med endnu\.$/);
+});
+
+test("lift board: an earlier block in the same phase is shown as 'Bedst i blok n', not a delta", () => {
   const blocks: StrengthBlockRow[] = [
     ...BLOCKS,
     { name: "Program - blok 13", blockNo: 13, startDate: "2026-09-28", endDate: null, deloadStart: null, phase: "off_season" },
   ];
   const w = [...weeks(), row("2026-09-28", "SQUAT", { block: "Program - blok 13", blockNo: 13, ...e1rm(176, true) })];
-  const b = buildBoard(w, blocks, 13);
-  assert.deepEqual(b.rows[0].lines.at(-1), "Blok 12: 174,1 kg");
+  const b = buildBoard(w, blocks, 13, TODAY);
+  assert.deepEqual(b.rows[0].lines.at(-1), "Bedst i blok 12: 174,1 kg");
   assert.equal(b.firstNote, null);
 });
 
@@ -244,10 +265,10 @@ test("weeks: zero weeks stay visible, gap weeks read 'mellem blokke', tooltips a
   assert.equal(gap.head, "Uge 35 · 24.–30. aug. · mellem blokke");
   assert.deepEqual(gap.tonnage, { SQUAT: 0, BENCH: 0, DEADLIFT: 0 });
   assert.deepEqual(gap.srRow.slice(1), ["mellem blokke", "0", "0", "0"]);
-  assert.equal(first.e1rmTip[2], "Dødløft: ikke trænet");
-  assert.equal(first.e1rmTip[1], "Bænkpres: intet sæt med højst 5 reps ved RPE 7+");
-  assert.equal(b12w1.e1rmTip[0], "Squat: 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet · bedst i blokken");
-  assert.equal(b12w1.tonnageTip[0], "Squat: 2.100 kg · 10 sæt");
+  assert.equal(first.e1rmTip[2], "Dødløft ikke trænet");
+  assert.equal(first.e1rmTip[1], "Bænkpres · intet sæt med højst 5 reps ved RPE 7+");
+  assert.equal(b12w1.e1rmTip[0], "Squat 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet · blokkens bedste");
+  assert.equal(b12w1.tonnageTip[0], "Squat 2.100 kg · 10 sæt");
   assert.equal(current.current, true);
   assert.match(current.head, / · indtil videre$/);
   assert.equal(current.srRow[3], "14.008");
@@ -297,8 +318,8 @@ test("a missing lift row is 'mangler' (null), never 0; the strip max ignores it"
   const week = v.weeks.find((w) => w.srRow[0].startsWith("Uge 33"));
   assert.ok(week !== undefined);
   assert.equal(week.tonnage.BENCH, null);
-  assert.equal(week.tonnageTip[1], "Bænkpres: mangler");
-  assert.equal(week.e1rmTip[1], "Bænkpres: mangler");
+  assert.equal(week.tonnageTip[1], "Bænkpres mangler");
+  assert.equal(week.e1rmTip[1], "Bænkpres mangler");
   assert.equal(week.srRow[3], "mangler");
   const benchLeft = ws.filter((w) => w.lift === "BENCH").map((w) => w.tonnageKg);
   assert.equal(v.tonnageMax.BENCH, Math.max(0, ...benchLeft)); // the missing week is ignored, not 0
@@ -314,4 +335,13 @@ test("sheet 1RM lines are matched to block spans by block number", () => {
     assert.ok(spans.some((sp) => sp.x0 === line.x0 && sp.x1 === line.x1));
   }
   assert.deepEqual(spans.map((sp) => sp.blockNo), [11, 12]);
+});
+
+test("2e e1RM readout: the sheet 1RM fact, lifts without one omitted, none in a gap week", () => {
+  const sheet = (block: string, lift: StrengthLift) => sheetOneRm(SHEET, block, lift).kg;
+  const w = strengthWeeks(weeks(), BLOCKS, TODAY, dayNumber("2026-08-10") - 0.5, sheet);
+  const b12 = w.find((x) => x.head.includes("blok 12"));
+  assert.equal(b12?.e1rmTip.at(-1), "1RM i arket: squat 180 kg, bænkpres 102,5 kg (ikke testet)");
+  const gap = w.find((x) => x.head.includes("mellem blokke"));
+  assert.equal(gap?.e1rmTip.length, 3);
 });

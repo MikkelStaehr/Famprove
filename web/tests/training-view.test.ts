@@ -385,3 +385,10 @@ test("contract: the planned_sets rows Python writes parse; a capped row keeps it
   assert.throws(() => parsePlannedSetRow({ ...(rows.suggestion as object), uncapped_kg: 82.5 }), RowError); // same as suggested
   assert.throws(() => parsePlannedSetRow({ ...(rows.none as object), uncapped_kg: 85 }), RowError); // no suggestion
 });
+
+test("4a answers-round §4: the 'Forslag er et skøn' footnote only with a suggested kg", async () => {
+  const { hasSuggestion } = await import("../src/lib/training-view.ts");
+  const ex = (suggestedKg: number | null) => ({ suggestedKg }) as unknown as import("../src/lib/training-view.ts").ExerciseView;
+  assert.equal(hasSuggestion({ exercises: [ex(null), ex(null)] }), false);
+  assert.equal(hasSuggestion({ exercises: [ex(null), ex(142.5)] }), true);
+});

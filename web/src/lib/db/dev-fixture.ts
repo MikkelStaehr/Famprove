@@ -31,6 +31,11 @@
  *          (eFTP flat, EF up, volume with a plan, 3 of 4 done; analyse.md §12d), so the normal
  *          state of the answer blocks can be screenshotted. The sentences are Python's (the
  *          contract fixture's), never real numbers. Other screens: real rows.
+ *   calendar  real /load rows with the prognose's second ISO week made a calendar week
+ *          (answers-round.md §1): its Tuesday a planned ride in intervals.icu with a load
+ *          (CALENDAR_RIDE_TSS), its Thursday one without (the typical day's value, fallback), the
+ *          other days no cycling; counts 2 rides, 1 week, 1 without load. Illustrative only: CTL,
+ *          ATL and TSB are left as Python computed them.
  *   weekly_plan (/load's week card, every fixture but empty / error): the real rows, with the
  *          current week (the latest weekly_load week) given an illustrative remaining value when it
  *          has none (the view not yet applied, or nothing left this week), so "planned" can be
@@ -71,7 +76,8 @@ export type DevFixture =
   | "exercise-end"
   | "pause-rated"
   | "finished"
-  | "feel";
+  | "feel"
+  | "calendar";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -87,6 +93,7 @@ const FIXTURES: readonly DevFixture[] = [
   "pause-rated",
   "finished",
   "feel",
+  "calendar",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
@@ -400,6 +407,36 @@ export function illustrativeBands(rows: readonly DailyProjectionRow[]): DailyPro
       atlBand: { low: row.atl - 0.25 * n, high: row.atl + 0.35 * n },
       tsbBand: { low: row.tsb - 0.4 * n, high: row.tsb + 0.3 * n },
     };
+  });
+}
+
+/** DEV_FIXTURE=calendar: the illustrative load of the planned ride with a load. */
+export const CALENDAR_RIDE_TSS = 45;
+
+/** ISO weekday 1..7 of a YYYY-MM-DD date (UTC, no time of day). */
+function isoWeekday(date: IsoDate): number {
+  const d = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return d === 0 ? 7 : d;
+}
+
+/**
+ * DEV_FIXTURE=calendar: the second Monday-to-Sunday week of the prognose becomes a calendar week
+ * (Tuesday: a ride with CALENDAR_RIDE_TSS; Thursday: a ride without a load, which keeps the typical
+ * day's value). Dev only; never a real estimate.
+ */
+export function illustrativeCalendar(rows: readonly DailyProjectionRow[]): DailyProjectionRow[] {
+  const mondays = rows.filter((r) => isoWeekday(r.date) === 1).map((r) => r.date);
+  const start = mondays[1] ?? mondays[0];
+  if (start === undefined) return [...rows];
+  const end = rows.find((r) => r.date > start && isoWeekday(r.date) === 7)?.date ?? start;
+  const calendar = { rides: 2, weeks: 1, noLoad: 1 };
+  return rows.map((row) => {
+    if (row.date < start || row.date > end) return row;
+    const day = isoWeekday(row.date);
+    const base = { ...row, cyclingSource: "calendar" as const, rides: [], calendar, typicalFallback: false };
+    if (day === 2) return { ...base, cyclingTss: CALENDAR_RIDE_TSS, events: [{ name: "Zwift · Z2 75 min", tss: CALENDAR_RIDE_TSS, reason: null }] };
+    if (day === 4) return { ...base, typicalFallback: true, events: [{ name: "Udendørs tur", tss: null, reason: null }] };
+    return { ...base, cyclingTss: 0, events: [] };
   });
 }
 

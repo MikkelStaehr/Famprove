@@ -5,6 +5,7 @@
 
 import type { BlockSpan, ChartPoint } from "./dashboard-view.ts";
 import { formatDay, formatLoad, formatSigned, stopAfter } from "./format.ts";
+import { calendarDayFact } from "./prognose-text.ts";
 
 /** One value cell on line 2: the series' swatch (by key), its label in --text-muted, then the value. */
 export type ReadoutCell = {
@@ -145,6 +146,7 @@ export function curveReadout(p: ChartPoint, blocks: readonly BlockSpan[]): Reado
     const span = p.bands?.ctl;
     const spanFact = span != null && formatLoad(span.low) !== formatLoad(span.high) ? [`spænd ${formatLoad(span.low)}–${formatLoad(span.high)}`] : [];
     const fact = [...blockFact, ...spanFact].join(" · ");
+    const cycling = calendarDayFact(p.estimate);
     return {
       head: `${formatDay(p.date)} · Prognose${p.estimate?.strengthMethod === "recent" ? " · efter blokken" : ""}`,
       cells: [
@@ -153,7 +155,7 @@ export function curveReadout(p: ChartPoint, blocks: readonly BlockSpan[]): Reado
         { key: "atl", label: "Træthed", value: formatLoad(p.atl) },
         { key: "tsb", label: "Form", value: formatSigned(p.tsb) },
       ],
-      facts: fact === "" ? [] : [fact],
+      facts: [...(cycling === null ? [] : [cycling]), ...(fact === "" ? [] : [fact])],
     };
   }
   return {

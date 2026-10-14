@@ -10,6 +10,7 @@ import {
   fixtureError,
   illustrativeAnswers,
   illustrativeBands,
+  illustrativeCalendar,
   illustrativeLogged,
   illustrativeWeeklyPlan,
   ILLUSTRATIVE_FEEL,
@@ -139,7 +140,8 @@ export async function loadDashboardData(): Promise<DashboardData> {
     projectionRead,
     weeklyPlanRead,
   ]);
-  const projection = fixture === "band" && read !== null ? illustrativeBands(read) : read;
+  const projection =
+    read === null ? read : fixture === "band" ? illustrativeBands(read) : fixture === "calendar" ? illustrativeCalendar(read) : read;
   // Under any other dev fixture the current week shows a planned value (dev-fixture.ts).
   const weeklyPlan = fixture === null ? planRead : illustrativeWeeklyPlan(weeks, planRead);
   if (fixture === "stale") {

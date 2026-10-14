@@ -10,7 +10,7 @@ import { formatDate, formatDay, formatLoad, formatSigned } from "./format.ts";
 
 /** Disclosure term 4 (load.md §9b, rewritten 2026-10-01). */
 export const PROGNOSE_TEXT =
-  "Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer. Cykling: dit gennemsnit for hver ugedag de sidste 28 dage (en planlagt tur erstatter dagen). Styrke: resten af blokken ud fra trænerens plan, og efter blokken dit gennemsnit pr. uge fra de seneste 4 hele uger uden deload. Det er et skøn, ikke en plan.";
+  "Fitness, træthed og form de næste 8 uger, hvis du træner som du plejer. Cykling: i uger med planlagte ture i intervals.icu kun de ture, ellers dit gennemsnit for hver ugedag de sidste 28 dage. Styrke: resten af blokken ud fra trænerens plan, og efter blokken dit gennemsnit pr. uge fra de seneste 4 hele uger uden deload. Det er et skøn, ikke en plan.";
 
 /** Disclosure term 5 (load.md §10a). */
 export const BAND_LABEL = "Spænd efter blokken";
@@ -70,6 +70,49 @@ export const COARSE_ZONES_NOTE = "Zonerne er grove ved lav fitness.";
 export function typicalRidesNote(rides: number): string {
   if (rides === 0) return "Cyklingen i prognosen bygger på 0 ture de sidste 28 dage, så den regner kun med planlagte ture.";
   return `Cyklingen i prognosen bygger på ${rides} ${rides === 1 ? "tur" : "ture"} de sidste 28 dage.`;
+}
+
+const tur = (n: number): string => `${n} ${n === 1 ? "tur" : "ture"}`;
+const planlagteTure = (n: number): string => `${n} ${n === 1 ? "planlagt tur" : "planlagte ture"}`;
+
+/**
+ * answers-round.md §1: what the prognose's cycling is built on. `calendar` = Python's counts of
+ * planned rides in intervals.icu (null: no calendar week); `allCalendar` = no day uses the typical
+ * week. Counts are Python's; this only formats. Never "0 planlagte": a zero count is no calendar.
+ */
+export function cyclingBasisNote(
+  typicalRides: number | null,
+  calendar: { readonly rides: number; readonly weeks: number; readonly noLoad: number | null } | null,
+  allCalendar: boolean,
+): string | null {
+  if (calendar === null || calendar.rides === 0 || calendar.weeks === 0) {
+    return typicalRides === null ? null : typicalRidesNote(typicalRides);
+  }
+  const noLoad =
+    calendar.noLoad === null || calendar.noLoad === 0
+      ? ""
+      : calendar.noLoad === 1
+        ? " 1 planlagt tur har ingen belastning i intervals.icu, så den dag bruger din typiske uge."
+        : ` ${calendar.noLoad} planlagte ture har ingen belastning i intervals.icu, så de dage bruger din typiske uge.`;
+  if (allCalendar) {
+    const dine = calendar.rides === 1 ? "din" : "dine";
+    return `Cyklingen i prognosen bygger kun på ${dine} ${planlagteTure(calendar.rides)} i intervals.icu.${noLoad}`;
+  }
+  const weeks = `${calendar.weeks} ${calendar.weeks === 1 ? "uge" : "uger"}`;
+  const others = typicalRides === null ? "" : ` De andre uger bygger på ${tur(typicalRides)} de sidste 28 dage.`;
+  return `Cyklingen i prognosen bygger på ${planlagteTure(calendar.rides)} i intervals.icu i ${weeks}.${others}${noLoad}`;
+}
+
+/**
+ * answers-round.md §1: the cycling fact in a calendar prognose day's readout; null on other days
+ * (unchanged) and on a calendar day without a planned ride.
+ */
+export function calendarDayFact(
+  estimate: { readonly cyclingTss: number; readonly cyclingSource: string; readonly events: readonly unknown[]; readonly typicalFallback: boolean } | null,
+): string | null {
+  if (estimate === null || estimate.cyclingSource !== "calendar" || estimate.events.length === 0) return null;
+  const basis = estimate.typicalFallback ? "typisk ugedag (planlagt tur uden belastning)" : "planlagt i intervals.icu";
+  return `Cykel ≈ ${formatLoad(estimate.cyclingTss)} TSS · ${basis}`;
 }
 
 /** load.md §10b: the note under the plot, `from` = the first `recent` prognose date. */

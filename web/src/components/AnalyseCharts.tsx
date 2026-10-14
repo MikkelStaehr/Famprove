@@ -6,13 +6,13 @@ import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek }
 import { type AxisTick, type ChartRow, chartRows, eftpDots, formatEf, type LineChartView, type Mark, type Seam, seamReadout, slotCentre, type WeekBar } from "@/lib/analyse-view";
 import { AMARKS, dashGradient, hatchGradient, isDeloadWeek, tickAnchor, ticksClearOfToday } from "@/lib/analyse-marks";
 import { MARKS } from "@/lib/chart-marks";
-import { gapSeam, highestAt, nearestIndex, type Readout, restingReadout, restingWeekIndex, xAtPointer } from "@/lib/chart-readout";
+import { gapSeam, highestAt, nearestIndex, type Readout, restingWeekIndex, xAtPointer } from "@/lib/chart-readout";
 import { formatLoad } from "@/lib/format";
 import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
 import { ChartBoundary, useHydrated, useWide, useWidth } from "./chart-hooks";
 import { HollowDot } from "./ChartMarks";
-import { ChartReadout, Marker, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
+import { ChartReadout, Marker, PLOT_FOCUS, useChartPick } from "./ChartReadout";
 
 /**
  * /analyse charts (design/specs/analyse.md §4-§5). One x domain [lo, hi] for all three, the pause
@@ -166,14 +166,11 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
       // DESIGN.md "Gaps": far from every ride and inside an "Ingen ture" seam, the marker stays at the tap.
       return gapSeam(x, xs[i], axis.seams) >= 0 ? { index: i, x } : highestAt(xs, ys, i);
     },
+    // answers-round.md §2: nothing at rest, no hover; a tap or click selects, the same point closes.
+    toggle: true,
+    hover: false,
   });
-  if (!hydrated)
-    return (
-      <>
-        <Skeleton height="h-(--chart-height)" />
-        <ReadoutSpace lines={3} cells />
-      </>
-    );
+  if (!hydrated) return <Skeleton height="h-(--chart-height)" />;
   const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
   // Today = the domain's last day (analyse-view: hi = today + 0.5); the same x in all three cards.
   const todayX = axis.hi - 0.5;
@@ -186,12 +183,10 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
   const seam = gapX === undefined ? undefined : axis.seams[gapSeam(gapX, undefined, axis.seams)];
   const picked = pick === null || seam !== undefined ? undefined : rows[pick.index];
   const pickedMark = picked?.marks[0];
-  const latestMark = latestIndex < 0 ? undefined : rows[latestIndex]?.marks[0];
   const pickedReadout = seam !== undefined ? seamReadout(seam) : pickedMark?.readout;
   const markerX = seam !== undefined && gapX !== undefined ? xCss(axis, gapX) : picked === undefined ? null : xCss(axis, picked.x);
-  const resting = restingReadout(latestMark?.readout ?? null, "Tryk på grafen for at se en tur");
-  const readout: Readout = pickedReadout !== undefined && pick?.mode !== "mouse" ? pickedReadout : resting;
-  const all = [resting, ...axis.seams.map(seamReadout), ...rows.flatMap((r) => r.marks.map((m) => m.readout))];
+  const readout: Readout | null = pickedReadout ?? null;
+  const all = [...axis.seams.map(seamReadout), ...rows.flatMap((r) => r.marks.map((m) => m.readout))];
   const ringY = pickedMark === undefined ? null : pickedMark.excluded ? chart.domain[0] : pickedMark.y;
   const segKeys = Array.from({ length: chart.segments }, (_, i) => `s${i}`);
 
@@ -242,9 +237,6 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
     >
       <div ref={widthRef} aria-hidden="true" className="pointer-events-none absolute inset-0" />
       {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
-      {pickedReadout !== undefined && markerX !== null && pick?.mode === "mouse" && (
-        <PointerTip readout={pickedReadout} left={markerX} rightInset={MARGIN_RIGHT} />
-      )}
       <ComposedChart
         responsive
         style={{ width: "100%", height: "100%" }}
@@ -371,13 +363,14 @@ function WeekGroup<W extends PickWeek>({
       const i = weeks.findIndex((w) => w.x0 <= x && x < w.x1);
       return i < 0 ? null : i;
     },
+    // answers-round.md §2: nothing at rest, no hover; a tap or click selects, the same week closes.
+    toggle: true,
+    hover: false,
   });
   const active = pick === null ? null : (weeks[pick.index] ?? null);
-  const latest = latestIndex < 0 ? undefined : weeks[latestIndex];
   const markerX = active === null ? null : xCss(axis, slotCentre(active));
-  const resting = restingReadout(latest === undefined ? null : readout(latest), "Tryk på grafen for at se en uge");
-  const shown = active !== null && pick?.mode !== "mouse" ? readout(active) : resting;
-  const all = [resting, ...weeks.map(readout)];
+  const shown = active === null ? null : readout(active);
+  const all = weeks.map(readout);
   // No label at today: one reaching the `I DAG` caption is skipped; none before the row is measured.
   const shownTicks =
     boxWidth === null
@@ -413,9 +406,6 @@ function WeekGroup<W extends PickWeek>({
             );
           })}
         </div>
-        {active !== null && markerX !== null && pick?.mode === "mouse" && (
-          <PointerTip readout={readout(active)} left={markerX} rightInset={MARGIN_RIGHT} />
-        )}
       </div>
       <ChartReadout readout={shown} all={all} lines={lines} cells={cells} />
     </div>
@@ -660,12 +650,6 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
                   backgroundImage: dashGradient("to right", e.sheet.color, e.sheet.on, e.sheet.off),
                 }}
               />
-              <span
-                className="absolute -translate-x-full bg-card px-0.5 font-mono text-11 leading-none text-text-muted"
-                style={{ left: xCss(axis, s.x1), top: `calc(${top(s.y)} - 14px)` }}
-              >
-                {s.label}
-              </span>
             </div>
           ))}
           <svg
@@ -694,25 +678,17 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
           {panel.points.map((p) => {
             const r = p.logged ? e.logged.r : e.prescribed.r;
             const x = xCss(axis, p.x);
-            // Block best: a 1×6 --text tick 3px off the point, its value mono 11 beyond it (below when
-            // the point sits under its block's sheet line). No ring.
+            // Block best: a 1×6 --text tick 3px off the point (below when the point sits under its
+            // block's sheet line). No ring and no value (answers-round.md §2: the readout says it).
             const tickTop = p.labelBelow ? `calc(${top(p.y)} + ${r + e.best.gap}px)` : `calc(${top(p.y)} - ${r + e.best.gap + e.best.height}px)`;
-            const labelTop = p.labelBelow
-              ? `calc(${top(p.y)} + ${r + e.best.gap + e.best.height + 2}px)`
-              : `calc(${top(p.y)} - ${r + e.best.gap + e.best.height + 2 + e.best.labelSize}px)`;
             return (
               <div key={p.x}>
                 {p.best && (
-                  <>
-                    <span
-                      data-mark="best"
-                      className="absolute"
-                      style={{ left: `calc(${x} - ${e.best.width / 2}px)`, top: tickTop, width: e.best.width, height: e.best.height, background: e.best.color }}
-                    />
-                    <span className="absolute -translate-x-1/2 font-mono text-11 leading-none text-text" style={{ left: x, top: labelTop }}>
-                      {p.label}
-                    </span>
-                  </>
+                  <span
+                    data-mark="best"
+                    className="absolute"
+                    style={{ left: `calc(${x} - ${e.best.width / 2}px)`, top: tickTop, width: e.best.width, height: e.best.height, background: e.best.color }}
+                  />
                 )}
                 <span
                   data-mark={p.logged ? "logged" : "prescribed"}

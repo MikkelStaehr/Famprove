@@ -45,7 +45,7 @@ import {
   prognoseSentence,
   STRENGTH_ESTIMATE_NOTE,
   strengthUnknownNote,
-  typicalRidesNote,
+  cyclingBasisNote,
 } from "@/lib/prognose-text";
 import { resolveToday, strengthWeek } from "@/lib/training-view";
 import { type DatedPlan, datedPlan } from "@/lib/week-plan";
@@ -219,6 +219,7 @@ function Tiles({ view }: { readonly view: ReadyView }) {
 
 function Dashboard({ view }: { readonly view: ReadyView }) {
   const today = resolveToday(new Date(), process.env);
+  const cyclingNote = cyclingBasisNote(view.typicalRides, view.calendar, view.allCalendar);
   return (
     <>
       <Card
@@ -239,8 +240,8 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
         {view.projection === "none" && (
           <p className="text-13 text-text-muted">Ingen prognose endnu. Den beregnes af det daglige job omkring kl. 05.00.</p>
         )}
-        {view.projection === "ready" && view.typicalRides !== null && (
-          <p className="max-w-[60ch] text-13 text-text-muted">{typicalRidesNote(view.typicalRides)}</p>
+        {view.projection === "ready" && cyclingNote !== null && (
+          <p className="max-w-[60ch] text-13 text-text-muted">{cyclingNote}</p>
         )}
         {strengthUnknownFrom(view.chart) !== null && (
           <p className="max-w-[60ch] text-13 text-text-muted">{strengthUnknownNote(strengthUnknownFrom(view.chart) ?? view.lastActual)}</p>

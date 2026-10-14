@@ -97,7 +97,7 @@ export type BoardRow = {
 };
 
 export type LiftBoard = {
-  readonly label: string; // "Bedste e1RM · blok 12"
+  readonly label: string; // "E1RM · SIDSTE 4 UGER"
   readonly phase: string | null; // "uden for sæson"
   readonly rows: readonly BoardRow[];
   readonly firstNote: string | null; // "Blok 12 er den første blok uden for sæson, …"
@@ -200,19 +200,38 @@ export function sheetOneRm(
 
 // --- hero (spec §4, §7) --------------------------------------------------------------------
 
-export function buildBoard(weeks: readonly StrengthWeekRow[], blocks: readonly StrengthBlockRow[], latest: number): LiftBoard {
+/** The board's note (answers-round.md §3): which e1RM this is. */
+export const BOARD_NOTE = "Samme e1RM som de foreslåede kg: bedste sæt med højst 5 reps ved RPE 7 eller mere de sidste 4 uger.";
+
+/**
+ * answers-round.md §3: per lift, Python's rolling_e1rm_kg of the lift's latest week (on or before
+ * today's ISO week) and the set behind it from the row of rolling_e1rm_week. The web never takes a
+ * 4-week max itself. The comparison stays the earlier same-phase block's best (is_block_best).
+ */
+export function buildBoard(weeks: readonly StrengthWeekRow[], blocks: readonly StrengthBlockRow[], latest: number, today: IsoDate): LiftBoard {
   const phase = phaseOfBlock(blocks, weeks, latest);
+  const current = isoWeekStart(today);
   let anyEarlier = false;
   const rows: BoardRow[] = LIFTS.map((lift) => {
-    const best = bestRow(weeks, latest, lift);
+    const now = weeks
+      .filter((w) => w.lift === lift && w.weekStart <= current)
+      .reduce<StrengthWeekRow | undefined>((a, w) => (a === undefined || w.weekStart > a.weekStart ? w : a), undefined);
+    const kg = now?.rollingE1rmKg ?? null;
+    const source = kg === null ? undefined : weeks.find((w) => w.lift === lift && w.weekStart === now?.rollingE1rmWeek);
     const lines: string[] = [];
-    if (best === undefined || best.e1rmKg === null) {
-      lines.push(`Intet e1RM i ${blockLabel(latest)} endnu`);
-    } else {
-      const set = setText(best);
-      const week = `uge ${blockWeekOf(weeks, latest, best.weekStart)}`;
-      lines.push(set === "" ? week : `${set} · ${week}`);
-      lines.push(best.e1rmRpeSource === "logged" ? "logget RPE" : "baseret på foreskrevet RPE");
+    if (kg === null) {
+      lines.push("Intet e1RM de sidste 4 uger");
+    } else if (source !== undefined) {
+      const set = setText(source);
+      const week =
+        source.blockNo === null
+          ? null
+          : source.blockNo === latest
+            ? `uge ${blockWeekOf(weeks, source.blockNo, source.weekStart)}`
+            : `${blockLabel(source.blockNo)}, uge ${blockWeekOf(weeks, source.blockNo, source.weekStart)}`;
+      const line = [set, week].filter((t): t is string => t !== null && t !== "").join(" · ");
+      if (line !== "") lines.push(line);
+      lines.push(source.e1rmRpeSource === "logged" ? "logget RPE" : "baseret på foreskrevet RPE");
     }
     if (phase !== null) {
       const earlier = [...new Set(weeks.map((w) => w.blockNo))]
@@ -222,39 +241,37 @@ export function buildBoard(weeks: readonly StrengthWeekRow[], blocks: readonly S
         .find((r) => r !== undefined);
       if (earlier !== undefined && earlier.e1rmKg !== null && earlier.blockNo !== null) {
         anyEarlier = true;
-        lines.push(`Blok ${earlier.blockNo}: ${formatE1rm(earlier.e1rmKg)} kg`);
+        lines.push(`Bedst i ${blockLabel(earlier.blockNo)}: ${formatE1rm(earlier.e1rmKg)} kg`);
       }
     }
     return {
       lift,
       name: LIFT_NAME[lift],
-      value: best === undefined || best.e1rmKg === null ? MISSING : `${formatE1rm(best.e1rmKg)} kg`,
-      logged: best !== undefined && best.e1rmKg !== null && best.e1rmRpeSource === "logged",
+      value: kg === null ? MISSING : `${formatE1rm(kg)} kg`,
+      logged: kg !== null && source?.e1rmRpeSource === "logged",
       lines,
     };
   });
   const phaseText = phase === null ? null : PHASE_TEXT[phase];
+  // "endnu" only while the block runs (user-approved): end_date null (ongoing) or >= today.
+  const end = blocks.find((b) => b.blockNo === latest)?.endDate ?? null;
+  const runs = end === null || end >= today;
   const firstNote =
     anyEarlier || phaseText === null
       ? null
-      : `Blok ${latest} er den første blok ${phaseText}, så der er ingen blok at sammenligne med endnu.`;
-  return { label: `Bedste e1RM · ${blockLabel(latest)}`, phase: phaseText, rows, firstNote, sr: boardSr(rows, latest, phaseText) };
+      : `Blok ${latest} er den første blok ${phaseText}, så der er ingen blok at sammenligne med${runs ? " endnu" : ""}.`;
+  return { label: "E1RM · SIDSTE 4 UGER", phase: phaseText, rows, firstNote, sr: boardSr(rows) };
 }
 
-function boardSr(rows: readonly BoardRow[], latest: number, phase: string | null): string {
-  const values = rows
-    .map((r) => `${liftLower(r.lift)} ${r.value === MISSING ? "ikke registreret" : r.value.replace(" kg", " kilo")}`)
-    .join(", ");
-  const head = `Bedste estimerede 1RM i ${blockLabel(latest)}${phase === null ? "" : `, ${phase}`}: ${values}.`;
+function boardSr(rows: readonly BoardRow[]): string {
+  const values = rows.map((r) => `${liftLower(r.lift)} ${r.value === MISSING ? "intet" : r.value.replace(" kg", " kilo")}`).join(", ");
+  const head = `Estimeret 1RM de sidste 4 uger: ${values}.`;
   const valued = rows.filter((r) => r.value !== MISSING);
   const logged = valued.filter((r) => r.logged);
-  const names = (rs: readonly BoardRow[]) => listWords(rs.map((r) => liftLower(r.lift)));
   if (valued.length === 0) return head;
-  if (logged.length === 0)
-    return `${head} ${valued.length === 3 ? "Alle tre er" : `${capital(names(valued))} er`} baseret på foreskrevet RPE.`;
-  if (logged.length === valued.length)
-    return `${head} ${valued.length === 3 ? "Alle tre er" : `${capital(names(valued))} er`} baseret på logget RPE.`;
-  return `${head} ${capital(names(logged))} er baseret på logget RPE, de andre på foreskrevet.`;
+  if (logged.length === 0) return `${head} Baseret på foreskrevet RPE.`;
+  if (logged.length === valued.length) return `${head} Baseret på logget RPE.`;
+  return `${head} ${capital(listWords(logged.map((r) => liftLower(r.lift))))} er baseret på logget RPE, de andre på foreskrevet.`;
 }
 
 // --- axis, blocks, phases (spec §5) --------------------------------------------------------
@@ -409,6 +426,7 @@ export function strengthWeeks(
   blocks: readonly StrengthBlockRow[],
   today: IsoDate,
   lo: number,
+  sheetKg?: (block: string, lift: StrengthLift) => number | null,
 ): StrengthWeek[] {
   const year = yearOf(today);
   const current = isoWeekStart(today);
@@ -428,21 +446,31 @@ export function strengthWeeks(
       ...(rows.some((r) => r.status === "pre_log") ? ["før aktivitetslog"] : []),
       ...(isCurrent ? ["indtil videre"] : []),
     ].join(" · ");
-    const e1rmTip = LIFTS.map((l) => {
+    // answers-round.md §2: "Squat 174,0 kg · 145 kg × 3 · RPE 7 foreskrevet · blokkens bedste".
+    const e1rmLines = LIFTS.map((l) => {
       const r = byLift(l);
       const name = LIFT_NAME[l];
-      if (r === undefined) return `${name}: mangler`;
-      if (r.status === null) return `${name}: ikke trænet`;
-      if (r.e1rmKg === null) return `${name}: intet sæt med højst 5 reps ved RPE 7+`;
+      if (r === undefined) return `${name} mangler`;
+      if (r.status === null) return `${name} ikke trænet`;
+      if (r.e1rmKg === null) return `${name} · intet sæt med højst 5 reps ved RPE 7+`;
       const set = setText(r);
       const source = r.e1rmRpe === null ? "" : r.e1rmRpeSource === "logged" ? " logget" : " foreskrevet";
-      return `${name}: ${formatE1rm(r.e1rmKg)} kg${set === "" ? "" : ` · ${set}${source}`}${r.isBlockBest ? " · bedst i blokken" : ""}`;
+      return `${name} ${formatE1rm(r.e1rmKg)} kg${set === "" ? "" : ` · ${set}${source}`}${r.isBlockBest ? " · blokkens bedste" : ""}`;
     });
+    // The block's sheet 1RM per lift (lifts without one omitted; none or a gap week: no line).
+    const sheetParts =
+      block === undefined || sheetKg === undefined
+        ? []
+        : LIFTS.flatMap((l) => {
+            const kg = sheetKg(block.name, l);
+            return kg === null ? [] : [`${liftLower(l)} ${formatKg(kg)} kg`];
+          });
+    const e1rmTip = sheetParts.length === 0 ? e1rmLines : [...e1rmLines, `1RM i arket: ${sheetParts.join(", ")} (ikke testet)`];
     const tonnageTip = LIFTS.map((l) => {
       const r = byLift(l);
       const name = LIFT_NAME[l];
-      if (r === undefined) return `${name}: mangler`;
-      return r.status === null ? `${name}: ikke trænet` : `${name}: ${formatTonnage(r.tonnageKg)} kg · ${r.setsLifted} sæt`;
+      if (r === undefined) return `${name} mangler`;
+      return r.status === null ? `${name} ikke trænet` : `${name} ${formatTonnage(r.tonnageKg)} kg · ${r.setsLifted} sæt`;
     });
     // A missing row is null ("mangler"), never 0: 0 is a real week with nothing lifted.
     const tonnage = perLift((l) => byLift(l)?.tonnageKg ?? null);
@@ -506,7 +534,7 @@ export function buildStyrkeView(data: StrengthAnalysisData, now: Date, today: Is
         ]),
     NOTE_ESTIMATE,
   ];
-  const strengthRows = strengthWeeks(weeks, blocks, today, lo);
+  const strengthRows = strengthWeeks(weeks, blocks, today, lo, (block, lift) => sheetOneRm(data.sheetOneRm, block, lift).kg);
   return {
     kind: "ready",
     freshness: freshness(latestComputedAt(weeks), now),
@@ -516,7 +544,7 @@ export function buildStyrkeView(data: StrengthAnalysisData, now: Date, today: Is
     ticksWide,
     blocks: spans,
     phaseRules: changes.map((c) => dayNumber(c.block.startDate) - 0.5),
-    board: buildBoard(weeks, blocks, latest),
+    board: buildBoard(weeks, blocks, latest, today),
     panels,
     hasSheet: allPanels.some((p) => p.sheet.length > 0),
     hasDeload: spans.some((s) => s.deloadX0 !== null),

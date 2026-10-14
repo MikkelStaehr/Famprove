@@ -14,6 +14,7 @@ import type {
   ActivityRow,
   Band,
   BlockRow,
+  CalendarCounts,
   DailyLoadRow,
   DailyProjectionRow,
   DashboardData,
@@ -53,6 +54,8 @@ export type ChartPoint = {
   readonly estimate: {
     readonly cyclingTss: number;
     readonly cyclingSource: DailyProjectionRow["cyclingSource"];
+    readonly events: DailyProjectionRow["events"];
+    readonly typicalFallback: boolean;
     readonly strengthTss: number;
     readonly rides: DailyProjectionRow["rides"];
     readonly sessions: DailyProjectionRow["sessions"];
@@ -119,6 +122,8 @@ export type DashboardView =
       /** ready: projected points exist; none: nothing after lastActual; error: couldn't be read. */
       readonly projection: "ready" | "none" | "error";
       readonly typicalRides: number | null; // Python's rides behind the prognose's typical week
+      readonly calendar: CalendarCounts | null; // Python's counts of planned rides in intervals.icu
+      readonly allCalendar: boolean; // every prognose day is a calendar day (no typical week used)
       readonly blocks: readonly BlockSpan[];
       readonly week: WeekNav | null; // null if weekly_load has no row for the latest date
       /** The current ISO week's weekly_load row (the UGE tile), whatever week the list shows. */
@@ -450,6 +455,8 @@ export function chartPoints(data: DashboardData, lastActual: IsoDate): ChartPoin
       estimate: {
         cyclingTss: p.cyclingTss,
         cyclingSource: p.cyclingSource,
+        events: p.events,
+        typicalFallback: p.typicalFallback,
         strengthTss: p.strengthTss,
         rides: p.rides,
         sessions: p.sessions,
@@ -463,6 +470,17 @@ export function chartPoints(data: DashboardData, lastActual: IsoDate): ChartPoin
 /** Python's typical_rides, taken from the first typical-week prognose day (selection, no maths). */
 export function typicalRidesOf(projection: readonly DailyProjectionRow[] | null): number | null {
   return projection?.find((p) => p.cyclingSource === "typical_week" && p.typicalRides !== null)?.typicalRides ?? null;
+}
+
+/** Python's calendar counts, taken from the first calendar prognose day that has them (selection, no maths). */
+export function calendarOf(projection: readonly DailyProjectionRow[] | null): CalendarCounts | null {
+  return projection?.find((p) => p.cyclingSource === "calendar" && p.calendar !== null)?.calendar ?? null;
+}
+
+/** True when the prognose has days and every one of them is a calendar day. */
+export function allCalendarOf(projection: readonly DailyProjectionRow[] | null, after: IsoDate): boolean {
+  const days = (projection ?? []).filter((p) => p.date > after);
+  return days.length > 0 && days.every((p) => p.cyclingSource === "calendar");
 }
 
 /** Composes the helpers above. "empty" when data.daily is empty. */
@@ -487,6 +505,8 @@ export function buildDashboardView(
           : "none",
     blocks: blockSpans(data.blocks, latest.date),
     typicalRides: typicalRidesOf(data.projection),
+    calendar: calendarOf(data.projection),
+    allCalendar: allCalendarOf(data.projection, latest.date),
     week: selectWeek(data, latest.date, week),
     thisWeek: currentWeek(data, latest.date),
     days: data.daily.map((d) => ({ date: d.date, cyclingTss: d.cyclingTss, strengthTss: d.strengthTss, totalTss: d.totalTss })),
