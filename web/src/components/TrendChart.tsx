@@ -225,7 +225,7 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
   if (!hydrated) {
     return (
       <>
-        <div className="h-(--chart-height) w-full bg-surface motion-safe:animate-pulse" />
+        <div className="h-(--chart-height) w-full bg-raised motion-safe:animate-pulse" />
         <ReadoutSpace lines={READOUT_LINES} cells />
       </>
     );

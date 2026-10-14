@@ -66,7 +66,7 @@ export function FeelBlock({
   const felt = logged?.feltRpe ?? null;
   return (
     <section aria-labelledby={`${id}-q`} className="mt-2 flex flex-col">
-      <h2 id={`${id}-q`} className="font-grotesk text-20 font-normal">
+      <h2 id={`${id}-q`} className="font-sans text-20 font-normal">
         {feelQuestion(set, named)}
       </h2>
       {/* Round 4: one segmented control, a 1px --text-muted box, --border hairlines inside only. */}
@@ -80,7 +80,7 @@ export function FeelBlock({
               aria-pressed={on}
               aria-label={o.label}
               onClick={() => onTap("feel", set.ref, nextFeel(felt, o.value))}
-              className={`relative flex min-h-14 items-center justify-center px-2 font-grotesk text-16 leading-tight font-medium not-first:border-l not-first:border-border focus-visible:z-10 focus-visible:outline-offset-2 ${
+              className={`relative flex min-h-14 items-center justify-center px-2 font-sans text-16 leading-tight font-medium not-first:border-l not-first:border-border focus-visible:z-10 focus-visible:outline-offset-2 ${
                 on ? "bg-text text-bg" : "text-text"
               }`}
             >
@@ -137,7 +137,7 @@ function RepsStepper({
   return (
     <div role="group" aria-labelledby={`${id}-l`} className="mt-3 flex items-center justify-between gap-3">
       <p id={`${id}-l`} className="flex flex-col">
-        <span className="font-grotesk text-16">Reps i sæt {set.number}</span>
+        <span className="font-sans text-16">Reps i sæt {set.number}</span>
         {/* A small tabular number, not a caption label: mono in the muted grey (Barley Corn is for captions only). */}
         <span className="font-mono text-14 text-text-muted">
           {low}–{top}
@@ -150,7 +150,7 @@ function RepsStepper({
           </svg>
           <span className="sr-only">Færre reps</span>
         </button>
-        <output aria-live="polite" className="min-w-[3ch] text-center font-grotesk text-32 font-normal tabular-nums">
+        <output aria-live="polite" className="min-w-[3ch] text-center font-sans text-28 font-normal tabular-nums">
           {value}
         </output>
         <button type="button" disabled={value >= max} aria-disabled={value >= max} onClick={() => change(1)} className={stepButton}>
@@ -234,7 +234,7 @@ function Scale({ seconds, scaleS, minS, maxS }: { readonly seconds: number; read
             <rect data-mark="max" x={f.maxX} y={4} width={1} height={52} fill="var(--text)" />
           </>
         )}
-        <rect data-now={f.tickX} x={f.tickX} y={0} width={2} height={60} fill="var(--accent)" />
+        <rect data-now={f.tickX} x={f.tickX} y={0} width={2} height={60} fill="var(--today)" />
       </svg>
       <div className="mt-1 flex justify-between font-mono text-12 leading-none text-text-muted">
         <span>0</span>
@@ -253,7 +253,7 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
   const basis = rampBasis(exercise);
   return (
     <section aria-labelledby="fokus-warmup" className="flex flex-col">
-      <h2 id="fokus-warmup" className="font-grotesk text-32 font-normal [overflow-wrap:anywhere]">
+      <h2 id="fokus-warmup" className="font-sans text-28 font-normal [overflow-wrap:anywhere]">
         {warmupTitle(exercise)}
       </h2>
       <div className="mt-14">
@@ -317,7 +317,7 @@ export function NextSetCard({
   const kg = summary.kg;
   return (
     <section aria-label="Næste sæt" className={`${afterTimer ? "mt-14" : "mt-10"} flex flex-col gap-1`}>
-      <p className="font-grotesk text-20 [overflow-wrap:anywhere]">{summary.title}</p>
+      <p className="font-sans text-20 [overflow-wrap:anywhere]">{summary.title}</p>
       {(summary.line !== "" || kg !== null) && (
         <p className="text-16 [overflow-wrap:anywhere]">
           {summary.line}
@@ -340,7 +340,7 @@ export function Note({ text }: { readonly text: string }) {
   const long = text.length > NOTE_CLAMP_CHARS;
   return (
     <div className="flex flex-col items-start">
-      <p className={`font-grotesk text-16 text-text-muted [overflow-wrap:anywhere] ${long && !open ? "line-clamp-3" : ""}`}>Note: {text}</p>
+      <p className={`font-sans text-16 text-text-muted [overflow-wrap:anywhere] ${long && !open ? "line-clamp-3" : ""}`}>Note: {text}</p>
       {long && !open && (
         <button type="button" onClick={() => setOpen(true)} className={`-my-2.5 ${INK_LINK}`}>
           Hele noten

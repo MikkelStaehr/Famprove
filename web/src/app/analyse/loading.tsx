@@ -4,7 +4,7 @@ import { SkeletonBar as Bar } from "@/components/Skeleton";
 import { QUESTION_TITLE } from "@/lib/analyse-answers";
 import { RAIL_GRID } from "@/lib/rail-grid";
 
-const BLOCK = "w-full bg-surface motion-safe:animate-pulse";
+const BLOCK = "w-full bg-raised motion-safe:animate-pulse";
 
 /** Skeleton in the shape of page.tsx (analyse.md §8, §11, §12d): real headings, the three answer blocks in the rail, three chart cards and the disclosure in the main column. */
 export default function Loading() {
@@ -27,7 +27,7 @@ export default function Loading() {
                   </h3>
                   <div aria-hidden="true">
                     <span
-                      className={`mt-1 block w-1/3 bg-surface motion-safe:animate-pulse ${q === "eftp" ? "h-14" : "h-11"}`}
+                      className={`mt-1 block w-1/3 bg-raised motion-safe:animate-pulse ${q === "eftp" ? "h-14" : "h-11"}`}
                     />
                     <Bar className="mt-2 w-3/4 text-16" />
                     <Bar className="mt-1 w-2/3 text-14" />

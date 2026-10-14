@@ -187,11 +187,11 @@ export type DayDetail = {
  * Unknown keys -> raw key, "neutral".
  */
 export const FORM_ZONE_DISPLAY: Readonly<Record<string, { label: string; tone: Tone }>> = {
-  transition: { label: "Overgang", tone: "warning" },
+  transition: { label: "Pause", tone: "warning" },
   fresh: { label: "Frisk", tone: "positive" },
-  grey_zone: { label: "Gråzone", tone: "neutral" },
+  grey_zone: { label: "Neutral", tone: "neutral" },
   optimal: { label: "Optimal", tone: "positive" },
-  high_risk: { label: "Høj risiko", tone: "negative" },
+  high_risk: { label: "Risiko", tone: "negative" },
 };
 
 export function zoneDisplay(key: string | null): Hero["zone"] {

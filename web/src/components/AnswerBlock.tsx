@@ -53,7 +53,7 @@ export function AnswerBlock({ block }: { readonly block: AnswerBlockView }) {
             <span
               aria-hidden="true"
               className={`font-sans leading-none font-normal tabular-nums ${
-                block.figure.large ? "text-56" : "text-44"
+                block.figure.large ? "text-56" : "text-48"
               }`}
             >
               {block.figure.number}

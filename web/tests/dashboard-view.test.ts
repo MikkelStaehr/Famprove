@@ -48,7 +48,7 @@ test("freshness: fresh up to 26 h, stale after, unknown without computed_at", ()
 });
 
 test("zoneDisplay maps Python keys and falls back to neutral for unknown ones", () => {
-  assert.deepEqual(zoneDisplay("high_risk"), { key: "high_risk", label: "Høj risiko", tone: "negative" });
+  assert.deepEqual(zoneDisplay("high_risk"), { key: "high_risk", label: "Risiko", tone: "negative" });
   assert.deepEqual(zoneDisplay("new_zone"), { key: "new_zone", label: "new_zone", tone: "neutral" });
   assert.deepEqual(zoneDisplay("toString"), { key: "toString", label: "toString", tone: "neutral" });
   assert.equal(zoneDisplay(null), null);

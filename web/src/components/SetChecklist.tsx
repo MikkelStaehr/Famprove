@@ -83,7 +83,7 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
       {(reps !== null || prescribed !== null) && (
         <p
           aria-hidden="true"
-          className={`col-start-2 flex min-w-0 flex-wrap gap-x-4 gap-y-1 font-sans text-32 font-medium tabular-nums ${shared}`}
+          className={`col-start-2 flex min-w-0 flex-wrap gap-x-4 gap-y-1 font-sans text-28 font-medium tabular-nums ${shared}`}
         >
           {reps !== null && (
             <span>

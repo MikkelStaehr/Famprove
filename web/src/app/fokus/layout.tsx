@@ -6,7 +6,7 @@
  */
 export default function FokusLayout({ children }: LayoutProps<"/fokus">) {
   return (
-    <div data-screen="fokus" className="flex flex-1 flex-col font-grotesk font-normal text-text tabular-nums">
+    <div data-screen="fokus" className="flex flex-1 flex-col font-sans font-normal text-text tabular-nums">
       {children}
     </div>
   );

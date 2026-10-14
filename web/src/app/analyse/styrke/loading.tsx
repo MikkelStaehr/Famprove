@@ -4,7 +4,7 @@ import { SkeletonBar as Bar } from "@/components/Skeleton";
 import { E1RM_PANELS_HEIGHT } from "@/lib/analyse-styrke-view";
 import { RAIL_GRID } from "@/lib/rail-grid";
 
-const BLOCK = "w-full bg-surface motion-safe:animate-pulse";
+const BLOCK = "w-full bg-raised motion-safe:animate-pulse";
 
 /** Skeleton in the shape of styrke/page.tsx (analyse-styrke.md §8, §11): real tabs, the board in the rail, card titles in the main column. */
 export default function Loading() {
@@ -27,7 +27,7 @@ export default function Loading() {
                       <Bar className="w-2/3 text-20" />
                       <Bar className="mt-1 w-full text-14" />
                     </div>
-                    <span className="block h-14 w-1/3 bg-surface motion-safe:animate-pulse" />
+                    <span className="block h-14 w-1/3 bg-raised motion-safe:animate-pulse" />
                   </div>
                 ))}
               </div>

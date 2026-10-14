@@ -73,12 +73,12 @@ test("bracket label: drawn only when it fits (mono 12 = 7.2px a character, 4px a
   assert.deepEqual(MARKS.bracket.strip, { load: 24, analyse: 18 });
 });
 
-test("today tick 2px in --chart-today; 12 / 8 / 28 tall; the only accent in the constant", () => {
+test("today tick 2px in --today; 12 / 8 / 28 tall; the only today colour in the constant", () => {
   assert.equal(MARKS.todayTick.width, 2);
   assert.deepEqual(MARKS.todayTick.height, { chart: 12, analyse: 8, ruler: 28 });
   const src = readFileSync(new URL("../src/lib/chart-marks.ts", import.meta.url), "utf8");
-  assert.equal(src.match(/var\(--chart-today\)/g)?.length, 1);
-  assert.ok(!/var\(--accent\)|var\(--zone-|#[0-9a-fA-F]{3,6}\b/.test(src), "no accent, zone colour or hex");
+  assert.equal(src.match(/var\(--today\)/g)?.length, 1);
+  assert.ok(!/var\(--accent\)|var\(--chart-today\)|var\(--zone-|#[0-9a-fA-F]{3,6}\b/.test(src), "no accent, zone colour or hex");
 });
 
 test("shared marks and the zone ruler use no retired token", () => {

@@ -16,7 +16,7 @@ export default function Loading() {
       <div className="flex items-center justify-between gap-3">
         <Link
           href="/"
-          className="inline-flex min-h-11 shrink-0 items-center font-grotesk text-16 font-medium text-text underline decoration-1 underline-offset-4"
+          className="inline-flex min-h-11 shrink-0 items-center font-sans text-16 font-medium text-text underline decoration-1 underline-offset-4"
         >
           Afslut
         </Link>

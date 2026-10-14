@@ -12,7 +12,7 @@ export function NoSessionNote({ sentence, devSwitches }: { readonly sentence: st
       <h1 className="sr-only">Fokus</h1>
       {devSwitches && <p className="text-14 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
       <section aria-labelledby="fokus-none" className="mt-2 flex flex-col gap-3">
-        <h2 id="fokus-none" className="font-grotesk text-20 font-normal">
+        <h2 id="fokus-none" className="font-sans text-20 font-normal">
           Ingen styrkesession at træne nu.
         </h2>
         <Hairline />

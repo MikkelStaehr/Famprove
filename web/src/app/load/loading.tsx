@@ -9,7 +9,7 @@ export default function Loading() {
   return (
     <>
       <header className="flex flex-col">
-        <h1 className="font-sans text-32 font-normal break-words hyphens-auto">Belast&shy;ning</h1>
+        <h1 className="font-sans text-28 font-normal break-words hyphens-auto">Belast&shy;ning</h1>
         <div aria-hidden="true" className="mt-1">
           <Bar className="w-1/3 text-14" />
         </div>
@@ -33,7 +33,7 @@ export default function Loading() {
             {/* Legend row, the TSS/dag unit, then the plot block (spec §5). */}
             <Bar className="w-3/4 text-14" />
             <Bar className="w-12 text-12" />
-            <div className="h-(--chart-height) w-full bg-surface motion-safe:animate-pulse" />
+            <div className="h-(--chart-height) w-full bg-raised motion-safe:animate-pulse" />
             {/* "Hvad betyder det?" summary row under the plot (load.md §8b, §11b), so nothing jumps. */}
             <div className="flex min-h-11 items-center">
               <Bar className="w-1/3 text-16" />

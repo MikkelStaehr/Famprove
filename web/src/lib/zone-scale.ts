@@ -89,11 +89,37 @@ function spokenSigned(value: number): string {
 
 /** Each band's name and range as spoken (design/specs/today.md §5a, ZoneBar sr sentence). */
 const SPOKEN_BAND: Readonly<Record<ZoneKey, string>> = {
-  high_risk: "høj risiko, minus 30 og lavere",
+  high_risk: "risiko, minus 30 og lavere",
   optimal: "optimal, som går fra minus 30 til minus 10",
-  grey_zone: "gråzone, som går fra minus 10 til 5",
+  grey_zone: "neutral, som går fra minus 10 til 5",
   fresh: "frisk, som går fra 5 til 20",
-  transition: "overgang, 20 og højere",
+  transition: "pause, 20 og højere",
+};
+
+/**
+ * Zone key (Python's form_zone) → its Ember colour token (DESIGN.md Part B colour table and "Zone
+ * colour rule"): today's form figure, the active ZoneBar segment and label, the ZonePill. Always
+ * next to the zone's word; never in charts, bars, buttons or tabs.
+ */
+export const ZONE_TOKEN: Readonly<Record<ZoneKey, `--zone-${string}`>> = {
+  high_risk: "--zone-risk",
+  optimal: "--zone-optimal",
+  grey_zone: "--zone-neutral",
+  fresh: "--zone-fresh",
+  transition: "--zone-transition",
+};
+
+/**
+ * The same map as literal Tailwind classes (so the scanner sees them): `text` = the zone colour as
+ * text, `pill` = ZonePill (text, 1px border at 40 %, fill at 8 %), `fill` = the active ZoneBar
+ * segment, `faint` = an inactive segment (30 %, decorative).
+ */
+export const ZONE_CLASS: Readonly<Record<ZoneKey, { readonly text: string; readonly pill: string; readonly fill: string; readonly faint: string }>> = {
+  high_risk: { text: "text-zone-risk", pill: "text-zone-risk border-zone-risk/40 bg-zone-risk/8", fill: "bg-zone-risk", faint: "bg-zone-risk/30" },
+  optimal: { text: "text-zone-optimal", pill: "text-zone-optimal border-zone-optimal/40 bg-zone-optimal/8", fill: "bg-zone-optimal", faint: "bg-zone-optimal/30" },
+  grey_zone: { text: "text-zone-neutral", pill: "text-zone-neutral border-zone-neutral/40 bg-zone-neutral/8", fill: "bg-zone-neutral", faint: "bg-zone-neutral/30" },
+  fresh: { text: "text-zone-fresh", pill: "text-zone-fresh border-zone-fresh/40 bg-zone-fresh/8", fill: "bg-zone-fresh", faint: "bg-zone-fresh/30" },
+  transition: { text: "text-zone-transition", pill: "text-zone-transition border-zone-transition/40 bg-zone-transition/8", fill: "bg-zone-transition", faint: "bg-zone-transition/30" },
 };
 
 export function isZoneKey(key: string | null): key is ZoneKey {
@@ -101,7 +127,7 @@ export function isZoneKey(key: string | null): key is ZoneKey {
 }
 
 /**
- * The zone bar's one sr-only sentence, e.g. "Form plus 4 TSS per dag: gråzone, som går fra
+ * The zone bar's one sr-only sentence, e.g. "Form plus 4 TSS per dag: neutral, som går fra
  * minus 10 til 5." `zone` is daily_load.form_zone as-is (never derived from `tsb` here);
  * `fromDate` is the spoken date when the row is not today's ("søndag 27. september").
  */

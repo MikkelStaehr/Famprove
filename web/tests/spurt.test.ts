@@ -1,4 +1,4 @@
-// Design acceptance checks on the pure parts: tokens vs DESIGN.md Part B (Instrument, Revision 5),
+// Design acceptance checks on the pure parts: tokens vs DESIGN.md Part B (Ember, 2026-10-14),
 // contrast from token values, zone-bar fixtures, zone from form_zone, and Danish formats.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -16,15 +16,18 @@ const DESIGN = read("../../DESIGN.md");
 
 // --- tokens -------------------------------------------------------------------------------
 
-/** DESIGN.md Part B colour table (Revision 5): | `--token` ... | #dark | #light | role | */
+/** DESIGN.md Part B colour table (Ember): | `--token` | #hex | role | */
 const TABLE = DESIGN.slice(DESIGN.indexOf("## Colour tokens (`:root`"), DESIGN.indexOf("\n## Type", DESIGN.indexOf("## Colour tokens (`:root`")));
-const expected = [...TABLE.matchAll(/^\| `(--[a-z-]+)`[^|]*\| (#[0-9A-Fa-f]{6}) \| (#[0-9A-Fa-f]{6}) \|/gm)].map(
-  ([, name, dark, light]) => ({ name: name ?? "", light: (light ?? "").toLowerCase(), dark: (dark ?? "").toLowerCase() }),
-);
-/** Rows whose value is another token: | `--a`, `--b` | = `--x` | ... (and the series rows: `--text`, ...). */
-const aliases = [...TABLE.matchAll(/^\| ((?:`--[a-z-]+`(?:, )?)+) \| (?:= )?`(--[a-z-]+)`/gm)].flatMap(([, names, target]) =>
-  [...(names ?? "").matchAll(/`(--[a-z-]+)`/g)].map((m) => ({ name: m[1] ?? "", target: target ?? "" })),
-);
+const expected = [...TABLE.matchAll(/^\| `(--[a-z0-9-]+)` \| (#[0-9A-Fa-f]{6}) \|/gm)].map(([, name, hex]) => ({
+  name: name ?? "",
+  hex: (hex ?? "").toLowerCase(),
+}));
+/** Part B "Shape": | `--radius-x` | px | use | */
+const SHAPE = DESIGN.slice(DESIGN.indexOf("## Shape"), DESIGN.indexOf("## Space and density"));
+const radii = [...SHAPE.matchAll(/^\| `(--radius-[a-z]+)` \| (\d+) \|/gm)].map(([, name, px]) => ({ name: name ?? "", px: `${px ?? ""}px` }));
+/** Part B "Type": | `text-NN` (line-height) | ... */
+const TYPE = DESIGN.slice(DESIGN.indexOf("## Type", DESIGN.indexOf("# Part B")), DESIGN.indexOf("## Shape"));
+const sizes = [...TYPE.matchAll(/^\| `text-(\d+)` \(([\d.]+)\)/gm)].map(([, px, lh]) => ({ px: Number(px), lh: lh ?? "" }));
 
 function block(css: string, start: number): string {
   const open = css.indexOf("{", start);
@@ -38,75 +41,59 @@ function block(css: string, start: number): string {
 function vars(body: string): Map<string, string> {
   return new Map([...body.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)].map(([, k, v]) => [k ?? "", (v ?? "").trim()]));
 }
-const LIGHT = vars(block(CSS, CSS.indexOf(":root")));
-const DARK = vars(block(block(CSS, CSS.indexOf("@media (prefers-color-scheme: dark)")), 0));
+const ROOT = vars(block(CSS, CSS.indexOf(":root")));
 const THEME_INLINE = vars(block(CSS, CSS.indexOf("@theme inline")));
+const THEME_STATIC = vars(block(CSS, CSS.indexOf("@theme static")));
 
-/** A token's value with var() references followed (custom properties resolve per theme). */
-function resolve(tokens: Map<string, string>, name: string): string {
-  let v = tokens.get(name);
-  for (let i = 0; i < 5 && v !== undefined; i++) {
-    const ref = v.match(/^var\((--[a-z0-9-]+)\)$/);
-    if (ref === null) break;
-    v = tokens.get(ref[1] ?? "");
-  }
-  return (v ?? "").toLowerCase();
-}
-const THEMES = [
-  ["light", LIGHT],
-  ["dark", new Map([...LIGHT, ...DARK])],
-] as const;
-
-test("DESIGN.md Part B lists the colour tokens this test checks", () => {
-  assert.equal(expected.length, 9, `parsed ${expected.length} hex colour tokens`);
-  const names = aliases.map((a) => a.name);
-  for (const n of ["--positive", "--negative", "--warning", "--series-ctl", "--series-atl", "--series-tsb", "--chart-mark", "--chart-today"]) {
-    assert.ok(names.includes(n), `${n} is an alias row`);
-  }
+test("DESIGN.md Part B lists the Ember tokens this test checks", () => {
+  assert.equal(expected.length, 21, `parsed ${expected.length} hex colour tokens`);
+  assert.equal(radii.length, 8, `parsed ${radii.length} radius tokens`);
+  assert.deepEqual(
+    sizes.map((s) => s.px),
+    [56, 48, 28, 24, 22, 20, 16, 15, 14, 13, 12, 11],
+  );
 });
 
-test("every Part B colour token has its DESIGN.md value in light and in dark", () => {
-  for (const { name, light, dark } of expected) {
-    assert.equal(LIGHT.get(name)?.toLowerCase(), light, `${name} light`);
-    assert.equal(DARK.get(name)?.toLowerCase(), dark, `${name} dark`);
-  }
-  for (const [theme, tokens] of THEMES) {
-    for (const { name, target } of aliases) {
-      assert.equal(resolve(tokens, name), resolve(tokens, target), `${theme}: ${name} = ${target}`);
-    }
-  }
-  // Retired by Revision 5 and deleted when instrument-rest ended: no alias may come back.
-  for (const retired of ["--slab", "--on-slab", "--on-slab-muted", "--slab-mark", "--on-accent", "--zone-", "--block-fill", "--prognose-band", "--card-shadow", "--shadow-card", "--radius-mark", "--radius-control", "--radius-card", "--radius-pill", "--font-display"]) {
-    assert.ok(!new RegExp(`${retired}[a-z-]*:`).test(CSS), `${retired} is retired`);
-  }
-  // DESIGN.md: 224px below 640px, 240px from 640px (load.md §9a).
-  assert.equal(LIGHT.get("--chart-height"), "224px");
-  const wide = vars(block(block(CSS, CSS.indexOf("@media (min-width: 640px)")), 0));
-  assert.equal(wide.get("--chart-height"), "240px");
+test("every Part B colour token has its DESIGN.md value at :root, dark only", () => {
+  for (const { name, hex } of expected) assert.equal(ROOT.get(name)?.toLowerCase(), hex, name);
+  assert.equal(ROOT.get("color-scheme"), undefined); // a property, not a variable
+  assert.match(block(CSS, CSS.indexOf(":root")), /color-scheme: dark;/);
+  assert.ok(!CSS.includes("prefers-color-scheme"), "one theme only: no light palette");
 });
 
-test("the Instrument scope is gone: tokens sit at :root, Fokus is marked by data-screen", () => {
+test("retired Instrument and Spurt tokens never come back", () => {
+  for (const retired of ["--surface", "--caption:", "--accent", "--positive", "--negative", "--series-", "--chart-mark", "--chart-today", "--grain", "--slab", "--on-slab", "--block-fill", "--prognose-band", "--card-shadow", "--shadow-card", "--radius-mark", "--font-display", "--font-inter", "--font-instrument-mono", "--font-grotesk"]) {
+    assert.ok(!CSS.includes(retired), `${retired} is retired`);
+  }
   assert.ok(!CSS.includes("data-direction"));
-  assert.match(CSS, /\[data-screen="fokus"\]/);
+  assert.ok(!/body::after/.test(CSS), "no registration marks");
+  assert.ok(!/box-shadow/.test(CSS), "no shadows anywhere");
+  const LAYOUT = read("../src/app/layout.tsx");
+  assert.match(LAYOUT, /import \{ Geist, Geist_Mono \} from "next\/font\/google";/);
+  assert.ok(!/Inter|Chivo/.test(LAYOUT));
+  assert.match(LAYOUT, /colorScheme: "dark"/);
 });
 
-test("every Part B colour token is exposed through @theme inline as --color-*", () => {
-  const missing = [...expected, ...aliases]
-    .map(({ name }) => name)
-    .filter((name) => THEME_INLINE.get(`--color-${name.slice(2)}`) !== `var(${name})`);
+test("every Part B colour token is exposed through @theme inline as --color-*, and nothing else", () => {
+  const missing = expected.map(({ name }) => name).filter((name) => THEME_INLINE.get(`--color-${name.slice(2)}`) !== `var(${name})`);
   assert.deepEqual(missing, []);
+  const colours = [...THEME_INLINE.keys()].filter((k) => k.startsWith("--color-"));
+  assert.deepEqual(
+    colours.filter((k) => !["--color-transparent", "--color-current"].includes(k)).sort(),
+    expected.map(({ name }) => `--color-${name.slice(2)}`).sort(),
+  );
 });
 
-test("type, radius and font tokens are exposed; Tailwind defaults and retired sizes are gone", () => {
-  for (const size of [12, 14, 16, 20, 24, 32, 44, 56]) assert.ok(THEME_INLINE.has(`--text-${size}`), `text-${size}`);
-  // Radius 0 everywhere (Revision 5): no radius token exists, and Tailwind's scale stays removed (below).
-  assert.ok(![...THEME_INLINE.keys()].some((k) => k.startsWith("--radius-")));
-  assert.equal(THEME_INLINE.get("--text-56"), "3.5rem");
-  assert.equal(THEME_INLINE.get("--text-32"), "2rem");
-  assert.equal(THEME_INLINE.get("--font-sans"), "var(--font-inter), system-ui, sans-serif");
-  assert.equal(THEME_INLINE.get("--font-mono"), "var(--font-instrument-mono), ui-monospace, monospace");
-  assert.ok(!CSS.includes("barlow"));
-  assert.ok(!THEME_INLINE.has("--text-28") && !THEME_INLINE.has("--text-40"));
+test("type, radius and font tokens follow Part B; Tailwind defaults stay removed", () => {
+  for (const { px, lh } of sizes) {
+    assert.equal(THEME_INLINE.get(`--text-${px}`), `${px / 16}rem`, `text-${px}`);
+    assert.equal(THEME_INLINE.get(`--text-${px}--line-height`), lh, `text-${px} line height`);
+  }
+  assert.ok(![...THEME_INLINE.keys()].some((k) => /^--text-\d+$/.test(k) && !sizes.some((s) => `--text-${s.px}` === k)), "no size outside Part B");
+  for (const { name, px } of radii) assert.equal(THEME_STATIC.get(name), px, name);
+  assert.equal(THEME_STATIC.get("--radius-pill"), "999px");
+  assert.equal(THEME_INLINE.get("--font-sans"), "var(--font-geist), system-ui, sans-serif");
+  assert.equal(THEME_INLINE.get("--font-mono"), "var(--font-geist-mono), ui-monospace, monospace");
   assert.match(CSS, /--color-\*: initial;/);
   assert.match(CSS, /--text-\*: initial;/);
   assert.match(CSS, /--radius-\*: initial;/);
@@ -129,48 +116,52 @@ function ratio(a: string, b: string): number {
 /** [foreground, background] pairs that carry text (4.5:1) or marks/focus/control outlines (3:1). */
 const TEXT_PAIRS: readonly (readonly [string, string])[] = [
   ["--text", "--bg"],
-  ["--text", "--surface"],
-  ["--bg", "--text"], // primary ink slab label
+  ["--text", "--card"],
   ["--text-muted", "--bg"],
-  ["--caption", "--bg"],
-  ["--positive", "--bg"],
-  ["--warning", "--bg"],
-  ["--negative", "--bg"],
+  ["--text-muted", "--card"],
+  ["--today", "--bg"],
+  ["--today", "--card"],
+  ["--warning", "--card"],
+  ["--zone-risk", "--card"],
+  ["--zone-optimal", "--card"],
+  ["--zone-neutral", "--card"],
+  ["--zone-fresh", "--card"],
+  ["--zone-transition", "--card"],
+  ["--inverse-text", "--inverse-bg"],
+  ["--inverse-muted", "--inverse-bg"],
+  ["--inverse-text", "--text"], // the primary button's label on its --text fill
 ];
 const MARK_PAIRS: readonly (readonly [string, string])[] = [
-  ["--text-muted", "--bg"], // control outlines ([A5])
   ["--focus", "--bg"],
-  ["--chart-mark", "--bg"],
-  ["--series-ctl", "--bg"],
-  ["--chart-today", "--bg"], // the red today tick
+  ["--focus", "--card"],
+  ["--shade-2", "--card"],
+  ["--text-muted", "--card"], // secondary button border
 ];
 
-for (const [theme, tokens] of THEMES) {
-  test(`${theme}: text ≥ 4.5:1 and marks/focus ≥ 3:1, computed from the token values`, () => {
-    const hex = (name: string) => {
-      const v = resolve(tokens, name);
-      assert.ok(/^#[0-9a-f]{6}$/.test(v), `${name} is a hex token`);
-      return v;
-    };
-    const fails: string[] = [];
-    for (const [fg, bg] of TEXT_PAIRS) {
-      const r = ratio(hex(fg), hex(bg));
-      if (r < 4.5) fails.push(`text ${fg} on ${bg} = ${r.toFixed(2)}`);
-    }
-    for (const [fg, bg] of MARK_PAIRS) {
-      const r = ratio(hex(fg), hex(bg));
-      if (r < 3) fails.push(`mark ${fg} on ${bg} = ${r.toFixed(2)}`);
-    }
-    assert.deepEqual(fails, []);
-  });
-}
+test("text ≥ 4.5:1 and marks/focus ≥ 3:1, computed from the token values", () => {
+  const hex = (name: string) => {
+    const v = (ROOT.get(name) ?? "").toLowerCase();
+    assert.ok(/^#[0-9a-f]{6}$/.test(v), `${name} is a hex token`);
+    return v;
+  };
+  const fails: string[] = [];
+  for (const [fg, bg] of TEXT_PAIRS) {
+    const r = ratio(hex(fg), hex(bg));
+    if (r < 4.5) fails.push(`text ${fg} on ${bg} = ${r.toFixed(2)}`);
+  }
+  for (const [fg, bg] of MARK_PAIRS) {
+    const r = ratio(hex(fg), hex(bg));
+    if (r < 3) fails.push(`mark ${fg} on ${bg} = ${r.toFixed(2)}`);
+  }
+  assert.deepEqual(fails, []);
+  // Part B: --today on the inverse card is 2.91:1, so it is forbidden there.
+  assert.ok(ratio(hex("--today"), hex("--inverse-bg")) < 3);
+});
 
-test("red is only the today tick: no text, status or series token resolves to --accent", () => {
-  for (const [theme, tokens] of THEMES) {
-    const red = resolve(tokens, "--accent");
-    for (const t of ["--text", "--text-muted", "--caption", "--focus", "--positive", "--negative", "--warning", "--series-ctl", "--series-atl", "--series-tsb", "--chart-mark"]) {
-      assert.notEqual(resolve(tokens, t), red, `${theme}: ${t}`);
-    }
+test("orange is only today: no text, status or zone token resolves to --today", () => {
+  const today = ROOT.get("--today");
+  for (const t of ["--text", "--text-muted", "--focus", "--warning", "--zone-risk", "--zone-optimal", "--zone-neutral", "--zone-fresh", "--zone-transition"]) {
+    assert.notEqual(ROOT.get(t), today, t);
   }
 });
 
@@ -195,20 +186,20 @@ test("zone-bar fixtures: signed flag value with U+2212, marker at (clamp+40)/70,
 
 test("zone-bar sr sentence per fixture (today.md §5a)", () => {
   assert.equal(zoneSentence(-12, "optimal"), "Form minus 12 TSS per dag: optimal, som går fra minus 30 til minus 10.");
-  assert.equal(zoneSentence(4, "grey_zone"), "Form plus 4 TSS per dag: gråzone, som går fra minus 10 til 5.");
+  assert.equal(zoneSentence(4, "grey_zone"), "Form plus 4 TSS per dag: neutral, som går fra minus 10 til 5.");
   assert.equal(
     zoneSentence(-45, "high_risk"),
-    "Form minus 45 TSS per dag: høj risiko, minus 30 og lavere. Uden for skalaen, som går fra minus 40 til 30.",
+    "Form minus 45 TSS per dag: risiko, minus 30 og lavere. Uden for skalaen, som går fra minus 40 til 30.",
   );
   assert.equal(
     zoneSentence(34, "transition"),
-    "Form plus 34 TSS per dag: overgang, 20 og højere. Uden for skalaen, som går fra minus 40 til 30.",
+    "Form plus 34 TSS per dag: pause, 20 og højere. Uden for skalaen, som går fra minus 40 til 30.",
   );
   assert.equal(zoneSentence(11, "fresh"), "Form plus 11 TSS per dag: frisk, som går fra 5 til 20.");
-  assert.equal(zoneSentence(24, "transition"), "Form plus 24 TSS per dag: overgang, 20 og højere.");
+  assert.equal(zoneSentence(24, "transition"), "Form plus 24 TSS per dag: pause, 20 og højere.");
   assert.equal(
     zoneSentence(4, "grey_zone", formatDayLong("2026-09-27")),
-    "Form plus 4 TSS per dag: gråzone, som går fra minus 10 til 5. Tallet er fra søndag 27. september.",
+    "Form plus 4 TSS per dag: neutral, som går fra minus 10 til 5. Tallet er fra søndag 27. september.",
   );
 });
 

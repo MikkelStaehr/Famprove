@@ -60,7 +60,7 @@ export type AnswerFigure = {
   readonly number: string; // "183 W", "1,24", "0,9 t", "0 af 3", "–"
   readonly sr: string; // the arrow as a word, then the number ("uændret 183 W", "ikke registreret")
   readonly caption: string;
-  readonly large: boolean; // block 1: text-56; blocks 2–3: text-44
+  readonly large: boolean; // block 1: text-56; blocks 2–3: text-48
 };
 
 export type AnswerBlock =

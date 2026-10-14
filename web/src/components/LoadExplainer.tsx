@@ -117,7 +117,7 @@ function ZoneSpanSwatch({ span }: { readonly span: { readonly start: number; rea
   const w = 32;
   return (
     <svg aria-hidden="true" viewBox={`0 0 ${w} 12`} className="h-3 w-8 shrink-0">
-      <line x1="0" x2={w} y1="8.5" y2="8.5" stroke="var(--chart-mark)" strokeWidth="1" />
+      <line x1="0" x2={w} y1="8.5" y2="8.5" stroke="var(--text-muted)" strokeWidth="1" />
       {span !== null && <rect x={span.start * w} y="6" width={(span.end - span.start) * w} height="3" fill="var(--text)" />}
     </svg>
   );

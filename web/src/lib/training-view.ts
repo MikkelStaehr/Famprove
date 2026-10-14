@@ -353,11 +353,11 @@ export const TSB_HINT: Readonly<Record<ZoneKey, string>> = {
 };
 
 const ZONE_WORD: Readonly<Record<ZoneKey, string>> = {
-  high_risk: "høj risiko",
+  high_risk: "risiko",
   optimal: "optimal",
-  grey_zone: "gråzone",
+  grey_zone: "neutral",
   fresh: "frisk",
-  transition: "overgang",
+  transition: "pause",
 };
 
 /**

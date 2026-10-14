@@ -13,7 +13,7 @@ export default function Loading() {
     <div className="flex w-full max-w-phone flex-col gap-10">
       <header className="flex flex-col">
         <h1 className="flex items-baseline gap-x-3">
-          <span className="font-sans text-32 font-normal">Træning</span>
+          <span className="font-sans text-28 font-normal">Træning</span>
           <Bar className="w-1/4 text-16" />
         </h1>
         <div aria-hidden="true" className="mt-1">
@@ -21,7 +21,7 @@ export default function Loading() {
         </div>
         <div aria-hidden="true" className="mt-4 flex flex-col gap-1">
           <Bar className="w-1/5 text-12" />
-          <span className="block h-6 w-1/3 bg-surface motion-safe:animate-pulse" />
+          <span className="block h-6 w-1/3 bg-raised motion-safe:animate-pulse" />
           <Bar className="w-2/3 text-16" />
         </div>
         <div aria-hidden="true" className="mt-6 flex flex-col">
@@ -30,9 +30,9 @@ export default function Loading() {
               <Bar className="w-2/3 text-20" />
               <Bar className="w-1/2 text-16" />
             </div>
-            <span className="block h-12 w-10 shrink-0 bg-surface motion-safe:animate-pulse" />
+            <span className="block h-12 w-10 shrink-0 bg-raised motion-safe:animate-pulse" />
           </div>
-          <span className="mt-4 block h-14 bg-surface motion-safe:animate-pulse" />
+          <span className="mt-4 block h-14 bg-raised motion-safe:animate-pulse" />
         </div>
       </header>
       <p className="sr-only" role="status">
@@ -45,9 +45,9 @@ export default function Loading() {
           <Bar className="w-1/4 text-20" />
         </div>
         <Bar className="w-1/3 text-24" />
-        <span className="block h-5 w-1/2 bg-surface motion-safe:animate-pulse" />
+        <span className="block h-5 w-1/2 bg-raised motion-safe:animate-pulse" />
         {Array.from({ length: GROUPS }, (_, g) => (
-          <span key={g} className="block h-18 bg-surface motion-safe:animate-pulse" />
+          <span key={g} className="block h-18 bg-raised motion-safe:animate-pulse" />
         ))}
       </div>
     </div>

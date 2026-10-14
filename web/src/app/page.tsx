@@ -78,7 +78,7 @@ export default async function TrainingPage() {
     <div className="flex w-full max-w-phone flex-col gap-10">
       <header className="flex flex-col">
         <h1 className="flex flex-wrap items-baseline gap-x-3">
-          <span className="font-sans text-32 font-normal">Træning</span>
+          <span className="font-sans text-28 font-normal">Træning</span>
           <span className="sr-only">, </span>
           <time dateTime={today} className="font-sans text-16 font-normal text-text-muted">
             {formatDay(today)}

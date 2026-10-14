@@ -39,11 +39,11 @@ function xCss(axis: { readonly lo: number; readonly hi: number }, x: number): st
 }
 
 function Skeleton({ height }: { readonly height: string }) {
-  return <div className={`${height} w-full bg-surface motion-safe:animate-pulse`} />;
+  return <div className={`${height} w-full bg-raised motion-safe:animate-pulse`} />;
 }
 
 /**
- * The red today tick (instrument-analyse.md §1): 2×8 --chart-today, centred on the x baseline at
+ * The red today tick (instrument-analyse.md §1): 2×8 --today, centred on the x baseline at
  * day `x`. HTML so it shares xCss with the seams and strips; aria-hidden.
  */
 function TodayMark({ axis, x, bottom }: { readonly axis: { readonly lo: number; readonly hi: number }; readonly x: number; readonly bottom: number }) {

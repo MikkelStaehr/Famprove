@@ -18,7 +18,7 @@ type TodayTickProps = {
   readonly align?: "center" | "up" | "down";
 };
 
-/** The red "now" tick: 2px wide, --chart-today; 12px on /load's axis, 8 on Analyse, 28 on the ruler. */
+/** The red "now" tick: 2px wide, --today; 12px on /load's axis, 8 on Analyse, 28 on the ruler. */
 export function TodayTick({ x, y, height = MARKS.todayTick.height.chart, align = "center" }: TodayTickProps) {
   const w = MARKS.todayTick.width;
   const top = align === "up" ? y - height : align === "down" ? y : y - height / 2;

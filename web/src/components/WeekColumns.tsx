@@ -10,7 +10,7 @@ const TONE: Readonly<Record<ColumnTone, string>> = {
 /**
  * The week's sessions as short columns (instrument-traening.md §2.2): one 8px column per session,
  * one 8 × 1 tick per set, bottom up. Done sessions ink; the current one ink where done or
- * skipped, muted where open, with the red today tick under it (the page's only --accent); later
+ * skipped, muted where open, with the red today tick under it (the page's only --today); later
  * sessions --border ticks inside a 1px --text-muted outline. aria-hidden: the caller renders
  * weekSentence as sr text. No motion.
  */
@@ -57,7 +57,7 @@ export function WeekColumns({
               y={g.todayTick.y}
               width={g.columnWidth}
               height={g.todayTick.height}
-              fill="var(--accent)"
+              fill="var(--today)"
             />
           )}
         </g>

@@ -88,7 +88,7 @@ export function RideCard({ id, ride }: RideCardProps) {
 }
 
 /**
- * Left: label (text-20 500) over the duration (text-20). Right: watts (Inter 500 text-32 tabular) over
+ * Left: label (text-20 500) over the duration (text-20). Right: watts (Inter 500 text-28 tabular) over
  * % FTP (text-14 muted); without watts (no FTP) the % FTP takes the big line.
  */
 function StepRow({ step }: { readonly step: PlanStep }) {
@@ -121,14 +121,14 @@ function StepRow({ step }: { readonly step: PlanStep }) {
         {/* A range never breaks after its en dash ("125–" / "188 W" reads like a 188 W target).
             Only the unit may wrap under it, when the card is narrower than the value (200% text). */}
         {watts === null ? (
-          <span className="font-sans text-32 font-medium tabular-nums">
+          <span className="font-sans text-28 font-medium tabular-nums">
             <span className="whitespace-nowrap">{pct}%</span>
             <span className="text-20"> FTP</span>
           </span>
         ) : (
           <>
             {/* Full-size unit: a smaller capital W beside 28px digits reads as a lowercase "w". */}
-            <span className="font-sans text-32 font-medium tabular-nums">
+            <span className="font-sans text-28 font-medium tabular-nums">
               <span className="whitespace-nowrap">{watts}</span> W
             </span>
             <span className="text-14 text-text-muted tabular-nums">{pct}% FTP</span>

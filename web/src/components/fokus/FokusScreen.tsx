@@ -334,7 +334,7 @@ function SetView({
   return (
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       <section aria-labelledby="fokus-set" className="mt-4 flex flex-1 flex-col">
-        <h2 id="fokus-set" className="font-grotesk text-32 font-normal [overflow-wrap:anywhere]">
+        <h2 id="fokus-set" className="font-sans text-28 font-normal [overflow-wrap:anywhere]">
           {exerciseName(e)}
         </h2>
         <p className="caption mt-3">{setTitle(current)}</p>
@@ -345,14 +345,14 @@ function SetView({
             {e.repsText !== null && (
               <p className="flex flex-col [overflow-wrap:anywhere]">
                 <span className="caption">Reps</span>
-                <span className="text-44">{rangeFigure(e.repsText)}</span>
+                <span className="text-48">{rangeFigure(e.repsText)}</span>
               </p>
             )}
             {cell !== null && (
               <p className="flex flex-col [overflow-wrap:anywhere]">
                 <span className="caption">{cell.caption ?? "\u00a0"}</span>
                 <span>
-                  <span className="text-44">{cell.value}</span>
+                  <span className="text-48">{cell.value}</span>
                   {cell.unit !== null && <span className="text-20 text-text-muted">{cell.unit}</span>}
                 </span>
               </p>
@@ -365,7 +365,7 @@ function SetView({
               >
                 <span className="caption">{kg.label}</span>
                 <span>
-                  {kg.kind === "suggestion" ? <span className="text-44">{kg.figure}</span> : <FigureWithWords figure={kg.figure} />}
+                  {kg.kind === "suggestion" ? <span className="text-48">{kg.figure}</span> : <FigureWithWords figure={kg.figure} />}
                   {kg.unit !== null && <span className="text-20 text-text-muted">{"\u00a0"}kg</span>}
                 </span>
               </p>
@@ -524,7 +524,7 @@ function FinishedView({
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
       <section aria-labelledby={`fokus-finished-${session}`} className={`${feel !== null ? "mt-10" : "mt-4"} flex flex-col`}>
-        <h2 id={`fokus-finished-${session}`} className="font-grotesk text-44 font-normal">
+        <h2 id={`fokus-finished-${session}`} className="font-sans text-48 font-normal">
           {card.title}
         </h2>
         <div className="mt-10 flex flex-col gap-3">
@@ -567,11 +567,11 @@ const hasWords = (figure: string): boolean => /\p{L}/u.test(figure);
  */
 function FigureWithWords({ figure }: { readonly figure: string }) {
   const m = /^(\D+?)\s*(\d[\d,.]*)$/.exec(figure);
-  if (m === null) return <span className="text-44">{figure}</span>;
+  if (m === null) return <span className="text-48">{figure}</span>;
   return (
     <>
       <span className="text-24">{m[1]} </span>
-      <span className="text-44">{m[2]}</span>
+      <span className="text-48">{m[2]}</span>
     </>
   );
 }

@@ -214,7 +214,7 @@ export function ZoneBarSkeleton({ size }: { readonly size: ZoneBarSize }) {
     <div aria-hidden="true">
       <LabelLine />
       <div className={`mt-2 flex items-center ${SIZE[size].slot}`}>
-        <span className={`block w-1/3 bg-surface motion-safe:animate-pulse ${size === "hero" ? "h-14" : "h-6"}`} />
+        <span className={`block w-1/3 bg-raised motion-safe:animate-pulse ${size === "hero" ? "h-14" : "h-6"}`} />
       </div>
       <Ruler active={null} />
       <Thresholds />
