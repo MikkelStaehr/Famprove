@@ -86,7 +86,7 @@ const isSentence = (line: string) => line === "logget RPE" || line === "baseret 
 /**
  * §3: the lift board as the hero card (radius 26, padding 22 20 16): three ListRows in SBD order,
  * the value Geist Mono 500 right, colour = RPE provenance (--text logged / --text-muted prescribed),
- * the words on the left carry it too. The <dl> stays aria-hidden behind the sr sentence.
+ * the words on the left carry it too; a last-known value (fitness-round.md §3) is always muted. The <dl> stays aria-hidden behind the sr sentence.
  */
 function Board({ view }: { readonly view: Ready }) {
   const { board } = view;
@@ -111,7 +111,7 @@ function Board({ view }: { readonly view: Ready }) {
               className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 border-t border-border py-3 first:border-t-0 first:pt-0"
             >
               <dt className="min-w-0 font-sans text-16 font-medium text-text">{r.name}</dt>
-              <dd className={`text-right font-mono text-40 font-medium ${r.logged ? "text-text" : "text-text-muted"}`}>
+              <dd className={`text-right font-mono text-40 font-medium ${r.logged && r.lastKnown === null ? "text-text" : "text-text-muted"}`}>
                 {kg ? r.value.slice(0, -3) : r.value}
                 {kg && <span className="ml-1 font-mono text-14 font-normal tracking-normal text-text-muted">kg</span>}
               </dd>

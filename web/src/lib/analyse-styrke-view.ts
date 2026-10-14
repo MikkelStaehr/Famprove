@@ -92,7 +92,12 @@ export type BoardRow = {
   readonly lift: StrengthLift;
   readonly name: string;
   readonly value: string; // "174,1 kg" or "–"
-  readonly logged: boolean; // ink (logged RPE) vs muted
+  readonly logged: boolean; // the RPE source was logged (ink only when the value is current)
+  /**
+   * fitness-round.md §3: "blok 11, uge 4" when the value is the last-known weekly e1RM (no rolling
+   * value; "" if that week has no block); null when current. A last-known value is always muted.
+   */
+  readonly lastKnown: string | null;
   readonly lines: readonly string[]; // the set, the RPE source, the earlier same-phase block
 };
 
@@ -216,11 +221,25 @@ export function buildBoard(weeks: readonly StrengthWeekRow[], blocks: readonly S
     const now = weeks
       .filter((w) => w.lift === lift && w.weekStart <= current)
       .reduce<StrengthWeekRow | undefined>((a, w) => (a === undefined || w.weekStart > a.weekStart ? w : a), undefined);
-    const kg = now?.rollingE1rmKg ?? null;
-    const source = kg === null ? undefined : weeks.find((w) => w.lift === lift && w.weekStart === now?.rollingE1rmWeek);
+    const rolling = now?.rollingE1rmKg ?? null;
+    // fitness-round.md §3: no rolling value → the lift's latest week with a weekly e1RM (on or before this week).
+    const fallback =
+      rolling !== null
+        ? undefined
+        : weeks
+            .filter((w) => w.lift === lift && w.weekStart <= current && w.e1rmKg !== null)
+            .reduce<StrengthWeekRow | undefined>((a, w) => (a === undefined || w.weekStart > a.weekStart ? w : a), undefined);
+    const kg = rolling ?? fallback?.e1rmKg ?? null;
+    const source = rolling === null ? fallback : weeks.find((w) => w.lift === lift && w.weekStart === now?.rollingE1rmWeek);
+    const lastKnown =
+      fallback === undefined || fallback.blockNo === null ? null : `${blockLabel(fallback.blockNo)}, uge ${blockWeekOf(weeks, fallback.blockNo, fallback.weekStart)}`;
     const lines: string[] = [];
     if (kg === null) {
-      lines.push("Intet e1RM de sidste 4 uger");
+      lines.push("Intet e1RM endnu");
+    } else if (fallback !== undefined) {
+      const line = [lastKnown, setText(fallback)].filter((t): t is string => t !== null && t !== "").join(" · ");
+      lines.push(`seneste: ${line}`);
+      lines.push(fallback.e1rmRpeSource === "logged" ? "logget RPE" : "baseret på foreskrevet RPE");
     } else if (source !== undefined) {
       const set = setText(source);
       const week =
@@ -249,6 +268,7 @@ export function buildBoard(weeks: readonly StrengthWeekRow[], blocks: readonly S
       name: LIFT_NAME[lift],
       value: kg === null ? MISSING : `${formatE1rm(kg)} kg`,
       logged: kg !== null && source?.e1rmRpeSource === "logged",
+      lastKnown: fallback === undefined ? null : (lastKnown ?? ""),
       lines,
     };
   });
@@ -264,7 +284,14 @@ export function buildBoard(weeks: readonly StrengthWeekRow[], blocks: readonly S
 }
 
 function boardSr(rows: readonly BoardRow[]): string {
-  const values = rows.map((r) => `${liftLower(r.lift)} ${r.value === MISSING ? "intet" : r.value.replace(" kg", " kilo")}`).join(", ");
+  const values = rows
+    .map((r) => {
+      if (r.value === MISSING) return `${liftLower(r.lift)} intet`;
+      const kilo = r.value.replace(" kg", " kilo");
+      if (r.lastKnown === null) return `${liftLower(r.lift)} ${kilo}`;
+      return `${liftLower(r.lift)} seneste ${kilo}${r.lastKnown === "" ? "" : `, ${r.lastKnown}`}`;
+    })
+    .join(", ");
   const head = `Estimeret 1RM de sidste 4 uger: ${values}.`;
   const valued = rows.filter((r) => r.value !== MISSING);
   const logged = valued.filter((r) => r.logged);

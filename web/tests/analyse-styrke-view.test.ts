@@ -128,15 +128,16 @@ test("3a/3b lift board: values are rolling_e1rm_kg of the latest week, not the b
     [
       ["Squat", "174,1 kg", false],
       ["Bænkpres", "106,2 kg", false],
-      ["Dødløft", "–", false], // block best 174,1 exists, but no rolling e1RM
+      ["Dødløft", "174,1 kg", false], // no rolling e1RM: the last-known weekly e1RM (fitness-round.md §3)
     ],
   );
   assert.deepEqual(b.rows[0].lines, ["140 kg × 5 · RPE 6,5 · uge 1", "baseret på foreskrevet RPE"]);
-  assert.deepEqual(b.rows[2].lines, ["Intet e1RM de sidste 4 uger"]);
+  assert.equal(b.rows[0].lastKnown, null); // 3c: a current value is unchanged
+  assert.deepEqual(b.rows[2].lines, ["seneste: blok 12, uge 2 · 140 kg × 5 · RPE 6,5", "baseret på foreskrevet RPE"]);
   assert.equal(b.firstNote, "Blok 12 er den første blok uden for sæson, så der er ingen blok at sammenligne med endnu.");
   assert.equal(
     b.sr,
-    "Estimeret 1RM de sidste 4 uger: squat 174,1 kilo, bænkpres 106,2 kilo, dødløft intet. Baseret på foreskrevet RPE.",
+    "Estimeret 1RM de sidste 4 uger: squat 174,1 kilo, bænkpres 106,2 kilo, dødløft seneste 174,1 kilo, blok 12, uge 2. Baseret på foreskrevet RPE.",
   );
   assert.equal(BOARD_NOTE, "Samme e1RM som de foreslåede kg: bedste sæt med højst 5 reps ved RPE 7 eller mere de sidste 4 uger.");
 });
@@ -151,10 +152,31 @@ test("lift board: a source week in an earlier block names the block; logged rows
   assert.match(b.sr, /Bænkpres er baseret på logget RPE, de andre på foreskrevet\.$/);
 });
 
-test("lift board: no rolling columns (before Python writes them) gives the empty text per lift", () => {
-  const b = buildBoard(weeks(), BLOCKS, 12, TODAY);
-  assert.deepEqual(b.rows.map((r) => r.value), ["–", "–", "–"]);
-  assert.equal(b.sr, "Estimeret 1RM de sidste 4 uger: squat intet, bænkpres intet, dødløft intet.");
+test("3a lift board: a null rolling value falls back to the latest older weekly e1RM, muted even when logged", () => {
+  // Only blok 11 has a squat e1RM, and its RPE was logged: the value stays muted (lastKnown set).
+  const w = weeks()
+    .filter((r) => !(r.lift === "SQUAT" && r.blockNo === 12))
+    .map((r) => (r.lift === "SQUAT" && r.weekStart === "2026-08-17" ? { ...r, e1rmLoadKg: 145, e1rmReps: 3, e1rmRpe: 7, e1rmRpeSource: "logged" as const } : r));
+  const b = buildBoard(w, BLOCKS, 12, TODAY);
+  const squat = b.rows[0];
+  assert.equal(squat.value, "179,6 kg");
+  assert.equal(squat.lastKnown, "blok 11, uge 2");
+  assert.deepEqual(squat.lines.slice(0, 2), ["seneste: blok 11, uge 2 · 145 kg × 3 · RPE 7", "logget RPE"]);
+  assert.match(b.sr, /^Estimeret 1RM de sidste 4 uger: squat seneste 179,6 kilo, blok 11, uge 2, /);
+});
+
+test("3b lift board: a lift with no weekly e1RM ever shows '–' and 'Intet e1RM endnu'", () => {
+  const w = weeks().map((r) => (r.lift === "BENCH" ? { ...r, e1rmKg: null } : r));
+  const b = buildBoard(w, BLOCKS, 12, TODAY);
+  assert.equal(b.rows[1].value, "–");
+  assert.equal(b.rows[1].lastKnown, null);
+  assert.deepEqual(b.rows[1].lines, ["Intet e1RM endnu"]);
+  assert.match(b.sr, /bænkpres intet/);
+});
+
+test("lift board: a future week's e1RM is never the fallback", () => {
+  const w = [...weeks().filter((r) => r.lift !== "DEADLIFT"), row("2026-10-05", "DEADLIFT", e1rm(190))];
+  assert.equal(buildBoard(w, BLOCKS, 12, TODAY).rows[2].value, "–");
 });
 
 test("3c lift board: 'endnu' only while the block runs (end_date >= today)", () => {
