@@ -59,11 +59,11 @@ Two usage modes, two layouts. **Phone** (390px): in the gym and on the bike; Tr�
 **Two kinds of screen:**
 | | Below `lg` | From `lg` |
 |---|---|---|
-| **Phone-first:** Træning `/`, Fokus `/fokus` | one column of cards, full frame width | the same single column, `max-w-phone` (35rem = 560px). Træning is left-aligned (shares the left edge with the header row); Fokus is centred (no nav). Nothing reflows, nothing gets bigger. |
+| **Phone-first:** Træning `/`, Fokus `/fokus` | one column of cards, full frame width | **Træning:** two columns, `lg:grid-cols-[7fr_5fr] lg:items-start`, gap 16 (`reset-traening.md` §4, `review-round.md` §7): left = the "I dag" card, then the Sæt card (or the ride card(s) when there is no strength session); right = the compact `WeekCard`, the form card, then the ride card(s) when the Sæt card is on the left. DOM order stays the phone order. **Fokus:** the same single column, `max-w-phone` (35rem = 560px), centred (no nav). Nothing gets bigger. |
 | **Desktop:** Belastning `/load`, Analyse `/analyse`, `/analyse/styrke` | one column of cards, phone order | **header row + 3-column card grid**: header row (h1, updated line, notices, section tabs) spans 1200px; under it `lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start`, three columns of 384px. A card spans 1, 2 (792px) or 3 columns. |
 
 **The desktop rule in one line:** the key figure and the small cards sit in column 1; charts span columns 2–3; lists take what is left. DOM order is always the phone order, so reading and tab order don't change with the width; grid placement (`lg:col-start-*`, `lg:row-start-*`) does the rest.
-- **Belastning:** placement in `design/specs/reset-belastning.md` §8.
+- **Belastning:** placement in `design/specs/review-round.md` §1 (column 1: form card, tiles, week card; the fitness curve spans columns 2–3, rows 1–3; row 4: grid in column 1, TSS bars in columns 2–3), which supersedes `reset-belastning.md` §8.
 - **Analyse:** column 1 = the section's hero cards (Cykel: the answers / eFTP figure; Styrke: the lift board), `lg:sticky lg:top-6`; columns 2–3 = the section's chart cards stacked, all 792px wide so shared time axes and `Ingen ture` seams stay aligned. (The old 384px rail + 792px main are exactly columns 1 and 2–3.)
 - **Chart heights** are set per card in the screen specs; a chart is never shorter than 160px at 390.
 - **Tables from `lg`:** a list that is a table in disguise becomes a real `<table>` in a 2-column card (Cykel's excluded rides: Dato · Årsag · Forklaring · Fakta). Below `lg` it stays the stacked list.
