@@ -9,6 +9,7 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
+      "typical_rides": 1,
       "strength": [
         {
           "session": 1,
@@ -43,8 +44,7 @@
           "method": "plan",
           "reason": "no day left this week"
         }
-      ],
-      "typical_rides": 1
+      ]
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -65,8 +65,8 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
-      "strength": [],
-      "typical_rides": 1
+      "typical_rides": 1,
+      "strength": []
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -87,6 +87,7 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
+      "typical_rides": 1,
       "strength": [
         {
           "session": 1,
@@ -101,8 +102,7 @@
             "entered": 1
           }
         }
-      ],
-      "typical_rides": 1
+      ]
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -123,6 +123,7 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
+      "typical_rides": 1,
       "strength": [
         {
           "session": 2,
@@ -137,8 +138,7 @@
             "entered": 1
           }
         }
-      ],
-      "typical_rides": 1
+      ]
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -165,8 +165,8 @@
           "reason": "step 1: minutes must be a number"
         }
       ],
-      "strength": [],
-      "typical_rides": 1
+      "typical_rides": 1,
+      "strength": []
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -187,8 +187,8 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
-      "strength": [],
-      "typical_rides": 1
+      "typical_rides": 1,
+      "strength": []
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -209,6 +209,7 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
+      "typical_rides": 1,
       "strength": [
         {
           "session": 3,
@@ -222,8 +223,7 @@
           "kg_sources": {},
           "reason": "no kg for any set in the plan"
         }
-      ],
-      "typical_rides": 1
+      ]
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -244,8 +244,8 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
-      "strength": [],
-      "typical_rides": 1
+      "typical_rides": 1,
+      "strength": []
     },
     "strength_method": "plan",
     "ctl_low": null,
@@ -266,8 +266,8 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
-      "strength": [],
-      "typical_rides": 1
+      "typical_rides": 1,
+      "strength": []
     },
     "strength_method": "recent",
     "ctl_low": 5.334229602893664,
@@ -288,6 +288,7 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
+      "typical_rides": 1,
       "strength": [
         {
           "session": 1,
@@ -301,8 +302,7 @@
           "tss_high": 20.0,
           "recent_weeks": 3
         }
-      ],
-      "typical_rides": 1
+      ]
     },
     "strength_method": "recent",
     "ctl_low": 5.522435021964659,
@@ -323,6 +323,7 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
+      "typical_rides": 1,
       "strength": [
         {
           "session": 2,
@@ -336,8 +337,7 @@
           "tss_high": 20.0,
           "recent_weeks": 3
         }
-      ],
-      "typical_rides": 1
+      ]
     },
     "strength_method": "recent",
     "ctl_low": 5.706212284962005,
@@ -358,6 +358,7 @@
     "basis": {
       "cycling": "typical_week",
       "rides": [],
+      "typical_rides": 1,
       "strength": [
         {
           "session": 1,
@@ -369,8 +370,7 @@
           "tss": null,
           "reason": "no recent weeks to average"
         }
-      ],
-      "typical_rides": 1
+      ]
     },
     "strength_method": "recent",
     "ctl_low": 5.32943072696175,
@@ -379,6 +379,238 @@
     "atl_high": 8.653517238208902,
     "tsb_low": -3.3240865112471525,
     "tsb_high": -3.3240865112471525,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-19",
+    "cycling_tss": 0,
+    "strength_tss": 0,
+    "ctl": 6.860749192851745,
+    "atl": 11.416712847673747,
+    "tsb": -4.555963654822002,
+    "basis": {
+      "cycling": "calendar",
+      "events": [],
+      "rides": [],
+      "calendar_rides": 2,
+      "calendar_weeks": 1,
+      "calendar_no_load": 1,
+      "strength": []
+    },
+    "strength_method": "recent",
+    "ctl_low": 6.6483559413670195,
+    "ctl_high": 7.0731424443364705,
+    "atl_low": 10.677711334574614,
+    "atl_high": 12.155714360772889,
+    "tsb_low": -5.082571916436418,
+    "tsb_high": -4.029355393207594,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-20",
+    "cycling_tss": 55.0,
+    "strength_tss": 16.666666666666668,
+    "ctl": 8.385523125964525,
+    "atl": 19.43731324001265,
+    "tsb": -11.051790114048124,
+    "basis": {
+      "cycling": "calendar",
+      "events": [
+        {
+          "name": "Z2 60 min",
+          "tss": 55.0
+        }
+      ],
+      "rides": [],
+      "calendar_rides": 2,
+      "calendar_weeks": 1,
+      "calendar_no_load": 1,
+      "strength": [
+        {
+          "session": 1,
+          "weekday": "learnt",
+          "moved": false,
+          "day_estimated": false,
+          "planned_in_sheet": false,
+          "method": "recent",
+          "tss": 16.666666666666668,
+          "tss_low": 13.333333333333334,
+          "tss_high": 20.0,
+          "recent_weeks": 3
+        }
+      ]
+    },
+    "strength_method": "recent",
+    "ctl_low": 8.099699418294493,
+    "ctl_high": 8.671346833634558,
+    "atl_low": 18.35294882625901,
+    "atl_high": 20.521677653766304,
+    "tsb_low": -11.850330820131745,
+    "tsb_high": -10.253249407964516,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-21",
+    "cycling_tss": 0,
+    "strength_tss": 16.666666666666668,
+    "ctl": 8.580364466067916,
+    "atl": 19.06847894911887,
+    "tsb": -10.488114483050953,
+    "basis": {
+      "cycling": "calendar",
+      "events": [],
+      "rides": [],
+      "calendar_rides": 2,
+      "calendar_weeks": 1,
+      "calendar_no_load": 1,
+      "rides_ignored": [
+        {
+          "name": "Overridden",
+          "tss": 42.25000000000001
+        }
+      ],
+      "strength": [
+        {
+          "session": 2,
+          "weekday": "spread",
+          "moved": false,
+          "day_estimated": true,
+          "planned_in_sheet": false,
+          "method": "recent",
+          "tss": 16.666666666666668,
+          "tss_low": 13.333333333333334,
+          "tss_high": 20.0,
+          "recent_weeks": 3
+        }
+      ]
+    },
+    "strength_method": "recent",
+    "ctl_low": 8.222837996994974,
+    "ctl_high": 8.937890935140862,
+    "atl_low": 17.684727069394217,
+    "atl_high": 20.452230828843536,
+    "tsb_low": -11.514339893702674,
+    "tsb_high": -9.461889072399243,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-22",
+    "cycling_tss": 60.0,
+    "strength_tss": 0,
+    "ctl": 9.790181763137717,
+    "atl": 24.51736899783182,
+    "tsb": -14.727187234694103,
+    "basis": {
+      "cycling": "calendar",
+      "events": [
+        {
+          "name": "Uden belastning",
+          "tss": null,
+          "reason": "ingen belastning i intervals.icu"
+        }
+      ],
+      "rides": [],
+      "calendar_rides": 2,
+      "calendar_weeks": 1,
+      "calendar_no_load": 1,
+      "fallback": "typical_week",
+      "strength": []
+    },
+    "strength_method": "recent",
+    "ctl_low": 9.441067288859239,
+    "ctl_high": 10.139296237416197,
+    "atl_low": 23.317825074560748,
+    "atl_high": 25.716912921102903,
+    "tsb_low": -15.577616683686706,
+    "tsb_high": -13.876757785701509,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-23",
+    "cycling_tss": 0,
+    "strength_tss": 0,
+    "ctl": 9.559835298883119,
+    "atl": 21.253565344240663,
+    "tsb": -11.693730045357544,
+    "basis": {
+      "cycling": "calendar",
+      "events": [],
+      "rides": [],
+      "calendar_rides": 2,
+      "calendar_weeks": 1,
+      "calendar_no_load": 1,
+      "strength": []
+    },
+    "strength_method": "recent",
+    "ctl_low": 9.218934899349703,
+    "ctl_high": 9.900735698416538,
+    "atl_low": 20.21370722737734,
+    "atl_high": 22.29342346110399,
+    "tsb_low": -12.392687762687453,
+    "tsb_high": -10.994772328027638,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-24",
+    "cycling_tss": 0,
+    "strength_tss": 16.666666666666668,
+    "ctl": 9.727047054213998,
+    "atl": 20.642947758648898,
+    "tsb": -10.9159007044349,
+    "basis": {
+      "cycling": "calendar",
+      "events": [],
+      "rides": [],
+      "calendar_rides": 2,
+      "calendar_weeks": 1,
+      "calendar_no_load": 1,
+      "strength": [
+        {
+          "session": 3,
+          "weekday": "spread",
+          "moved": false,
+          "day_estimated": true,
+          "planned_in_sheet": false,
+          "method": "recent",
+          "tss": 16.666666666666668,
+          "tss_low": 13.333333333333334,
+          "tss_high": 20.0,
+          "recent_weeks": 3
+        }
+      ]
+    },
+    "strength_method": "recent",
+    "ctl_low": 9.31573975494199,
+    "ctl_high": 10.138354353486008,
+    "atl_low": 19.29777740409818,
+    "atl_high": 21.98811811319962,
+    "tsb_low": -11.84976375971361,
+    "tsb_high": -9.98203764915619,
+    "computed_at": "2026-10-03T03:00:00+00:00"
+  },
+  {
+    "date": "2026-10-25",
+    "cycling_tss": 0,
+    "strength_tss": 0,
+    "ctl": 9.498186043174076,
+    "atl": 17.894915197670276,
+    "tsb": -8.3967291544962,
+    "basis": {
+      "cycling": "calendar",
+      "events": [],
+      "rides": [],
+      "calendar_rides": 2,
+      "calendar_weeks": 1,
+      "calendar_no_load": 1,
+      "strength": []
+    },
+    "strength_method": "recent",
+    "ctl_low": 9.096556110921561,
+    "ctl_high": 9.899815975426595,
+    "atl_low": 16.728816745911143,
+    "atl_high": 19.061013649429412,
+    "tsb_low": -9.161197674002818,
+    "tsb_high": -7.632260634989581,
     "computed_at": "2026-10-03T03:00:00+00:00"
   }
 ]

@@ -11,14 +11,14 @@ without recent weeks, and an unreadable planned ride.
 
 import json
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from training_load.db.daily_projection import DailyProjectionRow, to_row
 from training_load.domain.daily import build_daily_load
 from training_load.domain.load import Decay
-from training_load.domain.projection import PlannedRide, project
+from training_load.domain.projection import CalendarRide, PlannedRide, project
 from training_load.domain.sessions import StrengthSession
 from training_load.domain.strength import StrengthSet
 
@@ -67,14 +67,25 @@ def producer_rows(make_set: MakeSet) -> list[DailyProjectionRow]:
         end=TODAY,
         decay=Decay.EXPONENTIAL,
     )
-    rides = [PlannedRide(date(2026, 10, 8), "Broken", [{"minutes": "x", "pct_ftp": 100}])]
+    rides = [
+        PlannedRide(date(2026, 10, 8), "Broken", [{"minutes": "x", "pct_ftp": 100}]),
+        PlannedRide(date(2026, 10, 21), "Overridden", [{"minutes": 60, "pct_ftp": 65}]),
+    ]
+    # A calendar week (19-25 Oct): a ride with a load, one without (that day: the typical value),
+    # the hand-filled ride on the 21st overridden, the other days 0 (answers round, 2026-10-14).
+    calendar = [
+        CalendarRide(date(2026, 10, 20), "Z2 60 min", 55.0),
+        CalendarRide(date(2026, 10, 22), "Uden belastning", None),
+    ]
     recent = [
         done(date(2026, 9, 7), 40.0),
         done(date(2026, 9, 14), 50.0),
         done(W40 - timedelta(7), 60.0),
     ]
 
-    def run(sessions: list[StrengthSession]) -> list[DailyProjectionRow]:
+    def run(
+        sessions: list[StrengthSession], cal: Sequence[CalendarRide] = ()
+    ) -> list[DailyProjectionRow]:
         days = project(
             history,
             sessions,
@@ -84,6 +95,7 @@ def producer_rows(make_set: MakeSet) -> list[DailyProjectionRow]:
             today=TODAY,
             decay=Decay.EXPONENTIAL,
             typical_rides=1,
+            calendar=cal,
         )
         return [to_row(d, computed_at=RUN_AT) for d in days]
 
@@ -93,7 +105,10 @@ def producer_rows(make_set: MakeSet) -> list[DailyProjectionRow]:
         for r in run([])
         if r["strength_method"] == "recent" and r["strength_tss"] == 0.0 and r["basis"]["strength"]
     )
-    return [*with_history, without]
+    calendar_week = [
+        r for r in run(recent, calendar) if "2026-10-19" <= str(r["date"]) <= "2026-10-25"
+    ]
+    return [*with_history, without, *calendar_week]
 
 
 def test_the_web_fixture_is_pythons_current_output(make_set: MakeSet) -> None:
@@ -123,5 +138,12 @@ def test_the_fixture_keeps_its_edge_cases(make_set: MakeSet) -> None:
     }
     assert any(e["method"] == "plan" and e.get("unscored") == 1 and e["tss"] for e in entries)
     assert any(e["method"] == "recent" and "tss_low" in e for e in entries)
+    calendar_days = [r["basis"] for r in rows if r["basis"]["cycling"] == "calendar"]
+    assert len(calendar_days) == 7
+    assert any(b.get("fallback") == "typical_week" for b in calendar_days)
+    assert any(b.get("rides_ignored") for b in calendar_days)
+    assert any(b["events"] == [] for b in calendar_days)  # a calendar-week day without a ride
+    assert {b["calendar_rides"] for b in calendar_days} == {2}
+    assert {b["calendar_no_load"] for b in calendar_days} == {1}
     assert {r["strength_method"] for r in rows} == {"plan", "recent"}
     assert any(r["ctl_low"] is None for r in rows) and any(r["ctl_low"] is not None for r in rows)

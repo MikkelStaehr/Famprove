@@ -377,6 +377,7 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "daily_projection": ("date",),
     "forecast_log": ("made_on", "target_date", "method"),
     "planned_sessions": ("date", "name"),
+    "planned_events": ("id",),
     "planned_targets": ("date", "name"),
     "ride_metrics": ("activity_id",),
     "cycling_weeks": ("week_start",),

@@ -10,7 +10,7 @@ import os
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Final
 
 from training_load.config import ConfigError, compute_config, load_dotenv_file
@@ -24,6 +24,7 @@ from training_load.db.exercise_feel import sync_exercise_feel
 from training_load.db.exercises import all_exercises
 from training_load.db.forecast_log import log_forecast
 from training_load.db.planned import all_sessions
+from training_load.db.planned_events import events_between
 from training_load.db.planned_sets import sync_planned_sets
 from training_load.db.ride_metrics import sync_ride_metrics
 from training_load.db.set_log import all_logged_sets
@@ -44,7 +45,9 @@ from training_load.domain.kg_history import gone_states, kg_keys, next_kg_state
 from training_load.domain.load import DECAY
 from training_load.domain.planned_sets import planned_sets, suggestion_offsets
 from training_load.domain.projection import (
+    HORIZON_DAYS,
     MODEL_VERSION,
+    CalendarRide,
     PlannedRide,
     naive_projection,
     project,
@@ -217,6 +220,19 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     planned = all_sessions(db)
     rides = [PlannedRide(date=p.date, name=p.name, steps=p.steps) for p in planned]
     deload_weeks = {iso_week_start(b.deload_start) for b in blocks if b.deload_start}
+    # The intervals.icu calendar (collect-intervals mirrors it): its planned rides drive the
+    # cycling of their ISO weeks (user, 2026-10-14). Counts only in the log (public).
+    calendar = [
+        CalendarRide(date=e.date, name=e.name, load=e.load)
+        for e in events_between(db, today, today + timedelta(days=HORIZON_DAYS))
+        if e.is_planned_ride
+    ]
+    if calendar:
+        log.info(
+            "%d planned rides from the intervals.icu calendar (%d without a load)",
+            len(calendar),
+            sum(1 for c in calendar if c.load is None),
+        )
     projection = project(
         days,
         sessions,
@@ -227,6 +243,7 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         deload_weeks=deload_weeks,
         decay=DECAY,
         typical_rides=typical_ride_count(activities, today),
+        calendar=calendar,
     )
     sync_projection(db, projection, computed_at=computed_at)
     logged = log_forecast(

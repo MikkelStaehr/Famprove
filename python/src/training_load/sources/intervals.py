@@ -286,3 +286,86 @@ def fetch_power_stream(
         params=[("types", "time,watts")],
     )
     return parse_power_stream(response.json())
+
+
+# --- Calendar events (planned workouts; answers round, user 2026-10-14) -------------------------
+
+PLANNED_RIDE_CATEGORY: Final = "WORKOUT"
+PLANNED_RIDE_TYPES: Final = frozenset({"Ride", "VirtualRide"})
+
+
+@dataclass(frozen=True, slots=True)
+class PlannedEvent:
+    """One intervals.icu calendar event, stored raw in public.planned_events."""
+
+    id: int
+    date: date  # the local date of start_date_local
+    category: str
+    type: str | None
+    name: str | None
+    load: float | None  # icu_training_load; None = missing (absent, not a number, or 0)
+    raw: Mapping[str, object]
+
+    @property
+    def is_planned_ride(self) -> bool:
+        return self.category == PLANNED_RIDE_CATEGORY and self.type in PLANNED_RIDE_TYPES
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedEvents:
+    events: list[PlannedEvent]
+    skipped: int  # objects without a readable id, category or date: left out, counted
+    rides_without_load: int  # planned rides whose load is missing: kept with load None, counted
+
+
+def fetch_events(
+    send: HttpSend, *, api_key: str, athlete_id: str, oldest: date, newest: date
+) -> list[Mapping[str, object]]:
+    """GET /athlete/{athlete_id}/events?oldest=&newest= (ISO dates): the calendar (planned
+    workouts, notes, races, ...). Raises if the body is not a JSON list of objects."""
+    return _get_list(
+        send, "events", api_key=api_key, athlete_id=athlete_id, oldest=oldest, newest=newest
+    )
+
+
+def _event_load(raw: Mapping[str, object]) -> float | None:
+    """icu_training_load as a positive number, else None (never a silent 0)."""
+    value = raw.get("icu_training_load")
+    if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+        return None
+    return float(value)
+
+
+def parse_events(raw: Sequence[Mapping[str, object]]) -> ParsedEvents:
+    """Map calendar objects: id (int), start_date_local's date, category, type, name,
+    icu_training_load; the whole object is kept as ``raw``. Junk is skipped and counted."""
+    events: list[PlannedEvent] = []
+    skipped = 0
+    for obj in raw:
+        try:
+            event_id = opt_int(obj, "id")
+            category = req_str(obj, "category")
+            start = req_naive_datetime(obj, "start_date_local")
+            kind, name = opt_str(obj, "type"), opt_str(obj, "name")
+        except ValueError:
+            skipped += 1
+            continue
+        if event_id is None:
+            skipped += 1
+            continue
+        events.append(
+            PlannedEvent(
+                id=event_id,
+                date=start.date(),
+                category=category,
+                type=kind,
+                name=name,
+                load=_event_load(obj),
+                raw=obj,
+            )
+        )
+    return ParsedEvents(
+        events=events,
+        skipped=skipped,
+        rides_without_load=sum(1 for e in events if e.is_planned_ride and e.load is None),
+    )

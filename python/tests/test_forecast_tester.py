@@ -277,7 +277,7 @@ def test_compute_logs_112_rows_per_day_idempotently_and_keeps_earlier_days(
     earlier = sorted(str(r) for r in rows if r["made_on"] == FIXED_TODAY.isoformat())
     assert earlier == first_day
     params = {str(r["params"]) for r in rows}
-    assert params == {str({"model_version": "plan-v1", "strength_k": 0.02, "decay": "exponential"})}
+    assert params == {str({"model_version": "plan-v2", "strength_k": 0.02, "decay": "exponential"})}
 
 
 def test_naive_log_rows_hold_the_28_day_mean_and_carry_no_method_or_band(

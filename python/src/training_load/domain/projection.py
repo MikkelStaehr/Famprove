@@ -2,8 +2,12 @@
 
 Python owns the numbers; the web only draws them. Every future load is an ESTIMATE (decided
 with the user, 2026-09-30):
-  cycling   a planned ride's TSS replaces that day (NP-style from its steps' %FTP); every other
-            day gets the typical week: mean cycling TSS per weekday over the last TYPICAL_DAYS.
+  cycling   an ISO week with a planned ride in the intervals.icu calendar uses only those rides
+            (their planned load on their dates, 0 on the week's other days; a ride without a
+            load gives its day the typical value), user 2026-10-14. Any other week: a planned
+            ride from planned_sessions replaces that day (NP-style from its steps' %FTP); every
+            other day gets the typical week: mean cycling TSS per weekday over the last
+            TYPICAL_DAYS.
   strength  inside the block ("plan"): every session still to do is scored from the coach's
             prescription with the unchanged score formula and planned kg (domain.planned_load),
             times STRENGTH_K, assuming every planned session is done (decided 2026-10-01).
@@ -38,7 +42,7 @@ TYPICAL_DAYS: Final = 28
 RECENT_WEEKS: Final = 4
 WEEKDAY_WEEKS: Final = 4
 NAIVE_DAYS: Final = 28
-MODEL_VERSION: Final = "plan-v1"
+MODEL_VERSION: Final = "plan-v2"  # v2: intervals.icu calendar weeks (2026-10-14)
 """Bump when the forecast method changes: forecast_log compares errors per version."""
 
 # basis is stored as jsonb and only ever read as JSON: a JSON object, by construction.
@@ -53,6 +57,19 @@ class PlannedRide:
     date: date
     name: str
     steps: object
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarRide:
+    """A planned ride from the intervals.icu calendar (public.planned_events, category WORKOUT,
+    type Ride/VirtualRide); load None = intervals.icu has no load estimate for it."""
+
+    date: date
+    name: str | None
+    load: float | None
+
+
+NO_LOAD_REASON: Final = "ingen belastning i intervals.icu"
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,12 +301,14 @@ def project(
     deload_weeks: Iterable[date] = (),
     decay: Decay = DECAY,
     typical_rides: int | None = None,
+    calendar: Sequence[CalendarRide] = (),
 ) -> list[ProjectedDay]:
     """HORIZON_DAYS projected days, tomorrow .. today + HORIZON_DAYS, seeded from today's row.
 
     ``days`` is the daily_load series just computed (its last row must be ``today``).
     ``deload_weeks`` (ISO week starts) are left out of the "recent" average.
     ``typical_rides`` (typical_ride_count) goes into the basis of every typical-week day.
+    ``calendar``: planned rides from intervals.icu; an ISO week holding one uses only them.
     """
     if not days or days[-1].date != today:
         raise ValueError("the projection starts from today's daily_load row")
@@ -312,6 +331,17 @@ def project(
                 {"name": ride.name, "tss": ride_tss(items)}
             )
 
+    calendar_by_day: dict[date, list[CalendarRide]] = {}
+    for c in calendar:
+        if today < c.date <= last:
+            calendar_by_day.setdefault(c.date, []).append(c)
+    calendar_weeks = {iso_week_start(d) for d in calendar_by_day}
+    calendar_counts: Basis = {
+        "calendar_rides": sum(len(v) for v in calendar_by_day.values()),
+        "calendar_weeks": len(calendar_weeks),
+        "calendar_no_load": sum(1 for v in calendar_by_day.values() for c in v if c.load is None),
+    }
+
     dates = [today + timedelta(days=i) for i in range(1, HORIZON_DAYS + 1)]
     cycling: list[float] = []
     lifting: list[float] = []
@@ -320,11 +350,32 @@ def project(
     bases: list[Basis] = []
     for d in dates:
         planned = rides_by_day.get(d, [])
-        ride_loads = [t for r in planned if isinstance(t := r["tss"], float)]
-        if ride_loads:
-            ride_load, source = sum(ride_loads), "planned"
+        basis: Basis
+        if iso_week_start(d) in calendar_weeks:
+            events = calendar_by_day.get(d, [])
+            listed: list[Basis] = [
+                {"name": c.name, "tss": c.load}
+                if c.load is not None
+                else {"name": c.name, "tss": None, "reason": NO_LOAD_REASON}
+                for c in events
+            ]
+            basis = {"cycling": "calendar", "events": listed, "rides": [], **calendar_counts}
+            if any(c.load is None for c in events):
+                ride_load = typical[d.weekday()]  # never a silent 0 for a ride without a load
+                basis["fallback"] = "typical_week"
+            else:
+                ride_load = sum(c.load for c in events if c.load is not None)
+            if planned:
+                basis["rides_ignored"] = planned  # the calendar wins in its weeks
         else:
-            ride_load, source = typical[d.weekday()], "typical_week"
+            ride_loads = [t for r in planned if isinstance(t := r["tss"], float)]
+            if ride_loads:
+                ride_load, source = sum(ride_loads), "planned"
+            else:
+                ride_load, source = typical[d.weekday()], "typical_week"
+            basis = {"cycling": source, "rides": planned}
+            if source == "typical_week" and typical_rides is not None:
+                basis["typical_rides"] = typical_rides
         placed = strength.get(d, [])
         strength_load = sum(t for p in placed if isinstance(t := p["tss"], float))
         cycling.append(ride_load)
@@ -335,9 +386,7 @@ def project(
         lifting_high.append(
             sum(t for p in placed if isinstance(t := p.get("tss_high", p["tss"]), float))
         )
-        basis: Basis = {"cycling": source, "rides": planned, "strength": placed}
-        if source == "typical_week" and typical_rides is not None:
-            basis["typical_rides"] = typical_rides
+        basis["strength"] = placed
         bases.append(basis)
 
     seed = LoadState(ctl=days[-1].ctl, atl=days[-1].atl, tsb=days[-1].tsb)
