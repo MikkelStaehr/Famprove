@@ -1,7 +1,7 @@
 /**
  * The week's strength plan, shared by Træning's Uge card and /load's week list (user 2026-10-14,
  * slice week-shared): which session is today's (session k + 1, "I DAG"), which are done (with
- * their date), and which are planned without a date ("—" + "plan"). Pure; the input is the
+ * their date), and which are planned without a date ("–" + "plan"). Pure; the input is the
  * StrengthWeek that training-view builds from strength_sessions + strength_sets ("the n-th strength
  * activity of the ISO week is session n", never weekdays).
  */
@@ -22,7 +22,7 @@ export type WeekPlanInput = Pick<StrengthWeek, "columns" | "done">;
  * The week list from the week's columns and done activities: a done session carries its date and
  * activity words; the current one (session k + 1) is today's; later ones have no date until done.
  * When a session is already done today (`today` given), the next one is not also today's: it is
- * planned without a date ("—" + "plan"), so today never carries two sessions.
+ * planned without a date ("–" + "plan"), so today never carries two sessions.
  */
 export function weekRows(strength: WeekPlanInput, today?: IsoDate): readonly WeekRow[] {
   const rows: WeekRow[] = [];
@@ -59,7 +59,7 @@ export type PlannedSession = { readonly kind: "current" | "future"; readonly ses
  */
 export type DatedPlan = {
   readonly today: PlannedSession | null; // shown on today's day row with "I DAG"
-  readonly undated: readonly PlannedSession[]; // "—" + "plan" (or "I DAG" for a current one), after the days
+  readonly undated: readonly PlannedSession[]; // "–" + "plan" (or "I DAG" for a current one), after the days
 };
 
 export function datedPlan(strength: WeekPlanInput, today: IsoDate, listed: readonly IsoDate[]): DatedPlan {

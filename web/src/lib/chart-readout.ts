@@ -3,7 +3,8 @@
  * No React: the components (components/ChartReadout.tsx) render what these return.
  */
 
-import { stopAfter } from "./format.ts";
+import type { BlockSpan, ChartPoint } from "./dashboard-view.ts";
+import { formatDay, formatLoad, formatSigned, stopAfter } from "./format.ts";
 
 /** One value cell on line 2: the series' swatch (by key), its label in --text-muted, then the value. */
 export type ReadoutCell = {
@@ -126,4 +127,42 @@ export function gapSeam(
 ): number {
   if (nearestX !== undefined && Math.abs(nearestX - x) <= maxDays) return -1;
   return seams.findIndex((s) => s.x0 <= x && x < s.x1);
+}
+
+/**
+ * /load's fitness-curve readout (DESIGN.md readout): date (+ prognose status), Fitness · Træthed ·
+ * Form, then one line: block (· spænd on a prognose day). Every value is the stored one (a prognose
+ * day's Form is daily_projection.tsb as-is, never Fitness − Træthed recomputed here).
+ */
+export function curveReadout(p: ChartPoint, blocks: readonly BlockSpan[]): Readout {
+  const block = blocks.find((b) => b.start <= p.date && p.date <= b.end);
+  const deload = block !== undefined && block.deloadStart !== null && block.deloadStart <= p.date;
+  // The bracket's short label (`Blok 12`), so block · deload · spænd stays one line at 390px.
+  const blockFact = block === undefined ? [] : [`Blok ${block.blockNo}${deload ? " · deload" : ""}`];
+  if (p.kind === "projected") {
+    // One fact line (polish 2026-10-14): block · the fitness span. The prognose basis (cycling's typical
+    // day, strength sessions and their estimated day) lives in the card foot, not per day.
+    const span = p.bands?.ctl;
+    const spanFact = span != null && formatLoad(span.low) !== formatLoad(span.high) ? [`spænd ${formatLoad(span.low)}–${formatLoad(span.high)}`] : [];
+    const fact = [...blockFact, ...spanFact].join(" · ");
+    return {
+      head: `${formatDay(p.date)} · Prognose${p.estimate?.strengthMethod === "recent" ? " · efter blokken" : ""}`,
+      cells: [
+        // No "≈ " per cell: line 1 says Prognose, and with it the cells wrapped to two lines at 390px.
+        { key: "ctl", label: "Fitness", value: formatLoad(p.ctl) },
+        { key: "atl", label: "Træthed", value: formatLoad(p.atl) },
+        { key: "tsb", label: "Form", value: formatSigned(p.tsb) },
+      ],
+      facts: fact === "" ? [] : [fact],
+    };
+  }
+  return {
+    head: formatDay(p.date),
+    cells: [
+      { key: "ctl", label: "Fitness", value: Number.isFinite(p.ctl) ? formatLoad(p.ctl) : MISSING },
+      { key: "atl", label: "Træthed", value: formatLoad(p.atl) },
+      { key: "tsb", label: "Form", value: formatSigned(p.tsb) },
+    ],
+    facts: blockFact,
+  };
 }

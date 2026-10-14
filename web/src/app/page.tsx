@@ -1,30 +1,34 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 
 import { ErrorState } from "@/components/ErrorState";
 import { FormCard } from "@/components/FormCard";
 import { RideCard } from "@/components/RideCard";
-import { SessionBlock, SessionWeekCard } from "@/components/SessionBlock";
+import { SessionBlock, SessionWeekSentence } from "@/components/SessionBlock";
 import { SetLogProvider } from "@/components/SetLogProvider";
 import { StrengthCard } from "@/components/StrengthCard";
 import { RestToday, RideToday } from "@/components/TodayCard";
 import { WarningLine } from "@/components/WarningLine";
-import { WeekCard } from "@/components/WeekCard";
+import { type WeekBody, WeekCard } from "@/components/WeekCard";
+import { dayDetails, weekView } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { devFixture } from "@/lib/db/dev-fixture";
-import { loadTrainingForm, loadTrainingPlan, NEXT_SESSION_DAYS } from "@/lib/db/queries";
+import { loadDashboardData, loadTrainingForm, loadTrainingPlan, loadWeekDetail, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
+import { addDays, isoWeek, isoWeekStart } from "@/lib/dates";
 import { formatDay, formatUpdatedAt } from "@/lib/format";
 import {
   buildTrainingPlan,
   resolveToday,
   trainingHeader,
   type TrainingHeader,
+  type StrengthWeek,
   type TrainingPlan,
   updatedCaption,
   weekSentence,
 } from "@/lib/training-view";
+import { datedPlan } from "@/lib/week-plan";
 
 export const metadata: Metadata = {
   title: "Træning",
@@ -63,6 +67,51 @@ async function loadPlanState(today: IsoDate): Promise<PlanState> {
   }
 }
 
+/**
+ * The compact week card's body (review-round.md §7): the current ISO week's daily_load days,
+ * weekly_load + weekly_plan's I alt and the strength plan, from the same reads /load uses. A failed
+ * read shows ErrorState inside the card only; the "I dag" card is unaffected.
+ */
+async function loadWeekBody(today: IsoDate, strength: StrengthWeek | null): Promise<WeekBody> {
+  try {
+    const data = await loadDashboardData();
+    const row = data.weeks.find((w) => w.weekStart <= today && today <= w.weekEnd);
+    const week = row === undefined ? null : weekView(data, row);
+    const days = week === null ? [] : dayDetails(week, await loadWeekDetail(week.weekStart, week.weekEnd));
+    const logStart = data.blocks.reduce<IsoDate | null>((min, b) => (min === null || b.startDate < min ? b.startDate : min), null);
+    const plan = strength === null ? null : datedPlan(strength, today, days.map((d) => d.date));
+    return { kind: "rows", week, days, logStart, today, plan };
+  } catch (error) {
+    if (isDataError(error)) {
+      console.error("træning: loading the week failed", error);
+      const at = new Date().toISOString();
+      return {
+        kind: "message",
+        node: (
+          <ErrorState
+            title="Kunne ikke hente ugen"
+            what={describeDataError(error)}
+            detail={error.message}
+            at={{ iso: at, text: formatUpdatedAt(at) }}
+            retry={{ href: "/" }}
+          />
+        ),
+      };
+    }
+    throw error;
+  }
+}
+
+function weekHead(today: IsoDate) {
+  const weekStart = isoWeekStart(today);
+  return { isoWeek: isoWeek(today).week, weekStart, weekEnd: addDays(weekStart, 6) };
+}
+
+/** Streams under its Suspense boundary (skeleton of 5 rows), so the "I dag" card never waits for it. */
+async function TrainingWeek({ today, strength, sentence }: { readonly today: IsoDate; readonly strength: StrengthWeek | null; readonly sentence: ReactNode }) {
+  return <WeekCard variant="compact" head={weekHead(today)} body={await loadWeekBody(today, strength)} sentence={sentence} className={RIGHT_1} />;
+}
+
 /** Under `next dev` with DEV_TODAY or DEV_FIXTURE taps are not saved (lib/db/set-log.ts says so too). */
 function devSwitchesOn(): boolean {
   return process.env.NODE_ENV === "development" && (Boolean(process.env.DEV_TODAY) || devFixture() !== null);
@@ -78,10 +127,25 @@ export default async function TrainingPage() {
   const session = plan.kind === "ready" && plan.plan.strength.state === "next" ? plan.plan.strength.next : null;
   const formCard =
     form.kind === "error" ? (
-      <FormCard kind="error" retry={plan.kind !== "error"} className={RIGHT_1} />
+      <FormCard kind="error" retry={plan.kind !== "error"} className={RIGHT_2} />
     ) : (
-      <FormCard kind="ready" header={form.header} today={today} className={RIGHT_1} />
+      <FormCard kind="ready" header={form.header} today={today} className={RIGHT_2} />
     );
+  // review-round.md §7: the compact week card is the first card under the header.
+  const strengthWeek = plan.kind === "ready" ? plan.plan.strength : null;
+  const sentence =
+    strengthWeek === null || strengthWeek.columns.length === 0 ? null : session !== null ? (
+      <SessionWeekSentence strength={strengthWeek} />
+    ) : (
+      <p className="sr-only">{weekSentence(strengthWeek.columns, null)}</p>
+    );
+  const weekCard = (
+    <Suspense
+      fallback={<WeekCard variant="compact" head={weekHead(today)} body={{ kind: "loading", rows: 5 }} className={RIGHT_1} />}
+    >
+      <TrainingWeek today={today} strength={strengthWeek} sentence={sentence} />
+    </Suspense>
+  );
   // Phone: one column (max 640 from sm). Desktop (lg): 7fr | 5fr, DOM order = phone order (reset-traening.md §4).
   const page = (
     <div className="mx-auto flex w-full max-w-160 flex-col gap-3 lg:max-w-none lg:gap-4">
@@ -102,6 +166,7 @@ export default async function TrainingPage() {
         )}
       </header>
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[7fr_5fr] lg:grid-rows-[auto_auto_auto_1fr] lg:items-start lg:gap-4">
+        {weekCard}
         {plan.kind === "error" ? (
           <>
             <PlanError error={plan.error} at={plan.at} />
@@ -122,7 +187,7 @@ export default async function TrainingPage() {
   );
 }
 
-/** Desktop grid slots (lg): left = the "I dag" card, then the main list; right = form, rides, Uge. */
+/** Desktop grid slots (lg): left = the "I dag" card, then the Sæt card; right = the week card, form, rides (review-round.md §7). */
 const LEFT_1 = "lg:col-start-1 lg:row-start-1";
 const LEFT_REST = "lg:col-start-1 lg:row-start-2 lg:row-span-3";
 const RIGHT_1 = "lg:col-start-2 lg:row-start-1";
@@ -130,21 +195,20 @@ const RIGHT_2 = "lg:col-start-2 lg:row-start-2";
 const RIGHT_3 = "lg:col-start-2 lg:row-start-3";
 
 /**
- * Phone order (reset-traening.md §2): the "I dag" card, the form card, ride card(s), the Sæt card,
- * the Uge card. On desktop the Sæt card (or the rides, when there is no strength) sits under the
- * "I dag" card; the form card, rides next to strength, and the Uge card go right.
+ * Phone order (review-round.md §7): the week card (rendered by the page, first), the "I dag" card,
+ * the form card, ride card(s), the Sæt card. On desktop the Sæt card (or the rides, when there is no
+ * strength) sits under the "I dag" card; the week card, the form card and rides next to strength go right.
  */
 function DayCards({ plan, today, form }: { readonly plan: TrainingPlan; readonly today: IsoDate; readonly form: ReactNode }) {
   const strength = plan.strength.state === "next" ? plan.strength.next : null;
   const rides =
     plan.rides.length === 0 ? null : (
-      <div className={`flex flex-col gap-3 lg:gap-4 ${strength === null ? LEFT_REST : RIGHT_2}`}>
+      <div className={`flex flex-col gap-3 lg:gap-4 ${strength === null ? LEFT_REST : RIGHT_3}`}>
         {plan.rides.map((ride, i) => (
           <RideCard key={`ride-${i}`} id={`ride-${i + 1}`} ride={ride} />
         ))}
       </div>
     );
-  const weekSlot = strength !== null && plan.rides.length > 0 ? RIGHT_3 : RIGHT_2;
   return (
     <>
       {strength !== null ? (
@@ -163,16 +227,6 @@ function DayCards({ plan, today, form }: { readonly plan: TrainingPlan; readonly
       {form}
       {rides}
       {strength !== null && <StrengthCard session={strength} className={LEFT_REST} />}
-      {strength !== null ? (
-        <SessionWeekCard strength={plan.strength} today={today} className={weekSlot} />
-      ) : (
-        <WeekCard
-          strength={plan.strength}
-          today={today}
-          sentence={plan.strength.columns.length === 0 ? null : weekSentence(plan.strength.columns, null)}
-          className={weekSlot}
-        />
-      )}
     </>
   );
 }

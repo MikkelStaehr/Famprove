@@ -1,7 +1,7 @@
 import { Card } from "@/components/Card";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { SkeletonBar as Bar } from "@/components/Skeleton";
-import { WeekDaysSkeleton } from "@/components/WeekDays";
+import { WeekCard } from "@/components/WeekCard";
 import { ZoneBarSkeleton } from "@/components/ZoneBar";
 import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
 
@@ -32,6 +32,8 @@ export default function Loading() {
           ))}
         </div>
 
+        <WeekCard variant="full" head={null} body={{ kind: "loading", rows: 7 }} className={LOAD_PLACE.week} />
+
         <Card id="trend" title="Fitness" shape="hero" className={LOAD_PLACE.curve}>
           <div aria-hidden="true" className="h-[196px] w-full rounded-control bg-raised motion-safe:animate-pulse sm:h-[216px] lg:h-[296px]" />
           <Bar className="w-1/2 text-13" />
@@ -45,9 +47,6 @@ export default function Loading() {
           <div aria-hidden="true" className="h-[147px] w-full rounded-cell bg-raised motion-safe:animate-pulse" />
         </Card>
 
-        <Card id="week" title="Denne uge" className={`gap-1 ${LOAD_PLACE.week}`}>
-          <WeekDaysSkeleton rows={7} />
-        </Card>
       </div>
     </>
   );

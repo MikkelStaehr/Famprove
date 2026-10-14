@@ -157,3 +157,28 @@ export function curveScale(min: number, max: number): { readonly lo: number; rea
   const step = Math.max(10, Math.ceil((top - lo) / 3 / 10) * 10);
   return { lo, hi: lo + 3 * step, lines: [lo + step, lo + 2 * step, lo + 3 * step] };
 }
+
+/**
+ * review-round.md §2: the fitness curve's vertices, picked from Python's daily series (drawing, no
+ * maths). Measured: the window's first measured day, each ISO-week Sunday, the last measured day.
+ * Prognose: the last measured day (shared, so the line is continuous), each prognose Sunday, the
+ * last prognose day. `band`: the prognose days that carry a band, by the same rule (its first and
+ * last day plus the Sundays between), so the area starts where Python's band starts.
+ */
+export function curveAnchors<P extends { readonly date: IsoDate; readonly kind: "actual" | "projected" }>(
+  points: readonly P[],
+  hasBand: (p: P) => boolean = () => false,
+): { readonly measured: readonly P[]; readonly prognose: readonly P[]; readonly band: readonly P[] } {
+  const measured = weeklyAnchors(points.filter((p) => p.kind === "actual"));
+  const projected = points.filter((p) => p.kind === "projected");
+  const last = measured.at(-1);
+  const prognose = projected.length === 0 ? [] : [...(last === undefined ? [] : [last]), ...weeklyAnchors(projected, false)];
+  return { measured, prognose, band: weeklyAnchors(projected.filter(hasBand)) };
+}
+
+/** The first point (when `first`), every ISO-week Sunday, and the last point; ascending, no repeats. */
+function weeklyAnchors<P extends { readonly date: IsoDate }>(points: readonly P[], first = true): P[] {
+  return points.filter(
+    (p, i) => (first && i === 0) || i === points.length - 1 || addDays(isoWeekStart(p.date), 6) === p.date,
+  );
+}

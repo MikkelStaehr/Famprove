@@ -36,6 +36,11 @@ export function useChartPick(opts: {
   readonly steps?: Readonly<Record<string, number>>;
   /** When given, a key step to an index outside the chart or not valid is ignored (no clamping). */
   readonly valid?: (index: number) => boolean;
+  /**
+   * false (/load's charts, review-round.md §3): a mouse never hovers a selection; a click selects like
+   * a tap (toggle, drag with the button down, a click outside clears). Default true (Analyse: hover tooltip).
+   */
+  readonly hover?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pick, setPick] = useState<Pick | null>(null);
@@ -55,8 +60,9 @@ export function useChartPick(opts: {
   }, [pick]);
 
   const at = (e: PointerEvent<HTMLDivElement>, press: boolean) => {
-    const touch = e.pointerType !== "mouse";
-    if (touch && !press && e.buttons === 0) return; // a pen hovering: no selection
+    // Without hover a mouse acts as a tap: it selects on press and scrubs only with the button down.
+    const touch = e.pointerType !== "mouse" || opts.hover === false;
+    if (touch && !press && e.buttons === 0) return; // a pen (or, without hover, a mouse) hovering: no selection
     const hit = opts.indexAt(e.clientX, e.currentTarget.getBoundingClientRect(), e.clientY);
     if (hit === null) {
       if (!touch) setPick(null);

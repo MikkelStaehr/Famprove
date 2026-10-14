@@ -92,3 +92,23 @@ test("gapSeam: a tap in a seam far from every ride stays there; near a ride it s
   assert.equal(gapSeam(250, 280, seams), -1); // far, but not in a seam: snaps
   assert.equal(gapSeam(150, undefined, seams), 0);
 });
+
+// review-round.md §4 (web half): a prognose day's Form is daily_projection.tsb as stored, never
+// recomputed from Fitness − Træthed (which here would read −8, not −5).
+test("curveReadout: a projected point's Form is the stored tsb", () => {
+  const point = {
+    date: "2026-10-20",
+    ctl: 30,
+    atl: 38,
+    tsb: -5,
+    kind: "projected" as const,
+    estimate: null,
+    bands: null,
+  };
+  const r = readoutLib.curveReadout(point, []);
+  const form = r.cells.find((c) => c.key === "tsb");
+  assert.equal(form?.label, "Form");
+  assert.equal(form?.value, "−5");
+  assert.equal(r.cells.find((c) => c.key === "ctl")?.value, "30");
+  assert.equal(r.cells.find((c) => c.key === "atl")?.value, "38");
+});

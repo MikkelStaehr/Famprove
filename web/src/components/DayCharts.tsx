@@ -3,11 +3,12 @@
 import { useState } from "react";
 
 import { MISSING, type Readout } from "@/lib/chart-readout";
+import { isoWeek } from "@/lib/dates";
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDate, formatDay, formatLoad } from "@/lib/format";
 import { barDays, barTop, beforeLogSpan, type DayCell, type DayLoad, gridWeeks, type ShadeLevel } from "@/lib/load-days";
 
-import { ChartReadout, PLOT_FOCUS, PointerTip, useChartPick } from "./ChartReadout";
+import { ChartReadout, PLOT_FOCUS, useChartPick } from "./ChartReadout";
 import { SegmentedControl } from "./SegmentedControl";
 
 /**
@@ -48,7 +49,9 @@ type GridProps = {
   readonly logStart: IsoDate | null;
 };
 
-const ROW_LABEL: readonly string[] = ["M", "", "O", "", "F", "", "S"];
+const ROW_LABEL: readonly string[] = ["M", "T", "O", "T", "F", "L", "S"];
+/** review-round.md §6: the ISO week numbers' row (12px line) and its 6px gap above the first cell row. */
+const WEEK_ROW = "h-3 mb-1.5";
 /** ←/→ a week, ↑/↓ a day (rows Mon → Sun). */
 const GRID_STEPS: Readonly<Record<string, number>> = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 };
 
@@ -59,12 +62,13 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
   const drawn = cells.filter((c): c is DayCell => c !== null);
   const anyUnknown = drawn.some((c) => c.unknown);
   const latest = cells.findLastIndex((c) => c !== null);
-  // useChartPick's selection (mouse: a hover with the tooltip; otherwise a tap, drag or key with the
-  // readout row) and its tap-to-clear: tap the selected day again, Esc, or tap outside.
+  // useChartPick's selection (review-round.md §3: nothing at rest, no hover; a tap, click, drag or
+  // key shows the readout row) and its tap-to-clear: tap the selected day again, Esc, or tap outside.
   const { pick, plotProps } = useChartPick({
     count: cells.length,
     startIndex: latest,
     toggle: true,
+    hover: false,
     steps: GRID_STEPS,
     valid: (i) => cells[i] !== null,
     // Cells by position: 7 rows, one column per week (grid-flow-col), so i = column × 7 + row; a
@@ -82,13 +86,8 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
   }
 
   const selected = pick === null ? null : (cells[pick.index] ?? null);
-  const mouse = pick?.mode === "mouse";
-  // The readout row only after a tap, drag or key (user 2026-10-14); a mouse hover gets the tooltip.
-  const readout = selected === null || mouse ? null : dayReadout(selected);
-  const tip =
-    selected !== null && pick !== null && mouse
-      ? { readout: dayReadout(selected), left: `${Math.floor(pick.index / 7) * 24 + 10}px` }
-      : null;
+  // The readout row only after a tap, click, drag or key (review-round.md §3).
+  const readout = selected === null ? null : dayReadout(selected);
   const first = weeks[0]?.weekStart ?? today;
 
   return (
@@ -97,16 +96,27 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
         Træningsdage de sidste 12 uger, fra {formatDate(first)} til {formatDate(today)}. Hver dag i tabellen nedenfor.
       </p>
       <div className="flex gap-2.5">
-        <div aria-hidden="true" className="grid grid-rows-[repeat(7,20px)] gap-1 font-mono text-11 leading-5 text-text-muted">
-          {ROW_LABEL.map((l, i) => (
-            <span key={i}>{l}</span>
-          ))}
+        <div aria-hidden="true" className="flex flex-col">
+          <span className={WEEK_ROW} />
+          <div className="grid grid-rows-[repeat(7,20px)] gap-1 font-mono text-11 leading-5 text-text-muted">
+            {ROW_LABEL.map((l, i) => (
+              <span key={i}>{l}</span>
+            ))}
+          </div>
         </div>
         <div className="min-w-0">
+          {/* ISO week numbers above the columns (§6): mono 10 muted, the current week --text 500; the hidden table has the dates. */}
+          <div aria-hidden="true" className={`grid w-max grid-flow-col gap-1 font-mono text-10 leading-3 text-text-muted tabular-nums ${WEEK_ROW}`} style={{ gridAutoColumns: "20px" }}>
+            {weeks.map((w, i) => (
+              <span key={w.weekStart} className={`text-center ${i === weeks.length - 1 ? "font-medium text-text" : ""}`}>
+                {isoWeek(w.weekStart).week}
+              </span>
+            ))}
+          </div>
           <div
             {...plotProps}
             aria-label="Træningsdage. Brug piletasterne for at gå dag for dag."
-            className={`relative grid w-max grid-flow-col grid-rows-[repeat(7,20px)] gap-1 rounded-cell ${PLOT_FOCUS}`}
+            className={`relative grid w-max cursor-pointer grid-flow-col grid-rows-[repeat(7,20px)] gap-1 rounded-cell ${PLOT_FOCUS}`}
             style={{ ...plotProps.style, gridAutoColumns: "20px" }}
           >
             {cells.map((c, i) =>
@@ -126,7 +136,6 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
                 />
               ),
             )}
-            {tip !== null && <PointerTip readout={tip.readout} left={tip.left} rightInset={0} />}
           </div>
           <MonthLabels weeks={weeks.map((w) => w.weekStart)} />
         </div>
@@ -229,10 +238,11 @@ export function DailyTssBars({ days, today, logStart, titleId }: GridProps & { r
     startIndex: Math.max(0, latest),
     indexAt: (clientX, box) => Math.max(0, Math.min(n - 1, Math.floor(((clientX - box.left) / box.width) * n))),
     toggle: true,
+    hover: false,
   });
-  // The readout row only after a tap, drag or key (user 2026-10-14); a mouse hover gets the tooltip.
+  // The readout row only after a tap, click, drag or key (review-round.md §3).
   const picked = pick === null ? undefined : cells[pick.index];
-  const readout = picked === undefined || pick?.mode === "mouse" ? null : dayReadout(picked);
+  const readout = picked === undefined ? null : dayReadout(picked);
   const empty = cells.every((c) => c.total === null && c.cycling === null);
   const mid = cells[Math.floor(n / 2)]?.date ?? today;
   const h = (v: number) => (Math.max(0, v) / top) * PLOT_H;
@@ -255,7 +265,7 @@ export function DailyTssBars({ days, today, logStart, titleId }: GridProps & { r
           <div
             {...plotProps}
             aria-label="TSS pr. dag. Brug piletasterne for at gå dag for dag."
-            className={`relative rounded-control ${PLOT_FOCUS}`}
+            className={`relative cursor-pointer rounded-control ${PLOT_FOCUS}`}
             style={{ ...plotProps.style, height: STRIP_H + PLOT_H + 1 }}
           >
             {before !== null && (
@@ -303,9 +313,6 @@ export function DailyTssBars({ days, today, logStart, titleId }: GridProps & { r
                 );
               })}
             </div>
-            {picked !== undefined && pick?.mode === "mouse" && (
-              <PointerTip readout={dayReadout(picked)} left={`${((pick.index + 0.5) / n) * 100}%`} rightInset={0} />
-            )}
           </div>
           <div aria-hidden="true" className="relative h-lh font-mono text-11 text-text-muted">
             <span className="absolute left-0">{formatDate(cells[0]?.date ?? today)}</span>

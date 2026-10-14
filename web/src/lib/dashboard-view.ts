@@ -100,6 +100,12 @@ export type WeekView = {
   readonly totalTss: number;
   readonly dayCount: number; // weekly_load.days (< 7: a partial week)
   readonly days: readonly WeekDay[]; // daily_load rows inside the week, ascending
+  /**
+   * weekly_plan's done and planned TSS (review-round.md §1: `I alt` = done / ~planned). Null when the
+   * week has no planned value (past weeks, nothing left this week) or weekly_plan couldn't be read:
+   * the card then shows the done figure only, never "/ ~0".
+   */
+  readonly plan: { readonly doneTss: number; readonly plannedTss: number } | null;
 };
 
 export type DashboardView =
@@ -264,7 +270,18 @@ export function weekView(data: DashboardData, week: WeeklyLoadRow): WeekView {
     totalTss: week.totalTss,
     dayCount: week.days,
     days,
+    plan: weekPlanOf(data.weeklyPlan, week.weekStart),
   };
+}
+
+/** The week's weekly_plan row as done / planned; selection only (SQL owns both sums). */
+export function weekPlanOf(
+  rows: DashboardData["weeklyPlan"],
+  weekStart: IsoDate,
+): WeekView["plan"] {
+  const row = rows?.find((r) => r.weekStart === weekStart);
+  if (row === undefined || row.plannedTss === null) return null;
+  return { doneTss: row.doneTss, plannedTss: row.plannedTss };
 }
 
 /** Hero from the latest row (last element of data.daily). */

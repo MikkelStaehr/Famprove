@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { type ReactNode, Suspense } from "react";
 
 import { Card } from "@/components/Card";
 import { DailyTssBars, TrainingDaysGrid } from "@/components/DayCharts";
@@ -15,7 +15,7 @@ import { UpdatedLine } from "@/components/UpdatedLine";
 import { WarningLine } from "@/components/WarningLine";
 import { ZoneBar } from "@/components/ZoneBar";
 import { ZonePill } from "@/components/ZonePill";
-import { WeekDays, WeekDaysSkeleton } from "@/components/WeekDays";
+import { WeekCard } from "@/components/WeekCard";
 import { LatestWeekLink, weekHref, WeekSwitcher } from "@/components/WeekSwitcher";
 import {
   buildDashboardView,
@@ -32,7 +32,6 @@ import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
 import { noticeText } from "@/lib/notices";
 import {
   formatDate,
-  formatDateRange,
   formatDay,
   formatLoad,
   formatSigned,
@@ -146,11 +145,12 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
         </section>
       )}
       {state.kind === "ready" && (
-        // reset-belastning.md §2 / §8: phone order form → tiles → curve → grid → bars → week; from lg
-        // a 3-column grid by placement only (DOM order stays).
+        // review-round.md §1: phone order form → tiles → week → curve → grid → bars; from lg a
+        // 3-column grid by placement only (DOM order stays).
         <div className={LOAD_GRID}>
           <FormCard view={state} />
           <Tiles view={state} />
+          <Week view={state} />
           <Dashboard view={state} />
         </div>
       )}
@@ -218,7 +218,6 @@ function Tiles({ view }: { readonly view: ReadyView }) {
 }
 
 function Dashboard({ view }: { readonly view: ReadyView }) {
-  const { week } = view;
   const today = resolveToday(new Date(), process.env);
   return (
     <>
@@ -258,42 +257,58 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
         <p className="text-13 text-text-muted">{STRENGTH_ESTIMATE_NOTE}</p>
       </section>
 
-      <Card
-        id="week"
-        title={week === null ? "Denne uge" : `Uge ${week.selected.isoWeek}`}
-        action={week === null ? undefined : <MonoCaption uppercase={false}>{formatDateRange(week.selected.weekStart, week.selected.weekEnd)}</MonoCaption>}
-        className={`gap-1 ${LOAD_PLACE.week}`}
-      >
-        {week === null ? (
-          <EmptyState message="Ingen ugetotal for denne uge endnu." />
-        ) : (
-          <>
-            {week.selected.days.length === 0 ? (
-              <EmptyState message={`Ingen træningsdage registreret i uge ${week.selected.isoWeek}.`} />
-            ) : (
-              // Keyed by week: switching weeks shows this skeleton; the other cards stay put.
-              <Suspense key={week.param} fallback={<WeekFallback nav={week} />}>
-                <WeekSessions nav={week} logStart={view.logStart} today={today} />
-              </Suspense>
-            )}
-            <div className="mt-3">
-              <WeekSwitcher nav={week} latest={week.isLatest ? null : <LatestWeekLink />} />
-            </div>
-          </>
-        )}
-      </Card>
     </>
   );
 }
 
-function WeekFallback({ nav }: { readonly nav: WeekNav }) {
+/** The week card (review-round.md §1, §7 full): the selected week's days, streamed; the switcher below. */
+function Week({ view }: { readonly view: ReadyView }) {
+  const { week } = view;
+  const today = resolveToday(new Date(), process.env);
+  if (week === null) {
+    return (
+      <WeekCard
+        variant="full"
+        head={null}
+        body={{ kind: "message", node: <EmptyState message="Ingen ugetotal for denne uge endnu." /> }}
+        className={LOAD_PLACE.week}
+      />
+    );
+  }
+  const head = week.selected;
+  const footer = <WeekSwitcher nav={week} latest={week.isLatest ? null : <LatestWeekLink />} />;
+  if (week.selected.days.length === 0) {
+    return (
+      <WeekCard
+        variant="full"
+        head={head}
+        body={{ kind: "message", node: <EmptyState message={`Ingen træningsdage registreret i uge ${week.selected.isoWeek}.`} /> }}
+        footer={footer}
+        className={LOAD_PLACE.week}
+      />
+    );
+  }
   return (
-    <>
-      <p className="sr-only" role="status">
-        Henter uge {nav.selected.isoWeek}…
-      </p>
-      <WeekDaysSkeleton rows={nav.selected.days.length} />
-    </>
+    // Keyed by week: switching weeks shows this skeleton; the other cards stay put.
+    <Suspense
+      key={week.param}
+      fallback={
+        <WeekCard
+          variant="full"
+          head={head}
+          sentence={
+            <p className="sr-only" role="status">
+              Henter uge {week.selected.isoWeek}…
+            </p>
+          }
+          body={{ kind: "loading", rows: week.selected.days.length }}
+          footer={footer}
+          className={LOAD_PLACE.week}
+        />
+      }
+    >
+      <WeekSessions nav={week} logStart={view.logStart} today={today} footer={footer} />
+    </Suspense>
   );
 }
 
@@ -317,21 +332,50 @@ async function loadWeekPlan(nav: WeekNav, today: IsoDate): Promise<DatedPlan | n
 }
 
 /** Streams in under the week's Suspense boundary; a failure stays inside the week card. */
-async function WeekSessions({ nav, logStart, today }: { readonly nav: WeekNav; readonly logStart: IsoDate | null; readonly today: IsoDate }) {
+async function WeekSessions({
+  nav,
+  logStart,
+  today,
+  footer,
+}: {
+  readonly nav: WeekNav;
+  readonly logStart: IsoDate | null;
+  readonly today: IsoDate;
+  readonly footer: ReactNode;
+}) {
   const [state, plan] = await Promise.all([loadWeekState(nav), loadWeekPlan(nav, today)]);
   if (state.kind === "error") {
     const at = state.at.toISOString();
     return (
-      <ErrorState
-        title="Kunne ikke hente ugens træninger"
-        what={describeDataError(state.error)}
-        detail={state.error.message}
-        at={{ iso: at, text: formatUpdatedAt(at) }}
-        retry={{ href: weekHref(nav.param) }}
+      <WeekCard
+        variant="full"
+        head={nav.selected}
+        body={{
+          kind: "message",
+          node: (
+            <ErrorState
+              title="Kunne ikke hente ugens træninger"
+              what={describeDataError(state.error)}
+              detail={state.error.message}
+              at={{ iso: at, text: formatUpdatedAt(at) }}
+              retry={{ href: weekHref(nav.param) }}
+            />
+          ),
+        }}
+        footer={footer}
+        className={LOAD_PLACE.week}
       />
     );
   }
-  return <WeekDays week={nav.selected} days={state.days} logStart={logStart} today={today} plan={plan} />;
+  return (
+    <WeekCard
+      variant="full"
+      head={nav.selected}
+      body={{ kind: "rows", week: nav.selected, days: state.days, logStart, today, plan }}
+      footer={footer}
+      className={LOAD_PLACE.week}
+    />
+  );
 }
 
 /** CTL ramp as "is fitness going up?". Direction follows the displayed (rounded) value. */

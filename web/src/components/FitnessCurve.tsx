@@ -3,24 +3,26 @@
 import { type ReactNode, useState } from "react";
 
 import { bracketGeometry, monoLabelWidth } from "@/lib/chart-marks";
-import { MISSING, nearestIndex, type Readout, restingReadout } from "@/lib/chart-readout";
+import { curveReadout, nearestIndex } from "@/lib/chart-readout";
 import { type BlockSpan, type ChartPoint, ctlBandArea } from "@/lib/dashboard-view";
 import { addDays, dayNumber } from "@/lib/dates";
 import type { IsoDate } from "@/lib/db/rows";
-import { formatDate, formatDay, formatLoad, formatSigned } from "@/lib/format";
-import { type CurveRange, curveScale, curveWindow } from "@/lib/load-days";
+import { formatDate, formatDay } from "@/lib/format";
+import { curveAnchors, type CurveRange, curveScale, curveWindow } from "@/lib/load-days";
 import { monotonePath, monotoneSegments, segmentsPath } from "@/lib/monotone-path";
 
 import { useMedia, useWidth } from "./chart-hooks";
-import { ChartReadout, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
+import { ChartReadout, PLOT_FOCUS, useChartPick } from "./ChartReadout";
 import { SegmentedControl } from "./SegmentedControl";
 
 /**
- * Belastning's fitness curve (design/specs/reset-belastning.md §3, mockup C): CTL only, measured as a
- * 2px --text line, the prognose 1.5px --text-muted dashed 3 4, the band after the block as a 12 %
- * area, three dashed gridlines, block brackets in a 16px strip, today the 1.5px --today line with
- * `I DAG`. Lines and band edges are smooth monotone curves through each day's value (user
- * 2026-10-14). Python's values as-is; the only arithmetic here is the drawing scale (date -> x, value -> y).
+ * Belastning's fitness curve (design/specs/reset-belastning.md §3, review-round.md §2/§3/§5): CTL only,
+ * measured as a 2px --text line, the prognose 1.5px --text-muted dashed 3 4, the band after the block
+ * as a 12 % area, three dashed gridlines, block brackets in a 16px strip, the ring on the last
+ * measured day. Lines and band edges are monotone curves through weekly anchors (lib/load-days.ts
+ * curveAnchors), so the line bends only at Sundays and the window ends. No today line. Nothing at
+ * rest: a tap, click or key shows a 1px hairline and the readout. Python's values as-is; the only
+ * arithmetic here is the drawing scale (date -> x, value -> y).
  */
 type FitnessCurveProps = {
   readonly points: readonly ChartPoint[];
@@ -35,6 +37,14 @@ const STRIP = 16;
 const PAD_L = 2;
 const PAD_R = 6;
 const READOUT_LINES = 3; // date, cells, one fact (block · spænd)
+/** The ring on the last measured anchor (review-round.md §2), drawn the same in the legend. */
+function Ring() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3">
+      <circle cx={6} cy={6} r={4.5} fill="var(--bg)" stroke="var(--text)" strokeWidth={1.5} />
+    </svg>
+  );
+}
 const RANGES = [
   { value: "4U", label: "4U", ariaLabel: "4 uger" },
   { value: "12U", label: "12U", ariaLabel: "12 uger" },
@@ -61,6 +71,12 @@ export function FitnessCurve({ points, blocks, today, lastActual, summary }: Fit
       <div className="flex flex-nowrap items-center justify-between gap-x-3">
         <SegmentedControl label="Periode" segments={RANGES} value={range} onChange={setRange} size="hero" />
         <ul aria-label="Forklaring" className="flex flex-col items-end gap-1 font-mono text-11 text-text-muted sm:flex-row sm:items-center sm:gap-x-3">
+          {lastActual >= win.from && (
+            <li className="flex items-center gap-1.5">
+              <Ring />
+              {lastActual === today ? "i dag" : "seneste"}
+            </li>
+          )}
           {end !== undefined && <li>- - - prognose</li>}
           {band && (
             <li className="flex items-center gap-1.5">
@@ -92,7 +108,7 @@ type PlotProps = {
   readonly range: CurveRange;
 };
 
-function Plot({ points, blocks, today, lastActual, from, to, range }: PlotProps) {
+function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
   const sm = useMedia("(min-width: 640px)");
   const lg = useMedia("(min-width: 1024px)");
   const [measure, width] = useWidth();
@@ -116,33 +132,32 @@ function Plot({ points, blocks, today, lastActual, from, to, range }: PlotProps)
     count: points.length,
     startIndex: Math.max(0, latestIndex),
     indexAt: (clientX, box) => (points.length === 0 ? null : nearestIndex(xs, clientX - box.left)),
+    toggle: true,
+    hover: false,
   });
 
-  const readouts = points.map((p) => rowReadout(p, blocks));
-  const resting = restingReadout(latestIndex === -1 ? null : readouts[latestIndex], "Tryk på grafen for at se en dag");
+  // review-round.md §3: no readout at rest; a selection shows that day's readout.
+  const readouts = points.map((p) => curveReadout(p, blocks));
   const picked = pick === null ? undefined : points[pick.index];
-  const readout = picked !== undefined && pick?.mode !== "mouse" ? readouts[pick?.index ?? 0] : resting;
+  const readout = pick === null ? null : (readouts[pick.index] ?? null);
 
-  const measured = points.filter((p) => p.kind === "actual");
-  const projected = points.filter((p) => p.kind === "projected");
-  const last = measured.at(-1);
-  // One monotone spline through measured + prognose (lib/monotone-path.ts: through every day, no
-  // overshoot), split at the last measured day, so the dashed prognose leaves the line without a corner.
-  const curve = monotoneSegments([...measured, ...projected].map((p) => ({ x: x(p.date), y: y(p.ctl) })));
-  const measuredPath = segmentsPath(curve.slice(0, Math.max(0, measured.length - 1)));
-  const prognosePath = segmentsPath(curve.slice(Math.max(0, measured.length - 1)));
-  const bandPts = projected.filter((p) => ctlBandArea(p) !== null);
+  // One monotone spline through the weekly anchors (measured, then the prognose's after the shared
+  // last measured day), split there, so the dotted prognose leaves the line without a corner.
+  const anchors = curveAnchors(points, (p) => ctlBandArea(p) !== null);
+  const last = anchors.measured.at(-1);
+  const curve = monotoneSegments([...anchors.measured, ...anchors.prognose.slice(1)].map((p) => ({ x: x(p.date), y: y(p.ctl) })));
+  const measuredPath = segmentsPath(curve.slice(0, Math.max(0, anchors.measured.length - 1)));
+  const prognosePath = segmentsPath(curve.slice(Math.max(0, anchors.measured.length - 1)));
+  const bandPts = anchors.band;
   const edge = (side: 0 | 1) => bandPts.map((p) => ({ x: x(p.date), y: y(ctlBandArea(p)?.[side] ?? p.ctl) }));
   const bandPath = bandPts.length < 2 ? null : `${monotonePath(edge(1))}${monotonePath(edge(0).toReversed(), true)}Z`;
-  const todayIn = today >= from && today <= to;
-  const tx = x(today);
 
   return (
     <div ref={measure} className="flex flex-col gap-2">
       <div
         {...plotProps}
         aria-label="Fitness pr. dag. Brug piletasterne for at gå dag for dag."
-        className={`relative w-full rounded-control ${PLOT_FOCUS}`}
+        className={`relative w-full cursor-pointer rounded-control ${PLOT_FOCUS}`}
         style={{ ...plotProps.style, height }}
       >
         {width !== null && (
@@ -162,35 +177,17 @@ function Plot({ points, blocks, today, lastActual, from, to, range }: PlotProps)
             {bandPath !== null && <path d={bandPath} fill="var(--text-muted)" fillOpacity={0.12} stroke="none" />}
             {prognosePath !== "" && <path d={prognosePath} fill="none" stroke="var(--text-muted)" strokeWidth={1.5} strokeDasharray="3 4" />}
             {measuredPath !== "" && <path d={measuredPath} fill="none" stroke="var(--text)" strokeWidth={2} strokeLinejoin="round" />}
-            {todayIn && (
-              <g>
-                <line x1={tx} x2={tx} y1={STRIP} y2={STRIP + plotH} stroke="var(--today)" strokeWidth={1.5} />
-                <text x={tx - 4} y={STRIP + plotH - 4} textAnchor="end" fontSize={11} fontFamily="var(--font-mono)" fill="var(--today)">
-                  I DAG
-                </text>
-              </g>
-            )}
             {picked !== undefined && (
               <line x1={x(picked.date)} x2={x(picked.date)} y1={STRIP} y2={STRIP + plotH} stroke="var(--text)" strokeWidth={1} />
             )}
             {last !== undefined && last.date === lastActual && (
               <circle cx={x(last.date)} cy={y(last.ctl)} r={5} fill="var(--bg)" stroke="var(--text)" strokeWidth={2} />
             )}
-            {picked !== undefined && (
-              <circle cx={x(picked.date)} cy={y(picked.ctl)} r={3.5} fill="var(--text)" stroke="var(--card)" strokeWidth={2} />
-            )}
           </svg>
-        )}
-        {picked !== undefined && pick?.mode === "mouse" && (
-          <PointerTip readout={readouts[pick.index]} left={`${x(picked.date)}px`} rightInset={PAD_R} swatch={swatch} />
         )}
       </div>
       <XLabels from={from} to={to} x={x} width={w} wide={sm} />
-      {width === null ? (
-        <ReadoutSpace lines={READOUT_LINES} cells />
-      ) : (
-        <ChartReadout readout={readout} all={[resting, ...readouts]} lines={READOUT_LINES} cells swatch={swatch} />
-      )}
+      {width !== null && <ChartReadout readout={readout} all={readouts} lines={READOUT_LINES} cells swatch={swatch} />}
     </div>
   );
 }
@@ -256,38 +253,4 @@ function XLabels({ from, to, x, width, wide }: { readonly from: IsoDate; readonl
         ))}
     </div>
   );
-}
-
-/** DESIGN.md readout for the curve: date (+ prognose status), Fitness · Træthed · Form, then one line: block (· spænd on a prognose day). */
-function rowReadout(p: ChartPoint, blocks: readonly BlockSpan[]): Readout {
-  const block = blocks.find((b) => b.start <= p.date && p.date <= b.end);
-  const deload = block !== undefined && block.deloadStart !== null && block.deloadStart <= p.date;
-  // The bracket's short label (`Blok 12`), so block · deload · spænd stays one line at 390px.
-  const blockFact = block === undefined ? [] : [`Blok ${block.blockNo}${deload ? " · deload" : ""}`];
-  if (p.kind === "projected") {
-    // One fact line (polish 2026-10-14): block · the fitness span. The prognose basis (cycling's typical
-    // day, strength sessions and their estimated day) lives in the card foot, not per day.
-    const span = p.bands?.ctl;
-    const spanFact = span != null && formatLoad(span.low) !== formatLoad(span.high) ? [`spænd ${formatLoad(span.low)}–${formatLoad(span.high)}`] : [];
-    const fact = [...blockFact, ...spanFact].join(" · ");
-    return {
-      head: `${formatDay(p.date)} · Prognose${p.estimate?.strengthMethod === "recent" ? " · efter blokken" : ""}`,
-      cells: [
-        // No "≈ " per cell: line 1 says Prognose, and with it the cells wrapped to two lines at 390px.
-        { key: "ctl", label: "Fitness", value: formatLoad(p.ctl) },
-        { key: "atl", label: "Træthed", value: formatLoad(p.atl) },
-        { key: "tsb", label: "Form", value: formatSigned(p.tsb) },
-      ],
-      facts: fact === "" ? [] : [fact],
-    };
-  }
-  return {
-    head: formatDay(p.date),
-    cells: [
-      { key: "ctl", label: "Fitness", value: Number.isFinite(p.ctl) ? formatLoad(p.ctl) : MISSING },
-      { key: "atl", label: "Træthed", value: formatLoad(p.atl) },
-      { key: "tsb", label: "Form", value: formatSigned(p.tsb) },
-    ],
-    facts: blockFact,
-  };
 }

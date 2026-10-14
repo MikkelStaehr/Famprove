@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { describe, it, test } from "node:test";
 
 import {
   barDays,
   barTop,
   beforeLogSpan,
+  curveAnchors,
   curveScale,
   curveWindow,
   dayCell,
@@ -64,4 +65,34 @@ test("curve ranges: 4U 28 days + 14, 12U 84 + 28, season from the series start +
 test("curve gridlines: three multiples of 10 over the extent rounded out to 10", () => {
   assert.deepEqual(curveScale(8.4, 26.1), { lo: 0, hi: 30, lines: [10, 20, 30] });
   assert.deepEqual(curveScale(12, 49), { lo: 10, hi: 70, lines: [30, 50, 70] });
+});
+
+// review-round.md §2: the curve's vertices are only the weekly anchors.
+describe("curveAnchors", () => {
+  const p = (date: string, kind: "actual" | "projected", band = false) => ({ date, kind, band });
+  // Wed 2026-09-30 .. Wed 2026-10-14 measured; Thu 10-15 .. Tue 10-27 prognose (band from Tue 10-20).
+  const days: string[] = [];
+  for (let d = new Date("2026-09-30T00:00:00Z"); d <= new Date("2026-10-27T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 1)) {
+    days.push(d.toISOString().slice(0, 10));
+  }
+  const points = days.map((d) => p(d, d <= "2026-10-14" ? "actual" : "projected", d >= "2026-10-20"));
+  const a = curveAnchors(points, (x) => x.band);
+
+  it("measured: the window's first day, each Sunday, the last measured day", () => {
+    assert.deepEqual(a.measured.map((x) => x.date), ["2026-09-30", "2026-10-04", "2026-10-11", "2026-10-14"]);
+  });
+
+  it("prognose: the shared last measured day, each prognose Sunday, the last prognose day", () => {
+    assert.deepEqual(a.prognose.map((x) => x.date), ["2026-10-14", "2026-10-18", "2026-10-25", "2026-10-27"]);
+  });
+
+  it("band: its first day, the Sundays and its last day", () => {
+    assert.deepEqual(a.band.map((x) => x.date), ["2026-10-20", "2026-10-25", "2026-10-27"]);
+  });
+
+  it("no prognose: no prognose anchors, and a Sunday last day is not repeated", () => {
+    const only = curveAnchors(points.filter((x) => x.date <= "2026-10-11"));
+    assert.deepEqual(only.prognose, []);
+    assert.deepEqual(only.measured.map((x) => x.date), ["2026-09-30", "2026-10-04", "2026-10-11"]);
+  });
 });

@@ -13,7 +13,6 @@ import { INVERSE_BUTTON } from "./InverseCard";
 import { useSession } from "./SetLogProvider";
 import { TodaySecond, TodayShell } from "./TodayCard";
 import { settle } from "./useSetLog";
-import { WeekCard } from "./WeekCard";
 
 /**
  * Træning's "I dag" card with a strength session next (reset-traening.md §3; behaviour
@@ -71,18 +70,8 @@ export function SessionBlock({ today, className }: { readonly today: IsoDate; re
   );
 }
 
-/** The Uge card with a session in progress: its sr sentence reads the current session's set log. */
-export function SessionWeekCard({
-  strength,
-  today,
-  className,
-}: {
-  readonly strength: StrengthWeek;
-  readonly today: IsoDate;
-  readonly className?: string;
-}) {
+/** The week card's sr sentence with a session in progress: it reads the current session's set log. */
+export function SessionWeekSentence({ strength }: { readonly strength: StrengthWeek }) {
   const { view } = useSession();
-  return (
-    <WeekCard strength={strength} today={today} sentence={weekSentence(strength.columns, view.segments)} className={className} />
-  );
+  return <p className="sr-only">{weekSentence(strength.columns, view.segments)}</p>;
 }
