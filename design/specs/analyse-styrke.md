@@ -59,7 +59,7 @@ A three-row scoreboard, one row per lift in SBD order: three big tabular numbers
 - **Block best:** a ring around the point (2px `--text`, 16px outer). Its value sits above it: `179,6` in `text-12` 600 tabular `--text`. Only block-bests are labelled, so the eye compares block to block within a phase.
 - **`1RM i arket (ikke testet)`:** one horizontal dashed line (1.5px `--text-muted`, 6 4) per block span at that block's sheet value. Its value `180` (`text-12` muted, on a `--surface` halo so the hatch never runs through it) sits above the line at the right end of the span. A block-best label never crosses its span's dashed line: when the ring is below the line it goes under the ring. It is a reference only: never connected to the points and never in a delta.
 - **Notes under the x labels** (`text-14` muted, 60ch, 8px apart), each only when it applies:
-  1. If any point is prescribed: `Lyse punkter er baseret på foreskrevet RPE. Log RPE på topsættet, så tæller punktet fuldt.`
+  1. If any point is prescribed: `Lyse punkter er baseret på foreskrevet RPE. Logger du RPE på sættet, bruges din egen RPE i skønnet.`
   2. Always: `Blok 11 er i sæson, blok 12 uden for sæson. Den lodrette streg er faseskiftet: sammenlign blokke i samme fase.` This is built from `blocks`; with more blocks, list them as `Blok 11 er i sæson, blok 12–13 uden for sæson.`
   3. If any row is `pre_log`: `Blok 11 er fra før aktivitetsloggen. Dens uger tæller med, når ugen er slut, ikke når en session registreres.`
   4. Always: `e1RM er et skøn ud fra ugens bedste sæt med højst 5 reps ved foreskrevet RPE 7 eller mere, ikke et testet maks. Samme regel giver de foreslåede kg.`

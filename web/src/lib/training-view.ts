@@ -382,33 +382,18 @@ export function formSentence(tsb: number, zone: ZoneKey | null, fromDate?: strin
   return parts.join(" ");
 }
 
-/** Why a row has no suggestion (spec §6); a missing planned_sets row has no reason. */
-const NO_SUGGESTION: Readonly<Record<Exclude<SuggestionBasis, "rpe_e1rm" | "progression">, string>> = {
-  not_rpe: "Intet forslag til %-sæt",
-  no_e1rm: "Intet forslag: ingen e1RM endnu",
-  no_lift: "Intet forslag til denne øvelse",
-};
-
-/** Python's suggested kg ("142,5 kg"), or the words for its absence. "0 kg" never shows.
+/** Python's suggested kg ("142,5 kg"), or null when there is none. "0 kg" never shows.
  * `capped`: the weekly cap changed it, shown as "(begrænset)" (CAPPED_WORD). */
-export type SuggestionView =
-  | { readonly kg: string; readonly capped: boolean }
-  | { readonly kg: null; readonly words: string };
+export type SuggestionView = { readonly kg: string; readonly capped: boolean } | { readonly kg: null };
 
 /** After a suggestion the weekly cap changed (planned_sets.uncapped_kg, user 2026-10-13). */
 export const CAPPED_WORD = "(begrænset)";
 
-export function suggestionView(
-  e: Pick<ExerciseView, "suggestedKg" | "suggestionBasis" | "suggestionCapped">,
-): SuggestionView {
+export function suggestionView(e: Pick<ExerciseView, "suggestedKg" | "suggestionCapped">): SuggestionView {
   if (e.suggestedKg !== null && e.suggestedKg > 0) {
     return { kg: `${formatKg(e.suggestedKg)} kg`, capped: e.suggestionCapped };
   }
-  const basis = e.suggestionBasis;
-  return {
-    kg: null,
-    words: basis === null || basis === "rpe_e1rm" || basis === "progression" ? "Intet forslag" : NO_SUGGESTION[basis],
-  };
+  return { kg: null };
 }
 
 type AdjustmentFields = Pick<ExerciseView, "suggestedKg" | "suggestionCapped" | "adjustmentKg" | "adjustmentReason">;
@@ -473,16 +458,6 @@ function rangeFigure(text: string): string {
   return text.trim().replace(/(\d)\s*[-–]\s*(?=\d)/g, "$1–");
 }
 
-/** The reps cell with its word, ranges as one figure: "5 reps", "8–12 reps", "1 rep"; null when blank. */
-export function repsText(e: Pick<ExerciseView, "repsText">): string | null {
-  return e.repsText === null ? null : formatSetsReps(null, rangeFigure(e.repsText));
-}
-
-/** The prescription as shown, ranges as one figure: "RPE 7 - 8" -> "RPE 7–8"; null when blank. */
-export function prescribedText(e: Pick<ExerciseView, "prescribed">): string | null {
-  return e.prescribed === null ? null : rangeFigure(e.prescribed);
-}
-
 /** The reps cell as written, for speech (spokenRange reads its ranges as "til"). */
 function writtenRepsText(e: Pick<ExerciseView, "repsText">): string | null {
   return e.repsText === null ? null : formatSetsReps(null, e.repsText);
@@ -523,11 +498,8 @@ export type SetLineView = {
 
 export type SetGroupView = {
   readonly exercise: ExerciseView;
-  readonly showName: boolean; // first group of a run, or the next group
-  readonly nameMuted: boolean; // every set of the run is done or skipped
   readonly closed: boolean; // every set of this group is done or skipped
   readonly isNext: boolean; // holds the first open set (NÆSTE)
-  readonly dividerBefore: boolean; // between runs, unless the next group touches it
   readonly sets: readonly SetLineView[];
 };
 
@@ -560,21 +532,11 @@ export function checklistView(
   const closed = (refs: readonly SetRef[]) => refs.every((r) => stateOf(log.get(setKey(r))) !== "open");
   const holdsNext = (e: ExerciseView) => first !== null && e.sets.some((r) => r.row === first.row && r.set === first.set);
   const runs = runPositions(exercises);
-  const groups = exercises.map((e, i): SetGroupView => {
-    const name = e.name.trim();
-    const runStart = i === 0 || exercises[i - 1].name.trim() !== name;
-    let start = i;
-    while (start > 0 && exercises[start - 1].name.trim() === name) start -= 1;
-    let end = i + 1;
-    while (end < exercises.length && exercises[end].name.trim() === name) end += 1;
-    const isNext = holdsNext(e);
+  const groups = exercises.map((e): SetGroupView => {
     return {
       exercise: e,
-      showName: runStart || isNext,
-      nameMuted: closed(exercises.slice(start, end).flatMap((x) => x.sets)),
       closed: closed(e.sets),
-      isNext,
-      dividerBefore: runStart && i > 0 && !isNext && !holdsNext(exercises[i - 1]),
+      isNext: holdsNext(e),
       sets: e.sets.map((ref, n) => {
         const logged = log.get(setKey(ref));
         const state = stateOf(logged);

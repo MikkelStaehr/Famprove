@@ -30,7 +30,7 @@ const dated = (date: IsoDate): string => `${formatDate(date)}${stopAfter(formatD
 const liftLower = (l: StrengthLift): string => LIFT_NAME[l].toLowerCase();
 export const PHASE_TEXT: Readonly<Record<StrengthPhase, string>> = { in_season: "i sæson", off_season: "uden for sæson" };
 
-export const NOTE_PRESCRIBED = "Lyse punkter er baseret på foreskrevet RPE. Log RPE på topsættet, så tæller punktet fuldt.";
+export const NOTE_PRESCRIBED = "Lyse punkter er baseret på foreskrevet RPE. Logger du RPE på sættet, bruges din egen RPE i skønnet.";
 export const NOTE_ESTIMATE = "e1RM er et skøn ud fra ugens bedste sæt med højst 5 reps ved foreskrevet RPE 7 eller mere, ikke et testet maks. Samme regel giver de foreslåede kg.";
 export const NO_E1RM = "Der er intet e1RM endnu. Det kommer, når et sæt med højst 5 reps ved foreskrevet RPE 7 eller mere er løftet.";
 export const RPE_LINE = "Udviklingen i RPE kommer, når du har logget RPE på topsæt i nogle uger.";

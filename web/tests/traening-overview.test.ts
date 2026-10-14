@@ -10,8 +10,6 @@ import {
   exerciseRuns,
   formSentence,
   lastWeekText,
-  prescribedText,
-  repsText,
   runCountText,
   runPositions,
   setStatus,
@@ -74,29 +72,18 @@ test("form sentence: zone, no zone, an old row", () => {
   assert.equal(TSB_HINT.high_risk, "Meget træt: forvent at ligge klart under");
 });
 
-test("suggestion: kg, reasons per basis, never 0 kg", () => {
+test("suggestion: kg, never 0 kg", () => {
   assert.deepEqual(suggestionView(row(1)), { kg: "142,5 kg", capped: false });
   assert.deepEqual(suggestionView(row(1, { suggestedKg: 75, suggestionCapped: true })), { kg: "75 kg", capped: true });
-  assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: "not_rpe" })), { kg: null, words: "Intet forslag til %-sæt" });
-  assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: "no_e1rm" })), { kg: null, words: "Intet forslag: ingen e1RM endnu" });
-  assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: "no_lift" })), { kg: null, words: "Intet forslag til denne øvelse" });
-  assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: null })), { kg: null, words: "Intet forslag" });
-  assert.deepEqual(suggestionView(row(1, { suggestedKg: 0 })), { kg: null, words: "Intet forslag" });
+  assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: "not_rpe" })), { kg: null });
+  assert.deepEqual(suggestionView(row(1, { suggestedKg: 0 })), { kg: null });
 });
 
-test("last week, and reps and RPE ranges printed as Fokus prints them", () => {
+test("last week", () => {
   assert.equal(lastWeekText(row(1), 1), undefined);
   assert.equal(lastWeekText(row(1), 3), "140 kg");
   assert.equal(lastWeekText(row(1, { reference: null }), 3), null);
   assert.equal(lastWeekText(row(1, { reference: { kg: 10, bodyweight: true } }), 3), "kropsvægt + 10 kg");
-  assert.equal(repsText(row(1, { repsText: "8 - 12" })), "8\u201312 reps");
-  assert.equal(repsText(row(1, { repsText: "6-10" })), "6\u201310 reps");
-  assert.equal(repsText(row(1, { repsText: "5" })), "5 reps");
-  assert.equal(repsText(row(1, { repsText: null })), null);
-  assert.equal(prescribedText(row(1, { prescribed: "RPE 7 - 8" })), "RPE 7\u20138");
-  assert.equal(prescribedText(row(1, { prescribed: "RPE 6.5-7" })), "RPE 6.5\u20137");
-  assert.equal(prescribedText(row(1, { prescribed: "-12.5%" })), "-12.5%"); // a leading minus stays
-  assert.equal(prescribedText(row(1, { prescribed: null })), null);
 });
 
 test("checklist: Begynd begins the open warm-up (set 0); the highlight stays on set 1", () => {
@@ -115,33 +102,30 @@ test("checklist: Begynd begins the open warm-up (set 0); the highlight stays on 
   assert.deepEqual(checklistView(exercises, order, squatDone).beginAt, { row: 20, set: 0 });
 });
 
-test("checklist: next on the first open set's group, runs, dividers, progress", () => {
+test("checklist: next on the first open set's group, progress", () => {
   const exercises = [row(10), row(11), row(20, { name: "Bench press" })];
   const order = exercises.flatMap((e) => e.sets);
   const empty = checklistView(exercises, order, new Map());
   assert.equal(empty.primary, "begin");
   assert.deepEqual(empty.first, { row: 10, set: 1 });
-  assert.deepEqual(empty.groups.map((g) => [g.showName, g.isNext, g.dividerBefore]), [
-    [true, true, false],
-    [false, false, false], // continuation of the Squat run
-    [true, false, true], // a new run, not touching the next group
-  ]);
+  assert.deepEqual(
+    empty.groups.map((g) => g.isNext),
+    [true, false, false],
+  );
   assert.equal(empty.groups[0].sets[0].next, true);
 
-  // Row 10 done and skipped: the next group moves to row 11 (named, since it is NÆSTE); the divider before
-  // Bench press goes because the next group touches it.
+  // Row 10 done and skipped: the next group moves to row 11.
   const log = logOf([
     { row: 10, set: 1, startedAt: AT, endedAt: AT },
     { row: 10, set: 2, skipped: true },
   ]);
   const mid = checklistView(exercises, order, log);
   assert.equal(mid.primary, "continue");
-  assert.deepEqual(mid.groups.map((g) => [g.showName, g.isNext, g.closed, g.dividerBefore]), [
-    [true, false, true, false],
-    [true, true, false, false],
-    [true, false, false, false],
+  assert.deepEqual(mid.groups.map((g) => [g.isNext, g.closed]), [
+    [false, true],
+    [true, false],
+    [false, false],
   ]);
-  assert.equal(mid.groups[0].nameMuted, false); // row 11 of the run is still open
   assert.deepEqual(mid.progress, { done: 1, skipped: 1, total: 6 });
   assert.deepEqual(mid.segments, ["done", "skipped", "open", "open", "open", "open"]);
   assert.equal(setStatus(mid.groups[0].sets[0]), "kl. 18.42");
@@ -155,7 +139,7 @@ test("checklist: every set closed has no next group and is finished", () => {
   assert.equal(view.primary, "finished");
   assert.equal(view.first, null);
   assert.equal(view.groups[0].isNext, false);
-  assert.equal(view.groups[0].nameMuted, true);
+  assert.equal(view.groups[0].closed, true);
 });
 
 test("set line accessible names (spec §6)", () => {

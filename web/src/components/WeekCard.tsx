@@ -26,7 +26,7 @@ export function WeekCard({
   readonly sentence: string | null;
   readonly className?: string;
 }) {
-  const rows = weekRows(strength);
+  const rows = weekRows(strength, today);
   return (
     <section
       aria-labelledby="week-heading"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { type FocusEvent, useEffect, useId, useRef, useState } from "react";
 
 import type { SetState } from "@/lib/set-taps";
 import {
@@ -53,17 +53,58 @@ export function SetCount() {
  * One collapsible row per exercise (user 2026-10-14, slice exercise-collapse): an exercise is its
  * run of same-named sheet rows. Expanded = the user's toggle, else whether it holds the NÆSTE set,
  * so after its last set the next exercise opens unless the user chose otherwise.
+ * When ticking the last set auto-collapses an exercise that held focus, the ticked checkbox is
+ * hidden; focus moves to the next exercise's header (or, for the last exercise, its own header),
+ * so keyboard and screen-reader users keep their place.
  */
 export function SetChecklist() {
   const { session, view } = useSession();
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const runs = exerciseRuns(view.groups);
+  const expandedByKey = new Map(runs.map((run) => [run.key, toggled.get(run.key) ?? run.isNext] as const));
+  const items = useRef(new Map<string, HTMLLIElement>());
+  const headers = useRef(new Map<string, HTMLButtonElement>());
+  const focusedRun = useRef<string | null>(null); // the exercise focus was last inside
+  const wasExpanded = useRef<ReadonlyMap<string, boolean>>(new Map());
+
+  useEffect(() => {
+    const before = wasExpanded.current;
+    wasExpanded.current = expandedByKey;
+    const key = focusedRun.current;
+    if (key === null || before.get(key) !== true || expandedByKey.get(key) !== false || toggled.has(key)) return;
+    // Only when focus is still in the collapsed exercise (or was dropped to the body by the hide).
+    const active = document.activeElement;
+    const item = items.current.get(key);
+    if (active !== null && active !== document.body && !(item?.contains(active) ?? false)) return;
+    const at = runs.findIndex((r) => r.key === key);
+    const target = headers.current.get(runs[at + 1]?.key ?? key);
+    target?.focus();
+  });
+
+  const onBlur = (key: string) => (e: FocusEvent<HTMLLIElement>) => {
+    // Focus moving to another element outside this exercise; a hide (relatedTarget null) keeps the key.
+    if (e.relatedTarget !== null && !e.currentTarget.contains(e.relatedTarget) && focusedRun.current === key) {
+      focusedRun.current = null;
+    }
+  };
+
   return (
     <ol aria-label="Øvelser" className="flex flex-col">
       {runs.map((run, i) => {
-        const expanded = toggled.get(run.key) ?? run.isNext;
+        const expanded = expandedByKey.get(run.key) ?? false;
         return (
-          <li key={run.key} className={`relative${i === 0 ? "" : " border-t border-border"}`}>
+          <li
+            key={run.key}
+            ref={(el) => {
+              if (el === null) items.current.delete(run.key);
+              else items.current.set(run.key, el);
+            }}
+            onFocus={() => {
+              focusedRun.current = run.key;
+            }}
+            onBlur={onBlur(run.key)}
+            className={`relative${i === 0 ? "" : " border-t border-border"}`}
+          >
             {/* The NÆSTE exercise: a 2px --text bar on its left edge at x −12px, full height (§2.5). */}
             {run.isNext && <span aria-hidden="true" data-next-edge="true" className="absolute inset-y-0 -left-3 w-0.5 bg-text" />}
             <ExerciseRun
@@ -71,6 +112,10 @@ export function SetChecklist() {
               week={session.week}
               expanded={expanded}
               onToggle={() => setToggled((m) => new Map(m).set(run.key, !expanded))}
+              headerRef={(el) => {
+                if (el === null) headers.current.delete(run.key);
+                else headers.current.set(run.key, el);
+              }}
             />
           </li>
         );
@@ -84,11 +129,13 @@ function ExerciseRun({
   week,
   expanded,
   onToggle,
+  headerRef,
 }: {
   readonly run: ExerciseRunView;
   readonly week: number;
   readonly expanded: boolean;
   readonly onToggle: () => void;
+  readonly headerRef: (el: HTMLButtonElement | null) => void;
 }) {
   const regionId = useId();
   const e = run.focus;
@@ -100,6 +147,7 @@ function ExerciseRun({
   return (
     <div className="flex flex-col">
       <button
+        ref={headerRef}
         type="button"
         aria-expanded={expanded}
         aria-controls={regionId}

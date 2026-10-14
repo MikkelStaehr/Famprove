@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { MISSING, type Readout } from "@/lib/chart-readout";
 import type { IsoDate } from "@/lib/db/rows";
@@ -49,6 +49,8 @@ type GridProps = {
 };
 
 const ROW_LABEL: readonly string[] = ["M", "", "O", "", "F", "", "S"];
+/** ←/→ a week, ↑/↓ a day (rows Mon → Sun). */
+const GRID_STEPS: Readonly<Record<string, number>> = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 };
 
 /** §4: 12 ISO-week columns, rows Mon → Sun, 20px cells; a grid of cells with one keyboard group. */
 export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
@@ -57,57 +59,36 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
   const drawn = cells.filter((c): c is DayCell => c !== null);
   const anyUnknown = drawn.some((c) => c.unknown);
   const latest = cells.findLastIndex((c) => c !== null);
-  // mouse: a hover (tooltip); otherwise a tap, drag or key (readout row).
-  const [sel, setSel] = useState<{ readonly i: number; readonly mouse: boolean } | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  // The cell a tap just cleared: the same press dragging over it doesn't select it again.
-  const cleared = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (sel === null) return;
-    const onDown = (e: globalThis.PointerEvent) => {
-      if (ref.current !== null && !e.composedPath().includes(ref.current)) setSel(null);
-    };
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
-  }, [sel]);
+  // useChartPick's selection (mouse: a hover with the tooltip; otherwise a tap, drag or key with the
+  // readout row) and its tap-to-clear: tap the selected day again, Esc, or tap outside.
+  const { pick, plotProps } = useChartPick({
+    count: cells.length,
+    startIndex: latest,
+    toggle: true,
+    steps: GRID_STEPS,
+    valid: (i) => cells[i] !== null,
+    // Cells by position: 7 rows, one column per week (grid-flow-col), so i = column × 7 + row; a
+    // gap between cells belongs to the cell before it. A blank cell (a day not yet come) is no hit.
+    indexAt: (x, box, y) => {
+      const col = Math.min(weeks.length - 1, Math.max(0, Math.floor(((x - box.left) / box.width) * weeks.length)));
+      const row = Math.min(6, Math.max(0, Math.floor(((y - box.top) / box.height) * 7)));
+      const i = col * 7 + row;
+      return cells[i] === null || cells[i] === undefined ? null : i;
+    },
+  });
 
   if (drawn.every((c) => c.total === null && c.unknown) && days.length === 0) {
     return <p className="text-13 text-text-muted">Ingen dage med data i perioden.</p>;
   }
 
-  const pickAt = (e: PointerEvent<HTMLDivElement>) => {
-    const mouse = e.pointerType === "mouse";
-    const press = e.type === "pointerdown";
-    if (!mouse && !press && e.buttons === 0) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-i]");
-    const i = el instanceof HTMLElement ? Number(el.dataset.i) : NaN;
-    if (!Number.isInteger(i) || cells[i] === null) return;
-    if (!mouse) {
-      // Tap the selected day again: the readout goes away.
-      if (press && sel?.i === i) {
-        cleared.current = i;
-        setSel(null);
-        return;
-      }
-      if (!press && cleared.current === i) return;
-      cleared.current = null;
-    }
-    setSel({ i, mouse });
-  };
-  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Escape") return setSel(null);
-    const step = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 }[e.key];
-    if (step === undefined) return;
-    e.preventDefault();
-    const next = sel === null ? latest : sel.i + step;
-    if (next >= 0 && next < cells.length && cells[next] !== null) setSel({ i: next, mouse: false });
-  };
-
-  const selected = sel === null ? null : (cells[sel.i] ?? null);
+  const selected = pick === null ? null : (cells[pick.index] ?? null);
+  const mouse = pick?.mode === "mouse";
   // The readout row only after a tap, drag or key (user 2026-10-14); a mouse hover gets the tooltip.
-  const readout = selected === null || sel?.mouse === true ? null : dayReadout(selected);
-  const tip = selected !== null && sel?.mouse === true ? { readout: dayReadout(selected), left: `${Math.floor(sel.i / 7) * 24 + 10}px` } : null;
+  const readout = selected === null || mouse ? null : dayReadout(selected);
+  const tip =
+    selected !== null && pick !== null && mouse
+      ? { readout: dayReadout(selected), left: `${Math.floor(pick.index / 7) * 24 + 10}px` }
+      : null;
   const first = weeks[0]?.weekStart ?? today;
 
   return (
@@ -123,19 +104,10 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
         </div>
         <div className="min-w-0">
           <div
-            ref={ref}
-            role="group"
-            tabIndex={0}
+            {...plotProps}
             aria-label="Træningsdage. Brug piletasterne for at gå dag for dag."
-            onPointerDown={pickAt}
-            onPointerMove={pickAt}
-            onPointerLeave={(e) => {
-              if (e.pointerType === "mouse") setSel((s) => (s?.mouse === true ? null : s));
-            }}
-            onKeyDown={onKey}
-            onBlur={() => setSel(null)}
             className={`relative grid w-max grid-flow-col grid-rows-[repeat(7,20px)] gap-1 rounded-cell ${PLOT_FOCUS}`}
-            style={{ touchAction: "pan-y", gridAutoColumns: "20px" }}
+            style={{ ...plotProps.style, gridAutoColumns: "20px" }}
           >
             {cells.map((c, i) =>
               c === null ? (
@@ -143,10 +115,9 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
               ) : (
                 <span
                   key={c.date}
-                  data-i={i}
                   aria-hidden="true"
                   className={`block size-5 rounded-cell ${c.unknown || c.level === null ? UNKNOWN : SHADE[c.level]} ${
-                    i === sel?.i
+                    i === pick?.index
                       ? "outline-[1.5px] outline-offset-1 outline-text outline-solid"
                       : c.date === today
                         ? "outline-[1.5px] outline-offset-1 outline-today outline-solid"

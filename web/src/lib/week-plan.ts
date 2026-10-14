@@ -21,13 +21,16 @@ export type WeekPlanInput = Pick<StrengthWeek, "columns" | "done">;
 /**
  * The week list from the week's columns and done activities: a done session carries its date and
  * activity words; the current one (session k + 1) is today's; later ones have no date until done.
+ * When a session is already done today (`today` given), the next one is not also today's: it is
+ * planned without a date ("—" + "plan"), so today never carries two sessions.
  */
-export function weekRows(strength: WeekPlanInput): readonly WeekRow[] {
+export function weekRows(strength: WeekPlanInput, today?: IsoDate): readonly WeekRow[] {
   const rows: WeekRow[] = [];
+  const doneToday = today !== undefined && strength.done.some((d) => !d.extra && d.date === today);
   for (const c of strength.columns) {
     const done = strength.done.find((d) => !d.extra && d.session === c.session);
     if (done !== undefined) rows.push({ kind: "done", session: c.session, sets: c.sets, done });
-    else if (c.status === "current") rows.push({ kind: "current", session: c.session, sets: c.sets });
+    else if (c.status === "current" && !doneToday) rows.push({ kind: "current", session: c.session, sets: c.sets });
     else rows.push({ kind: "future", session: c.session, sets: c.sets });
   }
   for (const d of strength.done) {
@@ -50,6 +53,8 @@ export type PlannedSession = { readonly kind: "current" | "future"; readonly ses
 /**
  * The plan part of a dated week list (/load): the current session goes on today's row when that
  * day is listed; otherwise (no daily_load row for today yet) it joins the undated rows, first.
+ * When a session is already done today, the current one is planned without a date (weekRows), so
+ * today's row never reads "Styrke · session 1 · Styrke · session 2".
  * Done sessions are not repeated here: the dated list already has them on their day.
  */
 export type DatedPlan = {
@@ -58,7 +63,7 @@ export type DatedPlan = {
 };
 
 export function datedPlan(strength: WeekPlanInput, today: IsoDate, listed: readonly IsoDate[]): DatedPlan {
-  const open = weekRows(strength).filter(
+  const open = weekRows(strength, today).filter(
     (r): r is Extract<WeekRow, { kind: "current" | "future" }> => r.kind === "current" || r.kind === "future",
   );
   const planned = open.map((r): PlannedSession => ({ kind: r.kind, session: r.session }));

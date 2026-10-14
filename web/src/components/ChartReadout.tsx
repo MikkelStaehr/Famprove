@@ -20,12 +20,22 @@ export type Pick = { readonly index: number; readonly mode: PickMode; readonly x
 export const PLOT_FOCUS =
   "focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-focus [&_:focus]:outline-none";
 
+const ARROW_STEPS: Readonly<Record<string, number>> = { ArrowLeft: -1, ArrowRight: 1 };
+
 export function useChartPick(opts: {
   readonly count: number;
   readonly startIndex: number; // where ←/→ start (the latest point / current week)
-  readonly indexAt: (clientX: number, box: DOMRect) => number | { readonly index: number; readonly x: number } | null;
+  readonly indexAt: (
+    clientX: number,
+    box: DOMRect,
+    clientY: number,
+  ) => number | { readonly index: number; readonly x: number } | null;
   /** A touch tap on the selected point clears it (Belastning's day charts: readout only after a tap). */
   readonly toggle?: boolean;
+  /** Index step per key (default ←/→ = ∓1). The training-days grid steps a week with ←/→ and a day with ↑/↓. */
+  readonly steps?: Readonly<Record<string, number>>;
+  /** When given, a key step to an index outside the chart or not valid is ignored (no clamping). */
+  readonly valid?: (index: number) => boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pick, setPick] = useState<Pick | null>(null);
@@ -47,7 +57,7 @@ export function useChartPick(opts: {
   const at = (e: PointerEvent<HTMLDivElement>, press: boolean) => {
     const touch = e.pointerType !== "mouse";
     if (touch && !press && e.buttons === 0) return; // a pen hovering: no selection
-    const hit = opts.indexAt(e.clientX, e.currentTarget.getBoundingClientRect());
+    const hit = opts.indexAt(e.clientX, e.currentTarget.getBoundingClientRect(), e.clientY);
     if (hit === null) {
       if (!touch) setPick(null);
       return;
@@ -71,11 +81,16 @@ export function useChartPick(opts: {
       setPick(null);
       return;
     }
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const keyStep = (opts.steps ?? ARROW_STEPS)[e.key];
+    if (keyStep === undefined) return;
     e.preventDefault();
     const from = pick?.index ?? opts.startIndex;
-    const step = pick === null ? 0 : e.key === "ArrowLeft" ? -1 : 1;
-    setPick({ index: Math.max(0, Math.min(opts.count - 1, from + step)), mode: "key" });
+    const next = from + (pick === null ? 0 : keyStep);
+    if (opts.valid === undefined) {
+      setPick({ index: Math.max(0, Math.min(opts.count - 1, next)), mode: "key" });
+    } else if (next >= 0 && next < opts.count && opts.valid(next)) {
+      setPick({ index: next, mode: "key" });
+    }
   };
 
   const plotProps = {

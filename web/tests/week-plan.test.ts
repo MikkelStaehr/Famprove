@@ -62,3 +62,28 @@ test("datedPlan: all done or no program, nothing planned", () => {
   assert.deepEqual(datedPlan(allDone, "2026-10-14", ["2026-10-14"]), { today: null, undated: [] });
   assert.deepEqual(datedPlan({ columns: [], done: [] }, "2026-10-14", ["2026-10-14"]), { today: null, undated: [] });
 });
+
+test("datedPlan: a session done today keeps the next one off today's row, undated as plan", () => {
+  const doneToday = {
+    columns: [
+      { session: 1, sets: 19, status: "done" as const },
+      { session: 2, sets: 18, status: "current" as const },
+      { session: 3, sets: 17, status: "future" as const },
+    ],
+    done: [done(1, "2026-10-14")],
+  };
+  const plan = datedPlan(doneToday, "2026-10-14", ["2026-10-12", "2026-10-13", "2026-10-14"]);
+  assert.equal(plan.today, null);
+  assert.deepEqual(plan.undated, [
+    { kind: "future", session: 2 },
+    { kind: "future", session: 3 },
+  ]);
+  assert.deepEqual(
+    weekRows(doneToday, "2026-10-14").map((r) => r.kind),
+    ["done", "future", "future"],
+  );
+  assert.deepEqual(
+    weekRows(doneToday).map((r) => r.kind),
+    ["done", "current", "future"],
+  );
+});
