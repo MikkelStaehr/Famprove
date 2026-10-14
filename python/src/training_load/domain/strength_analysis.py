@@ -77,6 +77,11 @@ class StrengthWeek:
     e1rm_rpe: float | None
     e1rm_rpe_source: RpeSource | None
     is_block_best: bool
+    # The rolling e1RM as of this week (the suggestions' number, by the one rule): the best weekly
+    # e1RM of the lift in the ROLLING_E1RM_WEEKS ISO weeks ending here, and the week it comes from
+    # (ties: the latest). None when no week in that window has one.
+    rolling_e1rm_kg: float | None = None
+    rolling_e1rm_week: date | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,7 +256,27 @@ def strength_weeks(
                 )
             )
         week += timedelta(days=7)
-    return StrengthAnalysis(weeks=_mark_block_best(weeks), e1rm_out_of_bounds=out_of_bounds)
+    return StrengthAnalysis(
+        weeks=_with_rolling(_mark_block_best(weeks)), e1rm_out_of_bounds=out_of_bounds
+    )
+
+
+def _with_rolling(weeks: list[StrengthWeek]) -> list[StrengthWeek]:
+    """Each row's rolling e1RM (the value rolling_e1rm_at gives) and its source week."""
+    out: list[StrengthWeek] = []
+    for w in weeks:
+        first = w.week_start - timedelta(weeks=ROLLING_E1RM_WEEKS - 1)
+        window = [
+            x
+            for x in weeks
+            if x.lift == w.lift and x.e1rm_kg is not None and first <= x.week_start <= w.week_start
+        ]
+        if not window:
+            out.append(w)
+            continue
+        source = max(window, key=lambda x: (x.e1rm_kg or 0.0, x.week_start))
+        out.append(replace(w, rolling_e1rm_kg=source.e1rm_kg, rolling_e1rm_week=source.week_start))
+    return out
 
 
 def _mark_block_best(weeks: list[StrengthWeek]) -> list[StrengthWeek]:

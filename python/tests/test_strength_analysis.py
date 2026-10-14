@@ -241,6 +241,17 @@ def test_suggestions_and_analyse_agree_on_the_rolling_e1rm(make_set: MakeSet) ->
             expected = max(window, default=None)
             assert rolling_e1rm(sets, statuses, lift, run_week) == expected, (lift, run_week)
             assert rolling_e1rm_at(weeks, lift, run_week) == expected
+            # The board's stored number is the same one (answers round, 2026-10-14), and its source
+            # week points to the row that holds it.
+            row = next(x for x in weeks if x.lift == lift and x.week_start == run_week)
+            assert row.rolling_e1rm_kg == expected, (lift, run_week)
+            if expected is None:
+                assert row.rolling_e1rm_week is None
+            else:
+                source = next(
+                    x for x in weeks if x.lift == lift and x.week_start == row.rolling_e1rm_week
+                )
+                assert source.e1rm_kg == expected
 
 
 def test_planned_sets_never_count_and_every_week_has_a_row(make_set: MakeSet) -> None:

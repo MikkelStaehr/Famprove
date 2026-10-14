@@ -29,6 +29,8 @@ class StrengthWeekRow(TypedDict):
     e1rm_rpe: float | None
     e1rm_rpe_source: RpeSource | None
     is_block_best: bool
+    rolling_e1rm_kg: float | None  # the suggestions' rolling e1RM as of this week
+    rolling_e1rm_week: str | None  # ISO Monday of the week it comes from
     computed_at: str  # ISO timestamptz (UTC), the same on every row of one compute run
 
 
@@ -76,6 +78,8 @@ def week_row(w: StrengthWeek, computed_at: datetime) -> StrengthWeekRow:
         e1rm_rpe=w.e1rm_rpe,
         e1rm_rpe_source=w.e1rm_rpe_source,
         is_block_best=w.is_block_best,
+        rolling_e1rm_kg=w.rolling_e1rm_kg,
+        rolling_e1rm_week=w.rolling_e1rm_week.isoformat() if w.rolling_e1rm_week else None,
         computed_at=computed_at.isoformat(),
     )
 
