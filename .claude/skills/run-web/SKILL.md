@@ -6,8 +6,8 @@ description: Run the Next.js app in web/ on port 3100 with real data and take ex
 # run-web
 
 Start the web app on **port 3100** (agents' port; 3000 is the user's — never touch it), run a
-command against it, and always stop it again. Screenshots come from Edge through the DevTools
-protocol, in real time and at an exact viewport width.
+command against it, and always stop it again. Screenshots come from a Chromium browser through the
+DevTools protocol (Edge on Windows, Chrome on macOS), in real time and at an exact viewport width.
 
 ## Why not a plain headless screenshot
 Two Windows traps cost a full debugging session once:
@@ -17,7 +17,16 @@ Two Windows traps cost a full debugging session once:
   then cropped, which looks like overflow. `shoot.mjs` sets the width by device emulation instead.
 
 ## Use
-From the repo root (PowerShell or `powershell -NoProfile -File …` from Git Bash). Screenshots
+**macOS / Linux:** `serve.sh` is the twin of `serve.ps1` (same rules; the fixture list is read from
+`web/src/lib/db/dev-fixture.ts`, so it never goes stale). From the repo root:
+
+```bash
+.claude/skills/run-web/serve.sh -- "node .claude/skills/run-web/shoot.mjs --out \$TMPDIR/today-390.png"
+.claude/skills/run-web/serve.sh --dev-fixture midsession -- "node .claude/skills/run-web/shoot.mjs --out \$TMPDIR/traening-390.png --dark"
+.claude/skills/run-web/serve.sh --dev-today 2026-09-29 -- "node .claude/skills/run-web/shoot.mjs --out \$TMPDIR/rest-390.png"
+```
+
+**Windows:** from the repo root (PowerShell or `powershell -NoProfile -File …` from Git Bash). Screenshots
 contain personal training data: write them to the session scratchpad or `%TEMP%`, never into the repo.
 
 ```powershell
@@ -38,7 +47,8 @@ contain personal training data: write them to the session scratchpad or `%TEMP%`
 `shoot.mjs` options: `--out <png>` (required) · `--path /load?week=2026-W33` (default `/`) ·
 `--width 390` · `--open` (open every `<details>`) · `--dark` · `--reduce-motion` (emulates
 `prefers-reduced-motion: reduce`) · `--zoom200` (root font 200 %) ·
-`--base http://localhost:3100`. It prints one JSON line (height, horizontal overflow, console
+`--base http://localhost:3100` · `--timeout 90` (seconds for the whole shot: a hung browser is killed
+and the shot exits 1, never waited on; one stalled a run for hours on 2026-10-13). It prints one JSON line (height, horizontal overflow, console
 errors) and exits 1 on overflow, console errors or a page that never got ready. Then **Read the
 PNG** — a screenshot you haven't looked at proves nothing.
 
@@ -48,4 +58,6 @@ which a `next start` on port 3000 may be serving — so prefer dev mode, or ask 
 ## Rules
 - Port 3100 only. The script refuses to start if 3100 is taken and always stops its server.
 - `web/.env.local` (real Supabase keys) is read by Next itself; never open or print it.
-- Edge lives at the default Windows path; set `EDGE_PATH` if not.
+- The browser: Edge at its default Windows path, Chrome at `/Applications/Google Chrome.app` on macOS,
+  `google-chrome` on Linux; set `BROWSER_PATH` (or the older `EDGE_PATH`) if not.
+- Never a scratchpad copy of these scripts: if the skill can't do something, fix the skill.

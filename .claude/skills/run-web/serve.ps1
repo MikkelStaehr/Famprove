@@ -7,7 +7,7 @@
 param(
   [ValidateSet('dev', 'prod')][string]$Mode = 'dev',
   [string]$DevToday = '',
-  [ValidateSet('', 'empty', 'stale', 'error', 'band', 'ef-few', 'lsrpe')][string]$DevFixture = '',
+  [ValidateSet('', 'empty', 'stale', 'error', 'band', 'ef-few', 'lsrpe', 'midsession', 'answers', 'warmup', 'pause', 'exercise-end', 'pause-rated', 'finished', 'feel')][string]$DevFixture = '', # = FIXTURES in web/src/lib/db/dev-fixture.ts
   [Parameter(Mandatory = $true)][string]$Cmd
 )
 $ErrorActionPreference = 'Stop'

@@ -1,7 +1,9 @@
-// Exact-width, real-time screenshot of the web app through Edge's DevTools protocol (CDP).
+// Exact-width, real-time screenshot of the web app through a Chromium browser's DevTools protocol
+// (CDP): Edge on Windows, Chrome on macOS, google-chrome on Linux; BROWSER_PATH (or EDGE_PATH) overrides.
 // node .claude/skills/run-web/shoot.mjs --out <file.png> [--path /load] [--width 390]
-//   [--open] [--dark] [--reduce-motion] [--zoom200] [--base http://localhost:3100]
-// Prints one JSON line; exits 1 on horizontal overflow, console errors or a page that never got ready.
+//   [--open] [--dark] [--reduce-motion] [--zoom200] [--base http://localhost:3100] [--timeout 90]
+// Prints one JSON line; exits 1 on horizontal overflow, console errors, a page that never got ready,
+// or when the whole shot takes longer than --timeout seconds (a hung browser is killed, never waited on).
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,6 +20,7 @@ const { values: opt } = parseArgs({
     dark: { type: "boolean", default: false },
     "reduce-motion": { type: "boolean", default: false },
     zoom200: { type: "boolean", default: false },
+    timeout: { type: "string", default: "90" },
   },
 });
 if (!opt.out) {
@@ -25,14 +28,29 @@ if (!opt.out) {
   process.exit(2);
 }
 const width = Number(opt.width);
-const edgePath = process.env.EDGE_PATH ?? "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+const timeoutS = Number(opt.timeout);
+const DEFAULT_BROWSER = {
+  win32: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  linux: "google-chrome",
+};
+const browserPath = process.env.BROWSER_PATH ?? process.env.EDGE_PATH ?? DEFAULT_BROWSER[process.platform] ?? "google-chrome";
 const profile = mkdtempSync(join(tmpdir(), "run-web-"));
 const port = 9800 + Math.floor(Math.random() * 100);
-const edge = spawn(
-  edgePath,
+const browser = spawn(
+  browserPath,
   ["--headless=new", "--disable-gpu", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, "about:blank"],
   { stdio: "ignore" },
 );
+// A hung browser once stalled a screenshot run for hours (2026-10-13): the whole shot gets a hard limit.
+const watchdog = setTimeout(() => {
+  console.error(`shot did not finish within ${timeoutS} s; browser killed`);
+  browser.kill("SIGKILL");
+  try {
+    rmSync(profile, { recursive: true, force: true });
+  } catch {}
+  process.exit(1);
+}, timeoutS * 1000);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let exitCode = 0;
 
@@ -44,7 +62,7 @@ try {
     } catch {}
     if (!target) await sleep(200);
   }
-  if (!target) throw new Error(`Edge did not start (${edgePath}); set EDGE_PATH`);
+  if (!target) throw new Error(`the browser did not start (${browserPath}); set BROWSER_PATH`);
 
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((r) => ws.addEventListener("open", r, { once: true }));
@@ -126,7 +144,8 @@ try {
   if (horizontalOverflow || errors.length > 0) exitCode = 1;
   ws.close();
 } finally {
-  edge.kill();
+  clearTimeout(watchdog);
+  browser.kill();
   await sleep(300);
   try {
     rmSync(profile, { recursive: true, force: true });

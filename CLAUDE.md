@@ -16,7 +16,7 @@ All Python commands run from `python/` (they read the repo-root `.env.local`).
 - lint: `uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy`
 - db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
 - web (from `web/`, reads `web/.env.local`): `pnpm dev` · `pnpm build && pnpm start` · checks: `pnpm lint && pnpm typecheck && pnpm test`
-- **Run & screenshot:** use the `run-web` skill (`.claude/skills/run-web/`). Never invent a new screenshot method.
+- **Run & screenshot:** use the `run-web` skill (`.claude/skills/run-web/`: `serve.sh` on macOS/Linux, `serve.ps1` on Windows, `shoot.mjs` with a hard per-shot `--timeout`). Never invent a new screenshot method; if the skill falls short, fix the skill.
 - **Dev switches** (only under `next dev`, ignored in production): `DEV_TODAY=YYYY-MM-DD` shows another day; `DEV_FIXTURE=empty|stale|error|band|midsession|answers` (`answers`: all three Cykel answers answered, block 3 with a plan; `midsession`: an illustrative set log for today, 3 sets done and 1 skipped per session, so Træning/Fokus can be shot mid-session without a write) makes the data layer show that state (`empty` and `error` without reading Supabase; `stale` ages real rows by 3 days; `band` gives real prognose rows after the strength block an illustrative uncertainty band), so every designed state can be screenshotted: `serve.ps1 -DevFixture <state>`. Specs name their states with these words.
 
 CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain/load.py`.
@@ -147,6 +147,8 @@ If a budget is exceeded, **stop and ask**. Never keep running.
 **L slices:** plan the build steps against 40 of the 60 minutes; `design-lead` review, polish, `tester` and `reviewer` take about 20. A slice holds at most one new UI surface; split it otherwise.
 
 **Data check** (M and L): list every value the screen shows and mark it *exists / missing*. All missing data goes into **one** migration before any UI is built.
+
+**Readings while the user is away** (retro 2026-10-14): when your reading of an ambiguous brief conflicts with `design-lead`'s spec on how well a chart or screen reads, build the spec's version and put the other reading at the top of the report as a one-line option. The user decides; a literal reading is not a reason to override the specialist.
 
 **Research first, ask after.** Before asking the user a technical question, research it and bring numbers. Before calling a parameter or threshold wrong, run it on real data and report how many rows it selects. Before drawing a conclusion from a stored field, read how it is computed, so you don't measure your own input.
 
