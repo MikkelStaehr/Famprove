@@ -124,7 +124,7 @@ It always undoes exactly what the latest progress tap wrote (R3).
 ## 7. Analyse › Styrke feel line
 - Card `Sådan føles sættene` after the Tonnage card (the hero and Squat-panel fold in `analyse-styrke.md` §3 are unchanged). Title `text-20` 700.
 - A `<ul>` with one row per `exercise_feel` row, competition S/B/D first, then the rest alphabetically (da-DK).
-- Each row: the exercise name (`text-16` 700), then Python's sentence verbatim (`text-16` 400, max 60ch). Example: `Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over Benjamins RPE`. Under it `Ud fra 12 vurderede sæt` (`text-14` muted; needs a `rated_sets` count on `exercise_feel`). Rows are separated by 12px, with no dividers.
+- Each row: the exercise name (`text-16` 700), then Python's sentence verbatim (`text-16` 400, max 60ch). Example: `Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over <trænerens navn>s RPE`. Under it `Ud fra 12 vurderede sæt` (`text-14` muted; needs a `rated_sets` count on `exercise_feel`). Rows are separated by 12px, with no dividers.
 - An exercise with fewer than 4 rated sets has no row (Python writes none). With no rows, the whole card is absent.
 - Read fails: `WarningLine` in the card's place: `Kunne ikke hente dine vurderinger.` + `Prøv igen` (href `/analyse/styrke`).
 
@@ -189,4 +189,4 @@ Existing states (§5 of `traening.md`) apply. New and changed:
 ## Open decisions (main session / user)
 - **O1 (R2):** Is an untouched reps default stored? Storing it makes "top of the range two sessions in a row" fire for a user who never touches the stepper. Not storing it means every top-of-range set needs a tap. The spec stores it on leaving the pause, because the value is visible the whole time.
 - **O2:** Python now reads `exercise_set_log` (felt_rpe, reps_done). That contradicts CLAUDE.md "Python never reads it"; CLAUDE.md needs the update.
-- **O3:** "Benjamins RPE" hardcodes the coach's name in code in a public repo. Suggestion: an env var, or "trænerens RPE".
+- **O3:** "<trænerens navn>s RPE" hardcodes the coach's name in code in a public repo. Suggestion: an env var, or "trænerens RPE".
