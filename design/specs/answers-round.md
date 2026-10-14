@@ -6,7 +6,7 @@ Four small changes. Look and tokens: DESIGN.md Part B (unchanged). States use `D
 Question: "what is the cycling part of my prognose built on?" A **calendar week** = an ISO week (Mon–Sun, both inclusive) inside the prognose with ≥ 1 planned ride in intervals.icu; it uses those rides only. Other weeks keep the typical week. Counts are Python's (`calendar_rides`, `calendar_weeks`, rides of the last 28 days); the web only formats. Singular: `1 tur`, `1 uge`.
 - No calendar week (unchanged): `Cyklingen i prognosen bygger på 12 ture de sidste 28 dage.` (0 rides: the existing sentence.)
 - Some: `Cyklingen i prognosen bygger på 3 planlagte ture i intervals.icu i 2 uger. De andre uger bygger på 12 ture de sidste 28 dage.`
-- All weeks: `Cyklingen i prognosen bygger kun på dine 9 planlagte ture i intervals.icu.`
+- All weeks: `Cyklingen i prognosen bygger kun på dine 9 planlagte ture i intervals.icu.` Singular (accepted in review 2026-10-14): `… bygger kun på din 1 planlagte tur i intervals.icu.`
 - Planned ride without a load estimate (that day uses the typical week), added as its own sentence: `1 planlagt tur har ingen belastning i intervals.icu, så den dag bruger din typiske uge.` / `2 planlagte ture har ingen belastning i intervals.icu, så de dage bruger din typiske uge.` If Python gives no count, this goes in the day readout only.
 - Readout on a prognose day, cycling basis fact: `Cykel ≈ 45 TSS · planlagt i intervals.icu`; a no-load day: `Cykel ≈ 30 TSS · typisk ugedag (planlagt tur uden belastning)`; other days unchanged.
 - Disclosure term 4 (`PROGNOSE_TEXT`), cycling clause becomes: `Cykling: i uger med planlagte ture i intervals.icu kun de ture, ellers dit gennemsnit for hver ugedag de sidste 28 dage.`
