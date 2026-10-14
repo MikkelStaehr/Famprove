@@ -35,16 +35,16 @@ Card radius 22, padding 20 (18 sides allowed). Header: SectionTitle + MonoCaptio
 - **Line:** 1.5px `--text-muted`, one block at a time, breaks at every block boundary.
 - **Block best:** 1px × 6px `--text` tick 3px above the point, value Geist Mono 10 `--text` above it (`179,6`).
 - **`1RM i arket (ikke testet)`:** 1px `--text-muted` dashed (6 4) line per block span; value Geist Mono 10 muted at its right end on a `--card` halo; never crosses a best label (rule unchanged).
-- **Today:** the `--today` line at today's x through ruler + panels, `I DAG` label `--today` (Cykel §3).
-- Legend (bottom): `Logget RPE` (filled) · `Foreskrevet RPE` (hollow) · `Bedst i blokken` (tick) · `1RM i arket (ikke testet)` (dashed) · `Deload` (dashed bracket) · `I dag`.
+- **Today:** none (user, 2026-10-14: on weekly charts the today line was a lone tick without a date; the last point is the current week).
+- Legend (bottom): `Logget RPE` (filled) · `Foreskrevet RPE` (hollow) · `Bedst i blokken` (tick) · `1RM i arket (ikke testet)` (dashed) · `Deload` (dashed bracket).
 - **Notes** 1–4 after the legend, hairline `--border` top, Geist 13 muted, 8px apart, 60ch.
 - No e1RM for a lift: its panel shows `Intet e1RM endnu for squat.` Geist 13 muted at 112px height. No e1RM anywhere: the `NO_E1RM` sentence Geist 15 muted replaces the panels.
 
 ## 5. Tonnage pr. uge (B's bars)
-Card as §4; header unit `KG`; same ruler, phase rule, today line and readout (`Squat: 2.100 kg · 12 sæt`).
+Card as §4; header unit `KG`; same ruler, phase rule and readout (`Squat: 2.100 kg · 12 sæt`).
 - Three strips (Squat, Bænkpres, Dødløft), 72px each, 10px apart, label MonoCaption 11 left, y max Geist Mono 11 right, own y from 0.
 - Lifted week: **solid `--text` bar**, slot − 2px, radius 2 top. **Deload week: the same bar hatched** (`--shade-2` 1px diagonal, 4px pitch, on `--card`, 1px `--shade-2` outline), B's solid vs hatched. Zero week: 2px `--axis` stub.
-- Legend: `Uge med løft` · `Deload` (hatched) · `Intet løftet` (stub) · `I dag`.
+- Legend: `Uge med løft` · `Deload` (hatched) · `Intet løftet` (stub).
 - Explainer `Kg × reps for alle løftede sæt af løftet, også varianter.` Geist 13 muted under the legend. sr table unchanged.
 
 ## 6. Sådan føles sættene (A's list card)
@@ -53,7 +53,7 @@ Card radius 22, padding 20; SectionTitle h3. ListRows (1px `--border` top from r
 ## 7. Desktop (≥ 1024px)
 Max-width 1200, `grid-cols-3`, gap 16; header and tabs span 3.
 - Column 1: hero card (sticky top 24), the feel card under it.
-- Columns 2–3: e1RM card, then tonnage card (same width so ruler, phase rule and today line align), then the RPE line.
+- Columns 2–3: e1RM card, then tonnage card (same width so ruler and phase rule align), then the RPE line.
 - DOM order = phone order.
 
 ## 8. States
@@ -67,9 +67,9 @@ Max-width 1200, `grid-cols-3`, gap 16; header and tabs span 3.
 
 ## 9. Accessibility
 - h1 `Analyse` › h2 `Styrke` (sr-only) › h3 per card; the board has `aria-label="Bedste e1RM"` and its sr sentence.
-- e1RM figcaption per lift + phase sentence, tonnage sr table: unchanged (`analyse-styrke.md` §7). Ruler, ticks, hatching, dashed lines, today line `aria-hidden`.
+- e1RM figcaption per lift + phase sentence, tonnage sr table: unchanged (`analyse-styrke.md` §7). Ruler, ticks, hatching, dashed lines `aria-hidden`.
 - Chart groups focusable, ←/→/Esc, `--focus` ring 2px offset 2. Targets ≥ 44px (segments, chart group, `Prøv igen`).
-- Provenance is never colour alone (words in the board, filled vs hollow on the plot). Deload is hatched + legend word + `· deload` in the readout. `--today` never as text.
+- Provenance is never colour alone (words in the board, filled vs hollow on the plot). Deload is hatched + legend word + `· deload` in the readout. No `--today` on Styrke.
 - Hollow and hatched marks ≥ 3:1 against `--card` (computed at render).
 
 ## 10. Data check (all exist; nothing new)
@@ -89,7 +89,7 @@ Max-width 1200, `grid-cols-3`, gap 16; header and tabs span 3.
 4. e1RM panels: dashed `--border` gridlines, right-aligned Geist Mono y labels, filled vs hollow points, line breaks at block boundaries, best tick + value, dashed sheet-1RM line labelled `1RM i arket (ikke testet)`.
 5. Block ruler brackets with `BLOK n` labels and the phase rule run through every panel/strip in both cards, aligned to the same x.
 6. Tonnage bars solid `--text`, deload weeks hatched, zero weeks `--axis` stubs.
-7. `--today` appears only as the today line, at the same x in both chart cards.
+7. No `--today` on Styrke (no today line, no `I dag` legend entry).
 8. Tapping/dragging updates the readout row (one line per lift, strings per `analyse-styrke.md` §5c) without moving the plot.
 9. Feel card renders Python's lines verbatim as ListRows; absent with no rows.
 10. At 1280: max 1200, hero + feel in column 1, charts in columns 2–3 with identical widths.

@@ -72,7 +72,7 @@ Today sits at ≈ 67–84 % of the width, so the forward line reads as C's.
 - **Bars:** one per day, today − 27 … today (4U) or − 83 … today (12U); plot 130px, gap 4px (4U) / 1px (12U), baseline 1px `--axis`. Cycling solid `--text` at the bottom, strength hatched `--shade-2` on top when both (DESIGN.md Chart marks). Zero day: 2px `--axis` stub. Height scale: the visible window's largest `total_tss` rounded up to 50 (drawing); one dashed `--border` gridline at that top with its label (`150`) mono 11 muted, right.
 - **Before the strength log:** over those days a bracket in a 16px strip above the bars, 1.5px `--text-muted` dashed 3 3, label `styrke ikke registreret` mono 11 muted; days without a ride there draw no stub.
 - **X labels** mono 11 muted: start date, middle date, `i dag`. Legend: `Cykel` (solid 10 × 10) · `Styrke` (hatched 10 × 10).
-- **Readout row** as §4 (same cells), at rest `Seneste · …`.
+- **Readout row** as §4 (same cells), only after a tap, drag or keyboard selection; no rest row and no reserved space (user, 2026-10-14; the grid's readout likewise).
 - **Foot:** `Styrke-TSS er et skøn (K ukalibreret).` `text-13` muted.
 - B's `CYKEL / STYRKE / I ALT` window totals are **dropped** (sums over a window; SQL owns sums only per ISO week). This week's total is the `UGE` tile.
 - sr: `Daglig TSS fra 17. sep. til i dag, cykel og styrke. Tallene står i tabellen under Træningsdage.` (the 12U range is inside the grid's 12 weeks.)
@@ -137,7 +137,7 @@ DOM order stays §2. TabBar: desktop top bar (DESIGN.md).
 4. Form figure 56px Geist Mono 500 in its zone colour; pill and active ZoneBar label show the zone word in the same colour; inactive segments at 30 %; today tick on the bar.
 5. Tiles: `FITNESS` / `TRÆTHED` / `UGE N`, values 24px; fitness ramp from Python; no computed ATL delta; week total from `weekly_load`.
 6. Curve: fitness 2px cream line, prognose 1.5px muted dashed, dashed gridlines with mono labels, orange 1.5px today line with `I DAG`, block brackets; 4U / 12U / Sæson switch the window as §3's table, default 12U.
-7. Readout row on curve, grid and bars: tap/drag/keys, `Seneste · …` at rest, fixed height.
+7. Readout row on curve, grid and bars: tap/drag/keys; the curve shows `Seneste · …` at rest with a fixed height, the grid and bars show nothing until a day is selected (user, 2026-10-14).
 8. Grid: 12 ISO-week columns Mon–Sun, 20px cells, 4 shade levels by §4's thresholds, today outlined orange, pre-2026-08-10 days without a ride dashed (unknown), never shown as rest.
 9. Bars: cycling solid, strength hatched, stacked when both; 4U/12U; no window totals; `styrke ikke registreret` bracket where it applies.
 10. Week list: day | icon | text | value rows with hairline borders, `I DAG` in orange on today, `I alt` row, switcher buttons 44px, `<details>` day expansion intact.
