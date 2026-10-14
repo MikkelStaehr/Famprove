@@ -90,7 +90,7 @@ export function FeelBlock({
               aria-pressed={on}
               aria-label={o.label}
               onClick={() => onTap("feel", set.ref, nextFeel(felt, o.value))}
-              className={`relative flex min-h-14 items-center justify-center gap-1.5 rounded-segment px-2 font-sans text-16 leading-tight font-medium text-text transition-colors duration-[120ms] ease-out focus-visible:z-10 ${
+              className={`relative flex min-h-14 items-center justify-center gap-1 rounded-segment px-1 font-sans text-15 leading-tight font-medium text-text transition-colors duration-[120ms] ease-out focus-visible:z-10 ${
                 on ? "bg-raised" : "bg-transparent"
               }`}
             >
