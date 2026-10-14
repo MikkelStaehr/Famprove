@@ -6,8 +6,8 @@ from datetime import date, datetime
 from typing import Final, TypedDict
 
 from training_load.db.client import JsonRow, Postgrest
+from training_load.domain.calendar import PlannedEvent
 from training_load.narrow import opt_float, opt_str, req_date, req_int, req_str
-from training_load.sources.intervals import PlannedEvent
 
 TABLE: Final = "planned_events"
 DELETE_CHUNK: Final = 100

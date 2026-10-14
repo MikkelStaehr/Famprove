@@ -27,5 +27,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "" if len(problems) == 1 else "s",
         )
         return 2
-    log.info("configuration OK for collect-intervals, collect-strength, compute, collect-plan")
+    log.info(
+        "configuration OK for collect-intervals, collect-events, collect-strength, compute, "
+        "collect-plan"
+    )
     return 0

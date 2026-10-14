@@ -331,14 +331,20 @@ def project(
                 {"name": ride.name, "tss": ride_tss(items)}
             )
 
+    # Every planned ride marks its ISO week, also one earlier in this week or after the horizon
+    # in the last week (the week rule needs all of a week's rides); only rides on prognose days
+    # add load and count in the sentence.
+    calendar_weeks = {iso_week_start(c.date) for c in calendar}
     calendar_by_day: dict[date, list[CalendarRide]] = {}
     for c in calendar:
         if today < c.date <= last:
             calendar_by_day.setdefault(c.date, []).append(c)
-    calendar_weeks = {iso_week_start(d) for d in calendar_by_day}
     calendar_counts: Basis = {
         "calendar_rides": sum(len(v) for v in calendar_by_day.values()),
-        "calendar_weeks": len(calendar_weeks),
+        "calendar_weeks": len(
+            {iso_week_start(d) for d in calendar_by_day}
+            | {w for w in calendar_weeks if iso_week_start(today + timedelta(days=1)) <= w <= last}
+        ),
         "calendar_no_load": sum(1 for v in calendar_by_day.values() for c in v if c.load is None),
     }
 
@@ -360,11 +366,12 @@ def project(
                 for c in events
             ]
             basis = {"cycling": "calendar", "events": listed, "rides": [], **calendar_counts}
+            ride_load = sum(c.load for c in events if c.load is not None)
             if any(c.load is None for c in events):
-                ride_load = typical[d.weekday()]  # never a silent 0 for a ride without a load
+                # A ride without a load is never a silent 0: the day's typical value stands in
+                # for it, on top of the rides that have one (reviewer, 2026-10-14).
+                ride_load += typical[d.weekday()]
                 basis["fallback"] = "typical_week"
-            else:
-                ride_load = sum(c.load for c in events if c.load is not None)
             if planned:
                 basis["rides_ignored"] = planned  # the calendar wins in its weeks
         else:

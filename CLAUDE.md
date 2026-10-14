@@ -11,7 +11,7 @@ Personal training-load app for one user. It combines cycling (intervals.icu) and
 
 ## Commands
 All Python commands run from `python/` (they read the repo-root `.env.local`).
-- run: `uv run collect-intervals [--since 2024-12-30]` · `uv run collect-strength` · `uv run compute` · `uv run collect-plan` (in that order)
+- run: `uv run collect-intervals [--since 2024-12-30]` · `uv run collect-events` (the intervals.icu calendar; may fail without blocking) · `uv run collect-strength` · `uv run compute` · `uv run collect-plan` (in that order)
 - test: `uv run pytest` (offline, synthetic fixtures) · `uv run pytest -m live` (hits intervals.icu, read-only)
 - lint: `uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy`
 - db: `npx -y supabase@2.120.0 db push` from the repo root (migrations in `supabase/migrations/`; the CLI version is pinned, see Environment)

@@ -10,7 +10,7 @@ import os
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from typing import Final
 
 from training_load.config import ConfigError, compute_config, load_dotenv_file
@@ -36,6 +36,7 @@ from training_load.db.strength_analysis import (
 )
 from training_load.db.strength_sessions import sync_strength_sessions
 from training_load.db.strength_sets import all_sets, sync_final_scores
+from training_load.domain.calendar import events_window
 from training_load.domain.cycling import daily_cycling_tss
 from training_load.domain.cycling_answers import cycling_answers
 from training_load.domain.daily import build_daily_load
@@ -45,7 +46,6 @@ from training_load.domain.kg_history import gone_states, kg_keys, next_kg_state
 from training_load.domain.load import DECAY
 from training_load.domain.planned_sets import planned_sets, suggestion_offsets
 from training_load.domain.projection import (
-    HORIZON_DAYS,
     MODEL_VERSION,
     CalendarRide,
     PlannedRide,
@@ -224,7 +224,7 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     # cycling of their ISO weeks (user, 2026-10-14). Counts only in the log (public).
     calendar = [
         CalendarRide(date=e.date, name=e.name, load=e.load)
-        for e in events_between(db, today, today + timedelta(days=HORIZON_DAYS))
+        for e in events_between(db, *events_window(today))
         if e.is_planned_ride
     ]
     if calendar:

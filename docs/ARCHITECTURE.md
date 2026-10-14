@@ -13,9 +13,9 @@ GitHub Actions daily.yml at 05, 12, 20 Copenhagen: the droplet's workflow_dispat
   A manual "Run workflow" without slot always runs.
   check-config       every job's env vars at once        → fails the run before anything is read
   collect-intervals  intervals.icu API (last 14 d)      → activities (rides), strength_activities (WeightTraining),
-                                                          each with the API object as `raw`;
-                     intervals.icu calendar (this week .. → planned_events (every event raw; deletions mirrored
-                       the week of today + 56 d)            in the window)
+                                                          each with the API object as `raw`
+  collect-events     intervals.icu calendar (this week .. → planned_events (every event raw; deletions mirrored
+                       the week of today + 56 d)            in the window); continue-on-error: never blocks compute
   collect-strength   Google Drive xlsx export (read)    → strength_sets (ISO week + session 1..N, no dates;
                      + exercises (muscle factor,             the week's cells as `raw`, LSRPE as logged_rpe,
                        bodyweight fraction per name)         each set scored with its exercise's values);
@@ -87,7 +87,7 @@ Next.js (web/), server components only
 `docs/PLAN.md` lists every task and slice (id | title | size); commits end with `Slice: <id>`.
 
 ## Commands
-- Python, from `python/` (reads repo-root `.env.local`): `uv run check-config` · `uv run collect-intervals [--since 2026-01-01]`,
+- Python, from `python/` (reads repo-root `.env.local`): `uv run check-config` · `uv run collect-intervals [--since 2026-01-01]`, `collect-events`,
   `collect-strength`, `compute`, `collect-plan` · `uv run pytest` · `uv run ruff check src tests && uv run mypy`
 - Web, from `web/` (reads `web/.env.local`): `pnpm dev` · `pnpm lint && pnpm typecheck && pnpm test` · `pnpm build`
 - Database, from the repo root: `supabase db push`

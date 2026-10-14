@@ -1,5 +1,5 @@
 """The intervals.icu calendar (answers round, user 2026-10-14): sources.intervals.parse_events,
-db.planned_events, cli.collect_intervals.run_events, and the prognose's calendar week rule.
+db.planned_events, cli.collect_events.run_events, and the prognose's calendar week rule.
 Synthetic only: the user's calendar held no events when this was built (2024-01 .. 2027-06),
 so a real-data slice waits for the first planned ride."""
 
@@ -9,14 +9,14 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from conftest import FakeResponse, FakeSend, InMemoryPostgrest
-from training_load.cli.collect_intervals import (
+from training_load.cli.collect_events import (
     EventsRunSummary,
     EventsShapeError,
-    events_window,
     run_events,
 )
 from training_load.config import IntervalsSettings
 from training_load.db.planned_events import events_between
+from training_load.domain.calendar import events_window
 from training_load.domain.daily import build_daily_load
 from training_load.domain.load import Decay
 from training_load.domain.projection import CalendarRide, PlannedRide, ProjectedDay, project
@@ -133,11 +133,12 @@ def test_the_fetch_asks_for_the_window_with_a_day_of_margin(db: InMemoryPostgres
 def test_mostly_unreadable_calendar_fails_the_run_after_writing_the_readable_ones(
     db: InMemoryPostgrest,
 ) -> None:
+    run(db, [event(8, "2026-10-21")])  # stored, in the window, absent from the next response
     body: list[dict[str, object]] = [{"id": i} for i in range(3)]
     body.append(event(7, "2026-10-20"))
     with pytest.raises(EventsShapeError):
         run(db, body)
-    assert [r["id"] for r in db.tables["planned_events"]] == [7]
+    assert ids(db) == [7, 8]  # a changed shape never wipes the stored calendar
 
 
 def test_compute_reads_the_window_back(db: InMemoryPostgrest) -> None:
@@ -205,3 +206,46 @@ def test_a_ride_without_a_load_gives_its_day_the_typical_value_never_0() -> None
         {"name": "?", "tss": None, "reason": "ingen belastning i intervals.icu"}
     ]
     assert day.basis["calendar_no_load"] == 1
+
+
+def test_several_rides_on_one_day_add_up() -> None:
+    days = prognose(
+        [CalendarRide(date(2026, 10, 20), "AM", 40.0), CalendarRide(date(2026, 10, 20), "PM", 25.0)]
+    )
+    assert days[date(2026, 10, 20)].cycling_tss == 65.0
+    assert days[date(2026, 10, 20)].basis["calendar_rides"] == 2
+
+
+def test_a_mixed_day_keeps_the_known_load_and_adds_the_typical_value_for_the_unknown_ride() -> None:
+    typical = prognose([])[date(2026, 10, 22)].cycling_tss
+    day = prognose(
+        [
+            CalendarRide(date(2026, 10, 22), "Known", 40.0),
+            CalendarRide(date(2026, 10, 22), "?", None),
+        ]
+    )[date(2026, 10, 22)]
+    assert day.cycling_tss == 40.0 + typical and day.basis["fallback"] == "typical_week"
+
+
+def test_a_ride_today_marks_this_week_but_adds_no_prognose_load() -> None:
+    days = prognose([CalendarRide(TODAY, "Today", 70.0)])
+    rest_of_week = [days[TODAY + timedelta(days=i)] for i in range(1, 5)]  # Thu .. Sun
+    assert [d.cycling_tss for d in rest_of_week] == [0.0, 0.0, 0.0, 0.0]
+    assert {d.basis["cycling"] for d in rest_of_week} == {"calendar"}
+    assert rest_of_week[0].basis["calendar_rides"] == 0  # today's ride is not a prognose day
+    assert rest_of_week[0].basis["calendar_weeks"] == 1
+
+
+def test_a_ride_after_the_horizon_marks_the_last_week() -> None:
+    days = prognose([CalendarRide(date(2026, 12, 11), "After", 80.0)])  # horizon ends 9 Dec
+    last_week = [days[date(2026, 12, 7) + timedelta(days=i)] for i in range(3)]
+    assert [d.cycling_tss for d in last_week] == [0.0, 0.0, 0.0]
+    assert {d.basis["cycling"] for d in last_week} == {"calendar"}
+    assert days[date(2026, 12, 4)].basis["cycling"] == "typical_week"  # the week before
+
+
+def test_an_infinite_or_nan_load_is_missing() -> None:
+    parsed = parse_events(
+        [event(1, "2026-10-20", load=float("nan")), event(2, "2026-10-21", load=float("inf"))]
+    )
+    assert [e.load for e in parsed.events] == [None, None]

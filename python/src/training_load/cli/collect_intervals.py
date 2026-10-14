@@ -10,7 +10,7 @@ import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Final
 
 import requests
@@ -22,22 +22,18 @@ from training_load.config import (
     load_dotenv_file,
     mask_in_ci,
 )
-from training_load.db import planned_events, strength_activities
+from training_load.db import strength_activities
 from training_load.db.activities import delete_ids, ids_between, stored_warnings, upsert_activities
 from training_load.db.client import Postgrest
 from training_load.domain.cycling import CyclingActivity
 from training_load.domain.dates import ANALYSIS_START, today_local
 from training_load.domain.power_check import data_warning, largest_spike, needs_stream, spike_floor
-from training_load.domain.projection import HORIZON_DAYS
-from training_load.domain.strength import iso_week_start
 from training_load.http import HttpError, HttpSend, requests_send
 from training_load.narrow import opt_float, opt_int
 from training_load.sources.intervals import (
     fetch_activities,
-    fetch_events,
     fetch_power_stream,
     parse_activities,
-    parse_events,
 )
 
 DEFAULT_LOOKBACK_DAYS: Final = 14
@@ -226,82 +222,6 @@ def run(
     return summary
 
 
-MAX_EVENT_SKIP_SHARE: Final = 0.5
-"""Fail the run when more than this share of the calendar objects can't be read (junk is
-counted and logged per run; above the threshold the API shape has changed)."""
-
-
-@dataclass(frozen=True, slots=True)
-class EventsRunSummary:
-    fetched: int
-    upserted: int
-    deleted: int
-    skipped: int  # objects without a readable id, category or date
-    planned_rides: int  # WORKOUT Ride/VirtualRide events in the window
-    rides_without_load: int  # planned rides with no load estimate (compute uses the typical day)
-
-
-class EventsShapeError(RuntimeError):
-    """Too many calendar objects were unreadable; the readable ones were written, the run fails."""
-
-
-def events_window(today: date) -> tuple[date, date]:
-    """This ISO week's Monday .. the Sunday of the week holding today + HORIZON_DAYS: every week
-    the prognose touches, whole (the week rule needs all of a week's planned rides)."""
-    last = iso_week_start(today + timedelta(days=HORIZON_DAYS)) + timedelta(days=6)
-    return iso_week_start(today), last
-
-
-def run_events(
-    intervals: IntervalsSettings,
-    *,
-    send: HttpSend,
-    db: Postgrest,
-    today: date,
-    now: Callable[[], datetime] = lambda: datetime.now(UTC),
-) -> EventsRunSummary:
-    """Mirror the intervals.icu calendar into public.planned_events (answers round, 2026-10-14):
-    1. fetch_events over events_window(today), one day of margin on both edges;
-    2. parse_events: junk skipped and counted, a planned ride without a load kept with load
-       null and counted (counts only in the log: the Actions logs are public);
-    3. upsert every event on its id; mirror deletions inside the window only."""
-    first, last = events_window(today)
-    raw = fetch_events(
-        send,
-        api_key=intervals.api_key,
-        athlete_id=intervals.athlete_id,
-        oldest=first - timedelta(days=1),
-        newest=last + timedelta(days=1),
-    )
-    parsed = parse_events(raw)
-    if parsed.skipped:
-        log.warning("%d calendar events could not be read and were left out", parsed.skipped)
-    if parsed.rides_without_load:
-        log.warning(
-            "%d planned rides have no load in intervals.icu: those days use the typical week",
-            parsed.rides_without_load,
-        )
-    planned_events.upsert_events(db, parsed.events, fetched_at=now())
-    stale = planned_events.ids_between(db, first, last) - {e.id for e in parsed.events}
-    planned_events.delete_ids(db, stale)
-    summary = EventsRunSummary(
-        fetched=len(raw),
-        upserted=len(parsed.events),
-        deleted=len(stale),
-        skipped=parsed.skipped,
-        planned_rides=sum(
-            1 for e in parsed.events if e.is_planned_ride and first <= e.date <= last
-        ),
-        rides_without_load=parsed.rides_without_load,
-    )
-    if raw and parsed.skipped > MAX_EVENT_SKIP_SHARE * len(raw):
-        raise EventsShapeError(
-            f"{parsed.skipped} of {len(raw)} intervals.icu calendar events could not be read "
-            "(id, category or start_date_local)"
-        )
-    return summary
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     """load_dotenv_file -> collect_intervals_config(os.environ) -> run -> log summary."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -318,6 +238,4 @@ def main(argv: Sequence[str] | None = None) -> int:
     db = Postgrest(config.supabase.url, config.supabase.service_key, send)
     summary = run(config.intervals, send=send, db=db, since=since, today=today)
     log.info("intervals.icu %s..%s: %s", since, today, summary)
-    events = run_events(config.intervals, send=send, db=db, today=today)
-    log.info("intervals.icu calendar %s..%s: %s", *events_window(today), events)
     return 0

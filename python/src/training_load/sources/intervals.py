@@ -7,6 +7,7 @@ is always complete, which mirrored deletions depend on.
 """
 
 import base64
+import math
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from datetime import date
 from typing import Final
 from urllib.parse import quote
 
+from training_load.domain.calendar import PlannedEvent
 from training_load.domain.cycling import CyclingActivity, is_cycling
 from training_load.domain.ride_analysis import RideFacts
 from training_load.domain.sessions import StrengthActivity, is_strength
@@ -290,26 +292,6 @@ def fetch_power_stream(
 
 # --- Calendar events (planned workouts; answers round, user 2026-10-14) -------------------------
 
-PLANNED_RIDE_CATEGORY: Final = "WORKOUT"
-PLANNED_RIDE_TYPES: Final = frozenset({"Ride", "VirtualRide"})
-
-
-@dataclass(frozen=True, slots=True)
-class PlannedEvent:
-    """One intervals.icu calendar event, stored raw in public.planned_events."""
-
-    id: int
-    date: date  # the local date of start_date_local
-    category: str
-    type: str | None
-    name: str | None
-    load: float | None  # icu_training_load; None = missing (absent, not a number, or 0)
-    raw: Mapping[str, object]
-
-    @property
-    def is_planned_ride(self) -> bool:
-        return self.category == PLANNED_RIDE_CATEGORY and self.type in PLANNED_RIDE_TYPES
-
 
 @dataclass(frozen=True, slots=True)
 class ParsedEvents:
@@ -329,9 +311,11 @@ def fetch_events(
 
 
 def _event_load(raw: Mapping[str, object]) -> float | None:
-    """icu_training_load as a positive number, else None (never a silent 0)."""
+    """icu_training_load as a positive finite number, else None (never a silent 0)."""
     value = raw.get("icu_training_load")
-    if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    if not math.isfinite(value) or value <= 0:
         return None
     return float(value)
 
