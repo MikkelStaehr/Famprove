@@ -102,3 +102,9 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | board-rolling-e1rm | Styrke board shows the rolling 4-week e1RM (the suggestions' number), not the block best | M |
 | small-fixes | Træning footnote only with a suggestion, Styrke "endnu" gone once the block has ended, /load desktop gap if small | S |
 | cli-pin | Supabase CLI pinned to v2.120.0 in CLAUDE.md | S |
+| fitness-round | Fitness card verdict, bodyweight in strength TSS, board's last known e1RM, CLI from the repo, retro rule | L |
+| fitness-verdict | Fitness card: big CTL + ramp header (mockup C), a ramp verdict in zone colours from one set of constants, y axis near the data, legend only "prognose" | M |
+| bodyweight-fractions | Bodyweight exercises: fractions per the user's list (machines and cables 0), one bodyweight value, backfill and the fitness/form shift | M |
+| board-last-known | Styrke board: the latest known e1RM, muted with its date, when the last 4 weeks have none | S |
+| cli-from-repo | Supabase migrations run from the repo with the pinned CLI; the scratch copy is gone | S |
+| retro-external-step | CLAUDE.md: an external source gets its own step, optional ones continue-on-error | S |
