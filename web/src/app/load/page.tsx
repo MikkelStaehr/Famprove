@@ -27,6 +27,7 @@ import {
 } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { loadAppNotices, loadDashboardData, loadWeekDetail } from "@/lib/db/queries";
+import type { IsoDate } from "@/lib/db/rows";
 import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
 import { noticeText } from "@/lib/notices";
 import {
@@ -295,7 +296,7 @@ function WeekFallback({ nav }: { readonly nav: WeekNav }) {
 }
 
 /** Streams in under the week's Suspense boundary; a failure stays inside the week card. */
-async function WeekSessions({ nav, logStart, today }: { readonly nav: WeekNav; readonly logStart: string | null; readonly today: string }) {
+async function WeekSessions({ nav, logStart, today }: { readonly nav: WeekNav; readonly logStart: IsoDate | null; readonly today: IsoDate }) {
   const state = await loadWeekState(nav);
   if (state.kind === "error") {
     const at = state.at.toISOString();

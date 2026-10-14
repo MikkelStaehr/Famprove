@@ -69,3 +69,8 @@ test("today is the only --today mark", () => {
   const uses = JSON.stringify(AMARKS).match(/--today/g) ?? [];
   assert.equal(uses.length, 1);
 });
+
+test("a one-day domain keeps every tick (no division by zero)", () => {
+  const ticks = [{ x: 5, label: "jan." }];
+  assert.deepEqual(ticksClearOfToday(ticks, { lo: 5, hi: 5, today: 5, width: 300 }).map((t) => t.label), ["jan."]);
+});

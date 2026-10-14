@@ -6,6 +6,7 @@ import type {
   StrengthDetail,
   WeekView,
 } from "@/lib/dashboard-view";
+import type { IsoDate } from "@/lib/db/rows";
 import {
   formatDay,
   formatDevice,
@@ -38,8 +39,8 @@ type WeekDaysProps = {
   readonly week: WeekView;
   readonly days: readonly DayDetail[];
   /** The strength log's first day (earliest block start): days before it read "styrke ikke registreret". */
-  readonly logStart: string | null;
-  readonly today: string;
+  readonly logStart: IsoDate | null;
+  readonly today: IsoDate;
 };
 
 export function WeekDays({ week, days, logStart, today }: WeekDaysProps) {
@@ -56,13 +57,20 @@ export function WeekDays({ week, days, logStart, today }: WeekDaysProps) {
         <span className={DAY_COL} />
         <span className="min-w-0 flex-1 font-sans text-14 font-medium text-text">I alt</span>
         <span className={`${VALUE} font-medium`}>
-          <span className="sr-only">uge {week.isoWeek}: cykling {formatLoad(week.cyclingTss)} TSS, styrke {formatLoad(week.strengthTss)} TSS, i alt </span>
+          <span className="sr-only">uge {week.isoWeek}: cykling {formatLoad(week.cyclingTss)} TSS, styrke {strengthSr(week, logStart)}, i alt </span>
           {formatLoad(week.totalTss)}
           <span className="sr-only"> TSS</span>
         </span>
       </p>
     </div>
   );
+}
+
+/** Strength before the log is missing, never 0 (CLAUDE.md): a week wholly before it says so, a week across it is partial. */
+function strengthSr(week: WeekView, logStart: IsoDate | null): string {
+  if (logStart === null || week.weekEnd < logStart) return "ikke registreret";
+  const tss = `${formatLoad(week.strengthTss)} TSS`;
+  return week.weekStart < logStart ? `${tss}, delvist registreret` : tss;
 }
 
 function rideNames(day: DayDetail): string {

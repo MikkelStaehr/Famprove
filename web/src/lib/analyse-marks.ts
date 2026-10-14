@@ -96,7 +96,8 @@ export function ticksClearOfToday<T extends Tick>(
   ticks: readonly T[],
   g: { readonly lo: number; readonly hi: number; readonly today: number | null; readonly width: number },
 ): T[] {
-  if (g.today === null) return [...ticks];
+  // A one-day domain has no scale to measure against: keep every tick.
+  if (g.today === null || g.hi <= g.lo) return [...ticks];
   const px = (x: number) => ((x - g.lo) / (g.hi - g.lo)) * g.width;
   const line = px(g.today);
   const captionLeft = line - AMARKS.today.labelGap - monoWidth("I DAG");
