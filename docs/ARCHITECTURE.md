@@ -13,14 +13,17 @@ GitHub Actions daily.yml at 05, 12, 20 Copenhagen: the droplet's workflow_dispat
   A manual "Run workflow" without slot always runs.
   check-config       every job's env vars at once        → fails the run before anything is read
   collect-intervals  intervals.icu API (last 14 d)      → activities (rides), strength_activities (WeightTraining),
-                                                          each with the API object as `raw`
+                                                          each with the API object as `raw`;
+                     intervals.icu calendar (this week .. → planned_events (every event raw; deletions mirrored
+                       the week of today + 56 d)            in the window)
   collect-strength   Google Drive xlsx export (read)    → strength_sets (ISO week + session 1..N, no dates;
                      + exercises (muscle factor,             the week's cells as `raw`, LSRPE as logged_rpe,
                        bodyweight fraction per name)         each set scored with its exercise's values);
                                                           unknown names → exercises (insert only)
   compute            activities + strength_sets + strength_activities
                                                         → strength_sessions, daily_load, blocks (+ view weekly_load), strength_sets.score_final / rpe_final (the final set score),
-                                                          daily_projection (the 56-day prognose; + planned_sessions),
+                                                          daily_projection (the 56-day prognose; + planned_sessions; a week with
+                                                            planned rides in planned_events uses only those),
                                                           forecast_log (that prognose + a naive baseline, per run day),
                                                           ride_metrics + cycling_weeks (the ride analysis, rides since 2024-12-30),
                                                           analysis_summary (the three Cykel answers: eFTP, EF, hours),
@@ -73,7 +76,8 @@ Next.js (web/), server components only
 `ride_metrics` (derived: every ride since 2024-12-30 with its trend values, VI and VI warning, and why it is left out of the trends) ·
 `cycling_weeks` (derived: every ISO week since 2024-12-30, 0 for a week without rides) ·
 `analysis_summary` (derived: one row per Cykel question, eftp | ef | volume: value, comparison, direction and the Danish sentences) ·
-`strength_weeks` (derived: every ISO week x SQUAT/BENCH/DEADLIFT from the first block: tonnage, best e1RM, block best) ·
+`strength_weeks` (derived: every ISO week x SQUAT/BENCH/DEADLIFT from the first block: tonnage, best e1RM, block best, the rolling 4-week e1RM the suggestions use + its source week) ·
+`planned_events` (the intervals.icu calendar mirrored raw by collect-intervals; WORKOUT Ride/VirtualRide events drive the prognose's cycling in their ISO weeks) ·
 `strength_set_kg` (persistent: planned and lifted kg per set with timestamps; like forecast_log it can't be rebuilt) ·
 `exercise_set_log` (persistent: start/end/skip of each set and each exercise's warm-up (set 0), felt RPE and reps done, from the Træning screens' taps; can't be rebuilt; written only by the web; read back on reload; Python reads felt RPE and reps done) · `exercise_feel` (derived: one Styrke line per exercise with 4+ rated sets) ·
 `app_notices` (one current notice per kind, e.g. ftp_mismatch from collect-plan; shown on /load) ·
