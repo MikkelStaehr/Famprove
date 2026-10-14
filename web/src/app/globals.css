@@ -113,6 +113,15 @@
   --text-48: 3rem;
   --text-48--line-height: 1;
   --text-48--letter-spacing: -0.03em;
+  --text-44: 2.75rem;
+  --text-44--line-height: 1;
+  --text-44--letter-spacing: -0.03em;
+  --text-40: 2.5rem;
+  --text-40--line-height: 1;
+  --text-40--letter-spacing: -0.03em;
+  --text-32: 2rem;
+  --text-32--line-height: 1.15;
+  --text-32--letter-spacing: -0.01em;
   --text-28: 1.75rem;
   --text-28--line-height: 1.1;
   --text-24: 1.5rem;

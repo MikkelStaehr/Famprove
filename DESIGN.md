@@ -180,7 +180,7 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 ### Træning (`/`) and Fokus (`/fokus`) (behaviour; full spec `design/specs/traening.md`, look `design/specs/reset-traening.md`)
 - **Use:** a companion for the gym and the handlebar, read at arm's length (≈ 60–80 cm). `/` **Træning** is the overview of the day: the form figure with its zone word and one-line hint, the open strength session in the "I dag" `InverseCard` with its one primary action (**Begynd træning** / **Fortsæt træning**), ride and rest cards. `/fokus` **Fokus** is a full-screen mode for one set at a time, reached from that button; it is not a tab.
 - **Data:** server-side, read-only except the **set log**. Python computes every number, including target watts and the suggested kg; the web only formats. The rest timer (now − last done tap) is a clock, not a training metric. The date is the Europe/Copenhagen date at request time.
-- **Glance sizes:** Fokus: reps and the kg figure `text-56` Geist Mono 500, the rest timer `text-56`: the largest things on the screen. Træning: ≥ `text-24` Geist Mono 500 tabular for anything read mid-set or mid-interval (reps, prescription, target watts); `text-16`–`text-20` for exercise names and set lines; nothing in a session card smaller than 13px.
+- **Glance sizes:** Fokus: reps and the kg figure `text-44` Geist Mono 500, the rest timer and warm-up clock `text-56` (`reset-fokus.md`, review 2026-10-14): the largest things on the screen. Træning: ≥ `text-24` Geist Mono 500 tabular for anything read mid-set or mid-interval (reps, prescription, target watts); `text-16`–`text-20` for exercise names and set lines; nothing in a session card smaller than 13px.
 - **As written vs computed:** sheet strings are shown verbatim ("8 - 12", "RPE 6 - 7", "-12.5%"); only screen-reader text rewrites " - " to " til ". The suggested kg always carries the word `Forslag` (a `MonoCaption` above it) and never sits in the prescription line; last week's kg carries `Sidste uge`. The sheet's pre-filled kg is not shown on Træning or Fokus.
 - **Set lines (Træning):** one group per sheet row; each set is a `<label>` wrapping a native checkbox, ≥ 44px, the whole line is the target, accessible name the full sentence (`Squat, sæt 1 af 2, 5 reps ved RPE 7, forslag 142,5 kg, sidste uge 140 kg`). Open, done and skipped differ by shape (empty ring, filled disc with ✓, ring with a minus bar + the word), never colour alone. Lines never move or reorder. Tapping a done set reopens it.
 - **Set state:** lives in the set log and is read back on every load. Taps are optimistic (< 100ms) and saved in order through the one server action; kg is never written. A failed save keeps the tick and shows a `WarningLine` with **Gem igen**: "1 sæt er ikke gemt. De står her, men forsvinder, hvis siden genindlæses." Under DEV_TODAY / DEV_FIXTURE nothing is written: "Testvisning: sæt gemmes ikke."
@@ -249,9 +249,12 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 
 | Token | Face | Use |
 |---|---|---|
-| `text-56` (1) | Mono 500, −0.03em | today's form figure on `/load`; Fokus reps / kg / timer |
-| `text-48` (1) | Mono 500, −0.03em | a hero figure on a hero card (Analyse heroes) |
-| `text-28` (1.1) | Mono 500 | half-card figures (Træning form figure) |
+| `text-56` (1) | Mono 500, −0.03em | today's form figure on `/load`; Fokus rest timer, warm-up clock, finished-view counts |
+| `text-48` (1) | Mono 500, −0.03em | C's hero figure; no screen uses it after the 2026-10-14 review (Analyse heroes moved to `text-40`) |
+| `text-44` (1) | Mono 500, −0.03em | Fokus reps and kg figures (`reset-fokus.md`) |
+| `text-40` (1) | Mono 500, −0.03em | Analyse hero figures: Cykel answer numbers, Styrke lift-board values (`reset-analyse-*.md`) |
+| `text-32` (1.15) | Geist 600, −0.01em · Mono 500 | Fokus exercise name (Geist); Fokus reps-stepper value (Mono) |
+| `text-28` (1.1) | Mono 500 | half-card figures (Træning form figure; C's half card) |
 | `text-24` (1.1) | Mono 500 | `Tile` values; prescription numbers on Træning |
 | `text-22` (1.2) | Geist 600, −0.01em | page h1 |
 | `text-20` (1.25) | Geist 600, −0.01em | `InverseCard` title |
