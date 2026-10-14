@@ -1,5 +1,5 @@
 """
-Læser Benjamins program-tab (Powerlifting Now-template) fra xlsx-eksport
+Læser trænerens program-tab (Powerlifting Now-template) fra xlsx-eksport
 og producerer en sæt-tabel med rå score pr. sæt (formlen er uændret fra strength_collector.py).
 
 Brug:  parse_all(xlsx_bytes, scoring, issues)   (læser alle "Program - blok *"-tabs)
@@ -13,6 +13,8 @@ import io, math, re, datetime as dt
 from collections import Counter
 from typing import TypedDict
 import openpyxl
+
+from training_load.domain.exercises import variant_key
 
 class ParsedSet(TypedDict):
     date: dt.date
@@ -37,6 +39,8 @@ class ParsedSet(TypedDict):
     e1rm: float | None      # fanens 1RM for sættets løft (SQUAT/BENCH/DEADLIFT), ellers None
     raw: dict[str, object]  # ugens celler som skrevet: sets, reps, load, weight, lsrpe, notes, mean_weight
     logged_rpe: float | None  # LSRPE (loggede RPE), kun hele/halve 1-10; ellers None (talt)
+    variant: str | None       # normaliseret variantnavn fra "V:" i NOTES (videreført i blokken); None = ukendt
+    variant_display: str | None  # varianten som skrevet første gang (mellemrum samlet); None = ukendt
     score: float          # rå score, før STRENGTH_K
 
 ABS_SET_SCORE = 10*20*(0.6**2)   # fast score pr. abs-sæt (10 reps @ 20 kg RPE 6)
@@ -91,9 +95,32 @@ def cell_text(cell: object) -> str | None:
     if isinstance(cell, (int, float)) and not isinstance(cell, bool): return f"{cell:g}"
     return str(cell).strip() or None
 
+VARIANT_LINE = re.compile(r"^\s*(?:v|variant)\s*:\s*(.*)$", re.IGNORECASE)
+
+
+def split_notes(cell: object) -> tuple[str | None, str | None, int]:
+    """(variant as written, the coach's note, extra V: lines) of a NOTES cell (user, 2026-10-14):
+    a line "V: <variant>" or "Variant: <variant>" (any case) names the variant; the first such line
+    wins (more are counted), every other line is the coach's note. Line breaks: \r\n, \r, \n."""
+    text = cell_text(cell)
+    if text is None:
+        return None, None, 0
+    variant, extra, note = None, 0, []
+    for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        m = VARIANT_LINE.match(line)
+        if m is None:
+            if line.strip():
+                note.append(line.strip())
+        elif variant is None:
+            variant = m.group(1).strip()
+        else:
+            extra += 1
+    return variant, ("\n".join(note) or None), extra
+
+
 def notes_text(raw: dict[str, object]) -> str | None:
-    """The coach's NOTES cell of a parsed set (raw["notes"]) as written; None when blank."""
-    return cell_text(raw.get("notes"))
+    """The coach's note of a parsed set: raw["notes"] without any "V:" line; None when blank."""
+    return split_notes(raw.get("notes"))[1]
 
 def prescribed_text(load: object) -> str | None:
     """Load-cellen som i arket: tekst uændret, procent-tal (-0.1) som '-10%', andre tal som tekst."""
@@ -111,6 +138,8 @@ RPE_NOT_HALF = "RPE not a whole or half value"
 LSRPE_NOT_HALF = "logged RPE not a whole or half value"
 LSRPE_COLUMN_MISSING = "no LSRPE column in the header"
 RPE_UNKNOWN = "RPE unknown, set scored at RPE 6"   # en sæt-score afhænger af UNKNOWN_RPE (kg > 0)
+VARIANT_EMPTY = "variant line without a name"     # "V:" uden navn: varianten fortsætter uændret
+VARIANT_TWICE = "more than one variant line in a cell"   # den første vinder
 RAW_KEYS = ("sets", "reps", "load", "weight", "lsrpe", "notes", "mean_weight")  # ugens 7 første kolonner
 
 
@@ -203,6 +232,26 @@ def parse_all(data: bytes, scoring, issues: Counter[str] | None = None,
             sets += parse_tab(wb[tab], tab, scoring, issues if counted else Counter())
     return sets
 
+def row_variants(r, name, weeks, issues: Counter[str]):
+    """(the variant in force per week, whether the week's own NOTES named one) for one sheet row
+    (user, 2026-10-14): "V: <variant>" in a week's NOTES holds from that week to the end of the
+    block or the next "V:"; weeks before the first are None (ukendt). "V: <the row's own name>"
+    ends the variant. An empty "V:" keeps the current one (counted)."""
+    own = variant_key(name)
+    current, states, named = None, [], []
+    for w in range(weeks):
+        cell = r[4 + w*8 + 5] if 4 + w*8 + 5 < len(r) else None   # ugens NOTES (RAW_KEYS[5])
+        written, _note, extra = split_notes(cell)
+        if extra: issues[VARIANT_TWICE] += 1
+        if written is not None and not written.strip():
+            issues[VARIANT_EMPTY] += 1; written = None
+        if written is not None:
+            key = variant_key(written)
+            current = None if key == own else (key, " ".join(written.split()))
+        states.append(current)
+        named.append(written is not None)
+    return states, named
+
 def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
     issues = Counter() if issues is None else issues
     rows = list(ws.iter_rows(values_only=True))
@@ -211,6 +260,7 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
     week_dates = None
     section = 0
     lsrpe_ok = None   # afgøres af den første header-række (SETS i kolonne E): LSRPE 4 kolonner til højre
+    run_head = None   # (sektion, øvelse, variant pr. uge) for den række, der startede en øvelses-run
     for ri, r in enumerate(rows, start=1):
         if lsrpe_ok is None and r and len(r) > 4 and str(r[4] or "").strip().upper() == "SETS":
             lsrpe_ok = len(r) > 8 and str(r[8] or "").strip().upper() == "LSRPE"
@@ -228,8 +278,16 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
             if any(4+w*8 < len(r) and r[4+w*8] not in (None,0,"") for w in range(len(week_dates))):
                 issues[ROW_WITHOUT_TYPE] += 1   # foreskrevet, men uden TYPE: ville ellers forsvinde stille
             continue
-        exercise = scoring(typ, name)
+        states = row_variants(r, name, len(week_dates), issues)
+        if run_head is not None and run_head[0] == (section, variant_key(name)):
+            # En række i samme øvelses-run uden egen "V:" følger run'ens første række uge for uge.
+            first_own = next((w for w, st in enumerate(states[1]) if st), len(week_dates))
+            states = ([run_head[1][w] if w < first_own else states[0][w] for w in range(len(week_dates))], states[1])
+        else:
+            run_head = ((section, variant_key(name)), states[0])
         for w,date in enumerate(week_dates):
+            variant = states[0][w]
+            exercise = scoring(typ, name) if variant is None else scoring(typ, name, variant[0])
             base = 4 + w*8          # SETS-kolonne for uge w
             nsets, reps, load, kg = r[base], r[base+1], r[base+2], r[base+3]
             cells = [r[base+k] if base+k < len(r) else None for k in range(len(RAW_KEYS))]
@@ -262,6 +320,8 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
                                       muscle_factor=exercise.muscle_factor, sides=sides, kg_factor=kg_factor,
                                       prescribed=prescribed_text(load),
                                       sets_text=sets_text, reps_text=reps_text,
-                                      e1rm=e1rm.get(typ), raw=raw, logged_rpe=lsrpe))
+                                      e1rm=e1rm.get(typ), raw=raw, logged_rpe=lsrpe,
+                                      variant=variant[0] if variant else None,
+                                      variant_display=variant[1] if variant else None))
     if lsrpe_ok is None and sets: issues[LSRPE_COLUMN_MISSING] += 1   # ingen header-række: LSRPE ulæst
     return sets

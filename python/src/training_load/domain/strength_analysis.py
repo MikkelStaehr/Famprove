@@ -147,6 +147,7 @@ def e1rm_point(s: StrengthSet, status: KgStatus) -> E1rmPoint | None:
     if (
         status == "planned"
         or not is_competition_lift(s)
+        or s.variant_id is not None  # a named variant is not the competition lift (2026-10-14)
         or s.reps > E1RM_MAX_REPS
         or prescribed is None
         or prescribed < E1RM_MIN_RPE

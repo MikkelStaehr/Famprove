@@ -9,6 +9,7 @@ from training_load.db.client import JsonRow, Postgrest
 from training_load.domain.strength import StrengthSet
 from training_load.narrow import (
     opt_float,
+    opt_int,
     opt_object,
     opt_str,
     req_bool,
@@ -50,6 +51,7 @@ class StrengthSetRow(TypedDict):
     muscle_factor: float | None  # public.exercises at collect time; null on older rows
     sides: int  # 1 | 2: exercises.per_side at collect time (not null, default 1)
     kg_factor: int  # 1 | 2: exercises.kg_per_dumbbell at collect time (not null, default 1)
+    variant_id: int | None  # exercise_variants.id; null = ukendt
     notes: str | None  # the coach's NOTES cell; null = blank
     raw: JsonRow | None  # the week's cells as written
     score_final: float | None  # the score that feeds TSS: collect writes score, compute overwrites
@@ -86,6 +88,7 @@ def to_row(s: StrengthSet) -> StrengthSetRow:
         muscle_factor=s.muscle_factor,
         sides=s.sides,
         kg_factor=s.kg_factor,
+        variant_id=s.variant_id,
         notes=s.notes,
         raw=dict(s.raw) if s.raw is not None else None,
         score_final=s.score,
@@ -119,6 +122,7 @@ def from_row(row: JsonRow) -> StrengthSet:
         muscle_factor=opt_float(row, "muscle_factor"),
         sides=req_int(row, "sides"),
         kg_factor=req_int(row, "kg_factor"),
+        variant_id=opt_int(row, "variant_id"),
         notes=opt_str(row, "notes"),
         raw=opt_object(row, "raw"),
     )

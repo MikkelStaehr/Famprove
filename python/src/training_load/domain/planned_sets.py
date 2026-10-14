@@ -65,7 +65,7 @@ LOWER_BODY_WORDS: Final = (
 every other type (BENCH, CHEST/SHOULDERS, LATS/MIDDLE BACK, ...) is upper body."""
 ROUND_TO_KG: Final = 2.5
 
-type Basis = Literal["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift", "progression"]
+type Basis = Literal["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift", "progression", "new_variant"]
 
 HEAVY_MAX_REPS: Final = 5
 HEAVY_MIN_RPE: Final = 7.0
@@ -111,6 +111,7 @@ class PlannedSet:
     rest_max_s: int | None = None
     ramp: tuple[RampStep, ...] | None = None  # main lifts, a run's first set; None: no ramp
     rpe_kg: float | None = None  # the e1RM x RPE suggestion before adjustment and cap (not stored)
+    variant_id: int | None = None  # the set's exercise variant (not stored; 2026-10-14)
 
 
 def pct_of_e1rm(reps: float, rpe: float) -> float:
@@ -217,7 +218,7 @@ def planned_sets(
     statuses: Mapping[SetKey, KgStatus],
     *,
     today: date,
-    progressions: Mapping[int, Progression] | None = None,
+    progressions: Mapping[tuple[int, int | None], Progression] | None = None,
 ) -> list[PlannedSet]:
     """One PlannedSet per set of the run day's ISO week and later, in strength_sets order.
     ``progressions`` (domain.set_feedback, by exercise id): a step up or a hold, applied before
@@ -236,7 +237,9 @@ def planned_sets(
         if s.week_start < run_week:
             continue
         exercise = catalog.find(s.name)
-        lift = exercise.parent_lift if exercise is not None else None
+        # A named variant (user, 2026-10-14) is not the competition lift: no e1RM suggestion,
+        # progression only, from its own last week.
+        lift = exercise.parent_lift if exercise is not None and s.variant_id is None else None
         rpe = prescribed_rpe(s.prescribed)
         e1rm_kg = e1rms.get(lift) if lift is not None else None
         pct = pct_of_e1rm(s.reps, rpe) if rpe is not None else None
@@ -259,12 +262,17 @@ def planned_sets(
             suggested = None
         rpe_kg = suggested
         before = logged.get((s.block, s.sheet_row, s.week_start - timedelta(days=7)))
-        same = before is not None and _same_exercise(before.name, s.name) and _same_reps(before, s)
+        same = (
+            before is not None
+            and _same_exercise(before.name, s.name)
+            and _same_reps(before, s)
+            and before.variant_id == s.variant_id  # None matches only None
+        )
         anchor = before.logged_kg if same and before is not None else None
         if anchor is not None:
             anchors[set_key(s)] = anchor
         step = cap_kg(s.type)
-        rule = rules.get(exercise.id) if exercise is not None else None
+        rule = rules.get((exercise.id, s.variant_id)) if exercise is not None else None
         adjustment: float | None = None
         if rule is not None and suggested is not None:
             if rule.kind == "step":
@@ -279,6 +287,12 @@ def planned_sets(
             suggested = _step_down(anchor + adjustment)
             if suggested <= 0:
                 suggested, adjustment, basis = None, None, "no_lift" if lift is None else "no_e1rm"
+        if s.variant_id is not None and anchor is None:
+            # A variant with nothing logged last week: no suggestion until there is data.
+            suggested, adjustment, basis = None, None, "new_variant"
+        variant = catalog.variant_by_id(s.variant_id)
+        if variant is not None and not variant.suggests:
+            suggested, adjustment = None, None
         uncapped = None
         if suggested is not None:
             suggested, uncapped = weekly_cap(suggested, anchor, step)
@@ -308,6 +322,7 @@ def planned_sets(
                 rest_min_s=rest_min,
                 rest_max_s=rest_max,
                 rpe_kg=rpe_kg,
+                variant_id=s.variant_id,
             )
         )
     return _with_ramps(out, sets, catalog, anchors)
@@ -345,13 +360,14 @@ def _with_ramps(
     return [replace(p, ramp=ramps[i]) if i in ramps else p for i, p in enumerate(planned)]
 
 
-def suggestion_offsets(planned: Sequence[PlannedSet]) -> dict[int, float | None]:
-    """Per exercise: how far its next suggestion lies from the kg the coach's RPE gives
-    (suggested - rpe_kg on its first RPE-based planned set); None when it has none."""
-    out: dict[int, float | None] = {}
+def suggestion_offsets(planned: Sequence[PlannedSet]) -> dict[tuple[int, int | None], float | None]:
+    """Per (exercise, variant): how far its next suggestion lies from the kg the coach's RPE
+    gives (suggested - rpe_kg on its first RPE-based planned set); None when it has none."""
+    out: dict[tuple[int, int | None], float | None] = {}
     for p in sorted(planned, key=lambda p: (p.week_start, p.session, p.sheet_row, p.set_no)):
-        if p.exercise_id is None or p.exercise_id in out:
+        key = (p.exercise_id, p.variant_id) if p.exercise_id is not None else None
+        if key is None or key in out:
             continue
         if p.suggested_kg is not None and p.rpe_kg is not None:
-            out[p.exercise_id] = round(p.suggested_kg - p.rpe_kg, 1)
+            out[key] = round(p.suggested_kg - p.rpe_kg, 1)
     return out

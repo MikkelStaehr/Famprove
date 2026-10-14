@@ -14,6 +14,7 @@ TABLE: Final = "exercise_feel"
 
 class ExerciseFeelRow(TypedDict):
     exercise_id: int
+    variant_id: int | None  # exercise_variants id; null = ukendt
     rated_n: int
     lighter_n: int
     expected_n: int
@@ -25,6 +26,7 @@ class ExerciseFeelRow(TypedDict):
 def feel_row(f: Feel, computed_at: datetime) -> ExerciseFeelRow:
     return ExerciseFeelRow(
         exercise_id=f.exercise_id,
+        variant_id=f.variant_id,
         rated_n=f.rated_n,
         lighter_n=f.lighter_n,
         expected_n=f.expected_n,
@@ -38,5 +40,7 @@ def sync_exercise_feel(db: Postgrest, feels: Sequence[Feel], *, computed_at: dat
     if computed_at.tzinfo is None:
         raise ValueError("computed_at must be timezone-aware")
     if feels:
-        db.upsert(TABLE, [feel_row(f, computed_at) for f in feels], on_conflict="exercise_id")
+        db.upsert(
+            TABLE, [feel_row(f, computed_at) for f in feels], on_conflict="exercise_id,variant_id"
+        )
     db.delete(TABLE, [("computed_at", f"lt.{computed_at.isoformat()}")])

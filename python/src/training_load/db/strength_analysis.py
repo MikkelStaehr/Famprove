@@ -8,7 +8,7 @@ from typing import Final, Literal, TypedDict
 from training_load.db.client import JsonRow, Postgrest
 from training_load.domain.kg_history import KgKey, KgState
 from training_load.domain.strength_analysis import Phase, RpeSource, StrengthWeek
-from training_load.narrow import opt_float, opt_str, req_date, req_int, req_str
+from training_load.narrow import opt_float, opt_int, opt_str, req_date, req_int, req_str
 
 WEEKS_TABLE: Final = "strength_weeks"
 KG_TABLE: Final = "strength_set_kg"
@@ -56,6 +56,7 @@ class KgStateRow(TypedDict):
     lifted_changed_at: str | None
     first_seen_at: str
     gone_at: str | None
+    variant_id: int | None  # exercise_variants id when last seen (attribute, not key)
 
 
 KG_COLUMNS: Final = ",".join(KgStateRow.__annotations__)
@@ -125,6 +126,7 @@ def kg_row(k: KgState) -> KgStateRow:
         lifted_changed_at=_at(k.lifted_changed_at),
         first_seen_at=k.first_seen_at.isoformat(),
         gone_at=_at(k.gone_at),
+        variant_id=k.variant_id,
     )
 
 
@@ -160,6 +162,7 @@ def kg_from_row(row: JsonRow) -> KgState:
         lifted_changed_at=_opt_at(row, "lifted_changed_at"),
         first_seen_at=datetime.fromisoformat(req_str(row, "first_seen_at")),
         gone_at=_opt_at(row, "gone_at"),
+        variant_id=opt_int(row, "variant_id"),
     )
 
 

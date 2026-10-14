@@ -63,6 +63,7 @@ class Feel:
     expected_n: int
     harder_n: int
     verdict_text: str
+    variant_id: int | None = None  # exercise_variants id; None = ukendt (2026-10-14)
 
 
 def range_top(reps_text: str | None) -> float | None:
@@ -127,16 +128,28 @@ def _fmt(value: float) -> str:
     return f"{value:g}".replace(".", ",")
 
 
+type VariantKey = tuple[int, int | None]
+"""(exercise id, exercise_variants id or None = ukendt): progression, feel and suggestions group
+per variant (user, 2026-10-14); switching variant starts over."""
+
+
+def variants_of(sets: Sequence[StrengthSet]) -> dict[tuple[date, int, int, int], int | None]:
+    """(ISO week, session, sheet row, set) -> the set's variant id: the log has no variant, so a
+    logged set takes the variant of the sheet set it belongs to."""
+    return {(s.week_start, s.session, s.sheet_row, s.set_no): s.variant_id for s in sets}
+
+
 def progressions(
     logged: Sequence[LoggedSet], sets: Sequence[StrengthSet]
-) -> dict[int, Progression]:
-    """The progression rule that holds for each exercise now, by exercise id."""
+) -> dict[VariantKey, Progression]:
+    """The progression rule that holds for each (exercise, variant) now."""
     tops = {(s.week_start, s.session, s.sheet_row, s.set_no): range_top(s.reps_text) for s in sets}
-    by_exercise: dict[int, list[LoggedSet]] = defaultdict(list)
+    variant = variants_of(sets)
+    by_exercise: dict[VariantKey, list[LoggedSet]] = defaultdict(list)
     for e in logged:
         if _done(e):
-            by_exercise[e.exercise_id].append(e)
-    out: dict[int, Progression] = {}
+            by_exercise[(e.exercise_id, variant.get(_set_of(e)))].append(e)
+    out: dict[VariantKey, Progression] = {}
     for exercise_id, entries in by_exercise.items():
         rated = sorted((e for e in entries if e.felt is not None), key=lambda e: e.ended_at or "")
         last_two = [e.felt for e in rated[-2:]]
@@ -167,15 +180,22 @@ def _all_at_top(
     return bool(group)
 
 
-def exercise_feel(logged: Iterable[LoggedSet], offsets: Mapping[int, float | None]) -> list[Feel]:
-    """One line per exercise with at least MIN_RATED rated sets. ``offsets``: per exercise, how
-    far its next suggestion lies from the kg the coach's RPE gives (None: no RPE-based one)."""
-    counts: dict[int, Counter[int]] = defaultdict(Counter)
+def exercise_feel(
+    logged: Iterable[LoggedSet],
+    offsets: Mapping[VariantKey, float | None],
+    sets: Sequence[StrengthSet] = (),
+) -> list[Feel]:
+    """One line per (exercise, variant) with at least MIN_RATED rated sets. ``offsets``: per
+    (exercise, variant), how far its next suggestion lies from the kg the coach's RPE gives
+    (None: no RPE-based one). ``sets``: where each logged set's variant comes from."""
+    variant = variants_of(sets)
+    counts: dict[VariantKey, Counter[int]] = defaultdict(Counter)
     for e in logged:
         if _done(e) and e.felt is not None:
-            counts[e.exercise_id][e.felt] += 1
+            counts[(e.exercise_id, variant.get(_set_of(e)))][e.felt] += 1
     out: list[Feel] = []
-    for exercise_id, c in sorted(counts.items()):
+    for key, c in sorted(counts.items(), key=lambda kv: (kv[0][0], kv[0][1] or 0)):
+        exercise_id, variant_id = key
         rated = sum(c.values())
         if rated < MIN_RATED:
             continue
@@ -186,7 +206,7 @@ def exercise_feel(logged: Iterable[LoggedSet], offsets: Mapping[int, float | Non
             head = "Du melder oftest hårdere end foreskrevet"
         else:
             head = "Du melder oftest som foreskrevet"
-        offset = offsets.get(exercise_id)
+        offset = offsets.get(key)
         if offset is None:
             tail = ""
         elif offset > 0:
@@ -195,7 +215,9 @@ def exercise_feel(logged: Iterable[LoggedSet], offsets: Mapping[int, float | Non
             tail = f" – forslaget ligger {_fmt(-offset)} kg under {COACH_RPE}"  # noqa: RUF001  # Danish dash
         else:
             tail = f" – forslaget følger {COACH_RPE}"  # noqa: RUF001  # Danish dash
-        out.append(Feel(exercise_id, rated, lighter, expected, harder, f"{head}{tail}."))
+        out.append(
+            Feel(exercise_id, rated, lighter, expected, harder, f"{head}{tail}.", variant_id)
+        )
     return out
 
 

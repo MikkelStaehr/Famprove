@@ -16,7 +16,7 @@ from training_load.domain.planned_sets import (
     round_to_step,
     weekly_cap,
 )
-from training_load.domain.set_feedback import Progression
+from training_load.domain.set_feedback import Progression, VariantKey
 from training_load.domain.strength import StrengthSet
 from training_load.domain.strength_analysis import KgStatus, SetKey, e1rm, e1rm_point, set_key
 
@@ -266,7 +266,9 @@ def test_a_step_up_adds_the_region_step_inside_the_cap(sheet: Sheet) -> None:
     sheet.add(week_start=LAST_WEEK, sheet_row=40, reps=3.0, prescribed="RPE 6", logged_kg=140.0,
               type="BENCH", name="Bænk")  # fmt: skip
     s = sheet.add(sheet_row=40, reps=3.0, prescribed="RPE 6", type="BENCH", name="Bænk")
-    rules = {3: Progression("step", "de sidste to var lettere")}
+    rules: dict[VariantKey, Progression] = {
+        (3, None): Progression("step", "de sidste to var lettere")
+    }
     [p] = [
         p
         for p in planned_sets(sheet.sets, CATALOG, sheet.statuses, today=TODAY, progressions=rules)
@@ -290,8 +292,10 @@ def test_hold_keeps_last_weeks_kg_and_an_accessory_progresses_from_it(sheet: She
               name="Facepulls")  # fmt: skip
     accessory = sheet.add(sheet_row=41, reps=10.0, reps_text="8 - 12", prescribed="RPE 7 - 8",
                           type="CHEST/SHOULDERS", name="Facepulls")  # fmt: skip
-    rules = {1: Progression("hold", "de sidste to var hårdere"),
-             4: Progression("step", "du ramte 12 reps to gange")}  # fmt: skip
+    rules: dict[VariantKey, Progression] = {
+        (1, None): Progression("hold", "de sidste to var hårdere"),
+        (4, None): Progression("step", "du ramte 12 reps to gange"),
+    }
     by_row = {
         p.sheet_row: p
         for p in planned_sets(sheet.sets, CATALOG, sheet.statuses, today=TODAY, progressions=rules)

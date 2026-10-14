@@ -186,7 +186,7 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         sets, Catalog(all_exercises(db)), statuses, today=today, progressions=rules
     )
     sync_planned_sets(db, suggestions, computed_at=computed_at)
-    feels = exercise_feel(logged_sets, suggestion_offsets(suggestions))
+    feels = exercise_feel(logged_sets, suggestion_offsets(suggestions), sets)
     sync_exercise_feel(db, feels, computed_at=computed_at)
     log.info(
         "progression rules: %d exercises (%s); exercise_feel: %d lines",

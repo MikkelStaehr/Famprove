@@ -201,7 +201,7 @@ def _legacy_bodyweight(name: str) -> bool:
 def legacy_scoring(bodyweight: float) -> Scorer:
     """The old rule as a scorer: leg TYPEs 1.0, the rest 0.6; bodyweight names add BODYWEIGHT."""
 
-    def score(sheet_type: str, name: str) -> Scoring:
+    def score(sheet_type: str, name: str, variant: str | None = None, /) -> Scoring:
         return Scoring(
             muscle_factor=_legacy_factor(sheet_type),
             bodyweight_kg=bodyweight if _legacy_bodyweight(name) else None,
@@ -216,7 +216,7 @@ def legacy_catalog_rows() -> tuple[JsonRow, ...]:
     synthetic workbook and the real slice: what InMemoryPostgrest starts with."""
     seen: dict[str, tuple[str, str]] = {}
 
-    def record(sheet_type: str, name: str) -> Scoring:
+    def record(sheet_type: str, name: str, variant: str | None = None, /) -> Scoring:
         seen.setdefault(name_key(name), (sheet_type, name.strip()))
         return Scoring(muscle_factor=1.0, bodyweight_kg=None)
 
@@ -380,6 +380,7 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "forecast_log": ("made_on", "target_date", "method"),
     "planned_sessions": ("date", "name"),
     "planned_events": ("id",),
+    "exercise_variants": ("id",),
     "planned_targets": ("date", "name"),
     "ride_metrics": ("activity_id",),
     "cycling_weeks": ("week_start",),
@@ -387,7 +388,7 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "planned_sets": ("sheet_id", "block", "sheet_row", "week", "set_no"),
     "app_notices": ("kind",),
     "exercise_set_log": ("date", "session_no", "row_no", "set_no"),
-    "exercise_feel": ("exercise_id",),
+    "exercise_feel": ("exercise_id", "variant_id"),
     "analysis_summary": ("question",),
     "strength_set_kg": (
         "sheet_id",
@@ -488,7 +489,19 @@ class InMemoryPostgrest(Postgrest):
                 continue
             existing.add(key)
             stored = dict(row)
-            if PRIMARY_KEYS[table] == ("id",) and "id" not in stored:
+            if table == "exercise_variants" and "id" not in stored:
+                stored = {  # the column defaults (migration 20261014190000)
+                    "id": 1 + max((int(str(r["id"])) for r in self.tables[table]), default=0),
+                    "aliases": [],
+                    "muscle_factor": None,
+                    "bodyweight_fraction": None,
+                    "no_bodyweight": False,
+                    "per_side": None,
+                    "kg_per_dumbbell": None,
+                    "suggests": True,
+                    **stored,
+                }
+            elif PRIMARY_KEYS[table] == ("id",) and "id" not in stored:
                 stored = {
                     "id": 1 + max((int(str(r["id"])) for r in self.tables[table]), default=0),
                     "aliases": [],

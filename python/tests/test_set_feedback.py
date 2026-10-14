@@ -79,13 +79,13 @@ def test_an_unreadable_rpe_cell_is_not_used_when_scored_again(make_set: MakeSet)
 
 def test_two_lighter_in_a_row_step_up_and_two_harder_hold() -> None:
     lighter = [entry(32, 1, felt=-1, minute=1), entry(32, 2, felt=-1, minute=5)]
-    assert progressions(lighter, []) == {8: Progression("step", "de sidste to var lettere")}
+    assert progressions(lighter, []) == {(8, None): Progression("step", "de sidste to var lettere")}
     harder = [
         entry(32, 1, felt=-1, minute=1),
         entry(32, 2, felt=1, minute=5),
         entry(32, 3, felt=1, minute=9),
     ]
-    assert progressions(harder, []) == {8: Progression("hold", "de sidste to var hårdere")}
+    assert progressions(harder, []) == {(8, None): Progression("hold", "de sidste to var hårdere")}
     mixed = [entry(32, 1, felt=-1, minute=1), entry(32, 2, felt=0, minute=5)]
     assert progressions(mixed, []) == {}
     # A skipped set never counts; the order is by when the set ended.
@@ -104,7 +104,7 @@ def test_every_set_at_the_top_in_two_sessions_steps_up(make_set: MakeSet) -> Non
         for n in (1, 2)
     ]
     top = [entry(32, n, session=s, reps=10.0) for s in (1, 2) for n in (1, 2)]
-    assert progressions(top, week) == {8: Progression("step", "du ramte 10 reps to gange")}
+    assert progressions(top, week) == {(8, None): Progression("step", "du ramte 10 reps to gange")}
     one_short = [*top[:3], entry(32, 2, session=2, reps=9.0)]
     assert progressions(one_short, week) == {}
     assert progressions(top[:2], week) == {}  # one session is not two
@@ -112,18 +112,18 @@ def test_every_set_at_the_top_in_two_sessions_steps_up(make_set: MakeSet) -> Non
 
 def test_the_feel_line_needs_four_rated_sets_and_names_the_offset() -> None:
     three = [entry(32, n, felt=-1, minute=n) for n in (1, 2, 3)]
-    assert exercise_feel(three, {8: 5.0}) == []
+    assert exercise_feel(three, {(8, None): 5.0}) == []
     four = [*three, entry(33, 1, felt=0, minute=4)]
-    [feel] = exercise_feel(four, {8: 5.0})
+    [feel] = exercise_feel(four, {(8, None): 5.0})
     assert (feel.rated_n, feel.lighter_n, feel.expected_n, feel.harder_n) == (4, 3, 1, 0)
     assert feel.verdict_text == (
         "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE."  # noqa: RUF001
     )
-    [as_rx] = exercise_feel([entry(32, n, felt=0, minute=n) for n in range(4)], {8: 0.0})
+    [as_rx] = exercise_feel([entry(32, n, felt=0, minute=n) for n in range(4)], {(8, None): 0.0})
     assert (
         as_rx.verdict_text == "Du melder oftest som foreskrevet – forslaget følger trænerens RPE."  # noqa: RUF001
     )
-    [harder] = exercise_feel([entry(32, n, felt=1, minute=n) for n in range(4)], {8: None})
+    [harder] = exercise_feel([entry(32, n, felt=1, minute=n) for n in range(4)], {(8, None): None})
     assert harder.verdict_text == "Du melder oftest hårdere end foreskrevet."
 
 

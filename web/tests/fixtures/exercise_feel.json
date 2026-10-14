@@ -1,6 +1,7 @@
 [
   {
     "exercise_id": 2,
+    "variant_id": null,
     "rated_n": 4,
     "lighter_n": 3,
     "expected_n": 1,
@@ -9,10 +10,12 @@
     "computed_at": "2026-10-13T18:00:00+00:00",
     "exercises": {
       "name": "Bænk"
-    }
+    },
+    "exercise_variants": null
   },
   {
     "exercise_id": 8,
+    "variant_id": null,
     "rated_n": 4,
     "lighter_n": 0,
     "expected_n": 3,
@@ -21,10 +24,12 @@
     "computed_at": "2026-10-13T18:00:00+00:00",
     "exercises": {
       "name": "Low incline DB press"
-    }
+    },
+    "exercise_variants": null
   },
   {
     "exercise_id": 9,
+    "variant_id": null,
     "rated_n": 4,
     "lighter_n": 0,
     "expected_n": 0,
@@ -33,6 +38,23 @@
     "computed_at": "2026-10-13T18:00:00+00:00",
     "exercises": {
       "name": "Lat pulldowns"
+    },
+    "exercise_variants": null
+  },
+  {
+    "exercise_id": 16,
+    "variant_id": 7,
+    "rated_n": 4,
+    "lighter_n": 3,
+    "expected_n": 1,
+    "harder_n": 0,
+    "verdict_text": "Du melder oftest lettere end foreskrevet.",
+    "computed_at": "2026-10-13T18:00:00+00:00",
+    "exercises": {
+      "name": "Bicep of choice"
+    },
+    "exercise_variants": {
+      "display_name": "DB Preacher Curl"
     }
   }
 ]

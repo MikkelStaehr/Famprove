@@ -47,6 +47,7 @@ class KgState:
     lifted_changed_at: datetime | None
     first_seen_at: datetime
     gone_at: datetime | None = None  # the set is no longer in the sheet (since this run)
+    variant_id: int | None = None  # the variant in force when last seen (attribute, not key)
 
 
 def kg_keys(sets: Iterable[StrengthSet]) -> dict[SetKey, KgKey]:
@@ -88,6 +89,7 @@ def next_kg_state(
             lifted_first_at=None,
             lifted_changed_at=None,
             first_seen_at=now,
+            variant_id=s.variant_id,
         )
     else:
         state = replace(
@@ -97,6 +99,7 @@ def next_kg_state(
             reps_text=s.reps_text,
             week_start=s.week_start,
             gone_at=None,  # back in the sheet
+            variant_id=s.variant_id,
         )
     kg = s.logged_kg
     if status == "planned":

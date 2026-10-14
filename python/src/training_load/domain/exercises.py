@@ -14,9 +14,9 @@ accessory (UNKNOWN_FACTOR, no bodyweight) and is reported, never silent: collect
 and adds it to the table for the user to correct.
 """
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Protocol
 
 CATEGORIES: Final = ("main", "accessory", "isolation", "bodyweight", "abs")
 UNKNOWN_CATEGORY: Final = "accessory"
@@ -52,7 +52,36 @@ class Scoring:
     kg_factor: int = 1  # 2: the logged kg is per dumbbell, two held (exercises.kg_per_dumbbell)
 
 
-type Scorer = Callable[[str, str], Scoring]
+class Scorer(Protocol):
+    """(sheet TYPE, exercise name[, normalised variant]) -> Scoring. The catalogue scores by name
+    and variant only; the TYPE is there for callers that score by the sheet's TYPE."""
+
+    def __call__(self, sheet_type: str, name: str, variant: str | None = None, /) -> Scoring: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ExerciseVariant:
+    """A row of public.exercise_variants (user, 2026-10-14): a variant of an exercise written as
+    "V: <variant>" in the sheet. Every scoring field is an override; None = inherit."""
+
+    id: int
+    exercise_id: int
+    name: str  # normalised (variant_key)
+    display_name: str
+    aliases: tuple[str, ...] = ()
+    muscle_factor: float | None = None
+    bodyweight_fraction: float | None = None
+    no_bodyweight: bool = False  # True: no bodyweight even if the exercise has a fraction
+    per_side: bool | None = None
+    kg_per_dumbbell: bool | None = None
+    suggests: bool = True  # False: no suggested kg (e.g. a multi-exercise variant)
+
+
+def variant_key(text: str) -> str:
+    """The normalised variant name: trimmed, lower case, whitespace collapsed (user, 2026-10-14)."""
+    return " ".join(text.split()).lower()
+
+
 """(sheet TYPE, exercise name) -> Scoring. The catalogue scores by name only; the TYPE is there
 for callers that score by the sheet's TYPE (the tests' copy of the old rule)."""
 
@@ -70,7 +99,9 @@ class Catalog:
     in ``conflicts`` for a warning: the user has to fix the table, the run doesn't guess silently.
     """
 
-    def __init__(self, exercises: Iterable[Exercise]) -> None:
+    def __init__(
+        self, exercises: Iterable[Exercise], variants: Iterable[ExerciseVariant] = ()
+    ) -> None:
         ordered = sorted(exercises, key=lambda e: e.id)
         self._by_key: dict[str, Exercise] = {}
         self.conflicts: list[str] = []
@@ -84,23 +115,82 @@ class Catalog:
                         f"alias {alias!r} of {e.name!r} already names {owner.name!r}"
                     )
 
+        # Variants per exercise by name and alias (normalised); a clash keeps the first by id.
+        self._variants: dict[tuple[int, str], ExerciseVariant] = {}
+        ordered_variants = sorted(variants, key=lambda v: v.id)
+        for v in ordered_variants:
+            self._variants.setdefault((v.exercise_id, variant_key(v.name)), v)
+        for v in ordered_variants:
+            for alias in v.aliases:
+                holder = self._variants.setdefault((v.exercise_id, variant_key(alias)), v)
+                if holder.id != v.id:
+                    self.conflicts.append(
+                        f"variant alias {alias!r} of {v.name!r} already names {holder.name!r}"
+                    )
+
     def find(self, name: str) -> Exercise | None:
         return self._by_key.get(name_key(name))
 
-    def scoring(self, name: str, bodyweight: float) -> Scoring:
+    def variant_by_id(self, variant_id: int | None) -> ExerciseVariant | None:
+        if variant_id is None:
+            return None
+        return next((v for v in self._variants.values() if v.id == variant_id), None)
+
+    def find_variant(self, name: str, variant: str | None) -> ExerciseVariant | None:
+        """The stored variant (by name or alias) of the exercise ``name``; None when the exercise
+        or the variant is unknown, or ``variant`` is None (ukendt)."""
+        exercise = self.find(name)
+        if exercise is None or variant is None:
+            return None
+        return self._variants.get((exercise.id, variant_key(variant)))
+
+    def scoring(self, name: str, bodyweight: float, variant: str | None = None) -> Scoring:
+        """The exercise's scoring inputs, each overridden by the variant's when it sets one
+        (user, 2026-10-14). An unknown variant inherits everything."""
         exercise = self.find(name)
         if exercise is None:
             return Scoring(muscle_factor=UNKNOWN_FACTOR, bodyweight_kg=None)
+        v = self.find_variant(name, variant)
         fraction = exercise.bodyweight_fraction
+        if v is not None and v.no_bodyweight:
+            fraction = None
+        elif v is not None and v.bodyweight_fraction is not None:
+            fraction = v.bodyweight_fraction
+        per_side = exercise.per_side if v is None or v.per_side is None else v.per_side
+        per_dumbbell = (
+            exercise.kg_per_dumbbell
+            if v is None or v.kg_per_dumbbell is None
+            else v.kg_per_dumbbell
+        )
         return Scoring(
-            muscle_factor=exercise.muscle_factor,
+            muscle_factor=(
+                exercise.muscle_factor if v is None or v.muscle_factor is None else v.muscle_factor
+            ),
             bodyweight_kg=None if fraction is None else bodyweight * fraction,
-            sides=2 if exercise.per_side else 1,
-            kg_factor=2 if exercise.kg_per_dumbbell else 1,
+            sides=2 if per_side else 1,
+            kg_factor=2 if per_dumbbell else 1,
         )
 
     def scorer(self, bodyweight: float) -> Scorer:
-        return lambda _type, name: self.scoring(name, bodyweight)
+        def score(_type: str, name: str, variant: str | None = None, /) -> Scoring:
+            return self.scoring(name, bodyweight, variant)
+
+        return score
+
+    def unknown_variants(
+        self, pairs: Iterable[tuple[str, str | None, str | None]]
+    ) -> list[tuple[int, str, str]]:
+        """(exercise id, normalised name, display name) of the variants seen in (exercise name,
+        variant, display) that the catalogue doesn't store yet, for a known exercise; distinct,
+        the first display spelling wins."""
+        found: dict[tuple[int, str], str] = {}
+        for name, variant, display in pairs:
+            exercise = self.find(name)
+            if exercise is None or variant is None:
+                continue
+            if self.find_variant(name, variant) is None:
+                found.setdefault((exercise.id, variant_key(variant)), display or variant)
+        return [(eid, key, shown) for (eid, key), shown in sorted(found.items())]
 
     def unknown(self, names: Iterable[str]) -> list[str]:
         """The distinct names (first spelling seen, trimmed) that match nothing, sorted."""

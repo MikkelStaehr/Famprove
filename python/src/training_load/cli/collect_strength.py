@@ -19,6 +19,7 @@ from training_load.config import (
     mask_in_ci,
 )
 from training_load.db.client import Postgrest
+from training_load.db.exercise_variants import add_unknown_variants, all_variants
 from training_load.db.exercises import add_unknown, all_exercises
 from training_load.db.strength_sets import replace_for_sheet
 from training_load.domain.exercises import Catalog
@@ -80,7 +81,15 @@ def section_key(parsed: ParsedSet) -> SectionKey:
     return (parsed["block"], parsed["week"], parsed["section"])
 
 
-def to_domain(parsed: ParsedSet, sheet_id: str, slot: SessionSlot) -> StrengthSet:
+def variant_id(catalog: Catalog, parsed: ParsedSet) -> int | None:
+    """The stored variant's id for a parsed set (None: ukendt)."""
+    found = catalog.find_variant(parsed["name"], parsed["variant"])
+    return None if found is None else found.id
+
+
+def to_domain(
+    parsed: ParsedSet, sheet_id: str, slot: SessionSlot, variant_id: int | None = None
+) -> StrengthSet:
     """Map a parser dict to StrengthSet: row -> sheet_row, set -> set_no, add sheet_id and
     the session slot (ISO week start + session number); the sheet's date is not kept.
 
@@ -129,6 +138,7 @@ def to_domain(parsed: ParsedSet, sheet_id: str, slot: SessionSlot) -> StrengthSe
         muscle_factor=parsed["muscle_factor"],
         sides=parsed["sides"],
         kg_factor=parsed["kg_factor"],
+        variant_id=variant_id,
         notes=notes_text(parsed["raw"]),
     )
 
@@ -145,7 +155,7 @@ def run(google: GoogleSettings, *, bodyweight: float, send: HttpSend, db: Postgr
     """
     token = access_token(google.service_account_info)
     xlsx = download_workbook(send, token=token, file_id=google.sheet_id)
-    catalog = Catalog(all_exercises(db))
+    catalog = Catalog(all_exercises(db), all_variants(db))
     for conflict in catalog.conflicts:
         log.warning("public.exercises: %s (the first by id is used)", conflict)
     issues: Counter[str] = Counter()
@@ -163,10 +173,26 @@ def run(google: GoogleSettings, *, bodyweight: float, send: HttpSend, db: Postgr
             ", ".join(unknown),
         )
         add_unknown(db, unknown)
+        catalog = Catalog(all_exercises(db), all_variants(db))
+    # Variants from "V:" lines (user, 2026-10-14): unknown ones are added with every value
+    # inheriting from the exercise (insert-only), so they score exactly as the exercise until the
+    # user sets their values; each set then carries its variant's id.
+    pairs = ((p["name"], p["variant"], p["variant_display"]) for p in parsed)
+    if new_variants := catalog.unknown_variants(pairs):
+        log.warning(
+            "%d exercise variants not in public.exercise_variants, added inheriting the "
+            "exercise's values: %s",
+            len(new_variants),
+            ", ".join(shown for _eid, _key, shown in new_variants),
+        )
+        add_unknown_variants(db, new_variants)
+        catalog = Catalog(all_exercises(db), all_variants(db))
     slots = number_sessions((section_key(p), p["date"]) for p in parsed)
     if shared := shared_weeks(slots):
         log.warning("%d weeks have sessions from more than one tab", len(shared))
-    sets = [to_domain(p, google.sheet_id, slots[section_key(p)]) for p in parsed]
+    sets = [
+        to_domain(p, google.sheet_id, slots[section_key(p)], variant_id(catalog, p)) for p in parsed
+    ]
     replace_for_sheet(db, google.sheet_id, sets)
     for tab, count in sorted(Counter(s.block for s in sets).items()):
         log.info("%s: %d sets", tab, count)
