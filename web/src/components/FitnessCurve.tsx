@@ -64,11 +64,11 @@ export function FitnessCurve({ points, blocks, today, lastActual, summary }: Fit
   }.`;
   return (
     <>
-      <Plot points={shown} blocks={blocks} today={today} lastActual={lastActual} from={win.from} to={win.to} range={range} />
+      <Plot points={shown} blocks={blocks} lastActual={lastActual} from={win.from} to={win.to} range={range} />
       <p className="sr-only" aria-live="polite">
         {rangeSentence} {summary}
       </p>
-      <div className="flex flex-nowrap items-center justify-between gap-x-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <SegmentedControl label="Periode" segments={RANGES} value={range} onChange={setRange} size="hero" />
         <ul aria-label="Forklaring" className="flex flex-col items-end gap-1 font-mono text-11 text-text-muted sm:flex-row sm:items-center sm:gap-x-3">
           {lastActual >= win.from && (
@@ -101,7 +101,6 @@ export function FitnessCurve({ points, blocks, today, lastActual, summary }: Fit
 type PlotProps = {
   readonly points: readonly ChartPoint[];
   readonly blocks: readonly BlockSpan[];
-  readonly today: IsoDate;
   readonly lastActual: IsoDate;
   readonly from: IsoDate;
   readonly to: IsoDate;
@@ -145,7 +144,7 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
   // last measured day), split there, so the dotted prognose leaves the line without a corner.
   const anchors = curveAnchors(points, (p) => ctlBandArea(p) !== null);
   const last = anchors.measured.at(-1);
-  const curve = monotoneSegments([...anchors.measured, ...anchors.prognose.slice(1)].map((p) => ({ x: x(p.date), y: y(p.ctl) })));
+  const curve = monotoneSegments([...anchors.measured, ...anchors.prognose.slice(anchors.measured.length > 0 ? 1 : 0)].map((p) => ({ x: x(p.date), y: y(p.ctl) })));
   const measuredPath = segmentsPath(curve.slice(0, Math.max(0, anchors.measured.length - 1)));
   const prognosePath = segmentsPath(curve.slice(Math.max(0, anchors.measured.length - 1)));
   const bandPts = anchors.band;

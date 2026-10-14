@@ -98,15 +98,16 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
       <div className="flex gap-2.5">
         <div aria-hidden="true" className="flex flex-col">
           <span className={WEEK_ROW} />
-          <div className="grid grid-rows-[repeat(7,20px)] gap-1 font-mono text-11 leading-5 text-text-muted">
+          <div className="grid grid-rows-[repeat(7,20px)] gap-[4px] font-mono text-11 leading-5 text-text-muted">
             {ROW_LABEL.map((l, i) => (
               <span key={i}>{l}</span>
             ))}
           </div>
         </div>
-        <div className="min-w-0">
+        {/* px gaps: the grid stays 284px at 200 % text; past that it scrolls inside the card, never the page (3px room for the today outline). */}
+        <div className="-m-[3px] min-w-0 overflow-x-auto p-[3px]">
           {/* ISO week numbers above the columns (§6): mono 10 muted, the current week --text 500; the hidden table has the dates. */}
-          <div aria-hidden="true" className={`grid w-max grid-flow-col gap-1 font-mono text-10 leading-3 text-text-muted tabular-nums ${WEEK_ROW}`} style={{ gridAutoColumns: "20px" }}>
+          <div aria-hidden="true" className={`grid w-max grid-flow-col gap-[4px] font-mono text-10 leading-3 text-text-muted tabular-nums ${WEEK_ROW}`} style={{ gridAutoColumns: "20px" }}>
             {weeks.map((w, i) => (
               <span key={w.weekStart} className={`text-center ${i === weeks.length - 1 ? "font-medium text-text" : ""}`}>
                 {isoWeek(w.weekStart).week}
@@ -116,7 +117,7 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
           <div
             {...plotProps}
             aria-label="Træningsdage. Brug piletasterne for at gå dag for dag."
-            className={`relative grid w-max cursor-pointer grid-flow-col grid-rows-[repeat(7,20px)] gap-1 rounded-cell ${PLOT_FOCUS}`}
+            className={`relative grid w-max cursor-pointer grid-flow-col grid-rows-[repeat(7,20px)] gap-[4px] rounded-cell ${PLOT_FOCUS}`}
             style={{ ...plotProps.style, gridAutoColumns: "20px" }}
           >
             {cells.map((c, i) =>
