@@ -109,3 +109,4 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | cli-from-repo | Supabase migrations run from the repo with the pinned CLI; the scratch copy is gone | S |
 | retro-external-step | CLAUDE.md: an external source gets its own step, optional ones continue-on-error | S |
 | per-side-dumbbell | Unilateral and dumbbell exercises: exercises.per_side (reps per side, both counted) and kg_per_dumbbell (x2), recorded per set; marked after the user sees the lists | M |
+| variants | Exercise variants from 'V:' in the sheet's NOTES: exercise_variants with aliases and inherited fields, per (exercise, variant) grouping, variant names on Træning/Fokus | L |
