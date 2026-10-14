@@ -24,7 +24,7 @@ import type { LoggedSet, SetRef } from "@/lib/set-taps";
 import { formatKg } from "@/lib/format";
 import { dotField, FIELD_WIDTH } from "@/lib/fokus-marks";
 
-import { ArrowIcon, INK_LINK, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { ArrowIcon, CAPTION, INK_LINK, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
@@ -181,7 +181,7 @@ export function PauseCard({ since, exercise, onAnnounce }: { readonly since: str
   const rail = exercise.restMinS !== null && exercise.restMaxS !== null;
   return (
     <section aria-label="Pause" className="mt-10 flex flex-col">
-      <p className="caption">Pause</p>
+      <p className={CAPTION}>Pause</p>
       <div className="mt-3">
         <RestTimer seconds={seconds} label="Pause" />
       </div>
@@ -212,10 +212,10 @@ function Scale({ seconds, scaleS, minS, maxS }: { readonly seconds: number; read
     <div aria-hidden="true" className="mt-3 flex w-full flex-col">
       {marks && f.minX !== null && f.maxX !== null && (
         <div className="relative h-4">
-          <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: pct(f.minX + 1) }}>
+          <span className="absolute top-0 -translate-x-1/2 font-mono text-12 leading-none text-text-muted" style={{ left: pct(f.minX + 1) }}>
             Min
           </span>
-          <span className="caption absolute top-0 -translate-x-1/2 leading-none" style={{ left: pct(f.maxX + 0.5) }}>
+          <span className="absolute top-0 -translate-x-1/2 font-mono text-12 leading-none text-text-muted" style={{ left: pct(f.maxX + 0.5) }}>
             Max
           </span>
         </div>
@@ -234,7 +234,7 @@ function Scale({ seconds, scaleS, minS, maxS }: { readonly seconds: number; read
             <rect data-mark="max" x={f.maxX} y={4} width={1} height={52} fill="var(--text)" />
           </>
         )}
-        <rect data-now={f.tickX} x={f.tickX} y={0} width={2} height={60} fill="var(--today)" />
+        <rect data-now={f.tickX} x={f.tickX} y={0} width={2} height={60} fill="var(--text)" />
       </svg>
       <div className="mt-1 flex justify-between font-mono text-12 leading-none text-text-muted">
         <span>0</span>
@@ -262,12 +262,12 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
       </div>
       {ramp === "ramp" && exercise.ramp !== null && (
         <div className="@container mt-14 flex flex-col">
-          {basis !== null && <p className="caption">{basis}</p>}
+          {basis !== null && <p className={CAPTION}>{basis}</p>}
           {/* One row of columns while they fit (21rem at 100 % text); stacked at 200 % text. */}
           <ol aria-label="Opvarmningssæt" className="mt-3 grid gap-x-3 gap-y-4 @min-[21rem]:auto-cols-fr @min-[21rem]:grid-flow-col">
             {exercise.ramp.map((r) => (
               <li key={r.pct} className="flex flex-col @min-[21rem]:not-first:border-l @min-[21rem]:not-first:border-border @min-[21rem]:not-first:pl-3">
-                <span className="caption">{Math.round(r.pct)}&nbsp;%</span>
+                <span className={CAPTION}>{Math.round(r.pct)}&nbsp;%</span>
                 <span className="flex flex-wrap items-baseline">
                   <span className="text-24 text-text">{formatKg(r.kg)}</span>
                   <span className="text-14 text-text-muted">&nbsp;kg</span>

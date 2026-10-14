@@ -49,7 +49,7 @@ import {
 } from "@/lib/set-taps";
 
 import { FokusProgress } from "./FokusProgress";
-import { CheckIcon, FokusWarning as WarningLine, INK_LINK, MUTED_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { CAPTION, CheckIcon, FokusWarning as WarningLine, INK_LINK, MUTED_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { SessionSignature } from "./SessionSignature";
 import { FeelBlock, Footer, NextSetCard, Note, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
@@ -337,20 +337,20 @@ function SetView({
         <h2 id="fokus-set" className="font-sans text-28 font-normal [overflow-wrap:anywhere]">
           {exerciseName(e)}
         </h2>
-        <p className="caption mt-3">{setTitle(current)}</p>
+        <p className={`${CAPTION} mt-3`}>{setTitle(current)}</p>
 
         {/* One value row; below 21rem the kg column takes its own line (200 % text). */}
         <div className="@container mt-10">
           <div className="grid grid-cols-[auto_auto] gap-x-6 gap-y-3 @min-[21rem]:grid-cols-[auto_auto_1fr]">
             {e.repsText !== null && (
               <p className="flex flex-col [overflow-wrap:anywhere]">
-                <span className="caption">Reps</span>
+                <span className={CAPTION}>Reps</span>
                 <span className="text-48">{rangeFigure(e.repsText)}</span>
               </p>
             )}
             {cell !== null && (
               <p className="flex flex-col [overflow-wrap:anywhere]">
-                <span className="caption">{cell.caption ?? "\u00a0"}</span>
+                <span className={CAPTION}>{cell.caption ?? "\u00a0"}</span>
                 <span>
                   <span className="text-48">{cell.value}</span>
                   {cell.unit !== null && <span className="text-20 text-text-muted">{cell.unit}</span>}
@@ -363,7 +363,7 @@ function SetView({
                   hasWords(kg.figure) ? "col-span-full @min-[21rem]:col-span-full" : "col-span-2 @min-[21rem]:col-span-1"
                 }`}
               >
-                <span className="caption">{kg.label}</span>
+                <span className={CAPTION}>{kg.label}</span>
                 <span>
                   {kg.kind === "suggestion" ? <span className="text-48">{kg.figure}</span> : <FigureWithWords figure={kg.figure} />}
                   {kg.unit !== null && <span className="text-20 text-text-muted">{"\u00a0"}kg</span>}
@@ -395,7 +395,7 @@ function SetView({
 
         <div className={`mt-6 ${PRIMARY_DOCK}`}>
           <button ref={primary} type="button" onClick={() => onDone(current)} className={PRIMARY_BOX}>
-            <CheckIcon className="size-6" />
+            <CheckIcon className="size-5" />
             Udført
           </button>
         </div>
@@ -530,7 +530,7 @@ function FinishedView({
         <div className="mt-10 flex flex-col gap-3">
           <CountsFigure text={card.counts} />
           <SessionSignature marks={marks} />
-          {card.times !== null && <p className="caption">{card.times}</p>}
+          {card.times !== null && <p className={CAPTION}>{card.times}</p>}
           {footer}
         </div>
       </section>

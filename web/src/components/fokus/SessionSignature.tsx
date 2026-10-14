@@ -42,7 +42,7 @@ export function SessionSignature({ marks }: { readonly marks: Signature }) {
           );
         })}
       </svg>
-      <div className="caption flex flex-col gap-1 normal-case">
+      <div className="flex flex-col gap-1 font-mono text-13 text-text-muted">
         <p aria-hidden="true" className="flex flex-wrap items-center gap-x-2">
           <Glyph kind="ring" /> Lettere · <Glyph kind="dash" /> Som ventet · <Glyph kind="square" /> Hårdere ·{" "}
           <Glyph kind="cross" /> sprunget over
