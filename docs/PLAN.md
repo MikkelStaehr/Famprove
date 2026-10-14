@@ -83,3 +83,12 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | reset-belastning | Belastning from the mockup: form card with zone bar, stat cards, fitness curve with 4U/12U/Sæson, 12-week day grid, daily TSS bars, week list | L |
 | reset-traening | Træning with the light "I dag" card and card lists; Fokus on the new tokens and fonts | M |
 | reset-analyse | Analyse (Cykel, Styrke) on the card system | M |
+| post-reset | Review after the visual reset: curve, readouts, shared week, Træning rows, forecast needle, e1RM rule, Styrke tick | L |
+| curve-smooth | Belastning fitness curve as a smooth monotone curve; forecast stays dotted | S |
+| readout-on-tap | Day grid and TSS bars: readout row only after a tap, no default "Seneste" row | S |
+| week-shared | One week source for Træning and Belastning: planned sessions and I DAG in /load's week list | M |
+| no-suggestion-line | Træning: no "Intet forslag" lines; the suggestion when there is one, else only SIDSTE UGE | S |
+| exercise-collapse | Træning: one row per exercise (prescription, last week's kg, set dots), tap to expand, the next one open | M |
+| forecast-needle | Forecast form reaching −50 around 11 Nov: find the day, explain, fix the source value | M |
+| e1rm-one-rule | Analyse › Styrke e1RM uses the suggestions' rule (≤ 5 reps, RPE ≥ 7): one function, an agreement test | M |
+| styrke-today-tick | Analyse › Styrke chart: the lone today tick gets a date label or goes | S |
