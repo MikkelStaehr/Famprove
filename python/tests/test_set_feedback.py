@@ -12,12 +12,11 @@ from training_load.domain.set_feedback import (
     exercise_feel,
     progressions,
     range_top,
-    rolling_e1rm_at,
     with_reps_done,
     with_rolling_e1rm_rpe,
 )
 from training_load.domain.strength import StrengthSet
-from training_load.domain.strength_analysis import StrengthWeek
+from training_load.domain.strength_analysis import StrengthWeek, rolling_e1rm_at
 
 MakeSet = Callable[..., StrengthSet]
 MONDAY = date(2026, 10, 12)

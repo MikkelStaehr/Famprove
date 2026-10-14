@@ -34,7 +34,7 @@ def producer_rows(make_set: MakeSet) -> list[StrengthWeekRow]:
             "name": "Squat",
             "reps": 5.0,
             "logged_kg": 140.0,
-            "prescribed": "RPE 6.5",
+            "prescribed": "RPE 7",  # counts for e1RM (<= 5 reps at RPE >= 7)
         }
         return make_set(**(values | changes))
 

@@ -4,13 +4,12 @@
                  rounded to ROUND_TO_KG
 
 - The lift: the exercise's parent_lift in public.exercises (a main lift is its own parent).
-- Rolling e1RM: the highest e1RM of a qualifying lifted set of that lift in the
-  ROLLING_E1RM_WEEKS ISO weeks ending with the run day's week (one light week doesn't drag it
-  down, an old peak doesn't linger). Qualifying (user, 2026-10-13): the competition lift, at most
-  ROLLING_MAX_REPS reps and a prescribed RPE of at least ROLLING_MIN_RPE, because back-off and
-  high-rep sets inflate the estimate (an 8-rep back-off at RPE 5-7 put bench at 110 kg against
-  a top set of 85 x 3 @ 7). RPE = the set's logged RPE when present, else the prescribed one.
-  /analyse keeps its own, wider rule (strength_analysis.MAX_E1RM_REPS) for the e1RM history.
+- Rolling e1RM: the highest e1RM of that lift in the ROLLING_E1RM_WEEKS ISO weeks ending with
+  the run day's week (one light week doesn't drag it down, an old peak doesn't linger), by the
+  one e1RM rule /analyse uses too (strength_analysis.e1rm_point, user 2026-10-13/14: lifted
+  competition-lift sets of at most E1RM_MAX_REPS reps at a prescribed RPE of at least
+  E1RM_MIN_RPE; RPE = the set's logged RPE when present, else the prescribed one). It equals
+  the best weekly e1RM Analyse > Styrke shows in those weeks.
 - Weekly cap (user, 2026-10-13): against last week's logged kg for the same row (the same
   sheet row of the same block the week before, same exercise and reps: what Træning shows as
   "Sidste uge"), a suggestion rises at most CAP_UPPER_KG for an upper-body exercise and
@@ -43,18 +42,14 @@ from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.set_feedback import Progression
 from training_load.domain.strength import StrengthSet, iso_week_start
 from training_load.domain.strength_analysis import (
-    E1RM_BOUNDS_KG,
     E1RM_FACTOR,
+    ROLLING_E1RM_WEEKS,
     KgStatus,
     SetKey,
-    e1rm,
-    is_competition_lift,
+    best_e1rm,
     set_key,
 )
 
-ROLLING_E1RM_WEEKS: Final = 4
-ROLLING_MAX_REPS: Final = 5
-ROLLING_MIN_RPE: Final = 7.0
 CAP_UPPER_KG: Final = 2.5
 CAP_LOWER_KG: Final = 5.0
 LOWER_BODY_WORDS: Final = (
@@ -128,40 +123,19 @@ def round_to_step(kg: float, step: float = ROUND_TO_KG) -> float:
     return math.floor(kg / step + 0.5) * step
 
 
-def counts_for_rolling_e1rm(s: StrengthSet, status: KgStatus) -> bool:
-    """A lifted competition-lift set of at most ROLLING_MAX_REPS reps at a prescribed RPE of at
-    least ROLLING_MIN_RPE, with logged kg."""
-    rpe = prescribed_rpe(s.prescribed)
-    return (
-        status != "planned"
-        and is_competition_lift(s)
-        and s.reps <= ROLLING_MAX_REPS
-        and rpe is not None
-        and rpe >= ROLLING_MIN_RPE
-        and s.logged_kg is not None
-        and s.logged_kg > 0
-    )
-
-
 def rolling_e1rm(
     sets: Iterable[StrengthSet], statuses: Mapping[SetKey, KgStatus], lift: str, run_week: date
 ) -> float | None:
-    """The highest e1RM of ``lift``'s qualifying sets in the ROLLING_E1RM_WEEKS weeks ending with
-    ``run_week`` (an ISO Monday); None when there is none. Implausible values are left out."""
+    """The highest e1RM of ``lift``'s sets in the ROLLING_E1RM_WEEKS weeks ending with
+    ``run_week`` (an ISO Monday), by strength_analysis.e1rm_point; None when there is none.
+    Implausible values are left out."""
     first = run_week - timedelta(weeks=ROLLING_E1RM_WEEKS - 1)
-    low, high = E1RM_BOUNDS_KG
-    values = []
-    for s in sets:
-        if s.type != lift or not first <= s.week_start <= run_week:
-            continue
-        if not counts_for_rolling_e1rm(s, statuses[set_key(s)]):
-            continue
-        rpe = s.logged_rpe if s.logged_rpe is not None else prescribed_rpe(s.prescribed)
-        assert rpe is not None and s.logged_kg is not None  # counts_for_rolling_e1rm
-        value = e1rm(s.logged_kg, s.reps, rpe)
-        if low <= value <= high:
-            values.append(value)
-    return max(values, default=None)
+    best, _ = best_e1rm(
+        (s, statuses[set_key(s)])
+        for s in sets
+        if s.type == lift and first <= s.week_start <= run_week
+    )
+    return best.e1rm_kg if best is not None else None
 
 
 def _step_down(kg: float) -> float:

@@ -11,15 +11,21 @@ import pytest
 
 from conftest import legacy_scoring
 from training_load.domain.kg_history import KgState, gone_states, kg_keys, next_kg_state
+from training_load.domain.planned_sets import rolling_e1rm
 from training_load.domain.strength import Block, StrengthSet
 from training_load.domain.strength_analysis import (
     E1RM_FACTOR,
+    ROLLING_E1RM_WEEKS,
+    E1rmPoint,
     KgStatus,
+    SetKey,
     StrengthWeek,
     e1rm,
+    e1rm_point,
     kg_status,
     kg_statuses,
     phase_of,
+    rolling_e1rm_at,
     set_key,
     strength_weeks,
 )
@@ -38,7 +44,7 @@ NOW = datetime(2026, 10, 1, 3, 0, tzinfo=UTC)
 
 
 def top(make_set: MakeSet, **changes: object) -> StrengthSet:
-    """A lifted-looking competition top set: Squat 1 x 5 @ RPE 6.5, 140 kg."""
+    """A lifted-looking competition top set: Squat 1 x 5 @ RPE 7, 140 kg."""
     values: dict[str, object] = {
         "block": B11,
         "week_start": W1,
@@ -47,7 +53,7 @@ def top(make_set: MakeSet, **changes: object) -> StrengthSet:
         "name": "Squat",
         "reps": 5.0,
         "logged_kg": 140.0,
-        "prescribed": "RPE 6.5",
+        "prescribed": "RPE 7",
     }
     return make_set(**(values | changes))
 
@@ -131,7 +137,7 @@ def test_only_competition_rpe_sets_give_an_e1rm(make_set: MakeSet) -> None:
         top(make_set, sheet_row=2, name="3.2.0 Tempo squat"),  # variant
         top(make_set, sheet_row=3, prescribed="-10%", logged_kg=126.0),  # back-off
         top(make_set, sheet_row=4, prescribed="75%"),  # % of the tab's 1RM: circular
-        top(make_set, sheet_row=5, reps=10.0),  # above MAX_E1RM_REPS
+        top(make_set, sheet_row=5, reps=10.0),  # above E1RM_MAX_REPS
         top(make_set, sheet_row=6, logged_kg=None),  # nothing entered
     ]
     week = analyse(excluded)[(W1, "SQUAT")]
@@ -140,16 +146,101 @@ def test_only_competition_rpe_sets_give_an_e1rm(make_set: MakeSet) -> None:
     assert week.tonnage_kg == pytest.approx(140 * 5 * 2 + 126 * 5 + 140 * 10)
 
 
-def test_the_week_takes_its_best_set_and_logged_rpe_wins(make_set: MakeSet) -> None:
+def test_the_week_takes_its_best_set_each_with_its_own_rpe(make_set: MakeSet) -> None:
     prescribed_only = analyse([top(make_set), top(make_set, sheet_row=2, logged_kg=145.0)])
     best = prescribed_only[(W1, "SQUAT")]
     assert best.e1rm_load_kg == 145.0 and best.e1rm_rpe_source == "prescribed"
-    assert best.e1rm_kg == pytest.approx(e1rm(145.0, 5, 6.5))
+    assert best.e1rm_kg == pytest.approx(e1rm(145.0, 5, 7))
 
-    mixed = analyse([top(make_set, logged_rpe=8.0), top(make_set, sheet_row=2, logged_kg=150.0)])
-    logged = mixed[(W1, "SQUAT")]
-    assert logged.e1rm_rpe_source == "logged" and logged.e1rm_load_kg == 140.0
-    assert logged.e1rm_kg == pytest.approx(e1rm(140.0, 5, 8.0))
+    # A set's logged RPE replaces its prescribed one; another set keeps its own (one rule with
+    # the suggestions' rolling e1RM, user 2026-10-14).
+    logged_hard = top(make_set, logged_rpe=9.5, logged_kg=145.0)
+    plain = top(make_set, sheet_row=2, logged_kg=140.0)
+    week = analyse([logged_hard, plain])[(W1, "SQUAT")]
+    assert week.e1rm_rpe_source == "prescribed" and week.e1rm_load_kg == 140.0
+    assert week.e1rm_kg == pytest.approx(e1rm(140.0, 5, 7))  # 140 @ 7 beats 145 @ 9.5
+    logged_easy = top(make_set, logged_rpe=6.0, logged_kg=150.0)
+    week = analyse([logged_easy, plain])[(W1, "SQUAT")]
+    assert (week.e1rm_rpe_source, week.e1rm_load_kg, week.e1rm_rpe) == ("logged", 150.0, 6.0)
+
+
+def test_the_one_rule_only_heavy_low_rep_sets_count(make_set: MakeSet) -> None:
+    """User, 2026-10-14: Analyse uses the suggestions' rule. 78.5 x 8 @ 6 (it put bench at
+    110 kg) and 5 x RPE 6.5 never count; 5 x RPE 7 does; a week with only the first two has
+    no e1RM (None, never 0)."""
+    bench = {"type": "BENCH", "name": "Bænkpres"}
+    eight_at_6 = top(make_set, **bench, sheet_row=2, reps=8.0, prescribed="RPE 6", logged_kg=78.5)
+    five_at_65 = top(make_set, **bench, sheet_row=3, reps=5.0, prescribed="RPE 6.5", logged_kg=80.0)
+    five_at_7 = top(make_set, **bench, sheet_row=4, reps=5.0, prescribed="RPE 7", logged_kg=75.0)
+    for s in (eight_at_6, five_at_65):
+        assert e1rm_point(s, "lifted") is None
+    assert e1rm_point(five_at_7, "lifted") == E1rmPoint(
+        e1rm(75.0, 5, 7), 75.0, 5.0, 7.0, "prescribed"
+    )
+    assert e1rm_point(five_at_7, "planned") is None  # the plan never counts
+    # Edges: 5 reps and RPE 7 are in, a range's midpoint decides (RPE 6.5 - 7.5 -> 7).
+    assert e1rm_point(replace(five_at_7, prescribed="RPE 6.5 - 7.5"), "lifted") is not None
+    assert e1rm_point(replace(five_at_7, prescribed="RPE 6 - 7"), "lifted") is None
+    assert e1rm_point(replace(five_at_7, reps=6.0), "lifted") is None
+    # A logged RPE below 7 still counts: the prescription decides which sets qualify.
+    assert e1rm_point(replace(five_at_7, logged_rpe=6.0), "lifted") is not None
+
+    week_light = W1 + timedelta(days=7)
+    light = [replace(s, week_start=week_light, week=2) for s in (eight_at_6, five_at_65)]
+    weeks = analyse([eight_at_6, five_at_65, five_at_7, *light])
+    assert weeks[(W1, "BENCH")].e1rm_kg == pytest.approx(e1rm(75.0, 5, 7))
+    empty = weeks[(week_light, "BENCH")]
+    assert empty.e1rm_kg is None and empty.e1rm_rpe_source is None
+    assert empty.sets_lifted == 2 and empty.tonnage_kg == pytest.approx(78.5 * 8 + 80.0 * 5)
+    assert rolling_e1rm(light, {set_key(s): "lifted" for s in light}, "BENCH", week_light) is None
+
+
+def test_suggestions_and_analyse_agree_on_the_rolling_e1rm(make_set: MakeSet) -> None:
+    """For every lift and week: planned_sets' rolling e1RM = the best weekly e1RM strength_weeks
+    gives in the ROLLING_E1RM_WEEKS ISO weeks ending with that week (and set_feedback's, which
+    reads those weeks). Several weeks and lifts, sets that count and sets that don't."""
+    names = {"SQUAT": "Squat", "BENCH": "Bænkpres", "DEADLIFT": "Dødløft"}
+    base_kg = {"SQUAT": 140.0, "BENCH": 85.0, "DEADLIFT": 170.0}
+    rows = [  # (reps, prescribed, kg offset, logged RPE)
+        (3.0, "RPE 7", 0.0, None),
+        (5.0, "RPE 8", -10.0, None),
+        (1.0, "RPE 8.5", 10.0, 9.0),
+        (8.0, "RPE 6", -20.0, None),  # never counts
+        (5.0, "RPE 6.5", 5.0, None),  # never counts
+        (5.0, "-10%", -15.0, None),  # never counts
+    ]
+    sets: list[StrengthSet] = []
+    for w in range(7):
+        week_start = W1 + timedelta(weeks=w)
+        for lift, name in names.items():
+            if (w + len(lift)) % 4 == 0:
+                continue  # a week without the lift
+            for i, (reps, rx, offset, lrpe) in enumerate(rows):
+                if (w + i) % 3 == 2 and i < 3:
+                    continue  # a counting row left out this week
+                sets.append(
+                    top(make_set, block=B11, week=w + 1, week_start=week_start, type=lift,
+                        name=name, sheet_row=10 * len(lift) + i, reps=reps, prescribed=rx,
+                        logged_kg=base_kg[lift] + offset + 2.5 * ((w * 3 + i) % 5),
+                        logged_rpe=lrpe)
+                )  # fmt: skip
+    statuses: dict[SetKey, KgStatus] = {set_key(s): "lifted" for s in sets}
+    today = W1 + timedelta(weeks=7, days=2)
+    weeks = strength_weeks(sets, statuses, blocks(), today=today).weeks
+    assert any(w.e1rm_kg is None for w in weeks) and any(w.e1rm_kg is not None for w in weeks)
+    for lift in names:
+        for w in range(8):
+            run_week = W1 + timedelta(weeks=w)
+            window = [
+                x.e1rm_kg
+                for x in weeks
+                if x.lift == lift
+                and x.e1rm_kg is not None
+                and run_week - timedelta(weeks=ROLLING_E1RM_WEEKS - 1) <= x.week_start <= run_week
+            ]
+            expected = max(window, default=None)
+            assert rolling_e1rm(sets, statuses, lift, run_week) == expected, (lift, run_week)
+            assert rolling_e1rm_at(weeks, lift, run_week) == expected
 
 
 def test_planned_sets_never_count_and_every_week_has_a_row(make_set: MakeSet) -> None:
@@ -276,7 +367,7 @@ def test_a_top_set_and_a_backoff_never_swap_when_a_same_name_row_is_inserted(
     backoff = top(make_set, sheet_row=6, prescribed="-10%", logged_kg=126.0)
     before = kg_keys([top_set, backoff])
     # The coach inserts another "Squat" row above both: rows shift, the keys don't.
-    extra = top(make_set, sheet_row=5, prescribed="RPE 7")
+    extra = top(make_set, sheet_row=5, prescribed="RPE 7.5")
     shifted = [replace(top_set, sheet_row=6), replace(backoff, sheet_row=7)]
     after = kg_keys([extra, *shifted])
     assert after[set_key(shifted[0])] == before[set_key(top_set)]

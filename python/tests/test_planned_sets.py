@@ -10,7 +10,6 @@ from training_load.domain.exercises import Catalog, Exercise
 from training_load.domain.planned_sets import (
     PlannedSet,
     cap_kg,
-    counts_for_rolling_e1rm,
     pct_of_e1rm,
     planned_sets,
     rolling_e1rm,
@@ -19,7 +18,7 @@ from training_load.domain.planned_sets import (
 )
 from training_load.domain.set_feedback import Progression
 from training_load.domain.strength import StrengthSet
-from training_load.domain.strength_analysis import KgStatus, SetKey, e1rm, set_key
+from training_load.domain.strength_analysis import KgStatus, SetKey, e1rm, e1rm_point, set_key
 
 MakeSet = Callable[..., StrengthSet]
 RUN_WEEK = date(2026, 10, 12)  # a Monday
@@ -85,7 +84,7 @@ def sheet(make_set: MakeSet) -> Sheet:
 
 def test_only_low_rep_sets_at_rpe_7_or_more_count(sheet: Sheet) -> None:
     top = sheet.add(week_start=LAST_WEEK, reps=3.0, prescribed="RPE 7", logged_kg=145.0)
-    assert counts_for_rolling_e1rm(top, "lifted")
+    assert e1rm_point(top, "lifted") is not None
 
     def past(**fields: object) -> StrengthSet:
         return sheet.add(week_start=LAST_WEEK, **fields)
@@ -99,8 +98,8 @@ def test_only_low_rep_sets_at_rpe_7_or_more_count(sheet: Sheet) -> None:
                   logged_kg=150.0),  # a variant
         past(reps=3.0, prescribed="RPE 8", logged_kg=None),  # no kg
     ]  # fmt: skip
-    assert not any(counts_for_rolling_e1rm(s, "lifted") for s in excluded)
-    assert not counts_for_rolling_e1rm(top, "planned")  # the plan never counts
+    assert not any(e1rm_point(s, "lifted") for s in excluded)
+    assert e1rm_point(top, "planned") is None  # the plan never counts
     value = rolling_e1rm(sheet.sets, sheet.statuses, "SQUAT", RUN_WEEK)
     assert value == pytest.approx(e1rm(145.0, 3, 7))
 

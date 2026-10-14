@@ -19,11 +19,11 @@ import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date, timedelta
+from datetime import date
 from typing import Final, Literal
 
 from training_load.domain.strength import StrengthSet, iso_week_start
-from training_load.domain.strength_analysis import StrengthWeek
+from training_load.domain.strength_analysis import StrengthWeek, rolling_e1rm_at
 from training_load.sources.strength_sheet import decimal_dots, set_score
 
 MIN_RATED: Final = 4
@@ -196,27 +196,15 @@ def exercise_feel(logged: Iterable[LoggedSet], offsets: Mapping[int, float | Non
     return out
 
 
-ROLLING_E1RM_WEEKS: Final = 4
 _MAIN_LIFTS: Final = ("SQUAT", "BENCH", "DEADLIFT")
-
-
-def rolling_e1rm_at(weeks: Iterable[StrengthWeek], lift: str, week_start: date) -> float | None:
-    """The app's rolling e1RM as /analyse shows it: the best weekly e1RM of ``lift`` in the
-    ROLLING_E1RM_WEEKS ISO weeks ending with ``week_start``; None when there is none."""
-    first = week_start - timedelta(weeks=ROLLING_E1RM_WEEKS - 1)
-    values = [
-        w.e1rm_kg
-        for w in weeks
-        if w.lift == lift and w.e1rm_kg is not None and first <= w.week_start <= week_start
-    ]
-    return max(values, default=None)
 
 
 def with_rolling_e1rm_rpe(
     sets: Sequence[StrengthSet], weeks: Sequence[StrengthWeek]
 ) -> tuple[list[StrengthSet], int]:
     """Main-lift sets whose cell prescribes no RPE (e.g. "-10%", "75%") and with no logged RPE
-    get their %1RM RPE estimate from the app's rolling e1RM (user, 2026-10-13) instead of the
+    get their %1RM RPE estimate from the app's rolling e1RM (user, 2026-10-13; the one e1RM
+    rule, strength_analysis.rolling_e1rm_at, as the suggestions use it) instead of the
     tab's untested 1RM, which the parser used; the tab's stays only where no rolling e1RM
     exists. Scored again with the sheet formula, unchanged. Returns the sets and how many."""
     out: list[StrengthSet] = []

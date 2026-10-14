@@ -167,7 +167,12 @@ def test_compute_on_the_real_slice_writes_rows_every_migration_check_accepts(
     assert_rows_fit_the_migration(db)
     assert_weeks_are_complete(db)
     week1 = {r["lift"]: r for r in db.tables["strength_weeks"] if r["week_start"] == "2025-09-29"}
-    assert week1["SQUAT"]["e1rm_rpe_source"] == "logged"
+    # Blok 12 week 1 prescribes RPE 5-6.5 on every competition set (and -10% on a back-off):
+    # none counts for e1RM (<= 5 reps at a prescribed RPE >= 7, user 2026-10-14), not even with
+    # a logged RPE of 7.5 or 8. Lifted sets and no e1RM: missing, never 0.
+    for lift in ("SQUAT", "BENCH"):
+        assert week1[lift]["sets_lifted"] == 4  # 1 + 1 + 2 sets each
+        assert (week1[lift]["e1rm_kg"], week1[lift]["e1rm_rpe_source"]) == (None, None)
     # Tonnage over the slice's lifted sets: squat 1x3x110 + 1x3x112.5 + 2x5x100 (text and formula
     # kg), bench 1x3x65 + 1x3x65 + 2x8x60. The sheet's TONNAGE cells are block totals over rows
     # outside the slice (no deadlift row is in it), so they can't be compared here.
@@ -278,8 +283,8 @@ def test_compute_marks_phases_and_warns_about_an_unconfirmed_blok_13(
 @pytest.mark.parametrize(
     ("lift", "name", "reps", "prescribed", "one_rm"),
     [
-        ("SQUAT", "Squat", 3.0, "RPE 6", 145.0),
-        ("BENCH", "Bænk", 8.0, "RPE 5 - 6", 82.5),
+        ("SQUAT", "Squat", 3.0, "RPE 7", 145.0),
+        ("BENCH", "Bænk", 5.0, "RPE 7 - 8", 82.5),  # only sets that count for e1RM round-trip
         ("DEADLIFT", "Dødløft", 5.0, "RPE 7,5", 145.0),
     ],
 )

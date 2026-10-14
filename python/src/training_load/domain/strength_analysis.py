@@ -7,11 +7,16 @@ Rules agreed with the user (2026-10-01):
   Everything else is the plan ("planned") and never counts.
 - Phase: PHASES names the first block of each phase; a later block inherits the latest phase
   (compute logs blocks past PHASES_CONFIRMED_TO, so the user can confirm or add a phase).
-- e1RM, lifted kg only: kg x (1 + 0.0333 x (reps + 10 - RPE)), the sheet formula's own relation
-  (planned_load's inverse), on competition-name sets with an RPE prescription and at most
-  MAX_E1RM_REPS reps (no tempo/variants, no % rows, no -x% back-offs). RPE = the logged RPE
-  (LSRPE) when the week has any for the lift, else the prescribed RPE (a range's midpoint).
-  Week value = the best set; block best = the best week. Outside E1RM_BOUNDS_KG: not used.
+- e1RM, one rule for Analyse > Styrke and the suggestions (user, 2026-10-14; e1rm_point owns
+  it): kg x (1 + 0.0333 x (reps + 10 - RPE)), the sheet formula's own relation (planned_load's
+  inverse), from lifted kg of a competition-name set (no tempo/variants) of at most
+  E1RM_MAX_REPS reps at a prescribed RPE of at least E1RM_MIN_RPE (no % rows, no -x% back-offs,
+  no high-rep or light sets: an 8-rep set at RPE 6 put bench at 110 kg against 85 x 3 @ 7).
+  RPE = the set's logged RPE (LSRPE) when present, else the prescribed RPE (a range's
+  midpoint). Week value = the best set; block best = the best week; the rolling e1RM (the
+  suggestions, the %-row RPE estimate) = the best week of the ROLLING_E1RM_WEEKS ISO weeks
+  ending with a week. Outside E1RM_BOUNDS_KG: not used. A week with no such set has no e1RM
+  (None, never 0).
 - Tonnage: kg x reps over the lift type's lifted sets (variants included), as the sheet's
   TONNAGE.
 - Weeks: one row per ISO week x lift from the first set's week to today's week; a week with
@@ -47,7 +52,11 @@ PHASES: Final[tuple[tuple[int, Phase], ...]] = ((1, "in_season"), (12, "off_seas
 PHASES_CONFIRMED_TO: Final = 12
 """The newest block whose phase the user confirmed; later blocks inherit and are logged."""
 
-MAX_E1RM_REPS: Final = 8
+E1RM_MAX_REPS: Final = 5
+E1RM_MIN_RPE: Final = 7.0
+"""The e1RM rule's set filter (user, 2026-10-13 for the suggestions, 2026-10-14 for /analyse):
+reps <= E1RM_MAX_REPS at a prescribed RPE >= E1RM_MIN_RPE."""
+ROLLING_E1RM_WEEKS: Final = 4
 E1RM_FACTOR: Final = 0.0333
 E1RM_BOUNDS_KG: Final[tuple[float, float]] = E1RM_RANGE  # the parser's 1RM bound
 
@@ -68,6 +77,17 @@ class StrengthWeek:
     e1rm_rpe: float | None
     e1rm_rpe_source: RpeSource | None
     is_block_best: bool
+
+
+@dataclass(frozen=True, slots=True)
+class E1rmPoint:
+    """One set's e1RM and the values behind it."""
+
+    e1rm_kg: float
+    kg: float  # logged kg
+    reps: float
+    rpe: float
+    rpe_source: RpeSource
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,14 +135,55 @@ def is_competition_lift(s: StrengthSet) -> bool:
     return s.name.strip().lower() in COMPETITION_NAMES.get(s.type, frozenset())
 
 
-def _candidate(s: StrengthSet) -> bool:
-    return (
-        is_competition_lift(s)
-        and s.reps <= MAX_E1RM_REPS
-        and s.logged_kg is not None
-        and s.logged_kg > 0
-        and prescribed_rpe(s.prescribed) is not None  # an RPE top set: no %, no -x%
-    )
+def e1rm_point(s: StrengthSet, status: KgStatus) -> E1rmPoint | None:
+    """The one e1RM rule (module docstring): the set's e1RM when it counts, else None. Bounds
+    are checked by best_e1rm, which counts what they leave out."""
+    prescribed = prescribed_rpe(s.prescribed)  # None: no RPE cell (a % row, a -x% back-off)
+    if (
+        status == "planned"
+        or not is_competition_lift(s)
+        or s.reps > E1RM_MAX_REPS
+        or prescribed is None
+        or prescribed < E1RM_MIN_RPE
+        or s.logged_kg is None
+        or s.logged_kg <= 0
+    ):
+        return None
+    source: RpeSource
+    if s.logged_rpe is not None:
+        rpe, source = s.logged_rpe, "logged"
+    else:
+        rpe, source = prescribed, "prescribed"
+    return E1rmPoint(e1rm(s.logged_kg, s.reps, rpe), s.logged_kg, s.reps, rpe, source)
+
+
+def best_e1rm(sets: Iterable[tuple[StrengthSet, KgStatus]]) -> tuple[E1rmPoint | None, int]:
+    """The best plausible e1RM of the sets that count (ties: the first), and how many counting
+    sets were left out as implausible (outside E1RM_BOUNDS_KG)."""
+    low, high = E1RM_BOUNDS_KG
+    best: E1rmPoint | None = None
+    dropped = 0
+    for s, status in sets:
+        point = e1rm_point(s, status)
+        if point is None:
+            continue
+        if not low <= point.e1rm_kg <= high:
+            dropped += 1
+        elif best is None or point.e1rm_kg > best.e1rm_kg:
+            best = point
+    return best, dropped
+
+
+def rolling_e1rm_at(weeks: Iterable[StrengthWeek], lift: str, week_start: date) -> float | None:
+    """The rolling e1RM: the best weekly e1RM of ``lift`` in the ROLLING_E1RM_WEEKS ISO weeks
+    ending with ``week_start``; None when there is none."""
+    first = week_start - timedelta(weeks=ROLLING_E1RM_WEEKS - 1)
+    values = [
+        w.e1rm_kg
+        for w in weeks
+        if w.lift == lift and w.e1rm_kg is not None and first <= w.week_start <= week_start
+    ]
+    return max(values, default=None)
 
 
 def _block_of(week: date, blocks: Sequence[Block]) -> Block | None:
@@ -162,7 +223,7 @@ def strength_weeks(
         block = _block_of(week, blocks)
         for lift in LIFTS:
             lifted = counted.get((week, lift), [])
-            best, dropped = _best_e1rm([s for s, _ in lifted if _candidate(s)])
+            best, dropped = best_e1rm(lifted)
             out_of_bounds += dropped
             statuses_here = {status for _, status in lifted}
             weeks.append(
@@ -181,33 +242,16 @@ def strength_weeks(
                     ),
                     sets_lifted=len(lifted),
                     tonnage_kg=sum((s.logged_kg or 0.0) * s.reps for s, _ in lifted),
-                    e1rm_kg=best[0] if best else None,
-                    e1rm_load_kg=best[1] if best else None,
-                    e1rm_reps=best[2] if best else None,
-                    e1rm_rpe=best[3] if best else None,
-                    e1rm_rpe_source=best[4] if best else None,
+                    e1rm_kg=best.e1rm_kg if best else None,
+                    e1rm_load_kg=best.kg if best else None,
+                    e1rm_reps=best.reps if best else None,
+                    e1rm_rpe=best.rpe if best else None,
+                    e1rm_rpe_source=best.rpe_source if best else None,
                     is_block_best=False,
                 )
             )
         week += timedelta(days=7)
     return StrengthAnalysis(weeks=_mark_block_best(weeks), e1rm_out_of_bounds=out_of_bounds)
-
-
-def _best_e1rm(
-    candidates: Sequence[StrengthSet],
-) -> tuple[tuple[float, float, float, float, RpeSource] | None, int]:
-    """The best (e1rm, kg, reps, rpe, source) of the week's candidate sets, and how many were
-    left out as implausible. Logged RPE wins when any candidate has one."""
-    logged = [s for s in candidates if s.logged_rpe is not None]
-    source: RpeSource = "logged" if logged else "prescribed"
-    points: list[tuple[float, float, float, float, RpeSource]] = []
-    for s in logged or candidates:
-        rpe = s.logged_rpe if source == "logged" else prescribed_rpe(s.prescribed)
-        assert rpe is not None and s.logged_kg is not None  # _candidate, the source split
-        points.append((e1rm(s.logged_kg, s.reps, rpe), s.logged_kg, s.reps, rpe, source))
-    low, high = E1RM_BOUNDS_KG
-    plausible = [p for p in points if low <= p[0] <= high]
-    return max(plausible, default=None, key=lambda p: p[0]), len(points) - len(plausible)
 
 
 def _mark_block_best(weeks: list[StrengthWeek]) -> list[StrengthWeek]:
