@@ -31,6 +31,10 @@
  *          (eFTP flat, EF up, volume with a plan, 3 of 4 done; analyse.md §12d), so the normal
  *          state of the answer blocks can be screenshotted. The sentences are Python's (the
  *          contract fixture's), never real numbers. Other screens: real rows.
+ *   weekly_plan (/load's week card, every fixture but empty / error): the real rows, with the
+ *          current week (the latest weekly_load week) given an illustrative remaining value when it
+ *          has none (the view not yet applied, or nothing left this week), so "planned" can be
+ *          screenshotted. Never a real estimate.
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
@@ -49,6 +53,8 @@ import type {
   RideMetricsRow,
   SetLogRow,
   StrengthWeekRow,
+  WeeklyLoadRow,
+  WeeklyPlanRow,
 } from "./rows.ts";
 
 export type DevFixture =
@@ -395,6 +401,38 @@ export function illustrativeBands(rows: readonly DailyProjectionRow[]): DailyPro
       tsbBand: { low: row.tsb - 0.4 * n, high: row.tsb + 0.3 * n },
     };
   });
+}
+
+/** Illustrative TSS still to come in the current week (dev only; Python's prognose owns the real one). */
+export const ILLUSTRATIVE_REMAINING_TSS = 96;
+
+/**
+ * Any DEV_FIXTURE but empty / error: `real` weekly_plan rows (null: the read failed, e.g. the view
+ * isn't applied yet), with the current week (the latest weekly_load row) given
+ * ILLUSTRATIVE_REMAINING_TSS when it has no remaining value. Done TSS is the week's own total.
+ */
+export function illustrativeWeeklyPlan(
+  weeks: readonly WeeklyLoadRow[],
+  real: readonly WeeklyPlanRow[] | null,
+): WeeklyPlanRow[] {
+  const rows = [...(real ?? [])];
+  const current = weeks.at(-1);
+  if (current === undefined) return rows;
+  const at = rows.findIndex((r) => r.weekStart === current.weekStart);
+  if (at !== -1 && rows[at].remainingTss !== null) return rows;
+  const doneTss = at === -1 ? current.totalTss : rows[at].doneTss;
+  const row: WeeklyPlanRow = {
+    weekStart: current.weekStart,
+    weekEnd: current.weekEnd,
+    isoYear: current.isoYear,
+    isoWeek: current.isoWeek,
+    doneTss,
+    remainingTss: ILLUSTRATIVE_REMAINING_TSS,
+    plannedTss: doneTss + ILLUSTRATIVE_REMAINING_TSS,
+  };
+  if (at === -1) rows.push(row);
+  else rows[at] = row;
+  return rows.sort((a, b) => (a.weekStart < b.weekStart ? -1 : a.weekStart > b.weekStart ? 1 : 0));
 }
 
 /** DEV_FIXTURE=ef-few: EF points kept on the latest rides only. */

@@ -4,6 +4,8 @@ import { test } from "node:test";
 import {
   devFixture,
   fixtureError,
+  ILLUSTRATIVE_REMAINING_TSS,
+  illustrativeWeeklyPlan,
   midsessionLog,
   midsessionPlanned,
   pauseFixture,
@@ -164,4 +166,24 @@ test("DEV_FIXTURE pause-rated / finished (fokus-round4.md §5): pure, nothing is
   const rests = ends.slice(1).map((e, i) => (e - ends[i]) / 1000);
   assert.ok(rests.some((r) => r > 360));
   assert.ok(rests.filter((r) => r <= 360).every((r) => r >= 90 && r <= 300));
+});
+
+const WEEK_41 = { weekStart: "2026-10-05", weekEnd: "2026-10-11", isoYear: 2026, isoWeek: 41, cyclingTss: 150, strengthTss: 60, totalTss: 210, days: 7 };
+const WEEK_42 = { weekStart: "2026-10-12", weekEnd: "2026-10-18", isoYear: 2026, isoWeek: 42, cyclingTss: 80, strengthTss: 40, totalTss: 120, days: 3 };
+const PLAN_41 = { weekStart: "2026-10-05", weekEnd: "2026-10-11", isoYear: 2026, isoWeek: 41, doneTss: 210, remainingTss: null, plannedTss: null };
+
+test("illustrativeWeeklyPlan gives the current week a planned value when the read failed", () => {
+  assert.deepEqual(illustrativeWeeklyPlan([WEEK_41, WEEK_42], null), [
+    { weekStart: "2026-10-12", weekEnd: "2026-10-18", isoYear: 2026, isoWeek: 42, doneTss: 120, remainingTss: ILLUSTRATIVE_REMAINING_TSS, plannedTss: 120 + ILLUSTRATIVE_REMAINING_TSS },
+  ]);
+});
+
+test("illustrativeWeeklyPlan keeps real rows and a real planned value; fills only a current week without one", () => {
+  const real42 = { ...PLAN_41, weekStart: "2026-10-12", weekEnd: "2026-10-18", isoWeek: 42, doneTss: 118, remainingTss: 40, plannedTss: 158 };
+  assert.deepEqual(illustrativeWeeklyPlan([WEEK_41, WEEK_42], [PLAN_41, real42]), [PLAN_41, real42]);
+  const filled = illustrativeWeeklyPlan([WEEK_41, WEEK_42], [PLAN_41, { ...real42, remainingTss: null, plannedTss: null }]);
+  assert.deepEqual(filled[0], PLAN_41); // past weeks stay done-only
+  assert.equal(filled[1].doneTss, 118); // the view's done, not weekly_load's
+  assert.equal(filled[1].plannedTss, 118 + ILLUSTRATIVE_REMAINING_TSS);
+  assert.deepEqual(illustrativeWeeklyPlan([], null), []);
 });

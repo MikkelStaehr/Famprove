@@ -11,6 +11,7 @@ import {
   illustrativeAnswers,
   illustrativeBands,
   illustrativeLogged,
+  illustrativeWeeklyPlan,
   ILLUSTRATIVE_FEEL,
   isPauseFixture,
   midsessionLog,
@@ -62,9 +63,11 @@ import {
   parseStrengthWeekRow,
   parseStrengthSetRow,
   parseWeeklyLoadRow,
+  parseWeeklyPlanRow,
   STRENGTH_SESSIONS_SELECT,
   STRENGTH_SETS_SELECT,
   WEEKLY_LOAD_SELECT,
+  WEEKLY_PLAN_SELECT,
 } from "./rows.ts";
 import type {
   AppNoticeRow,
@@ -81,6 +84,7 @@ import type {
   SetLogRow,
   StrengthSessionRow,
   WeekDetailData,
+  WeeklyPlanRow,
 } from "./rows.ts";
 
 /** Call only after `await connection()`: reads env at request time. */
@@ -99,6 +103,8 @@ function client() {
  *    the matching parse*Row. No filters: daily_load holds exactly SERIES_START .. compute
  *    day by construction; blocks and weekly_load are tiny. "This week" is picked later from
  *    the latest daily row (dashboard-view.ts), never from the server clock.
+ * 4. The prognose and weekly_plan are secondary reads alongside (null on failure: /load still
+ *    renders; without weekly_plan the week card shows done TSS only).
  *
  * Throws EnvError / PostgrestError / RowError; the page catches and renders ErrorState.
  */
@@ -106,7 +112,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
   await connection();
   const fixture = devFixture();
   if (fixture === "error") throw fixtureError(DAILY_LOAD_SELECT.table);
-  if (fixture === "empty") return { daily: [], blocks: [], weeks: [], projection: [] };
+  if (fixture === "empty") return { daily: [], blocks: [], weeks: [], projection: [], weeklyPlan: [] };
   const db = client();
   // The prognose is secondary: if it can't be read, the rest of /load still renders (null).
   // It is read alongside the rest, with its own catch.
@@ -116,18 +122,31 @@ export async function loadDashboardData(): Promise<DashboardData> {
       return null;
     },
   );
-  const [daily, blocks, weeks] = await Promise.all([
+  // weekly_plan likewise (and, until its migration is applied, a 404 lands here): null = done only.
+  const weeklyPlanRead = selectAll(db, WEEKLY_PLAN_SELECT.table, WEEKLY_PLAN_SELECT, parseWeeklyPlanRow).then(
+    (rows): readonly WeeklyPlanRow[] | null => rows,
+    (error: unknown) => {
+      if (!isDataError(error)) throw error;
+      console.error("dashboard: loading weekly_plan failed", error);
+      return null;
+    },
+  );
+  // Promise.all also awaits the secondary reads when a main read fails first (no unhandled rejection).
+  const [daily, blocks, weeks, read, planRead] = await Promise.all([
     selectAll(db, DAILY_LOAD_SELECT.table, DAILY_LOAD_SELECT, parseDailyLoadRow),
     selectAll(db, BLOCKS_SELECT.table, BLOCKS_SELECT, parseBlockRow),
     selectAll(db, WEEKLY_LOAD_SELECT.table, WEEKLY_LOAD_SELECT, parseWeeklyLoadRow),
+    projectionRead,
+    weeklyPlanRead,
   ]);
-  const read = await projectionRead;
   const projection = fixture === "band" && read !== null ? illustrativeBands(read) : read;
+  // Under any other dev fixture the current week shows a planned value (dev-fixture.ts).
+  const weeklyPlan = fixture === null ? planRead : illustrativeWeeklyPlan(weeks, planRead);
   if (fixture === "stale") {
     const computedAt = staleComputedAt(new Date());
-    return { daily: daily.map((d) => ({ ...d, computedAt })), blocks, weeks, projection };
+    return { daily: daily.map((d) => ({ ...d, computedAt })), blocks, weeks, projection, weeklyPlan };
   }
-  return { daily, blocks, weeks, projection };
+  return { daily, blocks, weeks, projection, weeklyPlan };
 }
 
 /**

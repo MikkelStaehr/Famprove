@@ -7,6 +7,7 @@ import {
   parseDailyLoadRow,
   parseProjectionRow,
   parseWeeklyLoadRow,
+  parseWeeklyPlanRow,
   RowError,
 } from "../src/lib/db/rows.ts";
 
@@ -180,4 +181,48 @@ test("contract: every daily_projection row Python writes parses, edge cases incl
   assert.ok(sessions.some((s) => s.method === "recent" && s.tssBand !== null && s.recentWeeks !== null));
   assert.ok(sessions.some((s) => s.method === "plan" && s.unscored !== null && s.unscored > 0 && s.tss !== null));
   assert.ok(rows.some((r) => r.rides.some((ride) => ride.tss === null && ride.reason !== null)));
+});
+
+const PLAN = {
+  week_start: "2026-10-12",
+  week_end: "2026-10-18",
+  iso_year: 2026,
+  iso_week: 42,
+  done_tss: 143.6,
+  remaining_tss: 96.2,
+  planned_tss: 239.8,
+};
+
+test("parseWeeklyPlanRow maps the current week with a prognose", () => {
+  assert.deepEqual(parseWeeklyPlanRow(PLAN), {
+    weekStart: "2026-10-12",
+    weekEnd: "2026-10-18",
+    isoYear: 2026,
+    isoWeek: 42,
+    doneTss: 143.6,
+    remainingTss: 96.2,
+    plannedTss: 239.8,
+  });
+});
+
+test("parseWeeklyPlanRow keeps null remaining / planned (no prognose day) as null, never 0", () => {
+  const row = parseWeeklyPlanRow({ ...PLAN, remaining_tss: null, planned_tss: null });
+  assert.equal(row.remainingTss, null);
+  assert.equal(row.plannedTss, null);
+  assert.equal(parseWeeklyPlanRow({ ...PLAN, done_tss: 0 }).doneTss, 0); // a rest week is a real zero
+});
+
+test("parseWeeklyPlanRow rejects numbers as text, naming the column, never parsing them", () => {
+  for (const column of ["done_tss", "remaining_tss", "planned_tss", "iso_week"]) {
+    assert.throws(() => parseWeeklyPlanRow({ ...PLAN, [column]: "96,2" }), (e: unknown) => e instanceof RowError && e.message === `weekly_plan.${column}: expected a finite number`);
+    assert.throws(() => parseWeeklyPlanRow({ ...PLAN, [column]: "96.2" }), RowError);
+  }
+});
+
+test("parseWeeklyPlanRow rejects a missing column and a planned value without its remaining part", () => {
+  const noDone = Object.fromEntries(Object.entries(PLAN).filter(([column]) => column !== "done_tss"));
+  assert.throws(() => parseWeeklyPlanRow(noDone), RowError);
+  assert.throws(() => parseWeeklyPlanRow({ ...PLAN, remaining_tss: null }), RowError);
+  assert.throws(() => parseWeeklyPlanRow({ ...PLAN, planned_tss: null }), RowError);
+  assert.throws(() => parseWeeklyPlanRow({ ...PLAN, week_start: "2026-10-12T00:00:00" }), RowError);
 });

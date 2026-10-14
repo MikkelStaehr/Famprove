@@ -49,11 +49,28 @@ export type WeeklyLoadRow = {
   readonly days: number; // < 7 marks a partial week
 };
 
+/**
+ * public.weekly_plan (ISO week Mon-Sun): done TSS from daily_load and the prognose still to come.
+ * done_tss: 0 is a real zero (a week of rest days). remaining_tss / planned_tss: null when the week
+ * has no prognose day (past weeks, or nothing left this week), never 0 for "not planned".
+ */
+export type WeeklyPlanRow = {
+  readonly weekStart: IsoDate;
+  readonly weekEnd: IsoDate;
+  readonly isoYear: number;
+  readonly isoWeek: number;
+  readonly doneTss: number;
+  readonly remainingTss: number | null; // an estimate (daily_projection after the last daily_load day)
+  readonly plannedTss: number | null; // doneTss + remainingTss; null with remainingTss
+};
+
 /** Everything the page reads, as returned by queries.loadDashboardData. */
 export type DashboardData = {
   readonly daily: readonly DailyLoadRow[]; // ascending by date
   readonly blocks: readonly BlockRow[]; // ascending by startDate
   readonly weeks: readonly WeeklyLoadRow[]; // ascending by weekStart
+  /** Done + planned TSS per week, ascending by weekStart; null when it couldn't be read (done only). */
+  readonly weeklyPlan: readonly WeeklyPlanRow[] | null;
   /** The prognose, ascending by date; null when it couldn't be read (the page still renders). */
   readonly projection: readonly DailyProjectionRow[] | null;
 };
@@ -125,6 +142,12 @@ export const BLOCKS_SELECT = {
 export const WEEKLY_LOAD_SELECT = {
   table: "weekly_load",
   columns: "week_start,week_end,iso_year,iso_week,cycling_tss,strength_tss,total_tss,days",
+  order: "week_start", // unique: one row per ISO week
+} as const;
+
+export const WEEKLY_PLAN_SELECT = {
+  table: "weekly_plan",
+  columns: "week_start,week_end,iso_year,iso_week,done_tss,remaining_tss,planned_tss",
   order: "week_start", // unique: one row per ISO week
 } as const;
 
@@ -732,6 +755,25 @@ export function parseWeeklyLoadRow(raw: unknown): WeeklyLoadRow {
     strengthTss: f.number("strength_tss"),
     totalTss: f.number("total_tss"),
     days: f.number("days"),
+  };
+}
+
+export function parseWeeklyPlanRow(raw: unknown): WeeklyPlanRow {
+  const f = new Fields(WEEKLY_PLAN_SELECT.table, raw);
+  const remainingTss = f.numberOrNull("remaining_tss");
+  const plannedTss = f.numberOrNull("planned_tss");
+  // The view nulls both together; one without the other would be a planned value nobody can explain.
+  if ((remainingTss === null) !== (plannedTss === null)) {
+    throw new RowError(`${WEEKLY_PLAN_SELECT.table}.planned_tss: expected null exactly when remaining_tss is null`);
+  }
+  return {
+    weekStart: f.date("week_start"),
+    weekEnd: f.date("week_end"),
+    isoYear: f.number("iso_year"),
+    isoWeek: f.number("iso_week"),
+    doneTss: f.number("done_tss"),
+    remainingTss,
+    plannedTss,
   };
 }
 
