@@ -196,6 +196,18 @@ def test_collect_inserts_unknown_variants_once_and_never_overwrites(db: InMemory
     assert stored[(24, "palloff + ghd")].suggests is False  # a multi-exercise variant
 
 
+def test_v_with_the_exercises_own_name_or_alias_names_no_variant() -> None:
+    bench = Exercise(id=3, name="Bench press", aliases=("bench", "bænk"), category="main",
+                     parent_lift="BENCH", muscle_factor=1.0, bodyweight_fraction=None,
+                     tracks_e1rm=True)  # fmt: skip
+    catalog = Catalog([bench])
+    for written in ("Bench press", " BENCH ", "bænk"):
+        assert catalog.find_variant("Bench press", written) is None
+        assert catalog.scoring("Bench press", 85.0, written) == Scoring(1.0, None)
+    seen = [("Bench press", "bench", "bench"), ("Bench press", "paused bench", "Paused bench")]
+    assert catalog.unknown_variants(seen) == [(3, "paused bench", "Paused bench")]
+
+
 # --- grouping per (exercise, variant) ------------------------------------------------------------
 
 

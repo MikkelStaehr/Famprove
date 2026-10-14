@@ -82,10 +82,6 @@ def variant_key(text: str) -> str:
     return " ".join(text.split()).lower()
 
 
-"""(sheet TYPE, exercise name) -> Scoring. The catalogue scores by name only; the TYPE is there
-for callers that score by the sheet's TYPE (the tests' copy of the old rule)."""
-
-
 def name_key(name: str) -> str:
     """The matching key: trimmed, lower case (as SQL's lower(btrim(name)))."""
     return name.strip().lower()
@@ -136,11 +132,17 @@ class Catalog:
             return None
         return next((v for v in self._variants.values() if v.id == variant_id), None)
 
+    @staticmethod
+    def names_itself(exercise: Exercise, variant: str) -> bool:
+        """ "V: <the exercise's own name or one of its aliases>" names no variant (ukendt)."""
+        key = variant_key(variant)
+        return key in {variant_key(n) for n in (exercise.name, *exercise.aliases)}
+
     def find_variant(self, name: str, variant: str | None) -> ExerciseVariant | None:
         """The stored variant (by name or alias) of the exercise ``name``; None when the exercise
-        or the variant is unknown, or ``variant`` is None (ukendt)."""
+        or the variant is unknown, ``variant`` is None (ukendt) or names the exercise itself."""
         exercise = self.find(name)
-        if exercise is None or variant is None:
+        if exercise is None or variant is None or self.names_itself(exercise, variant):
             return None
         return self._variants.get((exercise.id, variant_key(variant)))
 
@@ -186,7 +188,7 @@ class Catalog:
         found: dict[tuple[int, str], str] = {}
         for name, variant, display in pairs:
             exercise = self.find(name)
-            if exercise is None or variant is None:
+            if exercise is None or variant is None or self.names_itself(exercise, variant):
                 continue
             if self.find_variant(name, variant) is None:
                 found.setdefault((exercise.id, variant_key(variant)), display or variant)

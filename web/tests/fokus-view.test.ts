@@ -34,6 +34,7 @@ import { applyTap, type LoggedSet, progress, setKey, type SetRef } from "../src/
 const SQUAT: FokusExercise = {
   name: "Squat ",
   variant: null,
+  variantId: null,
   repsText: "5",
   prescribed: "RPE 7",
   bodyweight: false,
@@ -56,6 +57,7 @@ const SQUAT: FokusExercise = {
 const PULLDOWN: FokusExercise = {
   name: "Lat pulldowns",
   variant: null,
+  variantId: null,
   repsText: "8 - 12",
   prescribed: "-12.5%",
   bodyweight: false,

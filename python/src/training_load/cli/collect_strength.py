@@ -183,7 +183,7 @@ def run(google: GoogleSettings, *, bodyweight: float, send: HttpSend, db: Postgr
             "%d exercise variants not in public.exercise_variants, added inheriting the "
             "exercise's values: %s",
             len(new_variants),
-            ", ".join(shown for _eid, _key, shown in new_variants),
+            ", ".join(shown[:60] for _eid, _key, shown in new_variants),  # public Actions log
         )
         add_unknown_variants(db, new_variants)
         catalog = Catalog(all_exercises(db), all_variants(db))

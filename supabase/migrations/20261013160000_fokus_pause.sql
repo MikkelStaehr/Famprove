@@ -144,7 +144,7 @@ create table public.exercise_feel (
   check (lighter_n + expected_n + harder_n = rated_n)
 );
 comment on table public.exercise_feel is
-  'One line per exercise for Analyse > Styrke, from exercise_set_log.felt_rpe: only exercises with 4+ rated sets have a row. Rebuilt by compute (upsert, then delete older rows). verdict_text is Danish and shown verbatim, e.g. "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over Benjamins RPE".';
+  'One line per exercise for Analyse > Styrke, from exercise_set_log.felt_rpe: only exercises with 4+ rated sets have a row. Rebuilt by compute (upsert, then delete older rows). verdict_text is Danish and shown verbatim, e.g. "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE".';
 
 alter table public.exercise_feel enable row level security;
 -- No policies on purpose: with RLS on and no policy, every non-bypassing role sees nothing.

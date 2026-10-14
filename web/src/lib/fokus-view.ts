@@ -36,6 +36,7 @@ export type FokusExercise = Pick<
   ExerciseView,
   | "name"
   | "variant"
+  | "variantId"
   | "repsText"
   | "prescribed"
   | "bodyweight"

@@ -504,15 +504,23 @@ export type RunPosition = { readonly index: number; readonly of: number };
  * with the same trimmed name count as one exercise, so Bænk's 1 + 1 + 2 sets read 1..4 af 4.
  * Keyed by setKey; a single-row run is numbered as before. Both Træning and Fokus use this.
  */
+/** Two consecutive rows are one run: the same trimmed name and the same variant (a row may name
+ * its own "V:", user 2026-10-14; null only matches null). */
+function sameRun(
+  a: Pick<ExerciseView, "name" | "variantId">,
+  b: Pick<ExerciseView, "name" | "variantId">,
+): boolean {
+  return a.name.trim() === b.name.trim() && a.variantId === b.variantId;
+}
+
 export function runPositions(
-  exercises: readonly Pick<ExerciseView, "name" | "sets">[],
+  exercises: readonly Pick<ExerciseView, "name" | "variantId" | "sets">[],
 ): ReadonlyMap<string, RunPosition> {
   const positions = new Map<string, RunPosition>();
   let i = 0;
   while (i < exercises.length) {
-    const name = exercises[i].name.trim();
     let end = i + 1;
-    while (end < exercises.length && exercises[end].name.trim() === name) end += 1;
+    while (end < exercises.length && sameRun(exercises[i], exercises[end])) end += 1;
     const refs = exercises.slice(i, end).flatMap((e) => e.sets);
     refs.forEach((ref, n) => positions.set(setKey(ref), { index: n + 1, of: refs.length }));
     i = end;
@@ -551,7 +559,7 @@ export type ChecklistView = {
 
 /**
  * The strength card's list from the sheet rows and the set log: one group per sheet row, runs of
- * the same trimmed name, the NÆSTE group (the one holding the first open set; skipped sets are not
+ * the same trimmed name and variant, the NÆSTE group (the one holding the first open set; skipped sets are not
  * open), and the counts. Pure: the log decides every state, nothing is reordered.
  */
 export function checklistView(
@@ -725,11 +733,11 @@ export function compactPrescription(e: Pick<ExerciseView, "sets" | "repsText" | 
 /** One dot per set of an exercise: its state, and whether it is the NÆSTE set. */
 export type SetDot = { readonly key: string; readonly state: SetState; readonly next: boolean };
 
-/** An exercise = a run of consecutive sheet rows with the same trimmed name (as runPositions counts them). */
+/** An exercise = a run of consecutive sheet rows with the same trimmed name and variant (as runPositions counts them). */
 export type ExerciseRunView = {
   readonly key: string; // the run's first row key
   readonly name: string;
-  readonly variant: string | null; // the run's head row's variant (rows of a run follow their head)
+  readonly variant: string | null; // the run's variant (a row with another variant starts a new run)
   readonly groups: readonly SetGroupView[]; // its sheet rows, sheet order
   readonly prescription: string; // the rows' compact prescriptions joined " · " ("" when none)
   /** The row whose suggestion and last week the head shows: the NÆSTE row, else the first open one, else the first. */
@@ -747,7 +755,7 @@ export function exerciseRuns(groups: readonly SetGroupView[]): readonly Exercise
   const runs: SetGroupView[][] = [];
   for (const g of groups) {
     const last = runs.at(-1);
-    if (last !== undefined && last[0].exercise.name.trim() === g.exercise.name.trim()) last.push(g);
+    if (last !== undefined && sameRun(last[0].exercise, g.exercise)) last.push(g);
     else runs.push([g]);
   }
   return runs.map((run): ExerciseRunView => {

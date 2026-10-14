@@ -127,6 +127,18 @@ test("Træning sr: collapsed count and set rows name the variant, then the exerc
   assert.doesNotMatch(spokenSetLine(e, 1, view.groups[0].sets[1]), /sidste uge/);
 });
 
+test("a row naming another variant starts its own run: title, count and set numbers follow it", () => {
+  const next = plan(
+    [set({ sheetRow: 40, setNo: 1, setsText: "2" }), set({ sheetRow: 40, setNo: 2, setsText: "2" }),
+     set({ sheetRow: 41, setNo: 1, setsText: "1", ...PREACHER })],
+    [],
+  );
+  const view = checklistView(next.exercises, next.order, new Map());
+  const runs = exerciseRuns(view.groups);
+  assert.deepEqual(runs.map((r) => [r.variant, r.name, r.total]), [[null, "Bicep of choice", 2], ["DB Preacher Curl", "Bicep of choice", 1]]);
+  assert.deepEqual(view.groups.map((g) => g.sets.map((l) => `${l.n} af ${l.of}`)), [["1 af 2", "2 af 2"], ["1 af 1"]]);
+});
+
 test("Fokus: titles, status, warm-up, next set, feel question and the new-variant kg block (variants.md §3)", () => {
   const next = plan([1, 2, 3].map((n) => set({ setNo: n, setsText: "3", ...PREACHER })), []);
   const s2 = setInContext(next.exercises, { row: 40, set: 2 });

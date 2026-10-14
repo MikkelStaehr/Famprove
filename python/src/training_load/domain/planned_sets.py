@@ -293,6 +293,8 @@ def planned_sets(
         variant = catalog.variant_by_id(s.variant_id)
         if variant is not None and not variant.suggests:
             suggested, adjustment = None, None
+            if basis == "progression":
+                basis = "no_lift" if lift is None else "no_e1rm"
         uncapped = None
         if suggested is not None:
             suggested, uncapped = weekly_cap(suggested, anchor, step)

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from training_load.domain.exercises import Catalog, Exercise
+from training_load.domain.exercises import Catalog, Exercise, ExerciseVariant
 from training_load.domain.planned_sets import (
     PlannedSet,
     cap_kg,
@@ -346,3 +346,38 @@ def test_a_main_lift_or_its_variant_always_rests_3_to_5_minutes(sheet: Sheet) ->
     assert by_row[tempo.sheet_row] == (180, 300)  # a variant: parent lift SQUAT
     assert by_row[accessory.sheet_row] == (90, 120)
     assert by_row[heavy_accessory.sheet_row] == (180, 300)  # reps <= 5 at RPE >= 7
+
+
+def test_a_variant_that_does_not_suggest_gets_no_kg_even_with_a_step_rule(sheet: Sheet) -> None:
+    """exercise_variants.suggests = false (a multi-exercise variant such as "palloff + ghd"):
+    no suggestion, and no 'progression' basis without a kg; a suggesting variant still steps."""
+    catalog = Catalog(
+        [lift(4, "Facepulls", None, "isolation")],
+        [ExerciseVariant(id=8, exercise_id=4, name="band pull", display_name="Band pull"),
+         ExerciseVariant(id=9, exercise_id=4, name="palloff + ghd", display_name="Palloff + GHD",
+                         suggests=False)],
+    )  # fmt: skip
+    rows = {}
+    for row, variant in ((41, 8), (42, 9)):
+        sheet.add(week_start=LAST_WEEK, sheet_row=row, reps=10.0, prescribed="RPE 8",
+                  logged_kg=22.0, type="CHEST/SHOULDERS", name="Facepulls",
+                  variant_id=variant)  # fmt: skip
+        rows[variant] = sheet.add(sheet_row=row, reps=10.0, prescribed="RPE 8",
+                                  type="CHEST/SHOULDERS", name="Facepulls",
+                                  variant_id=variant)  # fmt: skip
+    rules: dict[VariantKey, Progression] = {
+        (4, 8): Progression("step", "du ramte 12 reps to gange"),
+        (4, 9): Progression("step", "du ramte 12 reps to gange"),
+    }
+    by_row = {
+        p.sheet_row: p
+        for p in planned_sets(sheet.sets, catalog, sheet.statuses, today=TODAY, progressions=rules)
+    }
+    stepped, silent = by_row[rows[8].sheet_row], by_row[rows[9].sheet_row]
+    assert (stepped.basis, stepped.suggested_kg, stepped.adjustment_kg) == (
+        "progression",
+        22.5,
+        2.5,
+    )
+    assert (silent.basis, silent.suggested_kg, silent.adjustment_kg) == ("no_lift", None, None)
+    assert silent.adjustment_reason is None

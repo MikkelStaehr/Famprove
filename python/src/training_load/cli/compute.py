@@ -21,6 +21,7 @@ from training_load.db.client import Postgrest
 from training_load.db.daily_load import sync_daily_load
 from training_load.db.daily_projection import sync_projection
 from training_load.db.exercise_feel import sync_exercise_feel
+from training_load.db.exercise_variants import all_variants
 from training_load.db.exercises import all_exercises
 from training_load.db.forecast_log import log_forecast
 from training_load.db.planned import all_sessions
@@ -183,7 +184,11 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     # Træning: suggested kg per set of this week and later, from the rolling e1RM just computed.
     rules = progressions(logged_sets, sets)
     suggestions = planned_sets(
-        sets, Catalog(all_exercises(db)), statuses, today=today, progressions=rules
+        sets,
+        Catalog(all_exercises(db), all_variants(db)),
+        statuses,
+        today=today,
+        progressions=rules,
     )
     sync_planned_sets(db, suggestions, computed_at=computed_at)
     feels = exercise_feel(logged_sets, suggestion_offsets(suggestions), sets)
