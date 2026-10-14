@@ -1,5 +1,5 @@
--- PENDING the user's approval of the value list (2026-10-14); moved into migrations/ with a new
--- timestamp when approved. Slices bodyweight-fractions, per-side-dumbbell and variants.
+-- The user's value list, approved 2026-10-14 (DB Preacher Curl: one arm at a time = per side).
+-- Slices bodyweight-fractions, per-side-dumbbell and variants.
 -- public.exercises and public.exercise_variants are hand-edited and the service role has no
 -- UPDATE on them by design, so the user's values go in as a data migration (matched on id AND
 -- name; a renamed row is left alone). collect-strength + compute rescore afterwards.
