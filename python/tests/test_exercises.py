@@ -16,7 +16,7 @@ from training_load.cli import collect_strength
 from training_load.config import GoogleSettings
 from training_load.db.exercises import add_unknown, all_exercises, from_row
 from training_load.domain.exercises import UNKNOWN_FACTOR, Catalog, Exercise, Scoring
-from training_load.sources.strength_sheet import parse_all
+from training_load.sources.strength_sheet import parse_all, set_score
 
 BODYWEIGHT = 80.0
 GOOGLE = GoogleSettings(sheet_id=SYNTHETIC_SHEET_ID, service_account_info={})
@@ -64,6 +64,19 @@ def test_effective_kg_adds_bodyweight_times_the_fraction_and_null_adds_nothing()
     assert ghr.muscle_factor == 0.6
     assert ghr.bodyweight_kg is not None and abs(ghr.bodyweight_kg - 51.0) < 1e-9
     assert catalog.scoring("Facepulls", 85.0) == Scoring(0.6, None)
+
+
+def test_dips_with_10_kg_extra_lift_86_5_kg_effective() -> None:
+    """User, 2026-10-14: dips at fraction 0.90 and BODYWEIGHT 85 (a test value; the real one is
+    the BODYWEIGHT env var) with +10 kg logged score 10 + 85 x 0.9 = 86.5 kg."""
+    catalog = Catalog([exercise(23, "Dips", "Dip", fraction=0.9)])
+    scoring = catalog.scoring("dip", 85.0)
+    result: object = set_score(  # type: ignore[no-untyped-call]  # untyped legacy module
+        "UPPER", "Dips", 8, 10.0, "RPE 8", scoring.bodyweight_kg, scoring.muscle_factor, None
+    )
+    assert isinstance(result, tuple)
+    kg_used, _rpe, _score, bodyweight = result
+    assert bodyweight is True and abs(float(kg_used) - 86.5) < 1e-9
 
 
 def test_an_unknown_name_scores_as_an_accessory_without_bodyweight() -> None:
