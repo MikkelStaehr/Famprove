@@ -62,28 +62,32 @@ test("curve ranges: 4U 28 days + 14, 12U 84 + 28, season from the series start +
   assert.equal(curveWindow("12U", "2026-02-01", "2026-01-01").from, "2026-01-01");
 });
 
-test("curve y axis (fitness-round.md §1): first step of 1/2/5/10/20… with ≤ 4 intervals", () => {
-  // The spec's example: lowest 11,2 and highest 28,4 → step 5, ticks 10–30.
-  assert.deepEqual(curveScale(11.2, 28.4), { lo: 10, hi: 30, step: 5, lines: [10, 15, 20, 25, 30] });
-  assert.deepEqual(curveScale(8.4, 26.1), { lo: 0, hi: 30, step: 10, lines: [0, 10, 20, 30] });
-  assert.deepEqual(curveScale(12, 49), { lo: 10, hi: 50, step: 10, lines: [10, 20, 30, 40, 50] });
+test("curve y axis (fitness-round.md §1, user 2026-10-14): the axis starts at the data's whole-number floor; gridlines on 1/2/5/10/20… with ≤ 4 intervals", () => {
+  assert.deepEqual(curveScale(11.2, 28.4), { lo: 11, hi: 30, step: 5, lines: [15, 20, 25, 30] });
+  // 12U on 14 Oct: lowest 9,42 → the axis starts at 9, not 0 (no empty area under 10).
+  assert.deepEqual(curveScale(9.42, 26.1), { lo: 9, hi: 30, step: 10, lines: [10, 20, 30] });
+  assert.deepEqual(curveScale(10.91, 28), { lo: 10, hi: 30, step: 5, lines: [10, 15, 20, 25, 30] });
   assert.deepEqual(curveScale(17.2, 19.8), { lo: 17, hi: 20, step: 1, lines: [17, 18, 19, 20] });
-  assert.deepEqual(curveScale(3, 160), { lo: 0, hi: 200, step: 50, lines: [0, 50, 100, 150, 200] });
+  assert.deepEqual(curveScale(3, 160), { lo: 3, hi: 200, step: 50, lines: [50, 100, 150, 200] });
 });
 
-test("curve y axis: min = max gives one step; never below 0", () => {
+test("curve y axis: min = max gives one step; never below 0; Sæson from 0 stays at 0; non-finite throws", () => {
   assert.deepEqual(curveScale(20, 20), { lo: 20, hi: 21, step: 1, lines: [20, 21] });
   assert.deepEqual(curveScale(0, 0), { lo: 0, hi: 1, step: 1, lines: [0, 1] });
   assert.equal(curveScale(-2, 9).lo, 0);
+  assert.equal(curveScale(0, 26).lo, 0);
+  assert.throws(() => curveScale(Number.NaN, 10), RangeError);
+  assert.throws(() => curveScale(0, Number.POSITIVE_INFINITY), RangeError);
 });
 
-test("1d the bottom gridline is ≤ the minimum and less than one step below it", () => {
-  const cases: readonly (readonly [number, number])[] = [[11.2, 28.4], [0.4, 3.1], [18.7, 19.2], [5, 62], [44.9, 49.1], [99.5, 250], [20, 20]];
+test("1d the axis bottom is ≤ the minimum and less than 1 below it; ≤ 4 gridline intervals", () => {
+  const cases: readonly (readonly [number, number])[] = [[11.2, 28.4], [0.4, 3.1], [18.7, 19.2], [5, 62], [44.9, 49.1], [99.5, 250], [20, 20], [9.42, 26.1]];
   for (const [min, max] of cases) {
     const s = curveScale(min, max);
-    assert.ok(s.lo <= min && min - s.lo < s.step, `bottom ${s.lo} for min ${min}`);
+    assert.ok(s.lo <= min && min - s.lo < 1, `bottom ${s.lo} for min ${min}`);
     assert.ok(s.hi >= max && s.hi - max <= s.step, `top ${s.hi} for max ${max}`);
-    assert.ok(s.lines.length - 1 <= 4);
+    assert.ok(s.lines.every((v) => v >= s.lo && v <= s.hi && v % s.step === 0));
+    assert.ok((s.hi - Math.floor(s.lo / s.step) * s.step) / s.step <= 4);
   }
 });
 

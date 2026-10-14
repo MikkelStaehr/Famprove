@@ -27,7 +27,7 @@ export function roundRamp(ramp: number): number {
 
 /** The verdict on the ramp rounded to one decimal; null ramp → no verdict. */
 export function rampVerdict(ramp: number | null): RampVerdict | null {
-  if (ramp === null) return null;
+  if (ramp === null || !Number.isFinite(ramp)) return null; // never "For hurtigt" for a NaN
   const r = roundRamp(ramp);
   if (r < 0) return { label: "Falder", zone: "grey_zone" };
   if (r < RAMP_HARD_FROM) return { label: "Sund opbygning", zone: "optimal" };
@@ -39,8 +39,7 @@ const ONE_DECIMAL = new Intl.NumberFormat("da-DK", { minimumFractionDigits: 1, m
 
 /** A value with one decimal and a Danish comma: 18.74 → "18,7". */
 export function formatOneDecimal(value: number): string {
-  const r = roundRamp(value);
-  return ONE_DECIMAL.format(r === 0 ? 0 : r);
+  return ONE_DECIMAL.format(roundRamp(value));
 }
 
 /**

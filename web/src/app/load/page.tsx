@@ -403,7 +403,7 @@ function LoadError({ error, at }: { readonly error: DataError; readonly at: Date
 function chartSummary({ hero, chart, blocks }: ReadyView): string {
   const end = chart.findLast((p) => p.kind === "projected");
   const parts = [
-    `Den ${formatDay(hero.date)}: fitness ${formatLoad(hero.ctl)}, træthed ${formatLoad(hero.atl)}, form ${formatSigned(hero.tsb)}.`,
+    `Den ${formatDay(hero.date)}: fitness ${formatOneDecimal(hero.ctl)}, træthed ${formatLoad(hero.atl)}, form ${formatSigned(hero.tsb)}.`,
   ];
   if (end !== undefined) {
     parts.push(
@@ -411,7 +411,6 @@ function chartSummary({ hero, chart, blocks }: ReadyView): string {
     );
   }
   if (hero.ctlRamp7d !== null) {
-    parts.push(`Fitness ændrede sig med ${formatSigned(hero.ctlRamp7d)} over de sidste 7 dage.`);
   }
   if (blocks.length === 0) parts.push("Ingen styrkeblokke i perioden.");
   for (const b of blocks) {

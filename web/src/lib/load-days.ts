@@ -162,15 +162,21 @@ function* niceSteps(): Generator<number> {
  * every tick from bottom to top, one gridline and label each (the bottom one sits on the axis).
  */
 export function curveScale(min: number, max: number): { readonly lo: number; readonly hi: number; readonly step: number; readonly lines: readonly number[] } {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) throw new RangeError("curveScale: min and max must be finite");
   const a = Math.max(0, Math.min(min, max));
   const b = Math.max(0, min, max);
   for (const step of niceSteps()) {
-    const lo = Math.floor(a / step) * step;
+    const first = Math.floor(a / step) * step;
     const top = Math.ceil(b / step) * step;
-    const hi = top > lo ? top : lo + step;
-    if ((hi - lo) / step <= CURVE_MAX_INTERVALS) {
-      const n = Math.round((hi - lo) / step);
-      return { lo, hi, step, lines: Array.from({ length: n + 1 }, (_, i) => lo + i * step) };
+    const hi = top > first ? top : first + step;
+    if ((hi - first) / step <= CURVE_MAX_INTERVALS) {
+      // The axis starts at the data, not at the step below it (user, 2026-10-14: no empty area
+      // under the lowest value): the whole number at or below the minimum; the gridlines stay on
+      // the step's multiples inside [lo, hi].
+      const lo = Math.min(Math.floor(a), hi - 1);
+      const lines: number[] = [];
+      for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) lines.push(v);
+      return { lo, hi, step, lines };
     }
   }
   throw new Error("unreachable: the step candidates are unbounded");
