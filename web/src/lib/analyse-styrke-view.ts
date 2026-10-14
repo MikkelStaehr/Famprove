@@ -147,7 +147,6 @@ export type StyrkeView =
       readonly hi: number;
       readonly ticksNarrow: readonly AxisTick[];
       readonly ticksWide: readonly AxisTick[];
-      readonly todayX: number; // today's day number: the --today line in both chart cards
       readonly blocks: readonly BlockSpan[];
       readonly phaseRules: readonly number[];
       readonly board: LiftBoard;
@@ -513,7 +512,6 @@ export function buildStyrkeView(data: StrengthAnalysisData, now: Date, today: Is
     freshness: freshness(latestComputedAt(weeks), now),
     lo,
     hi,
-    todayX: dayNumber(today),
     ticksNarrow,
     ticksWide,
     blocks: spans,

@@ -9,7 +9,6 @@ import {
   LoggedSwatch,
   PrescribedSwatch,
   SheetSwatch,
-  TodaySwatch,
 } from "@/components/AnalyseLegend";
 import { AnalyseHeader } from "@/components/AnalyseTabs";
 import { ANSWER_CARD } from "@/components/AnswerBlock";
@@ -166,7 +165,6 @@ function Cards({ view }: { readonly view: Ready }) {
                 phaseRules={view.phaseRules}
                 weeks={view.weeks}
                 panels={view.panels}
-                todayX={view.todayX}
               />
               <Legend
                 items={[
@@ -175,7 +173,6 @@ function Cards({ view }: { readonly view: Ready }) {
                   { swatch: <BestSwatch />, label: "Bedst i blokken" },
                   ...(view.hasSheet ? [{ swatch: <SheetSwatch />, label: "1RM i arket (ikke testet)" }] : []),
                   ...(view.hasDeload ? [{ swatch: <DeloadBracketSwatch />, label: "Deload" }] : []),
-                  { swatch: <TodaySwatch />, label: "I dag" },
                 ]}
               />
               <figcaption className="sr-only">
@@ -202,14 +199,12 @@ function Cards({ view }: { readonly view: Ready }) {
             phaseRules={view.phaseRules}
             weeks={view.weeks}
             max={view.tonnageMax}
-            todayX={view.todayX}
           />
           <Legend
             items={[
               { swatch: <BarSwatch />, label: "Uge med løft" },
               ...(view.hasDeload ? [{ swatch: <BarSwatch kind="deload" />, label: "Deload" }] : []),
               { swatch: <BarSwatch kind="zero" />, label: "Intet løftet" },
-              { swatch: <TodaySwatch />, label: "I dag" },
             ]}
           />
           <p className="max-w-[60ch] font-sans text-13 text-text-muted">{TONNAGE_EXPLAINER}</p>

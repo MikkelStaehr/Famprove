@@ -94,7 +94,7 @@ export function BarSwatch({ kind = "bar" }: { readonly kind?: "bar" | "deload" |
   );
 }
 
-/** I dag: the 1.5px --today line (decorative; the word carries it). */
+/** I dag (Cykel only; Styrke has no today line since 2026-10-14): the 1.5px --today line (decorative; the word carries it). */
 export function TodaySwatch() {
   return (
     <Swatch>

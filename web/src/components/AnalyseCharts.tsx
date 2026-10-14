@@ -356,7 +356,10 @@ function WeekGroup<W extends PickWeek>({
   readonly padTop?: number;
   readonly hasData?: (w: W) => boolean; // rest on the latest week with data (Cykel: a week with rides)
   readonly children: (active: W | null) => React.ReactNode;
-  /** Today's day number: the --today line runs through the ruler and every strip/panel. */
+  /**
+   * Today's day number: the --today line runs through every strip. Omitted: no today line (Styrke,
+   * user 2026-10-14: on weekly charts it was a lone tick without a date).
+   */
   readonly todayX?: number;
 }) {
   const latestIndex = restingWeekIndex(weeks, hasData);
@@ -373,8 +376,6 @@ function WeekGroup<W extends PickWeek>({
   const active = pick === null ? null : (weeks[pick.index] ?? null);
   const latest = latestIndex < 0 ? undefined : weeks[latestIndex];
   const markerX = active === null ? null : xCss(axis, slotCentre(active));
-  const current = weeks.find((w) => w.current);
-  const today = todayX ?? (current === undefined ? undefined : slotCentre(current));
   const resting = restingReadout(latest === undefined ? null : readout(latest), "Tryk på grafen for at se en uge");
   const shown = active !== null && pick?.mode !== "mouse" ? readout(active) : resting;
   const all = [resting, ...weeks.map(readout)];
@@ -382,7 +383,7 @@ function WeekGroup<W extends PickWeek>({
   const shownTicks =
     boxWidth === null
       ? []
-      : ticksClearOfToday(ticks, { lo: axis.lo, hi: axis.hi, today: today ?? null, width: boxWidth - Y_AXIS_WIDTH - MARGIN_RIGHT });
+      : ticksClearOfToday(ticks, { lo: axis.lo, hi: axis.hi, today: todayX ?? null, width: boxWidth - Y_AXIS_WIDTH - MARGIN_RIGHT });
 
   return (
     <div className="flex flex-col gap-2">
@@ -395,7 +396,7 @@ function WeekGroup<W extends PickWeek>({
         {overlay}
         {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
         {children(active)}
-        {today !== undefined && <TodayLine axis={axis} x={today} />}
+        {todayX !== undefined && <TodayLine axis={axis} x={todayX} />}
         <div ref={widthRef} className="relative h-[30px]" aria-hidden="true">
           {shownTicks.map((t) => {
             const anchor = tickAnchor(ticks.indexOf(t), t.x, axis.hi);
@@ -737,8 +738,6 @@ type StrengthProps = {
   readonly blocks: readonly BlockSpan[];
   readonly phaseRules: readonly number[];
   readonly weeks: readonly StrengthWeek[];
-  /** Today's day number (the --today line). */
-  readonly todayX: number;
 };
 
 type PanelsProps = StrengthProps & { readonly panels: readonly E1rmPanel[] };
@@ -751,7 +750,7 @@ export function E1rmPanels(props: PanelsProps) {
   );
 }
 
-function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels, todayX }: PanelsProps) {
+function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProps) {
   const hydrated = useHydrated();
   const wide = useWide();
   if (!hydrated) return <Skeleton height={E1RM_PANELS_HEIGHT} />;
@@ -765,7 +764,6 @@ function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels, todayX }: Pa
       cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
       padTop={BLOCK_ROOM}
-      todayX={todayX}
     >
       {() => (
         // 24px between panels (12 + a 1px --border rule + 12), so one panel's bottom y label never
@@ -794,7 +792,7 @@ export function TonnageStrips(props: TonnageProps) {
 
 const TONNAGE_STRIP = 72;
 
-function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max, todayX }: TonnageProps) {
+function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnageProps) {
   const hydrated = useHydrated();
   const wide = useWide();
   if (!hydrated) return <Skeleton height="h-[324px]" />;
@@ -808,7 +806,6 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max, todayX }: To
       cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
       padTop={BLOCK_ROOM}
-      todayX={todayX}
     >
       {(active) =>
         LIFTS.map((lift) => (
