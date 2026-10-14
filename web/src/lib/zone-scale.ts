@@ -97,22 +97,11 @@ const SPOKEN_BAND: Readonly<Record<ZoneKey, string>> = {
 };
 
 /**
- * Zone key (Python's form_zone) → its Ember colour token (DESIGN.md Part B colour table and "Zone
- * colour rule"): today's form figure, the active ZoneBar segment and label, the ZonePill. Always
- * next to the zone's word; never in charts, bars, buttons or tabs.
- */
-export const ZONE_TOKEN: Readonly<Record<ZoneKey, `--zone-${string}`>> = {
-  high_risk: "--zone-risk",
-  optimal: "--zone-optimal",
-  grey_zone: "--zone-neutral",
-  fresh: "--zone-fresh",
-  transition: "--zone-transition",
-};
-
-/**
- * The same map as literal Tailwind classes (so the scanner sees them): `text` = the zone colour as
- * text, `pill` = ZonePill (text, 1px border at 40 %, fill at 8 %), `fill` = the active ZoneBar
- * segment, `faint` = an inactive segment (30 %, decorative).
+ * Zone key (Python's form_zone) → its Ember colour (DESIGN.md Part B colour table and "Zone colour
+ * rule") as literal Tailwind classes, so the scanner sees them: `text` = the zone colour as text
+ * (today's form figure, the active ZoneBar label), `pill` = ZonePill (text, 1px border at 40 %,
+ * fill at 8 %), `fill` = the active ZoneBar segment, `faint` = an inactive segment (30 %,
+ * decorative). Always next to the zone's word; never in charts, bars, buttons or tabs.
  */
 export const ZONE_CLASS: Readonly<Record<ZoneKey, { readonly text: string; readonly pill: string; readonly fill: string; readonly faint: string }>> = {
   high_risk: { text: "text-zone-risk", pill: "text-zone-risk border-zone-risk/40 bg-zone-risk/8", fill: "bg-zone-risk", faint: "bg-zone-risk/30" },

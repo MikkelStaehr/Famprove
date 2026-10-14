@@ -1,9 +1,6 @@
 import Link from "next/link";
-import type { IsoDate } from "@/lib/db/rows";
 import { FORM_ZONE_DISPLAY } from "@/lib/dashboard-view";
-import { formatDay, formatDayLong, formatSigned, stopAfter } from "@/lib/format";
-import { formSentence, type TrainingHeader, TSB_HINT } from "@/lib/training-view";
-import { BANDS, isZoneKey, pinned, position, ZONE_CLASS, type ZoneKey } from "@/lib/zone-scale";
+import { BANDS, pinned, position, ZONE_CLASS, type ZoneKey } from "@/lib/zone-scale";
 
 const pct = (x: number) => `${(x * 100).toFixed(4)}%`;
 
@@ -71,43 +68,6 @@ export function ZoneBar({ tsb, zone }: ZoneBarProps) {
             {FORM_ZONE_DISPLAY[b.key]?.label ?? b.key}
           </span>
         ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Træning's form row (instrument-traening.md, form flag row): text only, no pill, no swatch, no
- * scale. `caption` FORM (TSB), then value Inter 500 24 tabular + zone name Inter 400 16, the
- * zone's one-line hint and "Tallet er fra …" when the latest row is not today's. One sr-only
- * sentence carries all of it; the visual copy is hidden.
- */
-export function ZoneFlagRow({ header, today }: { readonly header: TrainingHeader | null; readonly today: IsoDate }) {
-  if (header === null) return <p className="text-16 text-text-muted">Form (TSB) er ikke beregnet endnu.</p>;
-  const zoneKey = header.zone !== null && isZoneKey(header.zone.key) ? header.zone.key : null;
-  const notToday = header.date !== today;
-  return (
-    <div>
-      <p className="sr-only">{formSentence(header.tsb, zoneKey, notToday ? formatDayLong(header.date) : undefined)}</p>
-      <div aria-hidden="true">
-        <p className="caption">Form (TSB)</p>
-        <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
-          <span className="font-sans text-24 font-medium whitespace-nowrap tabular-nums text-text">
-            {formatSigned(header.tsb)}
-          </span>
-          {zoneKey !== null && header.zone !== null && (
-            <span className="font-sans text-16 font-normal whitespace-nowrap text-text">{header.zone.label}</span>
-          )}
-        </p>
-        <p className={`mt-1 text-16 ${zoneKey === null ? "text-text-muted" : "text-text"}`}>
-          {zoneKey === null ? "Zone ikke beregnet." : TSB_HINT[zoneKey]}
-        </p>
-        {notToday && (
-          <p className="mt-1 text-14 text-text">
-            Tallet er fra <time dateTime={header.date}>{formatDay(header.date)}</time>
-            {stopAfter(formatDay(header.date))}
-          </p>
-        )}
       </div>
     </div>
   );
