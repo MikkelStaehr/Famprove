@@ -35,24 +35,6 @@
 
   /* Grain (Revision 4/5, fokus-round4.md §4): 160px tile of static fractal noise, shown at 3 %. */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-
-  /* --- transition aliases, deleted by the last instrument-rest step ---------------------------
-     Retired by Revision 5; kept so screens not yet restyled still compile and render unfilled and
-     monochrome. The radius tokens (all 0) sit in the theme block below. */
-  --slab: var(--bg);
-  --on-slab: var(--text);
-  --on-slab-muted: var(--text-muted);
-  --slab-mark: var(--text);
-  --on-accent: var(--bg);
-  --zone-risk: var(--text-muted);
-  --zone-optimal: var(--text-muted);
-  --zone-grey: var(--text-muted);
-  --zone-fresh: var(--text-muted);
-  --zone-transition: var(--text-muted);
-  --block-fill: transparent;
-  --prognose-band: transparent;
-  --card-shadow: none;
-  /* --- end of transition aliases --- */
 }
 
 /* Dark: the design target (Part B palette, dark primary). */
@@ -108,33 +90,20 @@
   --color-text-muted: var(--text-muted);
   --color-accent: var(--accent);
   --color-caption: var(--caption);
-  --color-slab: var(--slab);
-  --color-on-slab: var(--on-slab);
-  --color-on-slab-muted: var(--on-slab-muted);
-  --color-slab-mark: var(--slab-mark);
   --color-focus: var(--focus);
   --color-positive: var(--positive);
   --color-warning: var(--warning);
   --color-negative: var(--negative);
-  --color-zone-risk: var(--zone-risk);
-  --color-zone-optimal: var(--zone-optimal);
-  --color-zone-grey: var(--zone-grey);
-  --color-zone-fresh: var(--zone-fresh);
-  --color-zone-transition: var(--zone-transition);
   --color-series-ctl: var(--series-ctl);
   --color-series-atl: var(--series-atl);
   --color-series-tsb: var(--series-tsb);
-  --color-block-fill: var(--block-fill);
   --color-chart-mark: var(--chart-mark);
   --color-chart-today: var(--chart-today);
-  --color-on-accent: var(--on-accent);
 
   /* Instrument (Part B Type): Inter + Chivo Mono, loaded once by app/layout.tsx. */
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-grotesk: var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-instrument-mono), ui-monospace, monospace;
-  /* Transition alias (Barlow Condensed is retired): deleted by the last instrument-rest step. */
-  --font-display: var(--font-inter), system-ui, sans-serif;
 
   --text-12: 0.75rem;
   --text-12--line-height: 1.4;
@@ -152,13 +121,6 @@
   --text-44--line-height: 1;
   --text-56: 3.5rem;
   --text-56--line-height: 1;
-
-  /* Transition aliases (Revision 5: radius 0, no shadows): deleted by the last instrument-rest step. */
-  --radius-mark: 0;
-  --radius-control: 0;
-  --radius-card: 0;
-  --radius-pill: 0;
-  --shadow-card: var(--card-shadow);
 
   --container-content: 720px;
   /* DESIGN.md Part A "Layout: phone and desktop": the lg frame (1200px content + 32px gutters), and

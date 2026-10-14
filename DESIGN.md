@@ -3,7 +3,7 @@
 Contract between `design-lead` (owns this file) and `ui` (builds). Read before any UI work.
 
 - **Part A: Guardrails.** Fixed. Never traded away, whatever the direction.
-- **Part B: Direction.** The product's visual identity: **Instrument** (chosen 2026-10-13, replacing Spurt of 2026-09-30). App-wide since Revision 5 (slice `instrument-rest`, 2026-10-13); the Spurt appendix is history. Token values live in `web/src/app/globals.css` (`:root`) and come from Part B.
+- **Part B: Direction.** The product's visual identity: **Instrument** (chosen 2026-10-13, replacing Spurt of 2026-09-30). App-wide since Revision 5 (slice `instrument-rest`, 2026-10-13); Spurt is history (git). Token values live in `web/src/app/globals.css` (`:root`) and come from Part B.
 
 When Part B and a pattern pack conflict, Part B wins on look and the pack wins on structure. Part A beats both.
 
@@ -33,10 +33,10 @@ When Part B and a pattern pack conflict, Part B wins on look and the pack wins o
 
 ## Tokens contract
 Token **names and roles** are fixed here; their **values** come from Part B.
-- Colour roles: `--bg`, `--surface`, `--border`, `--text`, `--text-muted`, `--accent`, `--positive`, `--warning`, `--negative`, `--focus`, plus chart roles `--series-ctl`, `--series-atl`, `--series-tsb`, `--block-fill`, `--chart-mark`, the five form-zone roles `--zone-risk`, `--zone-optimal`, `--zone-grey`, `--zone-fresh`, `--zone-transition`, and Part B's `--track`, `--slab`, `--on-slab`, `--on-slab-muted`, `--slab-mark`, `--shadow-card`. (`--focus` and the zone roles replace the placeholder's accent-as-focus and the per-zone tones in `dashboard-view.ts`.)
+- Colour roles: `--bg`, `--surface`, `--border`, `--text`, `--text-muted`, `--caption`, `--accent`, `--positive`, `--warning`, `--negative`, `--focus`, plus chart roles `--series-ctl`, `--series-atl`, `--series-tsb`, `--chart-mark`, `--chart-today`, and Part B's `--track`. Form zones have no colour role (Revision 5: zones in words and a ruler).
 - Every theme the direction ships (light, dark, or one only) meets the accessibility rules below.
 - Spacing: 4-point scale – 4, 8, 12, 16, 24, 32, 48, 64.
-- Radius: one value per role (control, card, pill), no exceptions.
+- Radius: 0 everywhere (Revision 5); no radius tokens.
 - Type: one scale, named by px (`text-12 … text-56`, set by Part B). Tabular numerals for every number that is compared or read mid-set. Glance sizes for `/` and `/fokus` are in "Træning" below.
 - Semantic colours carry meaning only with a label, icon or shape – never colour alone.
 - Tokens only: no magic values in components. Tailwind's default colour, text-size and radius scales stay removed.
@@ -209,7 +209,7 @@ Applies to Belastning's trend, Cykel's eFTP, EF and weekly strips, and Styrke's 
 
 # Part B – Direction: Instrument (chosen 2026-10-13)
 
-**History:** Spurt (chosen 2026-09-30) was replaced by Instrument on 2026-10-13 at the user's request. Spurt's text is kept as the appendix at the end of this file only while the rollout runs; delete it when the last screen is restyled.
+**History:** Spurt (chosen 2026-09-30) was replaced by Instrument on 2026-10-13 at the user's request; its appendix was deleted when `instrument-rest` ended (2026-10-14, see git history).
 
 **Rollout:** Fokus first (pilot), then Træning, Belastning and Analyse together in Revision 5 (slice `instrument-rest`). Tokens sit at `:root`; the `[data-direction="instrument"]` scope is removed.
 
@@ -295,7 +295,7 @@ Supersedes everything above, Part A's Spurt-specific lines (Technical fonts, Scr
 - **Chart marks:** lines 1px ink (Belastning: fitness solid, fatigue dashed, form a needle per day from zero; user 2026-10-14), days as ticks, rides as dots, weeks as 2px bars, blocks as hairline brackets (deload part dashed), no areas, fills, hatches, gradients or gridlines. Mark forms live in one constant, `web/src/lib/chart-marks.ts`, read by every chart.
 - **Grain on**, every screen, both themes (`fokus-round4.md` §4, moved from the Fokus root to `body`). **Registration marks** on desktop, every screen.
 - **One living element per screen**, carrying data, drawing scale only, with an sr sentence: Træning the set barcode + week columns; Belastning the marks chart (+ the day barcode in the week card); Cykel the TSS-sized eFTP dots; Styrke the e1RM marks; Fokus as `fokus-round4.md`.
-- **Retired tokens:** `--slab`, `--on-slab`, `--on-slab-muted`, `--slab-mark`, `--zone-*`, `--block-fill`, `--prognose-band`, `--shadow-card`/`--card-shadow`, `--on-accent`, the radius tokens (all 0; classes removed). The foundation step keeps the `--slab*` aliases (unfilled values) so nothing breaks mid-build; the last screen PR deletes them, and a grep for each name must return nothing.
+- **Retired tokens:** `--slab`, `--on-slab`, `--on-slab-muted`, `--slab-mark`, `--zone-*`, `--block-fill`, `--prognose-band`, `--shadow-card`/`--card-shadow`, `--on-accent`, the radius tokens (all 0; classes removed). The foundation step kept them as aliases mid-build; they were deleted when the slice ended (2026-10-14), and `tests/spurt.test.ts` fails if one comes back.
 
 ### Single filled accent per Fokus view (design-lead decision, 2026-10-13; the fill is retired by Revision 2: the same element is the view's one red, as a rule + red label)
 | View | The one filled accent | Everything else |
@@ -321,13 +321,12 @@ Existing names are reused so later screens change cheaply. Ratios are the main s
 | `--text-muted` | #8C8578 | #645E54 | muted text, control outlines, minor ticks (Revision 2) |
 | `--caption` (new, Revision 2) | #A68763 | #725B41 | the small uppercase caption labels only |
 | `--accent` | #E0362B | #E0362B | **the today/now tick only** (Revision 5): Fokus rest tick, zone-ruler today tick, each chart's today tick, Træning's week-column today tick |
-| `--on-accent` | retired (Revision 4: no accent fill) | | |
+| `--on-accent` | deleted (Revision 4: no accent fill) | | |
 | `--focus` | #EAE0D2 | #2D2D2D | 3px ring, 3px offset (sits on bg) |
 | `--positive`, `--negative` | = `--text` | = `--text` | word + glyph (arrow, ◆); never red (Revision 5) |
 | `--warning` | = `--text` | = `--text` | ◆ SVG or dashed mark + a word ([A1]) |
-| `--slab` / `--on-slab` / `--on-slab-muted` / `--slab-mark` | `--bg` / `--text` / `--text-muted` / `--text` | same | transition aliases only; deleted by the last `instrument-rest` PR |
-| `--zone-*`, `--block-fill`, `--prognose-band`, `--shadow-card` | retired (Revision 5) | | zones in words, blocks as brackets, band as a range comb, no shadows |
-| `--card-shadow` | none | none | |
+| `--slab` / `--on-slab` / `--on-slab-muted` / `--slab-mark` | deleted (2026-10-14, end of `instrument-rest`) | | |
+| `--zone-*`, `--block-fill`, `--prognose-band`, `--shadow-card`, `--card-shadow`, radius tokens | deleted (2026-10-14) | | zones in words, blocks as brackets, band as a range comb, no shadows, radius 0 |
 | `--series-ctl` | `--text`, 1px solid line (user, 2026-10-14); prognose: hollow dot r 2, stroke 1 | same | fitness, the answer |
 | `--series-atl` | `--text`, 1px dashed line (4 3); prognose: hollow dot r 1.5, stroke 1 | same | fatigue |
 | `--series-tsb` | `--text`, one 1px needle per day from 0; prognose: dashed 1 2 outline needle | same | form |
@@ -358,177 +357,3 @@ Instruments step, they don't glide. The rest tick and the timer jump once a seco
 1. **The red "now" tick.** One 2px red vertical mark that says where you are: the moving tick on the rest scale, the current set in the progress barcode, "today" on charts later.
 2. **Progress barcode.** One vertical tick per set (done tall ink, skipped short muted, open hairline-short muted, current red and tallest). Shape carries state, red only marks "now".
 3. **Registration marks** on desktop (≥ 1024px): 12px + crosses, 1px `--text-muted`, 24px in from each viewport corner, `aria-hidden`, `pointer-events: none`.
-
----
-
-# Appendix – Spurt (HISTORY: replaced 2026-10-13, governs nothing since Revision 5; kept until `instrument-rest` ships, then delete)
-
-**Decision:** base **Spurt** (type, light palette, shape, density, motion, the NÆSTE slab, the segmented progress bar) + **Logbog's zone bar** as the one form element on both screens, restyled in Spurt's language + **dark theme derived from Ro's palette**. The Mode 0 samples (Ro, Logbog, Spurt) are local HTML files, git-ignored; this part is the contract, not the samples.
-
-## Personality
-**Energetic, bold, decisive.** Ink, warm grey and one volt accent; big condensed italic headings; prescriptions you can read at 70cm with sweaty hands. `/load` uses the same type and tokens but stays calm: no volt in the chart, card titles in text face.
-
-**The one idea:** `--slab` means **"you are here"**. It fills the NÆSTE group, the zone flag and marker, ticked checks, done progress segments, Fokus's set card and finish card, and the rest view's next-set preview, and nothing else. In light it is ink, in dark it is volt.
-
-## Colour tokens
-Switched by `prefers-color-scheme` (no toggle). Contrast is measured against the backgrounds listed.
-
-| Token | Light | Dark | Use and contrast |
-|---|---|---|---|
-| `--bg` | `#efeee9` | `#0b0e12` | page |
-| `--surface` | `#ffffff` | `#141920` | cards. Dark cards are raised by tone only (Ro): no border, no shadow |
-| `--border` | `#e4e2dc` | `#262d37` | dividers between runs, chart grid. Decorative only, never a control border |
-| `--track` | `#d9d7d0` | `#2c3440` | nav track, empty progress segments, skeleton fill. Text on it: 13.0 / 11.1:1 |
-| `--text` | `#121212` | `#eef1f5` | 16.1 (bg), 18.7 (surface) / 17.1, 15.6:1 |
-| `--text-muted` | `#595959` | `#9ba6b4` | secondary text **and** the unticked check ring. 6.0, 7.0 / 7.8, 7.2:1 |
-| `--accent` | `#d4ff3a` | `#d4ff3a` | volt. Light: **only on ink** (via `--slab-mark`); never text, line or icon on `--bg`/`--surface` (1.0–1.2:1). Dark: 16.7:1 on bg; used only via `--slab` and `--focus` |
-| `--slab` | `#121212` | `#d4ff3a` | "you are here" fill: NÆSTE group, zone flag + marker, ticked check, done segments, Fokus set/finish card and next-set preview |
-| `--on-slab` | `#ffffff` | `#121212` | text on slab: 18.7 / 16.2:1 |
-| `--on-slab-muted` | `#bdbdbd` | `#3d4a0f` | secondary text on slab: 10.0 / 8.3:1 |
-| `--slab-mark` | `#d4ff3a` | `#121212` | ✓ in a ticked check, the check ring on the NÆSTE group, the NÆSTE tag fill, the Udført button fill and the focus outline inside a slab: 16.2:1 against `--slab` |
-| `--focus` | `#121212` | `#d4ff3a` | 3px outline, 3px offset: 16.1 / 15.3:1 on bg/surface |
-| `--positive` / `--warning` / `--negative` | `#18743a` / `#8a4f00` / `#b42318` | `#4ade9a` / `#f5c451` / `#ff7b7b` | status text (stale line, errors), always with words or an icon. The `/load` fitness delta stays `--text` (neutral): a falling CTL in a deload week is planned, so red/green would judge what the data can't; the arrow + words carry direction. Light ≥ 5.0:1 on bg; dark ≥ 6.4:1 on bg, surface and block fill |
-| `--series-ctl` | `#121212` solid 2.5px | `#eef1f5` solid 2.5px | fitness: the line the question is about, so it gets the ink |
-| `--series-atl` | `#595959` dashed 2px (6 4) | `#9ba6b4` dashed 2px | fatigue. 6.0 / 6.5:1 on block fill |
-| `--series-tsb` | `#1f5bd0` dotted 2px (round caps) | `#7aa7ff` dotted 2px | form, the chart's only hue. 5.2 / 6.7:1 on block fill |
-| `--block-fill` | `#efeee9` | `#1c222b` | strength-block shading behind the lines |
-| `--chart-mark` | `#807e78` | `#737d8a` | zero line, deload hatch, axis ticks: 3.5 / 3.8:1 on block fill |
-| `--prognose-band` | `rgb(18 18 18 / .16)` | `rgb(238 241 245 / .18)` | CTL uncertainty band after the strength block (load.md §10a). Supplementary: the range is in tooltip and sr text. Lines on it stay ≥ 3.3:1 (ATL dark, the lowest) |
-| `--zone-risk` | `#f0b9aa` | `#542f32` | band fills in the zone bar and the flag swatch. **Supplementary tints:** 1.2–2.1:1 against the page, so they never carry meaning alone. The zone name (text), the threshold numbers and the active band's 2px `--text` outline do. In dark they are Ro's zone colours (`#ff7b7b`, `#4ade9a`, `#a9b3c1`, `#5ab8ff`, `#f5c451`) at 30% over `--bg` |
-| `--zone-optimal` | `#c3e0b0` | `#1e4c3b` | as above |
-| `--zone-grey` | `#d3d0c8` | `#3a3f47` | as above |
-| `--zone-fresh` | `#b9d4ec` | `#234159` | as above |
-| `--zone-transition` | `#f0d9a0` | `#514525` | as above |
-| `--shadow-card` | `0 1px 0 rgb(0 0 0 / .05), 0 12px 28px -18px rgb(0 0 0 / .35)` | `none` | light cards lift off the warm grey; dark uses tone |
-| `--chart-height` | 224px below 640px, 240px from 640px, 320px from 1024px (`lg`) | same | keeps hero + chart above the fold at 390 × 844 (load.md §9a); 320 gives the desktop main column (792px) a readable 2.5 : 1 plot |
-
-- **Links** (e.g. "Tilbage til denne uge"): `--text`, weight 600, underline 1px offset 3px. Volt is never a link colour.
-- **Nav current tab:** `--text` fill with `--bg` text, weight 700 (fill + weight, not colour alone). It deliberately does not use `--slab`.
-- **Section tabs** (`/analyse`, `AnalyseTabs`): the section word is the tab. `text-32` Condensed italic uppercase; current 800 `--text` + 4px `--text` bar under the word; other 700 `--text-muted`. Never ScreenNav's pill track (two pill strips read as one menu), never `--slab`.
-
-## Type
-**Decision (2026-09-30): Barlow + Barlow Condensed stay.** Chosen over Instrument Sans (one family with a width axis), Inter + Roboto Condensed, and Manrope + Sofia Sans Condensed. Those were rendered on Today at 390px, light and dark, against a brief for a calmer grotesk, and the user kept Barlow. Checked on the way: Barlow's default figures are proportional, but `tabular-nums` makes every digit the same width, so tabular figures work as specified below.
-
-Two families, self-hosted with `next/font/google`, which downloads the files at build time and serves them from the app (no Google `<link>`, no runtime request to Google).
-
-```ts
-Barlow({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-barlow", display: "swap" })
-Barlow_Condensed({ subsets: ["latin"], weight: ["700", "800"], style: ["normal", "italic"], variable: "--font-barlow-condensed", display: "swap" })
-```
-Tailwind `@theme inline`: `--font-sans: var(--font-barlow), system-ui, sans-serif` and `--font-display: var(--font-barlow-condensed), system-ui, sans-serif`. The `latin` subset covers æøå, × and the U+2212 minus. The ✓ is not a Barlow glyph: draw it as an inline SVG (2.5px stroke).
-
-| Token | Size / line-height | Face | Use |
-|---|---|---|---|
-| `text-56` | 56 / 1.0 | Condensed 800 italic, tabular | the `/load` zone-flag value (the largest element on `/load`, Part A principle 4); Fokus's suggested kg and rest timer (computed = italic) |
-| `text-56` | 56 / 1.0 | Condensed 700 upright, tabular | Fokus's reps and last week's logged kg (as written / logged = upright). With the row above, the largest things on `/fokus` |
-| `text-44` | 44 / 1.0 | Condensed 800 italic, uppercase, −0.01em | page title: "TRÆNING", "BELASTNING"; Fokus's finish title "SESSION 2 ER KLARET". Date after it in `text-16` Barlow 500 `--text-muted`, sentence case |
-| `text-32` | 32 / 1.1 | Condensed 700 upright, tabular | **prescriptions** on Træning: reps ("5 reps"), prescribed load ("RPE 7"), target watts ("238 W", W the same size); Fokus button labels (italic 800) |
-| `text-32` | 32 / 1.0 | Condensed 800 italic, uppercase | session-card titles on `/` ("STYRKE", "CYKEL"). On `/load` card titles are `text-20` Barlow 700, sentence case (calm) |
-| `text-24` | 24 / 1.0 | Condensed 800 italic, tabular | Træning's form-flag value; the done count in "**7** af 24 sæt udført"; the Begynd / Fortsæt button label |
-| `text-20` | 20 / 1.4 | Barlow 700 | exercise names, "Session 2 af 3 i denne uge", step labels and durations, last-week reference (500) |
-| `text-16` | 16 / 1.4 | Barlow 400 / 600 | body, block identity, nav tabs (600, current 700) |
-| `text-14` | 14 / 1.4 | Barlow 400 / 700 | supporting lines, footnote; labels ("FORM (TSB)", zone names, NÆSTE) in 700 uppercase +0.04em (NÆSTE +0.08em), threshold numbers 600 tabular |
-| `text-12` | 12 / 1.4 | Barlow 500, tabular | chart axis labels only. Never inside a session card (Part A: ≥ 14px there) |
-
-Every compared or mid-set number uses `font-variant-numeric: tabular-nums`, including the zone-bar numbers. There is no third family and no monospace.
-
-## Shape
-| Radius token | Value | Used for |
-|---|---|---|
-| `rounded-card` | 24px | cards |
-| `rounded-control` | 16px | tick rows (the focus outline follows it), the NÆSTE slab, chart tooltip |
-| `rounded-pill` | 999px | nav track and tabs, zone flag, StatusBadge |
-| `rounded-mark` | 4px | progress segments, zone bands, the NÆSTE tag, the flag swatch |
-
-- Depth: light uses `--shadow-card` and no card border. Dark has no border and no shadow: `--surface` on `--bg` (Ro).
-- Dividers: 1px `--border` between runs only. The slab hides the dividers it touches.
-- Check: a 28px circle with a 2.5px ring (3px on the slab).
-
-## Space and density
-Balanced: big type, tight rows. All values are on the Part A 4-point scale.
-- Page gutter 12px (content 366px at 390). Widths and the desktop grid: Part A "Layout: phone and desktop" (720px single column below `lg`; 1200px frame from `lg`; Træning/Fokus 560px).
-- Header (phone): the title 12px from the top (the nav is the bottom bar); "Opdateret …" 4px under the title; the zone bar 12px under that. Desktop: top bar 16px from the top, the title 24px under it.
-- `main` stack gap 16px (24px from `lg`), bottom padding 48px plus `--bottom-bar` on phone.
-- Card padding 24px top, 16px sides and bottom (24px all round from `lg`). Inside a card: progress bar 12px under the head, done list 16px, session line 12px, list 12px.
-- Tick row: min-height 44px, padding 8px 4px, grid `28px 1fr` with a 12px gap; the check aligns to the prescription line (bottom, 4px up).
-- `/load` keeps its week-card layout (Part A) with these tokens.
-
-## Motion
-Snappy, short, and only on things you touched. Easing `ease-out`.
-- **Press:** a check scales to 0.9 on `:active` and fills in 120ms.
-- **Hand-over:** when the last open set of a group is ticked, the slab colour cross-fades off that group and onto the group of the next open set in 180ms. Colour only: lines never move or reorder.
-- **Progress:** the touched segment fills in 120ms.
-- **Fokus:** Udført, Til næste sæt and Spring over scale to 0.97 on `:active` (120ms); switching between set, rest and finished view cross-fades the card's opacity in 180ms. Nothing slides; the top bar never moves; timer digits, kg and reps never animate.
-- **Never animated:** numbers, the zone marker (no slide on load or update), the chart, page transitions.
-- **Reduced motion:** under `prefers-reduced-motion: reduce` every transition is 0ms and the press scale is off. The end state is the still alternative. Skeletons pulse only under `motion-safe`.
-
-## Signature components
-
-### NÆSTE slab (Træning, strength card; rule changed 2026-10-12)
-- The **set group (sheet row) that holds the first open set** (document order; skipped sets are not open) becomes the slab. No slab when no set is open.
-- It is filled `--slab` with `--on-slab` text. Prescriptions are also `--on-slab` (not muted); labels ("Forslag", "Sidste uge") are `--on-slab-muted`. Inside it, the open check ring is 3px `--slab-mark`, a done check is `--slab-mark` filled with a `--slab` ✓.
-- It bleeds 8px past the group on both sides (margin-inline −8px, padding 12px), with 8px margin-block and `rounded-control`.
-- The group's name line **always shows the exercise name**, even inside a run (override). The **NÆSTE** tag sits right-aligned on the **first open set's line**: `text-14` 700 uppercase +0.08em, `--slab-mark` fill, `--slab` text, padding 2px 8px, `rounded-mark`.
-- The set's accessible name ends with ", næste", so screen readers hear it too.
-- Focus: a 3px `--focus` outline with 3px offset around the set line.
-- **In Fokus the slab grows into the whole set card** (the same "you are here", at full screen), with Udført inside it in the tag's colours (`--slab-mark` fill, `--slab` text).
-
-### Segmented progress (Træning strength card head and Fokus top bar)
-- The head reads "**2** af 8 udført": the count in `text-24` display, the rest in `text-16` 600.
-- Under it, one segment **per set** of the session, **by position** (since 2026-10-12): done `--slab`, skipped `--track` with a 2px `--text-muted` centre bar, open `--track`. 8px high, 4px gaps (2px above 30 sets), `rounded-mark`.
-- The first *k* segments are `--slab`, where *k* is the ticked count (not the ticked positions). The rest are `--track`.
-- `aria-hidden`: the text carries the count.
-
-### Zone bar (form: `/load` hero; its flag alone on Træning)
-Replaces the TSB number + zone badge on both screens. It is one component (`ZoneBar`) in two sizes. On `/load` the chart gets **no zone banding** (see below).
-
-**Scale.** −40 … +30 TSS/dag, linear: `x = (clamp(tsb, −40, 30) + 40) / 70`. Band thresholds −30 / −10 / 5 / 20 (intervals.icu):
-
-| Band | Range | x span | Label |
-|---|---|---|---|
-| `--zone-risk` | < −30 | 0 – 14.29% | Høj risiko |
-| `--zone-optimal` | −30 … −10 | 14.29 – 42.86% | Optimal |
-| `--zone-grey` | −10 … 5 | 42.86 – 64.29% | Gråzone |
-| `--zone-fresh` | 5 … 20 | 64.29 – 85.71% | Frisk |
-| `--zone-transition` | > 20 | 85.71 – 100% | Overgang |
-
-The thresholds are drawing constants for the scale only. They live in one frontend constant. **Which zone is active always comes from `daily_load.form_zone`** (Python), never from the UI comparing numbers.
-
-**Anatomy, top to bottom:**
-1. **Label line.** "FORM (TSB)" (`text-14` 700 uppercase) and "TSS/dag" (`text-14` `--text-muted`). 8px gap below.
-2. **Flag.** A `rounded-pill` in `--slab` holding three things:
-   - the signed value in display 800 italic tabular ("+4", "−12" with U+2212);
-   - an 8px gap, then a 12px `rounded-mark` swatch in `--zone-<active>` with a 1.5px `--on-slab` ring;
-   - a 6px gap, then the zone name in `text-14` 700 uppercase `--on-slab`.
-
-   Position: `left: x%; transform: translateX(−x%)`. That keeps the pill inside the bar at both ends without measuring.
-3. **Notch + marker.** An 8 × 6px `--slab` triangle under the flag, then a 3px `--slab` line through the band to 4px below it. Both sit exactly at `x`.
-4. **Bands.** 12px high, `rounded-mark`. Each band is placed at its exact % span and inset 2px at inner edges, so there is a 4px gap centred on each threshold (echoing the progress bar) and the scale stays linear. The **active band** gets a 2px inset `--text` outline.
-5. **Threshold numbers.** "−30", "−10", "5", "20" centred under the gaps, 4px below the bands, in `text-14` 600 tabular `--text-muted`.
-
-**Sizes:**
-
-| | Compact (Træning: **flag only**, prefixed "TSB", with the one-line hint) | Hero (`/load`) |
-|---|---|---|
-| Value | `text-24` | `text-56` |
-| Pill padding | 4px 12px (32px high) | 4px 16px (64px high) |
-| Below the bar | nothing | the existing fitness delta and "Fitness (CTL) … − træthed (ATL) …" detail line, 12px under the numbers |
-| Height at 390px | ≈ 96px | ≈ 130px |
-
-**Accessibility:**
-- Flag text is real HTML text (it scales to 200%). Bands, notch and marker are `aria-hidden`.
-- One `sr-only` sentence carries the whole reading, e.g. "Form plus 4 TSS per dag: gråzone, som går fra minus 10 til 5." It is written out, so screen readers never have to guess "−".
-- Meaning is never colour alone: zone name in text, threshold numbers, and the active band's outline.
-
-**States:**
-- **Loading:** skeleton in the bar's shape: the label line, then 5 `--track` bands. No flag.
-- **No TSB:** bands without marker or outline. In place of the flag, `text-16` `--text-muted`: "Form er ikke beregnet endnu."
-- **TSB without zone:** the flag shows the value only. Under the numbers, `text-14` muted: "Zone ikke beregnet." No active outline.
-- **Out of range (< −40 or > 30):** the marker is pinned to the bar end as an 8px outward chevron. The flag still shows the true value.
-- **Stale:** the bar is unchanged. The "Opdateret" line carries staleness (Part A), so no data is greyed out.
-
-**`/load` chart: no zone band shading.** CTL, ATL and TSB share one TSS/dag axis. Bands would put a CTL of 45 inside "Overgang" (dishonest), and the chart background already encodes strength blocks and deload hatch. Consistency comes from the identical `ZoneBar` directly above the chart and from the dotted `--series-tsb` line. If TSB ever gets its own panel, the bands may go behind that panel only.
-
-## Technical
-- Tokens are defined once in `web/src/app/globals.css`, exposed through `@theme inline` as `--color-*`, `--text-*` (12, 14, 16, 20, 24, 32, 44, 56), `--radius-card/control/pill/mark` and `--font-sans/--font-display`. Tailwind's default colour, text-size and radius scales stay removed. The placeholder values (system fonts, blue accent, 8/12 radii, `text-28`/`text-40`) are retired.
-- **shadcn/ui: not adopted.** The app has no dialogs, menus, forms or popovers, just a checkbox row, tabs, a badge and cards, all native HTML plus Tailwind. It would pay off only if settings or logging ever arrive (Dialog, Form, Toast with accessible focus handling). Until then it is a dependency without a job.

@@ -75,8 +75,11 @@ test("every Part B colour token has its DESIGN.md value in light and in dark", (
       assert.equal(resolve(tokens, name), resolve(tokens, target), `${theme}: ${name} = ${target}`);
     }
   }
-  // Retired (Revision 5): no shadows. DESIGN.md: 224px below 640px, 240px from 640px (load.md §9a).
-  assert.equal(LIGHT.get("--card-shadow"), "none");
+  // Retired by Revision 5 and deleted when instrument-rest ended: no alias may come back.
+  for (const retired of ["--slab", "--on-slab", "--on-slab-muted", "--slab-mark", "--on-accent", "--zone-", "--block-fill", "--prognose-band", "--card-shadow", "--shadow-card", "--radius-mark", "--radius-control", "--radius-card", "--radius-pill", "--font-display"]) {
+    assert.ok(!new RegExp(`${retired}[a-z-]*:`).test(CSS), `${retired} is retired`);
+  }
+  // DESIGN.md: 224px below 640px, 240px from 640px (load.md §9a).
   assert.equal(LIGHT.get("--chart-height"), "224px");
   const wide = vars(block(block(CSS, CSS.indexOf("@media (min-width: 640px)")), 0));
   assert.equal(wide.get("--chart-height"), "240px");
@@ -96,8 +99,8 @@ test("every Part B colour token is exposed through @theme inline as --color-*", 
 
 test("type, radius and font tokens are exposed; Tailwind defaults and retired sizes are gone", () => {
   for (const size of [12, 14, 16, 20, 24, 32, 44, 56]) assert.ok(THEME_INLINE.has(`--text-${size}`), `text-${size}`);
-  // Radius 0 everywhere (Revision 5); the names stay as transition aliases until instrument-rest ends.
-  for (const r of ["mark", "control", "card", "pill"]) assert.equal(THEME_INLINE.get(`--radius-${r}`), "0", r);
+  // Radius 0 everywhere (Revision 5): no radius token exists, and Tailwind's scale stays removed (below).
+  assert.ok(![...THEME_INLINE.keys()].some((k) => k.startsWith("--radius-")));
   assert.equal(THEME_INLINE.get("--text-56"), "3.5rem");
   assert.equal(THEME_INLINE.get("--text-32"), "2rem");
   assert.equal(THEME_INLINE.get("--font-sans"), "var(--font-inter), system-ui, sans-serif");
