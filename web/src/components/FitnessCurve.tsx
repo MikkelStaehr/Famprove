@@ -9,6 +9,7 @@ import { addDays, dayNumber } from "@/lib/dates";
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDate, formatDay, formatLoad, formatSigned } from "@/lib/format";
 import { type CurveRange, curveScale, curveWindow } from "@/lib/load-days";
+import { monotonePath, monotoneSegments, segmentsPath } from "@/lib/monotone-path";
 
 import { useMedia, useWidth } from "./chart-hooks";
 import { ChartReadout, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
@@ -18,7 +19,8 @@ import { SegmentedControl } from "./SegmentedControl";
  * Belastning's fitness curve (design/specs/reset-belastning.md §3, mockup C): CTL only, measured as a
  * 2px --text line, the prognose 1.5px --text-muted dashed 3 4, the band after the block as a 12 %
  * area, three dashed gridlines, block brackets in a 16px strip, today the 1.5px --today line with
- * `I DAG`. Python's values as-is; the only arithmetic here is the drawing scale (date -> x, value -> y).
+ * `I DAG`. Lines and band edges are smooth monotone curves through each day's value (user
+ * 2026-10-14). Python's values as-is; the only arithmetic here is the drawing scale (date -> x, value -> y).
  */
 type FitnessCurveProps = {
   readonly points: readonly ChartPoint[];
@@ -124,16 +126,14 @@ function Plot({ points, blocks, today, lastActual, from, to, range }: PlotProps)
   const measured = points.filter((p) => p.kind === "actual");
   const projected = points.filter((p) => p.kind === "projected");
   const last = measured.at(-1);
-  const line = (ps: readonly ChartPoint[]) => ps.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.date).toFixed(1)} ${y(p.ctl).toFixed(1)}`).join("");
-  const prognose = last === undefined ? projected : [last, ...projected];
+  // One monotone spline through measured + prognose (lib/monotone-path.ts: through every day, no
+  // overshoot), split at the last measured day, so the dashed prognose leaves the line without a corner.
+  const curve = monotoneSegments([...measured, ...projected].map((p) => ({ x: x(p.date), y: y(p.ctl) })));
+  const measuredPath = segmentsPath(curve.slice(0, Math.max(0, measured.length - 1)));
+  const prognosePath = segmentsPath(curve.slice(Math.max(0, measured.length - 1)));
   const bandPts = projected.filter((p) => ctlBandArea(p) !== null);
-  const bandPath =
-    bandPts.length < 2
-      ? null
-      : `${bandPts.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.date).toFixed(1)} ${y(ctlBandArea(p)?.[1] ?? p.ctl).toFixed(1)}`).join("")}${bandPts
-          .toReversed()
-          .map((p) => `L${x(p.date).toFixed(1)} ${y(ctlBandArea(p)?.[0] ?? p.ctl).toFixed(1)}`)
-          .join("")}Z`;
+  const edge = (side: 0 | 1) => bandPts.map((p) => ({ x: x(p.date), y: y(ctlBandArea(p)?.[side] ?? p.ctl) }));
+  const bandPath = bandPts.length < 2 ? null : `${monotonePath(edge(1))}${monotonePath(edge(0).toReversed(), true)}Z`;
   const todayIn = today >= from && today <= to;
   const tx = x(today);
 
@@ -160,10 +160,8 @@ function Plot({ points, blocks, today, lastActual, from, to, range }: PlotProps)
               <Bracket key={b.name} block={b} x={x} from={from} to={to} />
             ))}
             {bandPath !== null && <path d={bandPath} fill="var(--text-muted)" fillOpacity={0.12} stroke="none" />}
-            {prognose.length > 1 && (
-              <path d={line(prognose)} fill="none" stroke="var(--text-muted)" strokeWidth={1.5} strokeDasharray="3 4" />
-            )}
-            {measured.length > 1 && <path d={line(measured)} fill="none" stroke="var(--text)" strokeWidth={2} strokeLinejoin="round" />}
+            {prognosePath !== "" && <path d={prognosePath} fill="none" stroke="var(--text-muted)" strokeWidth={1.5} strokeDasharray="3 4" />}
+            {measuredPath !== "" && <path d={measuredPath} fill="none" stroke="var(--text)" strokeWidth={2} strokeLinejoin="round" />}
             {todayIn && (
               <g>
                 <line x1={tx} x2={tx} y1={STRIP} y2={STRIP + plotH} stroke="var(--today)" strokeWidth={1.5} />
