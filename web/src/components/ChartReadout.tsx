@@ -24,9 +24,13 @@ export function useChartPick(opts: {
   readonly count: number;
   readonly startIndex: number; // where ←/→ start (the latest point / current week)
   readonly indexAt: (clientX: number, box: DOMRect) => number | { readonly index: number; readonly x: number } | null;
+  /** A touch tap on the selected point clears it (Belastning's day charts: readout only after a tap). */
+  readonly toggle?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pick, setPick] = useState<Pick | null>(null);
+  // The index a tap just cleared: the same press dragging over it doesn't select it again.
+  const cleared = useRef<number | null>(null);
 
   // A tap outside the plot clears a touch or keyboard selection (a mouse clears on leave).
   useEffect(() => {
@@ -47,6 +51,16 @@ export function useChartPick(opts: {
     if (hit === null) {
       if (!touch) setPick(null);
       return;
+    }
+    const index = typeof hit === "number" ? hit : hit.index;
+    if (opts.toggle === true && touch) {
+      if (press && pick !== null && pick.index === index) {
+        cleared.current = index;
+        setPick(null);
+        return;
+      }
+      if (!press && cleared.current === index) return;
+      cleared.current = null;
     }
     const mode = touch ? "touch" : "mouse";
     setPick(typeof hit === "number" ? { index: hit, mode } : { index: hit.index, x: hit.x, mode });
@@ -155,26 +169,35 @@ export function ChartReadout({
   cells,
   swatch,
 }: {
-  readonly readout: Readout;
+  /** null: no row and no reserved space (Belastning's day charts at rest); the live region stays mounted. */
+  readonly readout: Readout | null;
   readonly all: readonly Readout[]; // every readout the chart can show (rest state included)
   readonly lines: number;
   readonly cells: boolean; // the chart has a cells line (line 2 at text-16)
   readonly swatch?: (key: string) => ReactNode;
 }) {
-  const live = useThrottled(readoutText(readout));
+  const live = useThrottled(readout === null ? "" : readoutText(readout));
   const key = all.map(readoutText).join("\n");
   // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the readouts' text, not the array identity
   const sizers = useMemo(() => uniqueByText(all), [key]);
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)]" style={{ minHeight: readoutMinHeight(lines, cells) }}>
-      <div aria-hidden="true" className="col-start-1 row-start-1 flex flex-col">
-        <ReadoutLines readout={readout} swatch={swatch} />
-      </div>
-      {sizers.map((r, i) => (
-        <div key={i} aria-hidden="true" className="invisible col-start-1 row-start-1 flex flex-col">
-          <ReadoutLines readout={r} swatch={swatch} />
-        </div>
-      ))}
+    // At rest (null) the wrapper is display: contents, so the parent's gap reserves nothing for it.
+    <div
+      className={readout === null ? "contents" : "grid grid-cols-[minmax(0,1fr)]"}
+      style={readout === null ? undefined : { minHeight: readoutMinHeight(lines, cells) }}
+    >
+      {readout !== null && (
+        <>
+          <div aria-hidden="true" className="col-start-1 row-start-1 flex flex-col">
+            <ReadoutLines readout={readout} swatch={swatch} />
+          </div>
+          {sizers.map((r, i) => (
+            <div key={i} aria-hidden="true" className="invisible col-start-1 row-start-1 flex flex-col">
+              <ReadoutLines readout={r} swatch={swatch} />
+            </div>
+          ))}
+        </>
+      )}
       <p className="sr-only" aria-live="polite">
         {live}
       </p>

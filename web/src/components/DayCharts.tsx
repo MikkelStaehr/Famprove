@@ -2,12 +2,12 @@
 
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 
-import { MISSING, type Readout, restingReadout } from "@/lib/chart-readout";
+import { MISSING, type Readout } from "@/lib/chart-readout";
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDate, formatDay, formatLoad } from "@/lib/format";
 import { barDays, barTop, beforeLogSpan, type DayCell, type DayLoad, gridWeeks, type ShadeLevel } from "@/lib/load-days";
 
-import { ChartReadout, PLOT_FOCUS, useChartPick } from "./ChartReadout";
+import { ChartReadout, PLOT_FOCUS, PointerTip, useChartPick } from "./ChartReadout";
 import { SegmentedControl } from "./SegmentedControl";
 
 /**
@@ -24,7 +24,6 @@ const SHADE: Readonly<Record<ShadeLevel, string>> = {
 };
 const UNKNOWN = "border border-dashed border-shade-1";
 const HATCH = "repeating-linear-gradient(135deg, var(--shade-2) 0 1.5px, transparent 1.5px 4px)";
-const EMPTY_REST = "Tryk på grafen for at se en dag";
 
 /**
  * The day readout (DESIGN.md "Charts: interaction"): `tirs. 13. okt.` · Cykel · Styrke · I alt; strength `–`
@@ -58,8 +57,11 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
   const drawn = cells.filter((c): c is DayCell => c !== null);
   const anyUnknown = drawn.some((c) => c.unknown);
   const latest = cells.findLastIndex((c) => c !== null);
-  const [sel, setSel] = useState<number | null>(null);
+  // mouse: a hover (tooltip); otherwise a tap, drag or key (readout row).
+  const [sel, setSel] = useState<{ readonly i: number; readonly mouse: boolean } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  // The cell a tap just cleared: the same press dragging over it doesn't select it again.
+  const cleared = useRef<number | null>(null);
 
   useEffect(() => {
     if (sel === null) return;
@@ -75,25 +77,37 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
   }
 
   const pickAt = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "mouse" && e.type === "pointermove" && e.buttons === 0) return;
+    const mouse = e.pointerType === "mouse";
+    const press = e.type === "pointerdown";
+    if (!mouse && !press && e.buttons === 0) return;
     const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-i]");
     const i = el instanceof HTMLElement ? Number(el.dataset.i) : NaN;
-    if (Number.isInteger(i) && cells[i] !== null) setSel(i);
+    if (!Number.isInteger(i) || cells[i] === null) return;
+    if (!mouse) {
+      // Tap the selected day again: the readout goes away.
+      if (press && sel?.i === i) {
+        cleared.current = i;
+        setSel(null);
+        return;
+      }
+      if (!press && cleared.current === i) return;
+      cleared.current = null;
+    }
+    setSel({ i, mouse });
   };
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") return setSel(null);
     const step = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 }[e.key];
     if (step === undefined) return;
     e.preventDefault();
-    const from = sel ?? latest;
-    const next = sel === null ? from : from + step;
-    if (next >= 0 && next < cells.length && cells[next] !== null) setSel(next);
+    const next = sel === null ? latest : sel.i + step;
+    if (next >= 0 && next < cells.length && cells[next] !== null) setSel({ i: next, mouse: false });
   };
 
-  const selected = sel === null ? null : cells[sel];
-  const latestCell = latest === -1 ? null : cells[latest];
-  const resting = restingReadout(latestCell === null ? null : dayReadout(latestCell), EMPTY_REST);
-  const readout = selected === null || selected === undefined ? resting : dayReadout(selected);
+  const selected = sel === null ? null : (cells[sel.i] ?? null);
+  // The readout row only after a tap, drag or key (user 2026-10-14); a mouse hover gets the tooltip.
+  const readout = selected === null || sel?.mouse === true ? null : dayReadout(selected);
+  const tip = selected !== null && sel?.mouse === true ? { readout: dayReadout(selected), left: `${Math.floor(sel.i / 7) * 24 + 10}px` } : null;
   const first = weeks[0]?.weekStart ?? today;
 
   return (
@@ -116,11 +130,11 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
             onPointerDown={pickAt}
             onPointerMove={pickAt}
             onPointerLeave={(e) => {
-              if (e.pointerType === "mouse") setSel(null);
+              if (e.pointerType === "mouse") setSel((s) => (s?.mouse === true ? null : s));
             }}
             onKeyDown={onKey}
             onBlur={() => setSel(null)}
-            className={`grid w-max grid-flow-col grid-rows-[repeat(7,20px)] gap-1 rounded-cell ${PLOT_FOCUS}`}
+            className={`relative grid w-max grid-flow-col grid-rows-[repeat(7,20px)] gap-1 rounded-cell ${PLOT_FOCUS}`}
             style={{ touchAction: "pan-y", gridAutoColumns: "20px" }}
           >
             {cells.map((c, i) =>
@@ -132,7 +146,7 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
                   data-i={i}
                   aria-hidden="true"
                   className={`block size-5 rounded-cell ${c.unknown || c.level === null ? UNKNOWN : SHADE[c.level]} ${
-                    i === sel
+                    i === sel?.i
                       ? "outline-[1.5px] outline-offset-1 outline-text outline-solid"
                       : c.date === today
                         ? "outline-[1.5px] outline-offset-1 outline-today outline-solid"
@@ -141,6 +155,7 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
                 />
               ),
             )}
+            {tip !== null && <PointerTip readout={tip.readout} left={tip.left} rightInset={0} />}
           </div>
           <MonthLabels weeks={weeks.map((w) => w.weekStart)} />
         </div>
@@ -166,7 +181,7 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
           Styrke er ikke registreret før {formatDate(logStart)}; dage uden cykling er ukendte.
         </p>
       )}
-      <ChartReadout readout={readout} all={[resting, ...drawn.map(dayReadout)]} lines={2} cells />
+      <ChartReadout readout={readout} all={drawn.map(dayReadout)} lines={2} cells />
       <DayTable cells={drawn} />
     </>
   );
@@ -242,9 +257,11 @@ export function DailyTssBars({ days, today, logStart, titleId }: GridProps & { r
     count: n,
     startIndex: Math.max(0, latest),
     indexAt: (clientX, box) => Math.max(0, Math.min(n - 1, Math.floor(((clientX - box.left) / box.width) * n))),
+    toggle: true,
   });
-  const resting = restingReadout(latest === -1 ? null : dayReadout(cells[latest]), EMPTY_REST);
-  const readout = pick === null ? resting : dayReadout(cells[pick.index]);
+  // The readout row only after a tap, drag or key (user 2026-10-14); a mouse hover gets the tooltip.
+  const picked = pick === null ? undefined : cells[pick.index];
+  const readout = picked === undefined || pick?.mode === "mouse" ? null : dayReadout(picked);
   const empty = cells.every((c) => c.total === null && c.cycling === null);
   const mid = cells[Math.floor(n / 2)]?.date ?? today;
   const h = (v: number) => (Math.max(0, v) / top) * PLOT_H;
@@ -315,6 +332,9 @@ export function DailyTssBars({ days, today, logStart, titleId }: GridProps & { r
                 );
               })}
             </div>
+            {picked !== undefined && pick?.mode === "mouse" && (
+              <PointerTip readout={dayReadout(picked)} left={`${((pick.index + 0.5) / n) * 100}%`} rightInset={0} />
+            )}
           </div>
           <div aria-hidden="true" className="relative h-lh font-mono text-11 text-text-muted">
             <span className="absolute left-0">{formatDate(cells[0]?.date ?? today)}</span>
@@ -333,7 +353,7 @@ export function DailyTssBars({ days, today, logStart, titleId }: GridProps & { r
           Styrke
         </li>
       </ul>
-      <ChartReadout readout={readout} all={[resting, ...cells.map(dayReadout)]} lines={2} cells />
+      <ChartReadout readout={readout} all={cells.map(dayReadout)} lines={2} cells />
     </>
   );
 }
