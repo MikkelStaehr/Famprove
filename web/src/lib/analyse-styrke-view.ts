@@ -31,8 +31,8 @@ const liftLower = (l: StrengthLift): string => LIFT_NAME[l].toLowerCase();
 export const PHASE_TEXT: Readonly<Record<StrengthPhase, string>> = { in_season: "i sæson", off_season: "uden for sæson" };
 
 export const NOTE_PRESCRIBED = "Lyse punkter er baseret på foreskrevet RPE. Log RPE på topsættet, så tæller punktet fuldt.";
-export const NOTE_ESTIMATE = "e1RM er et skøn ud fra ugens bedste tunge sæt (kg, reps og RPE), ikke et testet maks.";
-export const NO_E1RM = "Der er intet e1RM endnu. Det kommer, når et tungt sæt med RPE er løftet.";
+export const NOTE_ESTIMATE = "e1RM er et skøn ud fra ugens bedste sæt med højst 5 reps ved foreskrevet RPE 7 eller mere, ikke et testet maks. Samme regel giver de foreslåede kg.";
+export const NO_E1RM = "Der er intet e1RM endnu. Det kommer, når et sæt med højst 5 reps ved foreskrevet RPE 7 eller mere er løftet.";
 export const RPE_LINE = "Udviklingen i RPE kommer, når du har logget RPE på topsæt i nogle uger.";
 export const TONNAGE_EXPLAINER = "Kg × reps for alle løftede sæt af løftet, også varianter.";
 export const MISSING = "–";
@@ -433,7 +433,7 @@ export function strengthWeeks(
       const name = LIFT_NAME[l];
       if (r === undefined) return `${name}: mangler`;
       if (r.status === null) return `${name}: ikke trænet`;
-      if (r.e1rmKg === null) return `${name}: intet tungt sæt med RPE`;
+      if (r.e1rmKg === null) return `${name}: intet sæt med højst 5 reps ved RPE 7+`;
       const set = setText(r);
       const source = r.e1rmRpe === null ? "" : r.e1rmRpeSource === "logged" ? " logget" : " foreskrevet";
       return `${name}: ${formatE1rm(r.e1rmKg)} kg${set === "" ? "" : ` · ${set}${source}`}${r.isBlockBest ? " · bedst i blokken" : ""}`;

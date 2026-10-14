@@ -62,7 +62,7 @@ A three-row scoreboard, one row per lift in SBD order: three big tabular numbers
   1. If any point is prescribed: `Lyse punkter er baseret på foreskrevet RPE. Log RPE på topsættet, så tæller punktet fuldt.`
   2. Always: `Blok 11 er i sæson, blok 12 uden for sæson. Den lodrette streg er faseskiftet: sammenlign blokke i samme fase.` This is built from `blocks`; with more blocks, list them as `Blok 11 er i sæson, blok 12–13 uden for sæson.`
   3. If any row is `pre_log`: `Blok 11 er fra før aktivitetsloggen. Dens uger tæller med, når ugen er slut, ikke når en session registreres.`
-  4. Always: `e1RM er et skøn ud fra ugens bedste tunge sæt (kg, reps og RPE), ikke et testet maks.`
+  4. Always: `e1RM er et skøn ud fra ugens bedste sæt med højst 5 reps ved foreskrevet RPE 7 eller mere, ikke et testet maks. Samme regel giver de foreslåede kg.`
 - **No e1RM at all for a lift:** the panel shows its label and, in place of the plot, `Intet e1RM endnu for squat.` (`text-14` muted, 120px tall so the panels stay aligned).
 
 ### 5b. Tonnage pr. uge
@@ -78,7 +78,7 @@ A three-row scoreboard, one row per lift in SBD order: three big tabular numbers
 - **Line 1:** `Uge 39 · 22.–28. sep. · blok 12, uge 1`. Appended when they apply: ` · deload`, ` · før aktivitetslog` (any `pre_log` row in the week), ` · indtil videre` (current week). A gap week reads `Uge 35 · 24.–30. aug. · mellem blokke`.
 - **e1RM card, one line per lift:**
   - `Squat: 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet`. With a logged RPE: `… RPE 8 logget`. If it is the block best, ` · bedst i blokken` is appended.
-  - No `e1rm_kg`, but `sets_lifted > 0`: `Squat: intet tungt sæt med RPE`.
+  - No `e1rm_kg`, but `sets_lifted > 0`: `Squat: intet sæt med højst 5 reps ved RPE 7+` (the one e1RM rule, user 2026-10-14).
   - `status` null: `Squat: ikke trænet`.
 - **Tonnage card:** `Squat: 2.100 kg · 12 sæt`, or `Squat: ikke trænet`.
 
@@ -95,7 +95,7 @@ No chart. While no row has `e1rm_rpe_source = 'logged'`, one line follows the to
 | Updated / stale | `UpdatedLine` strings as `/analyse`, unchanged |
 | Page empty | `Der er ingen styrkeuger endnu. Det daglige job læser arket omkring kl. 05.00.` |
 | Page error | title `Kunne ikke hente styrkedata`, `describeDataError`, `Prøv igen` → `/analyse/styrke` |
-| No e1RM anywhere | in place of the 5a panels: `Der er intet e1RM endnu. Det kommer, når et tungt sæt med RPE er løftet.` |
+| No e1RM anywhere | in place of the 5a panels: `Der er intet e1RM endnu. Det kommer, når et sæt med højst 5 reps ved foreskrevet RPE 7 eller mere er løftet.` |
 | Sheet 1RM read fails | page error (the data layer reads `strength_weeks`, `blocks` and `strength_sets` together; accepted at review 2026-10-01: honest, not graceful). |
 | Chart error | as `/analyse` (`Grafen kan ikke vises` …) |
 | Missing value | `–`, spoken `ikke registreret` |

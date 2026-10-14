@@ -245,7 +245,7 @@ test("weeks: zero weeks stay visible, gap weeks read 'mellem blokke', tooltips a
   assert.deepEqual(gap.tonnage, { SQUAT: 0, BENCH: 0, DEADLIFT: 0 });
   assert.deepEqual(gap.srRow.slice(1), ["mellem blokke", "0", "0", "0"]);
   assert.equal(first.e1rmTip[2], "Dødløft: ikke trænet");
-  assert.equal(first.e1rmTip[1], "Bænkpres: intet tungt sæt med RPE");
+  assert.equal(first.e1rmTip[1], "Bænkpres: intet sæt med højst 5 reps ved RPE 7+");
   assert.equal(b12w1.e1rmTip[0], "Squat: 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet · bedst i blokken");
   assert.equal(b12w1.tonnageTip[0], "Squat: 2.100 kg · 10 sæt");
   assert.equal(current.current, true);
