@@ -292,7 +292,7 @@ Supersedes everything above, Part A's Spurt-specific lines (Technical fonts, Scr
 - **Zones are monochrome:** the five `--zone-*` tints are deleted. The zone ruler (`instrument-load.md` §2) shows the active zone by a thicker baseline span plus its **name in words**; Træning shows value + zone name as text only. Part A's "never colour alone" now reads "never colour" for zones.
 - **Red = today:** `--accent` is only the "now/today" tick: Fokus's rest tick, the zone ruler's today tick, each chart's today tick on the x baseline, and Træning's week-column today tick. `--positive`, `--negative` and `--warning` are `--text` with a word and the ◆ glyph; no red text, rule or fill anywhere.
 - **Hollow = estimated or missing**, app-wide: forecast days (Belastning), kg not in the sheet (Fokus), prescribed-RPE e1RM (Styrke), a ride without TSS (Cykel). Excluded rides are a × on the baseline, never hollow.
-- **Chart marks:** lines 1–2px ink, days as ticks, rides as dots, weeks as 2px bars, blocks as hairline brackets (deload part dashed), no areas, fills, hatches, gradients or gridlines. Mark forms live in one constant, `web/src/lib/chart-marks.ts`, read by every chart.
+- **Chart marks:** lines 1px ink (Belastning: fitness solid, fatigue dashed, form a needle per day from zero; user 2026-10-14), days as ticks, rides as dots, weeks as 2px bars, blocks as hairline brackets (deload part dashed), no areas, fills, hatches, gradients or gridlines. Mark forms live in one constant, `web/src/lib/chart-marks.ts`, read by every chart.
 - **Grain on**, every screen, both themes (`fokus-round4.md` §4, moved from the Fokus root to `body`). **Registration marks** on desktop, every screen.
 - **One living element per screen**, carrying data, drawing scale only, with an sr sentence: Træning the set barcode + week columns; Belastning the marks chart (+ the day barcode in the week card); Cykel the TSS-sized eFTP dots; Styrke the e1RM marks; Fokus as `fokus-round4.md`.
 - **Retired tokens:** `--slab`, `--on-slab`, `--on-slab-muted`, `--slab-mark`, `--zone-*`, `--block-fill`, `--prognose-band`, `--shadow-card`/`--card-shadow`, `--on-accent`, the radius tokens (all 0; classes removed). The foundation step keeps the `--slab*` aliases (unfilled values) so nothing breaks mid-build; the last screen PR deletes them, and a grep for each name must return nothing.
@@ -328,8 +328,8 @@ Existing names are reused so later screens change cheaply. Ratios are the main s
 | `--slab` / `--on-slab` / `--on-slab-muted` / `--slab-mark` | `--bg` / `--text` / `--text-muted` / `--text` | same | transition aliases only; deleted by the last `instrument-rest` PR |
 | `--zone-*`, `--block-fill`, `--prognose-band`, `--shadow-card` | retired (Revision 5) | | zones in words, blocks as brackets, band as a range comb, no shadows |
 | `--card-shadow` | none | none | |
-| `--series-ctl` | `--text`, a 3px horizontal tick per day (no line); prognose: hollow dot r 2, stroke 1 | same | fitness, the answer |
-| `--series-atl` | `--text`, a 1.5px horizontal tick per day; prognose: hollow dot r 1.5, stroke 1 | same | fatigue |
+| `--series-ctl` | `--text`, 1px solid line (user, 2026-10-14); prognose: hollow dot r 2, stroke 1 | same | fitness, the answer |
+| `--series-atl` | `--text`, 1px dashed line (4 3); prognose: hollow dot r 1.5, stroke 1 | same | fatigue |
 | `--series-tsb` | `--text`, one 1px needle per day from 0; prognose: dashed 1 2 outline needle | same | form |
 | `--chart-mark` | = `--text-muted` | same | zero line, block brackets (1px + 6px end ticks; deload dashed 3 2), seam rules, range comb, ×, zero stubs, minor ticks |
 | `--chart-today` | = `--accent` | same | the 2×12 today tick on a chart's x baseline (2×28 on the zone ruler) |

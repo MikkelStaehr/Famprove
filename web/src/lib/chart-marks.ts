@@ -13,14 +13,12 @@ const MUTED = "var(--chart-mark)"; // = --text-muted
 const TODAY = "var(--chart-today)"; // = --accent: the "today" tick only
 
 export const MARKS = {
-  /** Fitness: a horizontal 3px ink dash per measured day; prognose = hollow dots r 2, stroke 1. */
-  ctl: { color: "var(--series-ctl)", thickness: 3, prognose: { r: 2, stroke: 1 } },
-  /** Fatigue: as CTL at 1.5px; prognose = hollow dots r 1.5, stroke 1. */
-  atl: { color: "var(--series-atl)", thickness: 1.5, prognose: { r: 1.5, stroke: 1 } },
+  /** Fitness: a 1px solid ink line over the measured days (user, 2026-10-14: lines read as a trend); prognose = hollow dots r 2, stroke 1. */
+  ctl: { color: "var(--series-ctl)", width: 1, dash: undefined, prognose: { r: 2, stroke: 1 } },
+  /** Fatigue: a 1px dashed (4 3) ink line; prognose = hollow dots r 1.5, stroke 1. */
+  atl: { color: "var(--series-atl)", width: 1, dash: "4 3", prognose: { r: 1.5, stroke: 1 } },
   /** Form: a 1px needle from 0 per day; prognose = the same needle as a 1px dashed (1 2) outline. */
   tsb: { color: "var(--series-tsb)", width: 1, prognoseDash: "1 2" },
-  /** A day tick is the day pitch − 1px wide, never narrower than 1.5px. */
-  dayTick: { gap: 1, minWidth: 1.5 },
   /** Prognose dots: every 2nd day below lg, every day from lg. */
   prognoseEvery: { narrow: 2, wide: 1 },
   /** Today's measured CTL/ATL values: filled ink r 3 with a 2px --bg ring. */
@@ -71,12 +69,6 @@ export const MARKS = {
   /** Selection marker (unchanged): a 1px ink rule. */
   marker: { width: 1, color: INK },
 } as const;
-
-/** CTL/ATL day tick width for a day pitch in px: pitch − 1, at least 1.5. */
-export function dayTickWidth(pitch: number): number {
-  if (!Number.isFinite(pitch)) return MARKS.dayTick.minWidth;
-  return Math.max(MARKS.dayTick.minWidth, pitch - MARKS.dayTick.gap);
-}
 
 /** Every n-th prognose day carries a hollow dot: 2 below lg, 1 from lg. */
 export function prognoseEvery(wide: boolean): number {

@@ -22,11 +22,11 @@ Restyles `load.md` (§2–§11) to DESIGN.md Part B Revision 5. **Same data, cop
 - The zone name is always the word in the figure row; no colour anywhere. sr sentence unchanged (`load.md` §4).
 
 ## 3. The living element: the chart as marks (Recharts `ComposedChart`, `isAnimationActive={false}`)
-Window, axes, readout, keyboard and pointer exactly as now (`load.md` §9–10, DESIGN.md "Charts: interaction"). Marks: the user's brief reads "a tick per day, three line weights in ink" (main session's reading, 2026-10-13): every series is a tick per day in `--text`, told apart by weight (3 / 1.5 / 1px) and form (dash, dash, needle), never by colour; no connecting lines.
+Window, axes, readout, keyboard and pointer exactly as now (`load.md` §9–10, DESIGN.md "Charts: interaction"). Marks (user correction, 2026-10-14: "three series of daily ticks with no lines won't read as a trend"): fitness and fatigue are 1px ink lines (fitness solid, fatigue dashed), form is the daily needle from zero; told apart by dash and form, never by colour.
 | Series | Measured (≤ `lastActual`) | Prognose (> `lastActual`) |
 |---|---|---|
-| CTL (fitness, the answer) | **one tick per day**: a horizontal ink dash at the day's value, width = day pitch − 1px (min 1.5px), **3px** thick, `--text` (`<Scatter>` with a custom `shape`; no line) | hollow dots: `<Scatter>` r 2, fill none, stroke 1 `--text`, every 2nd day below `lg`, every day from `lg` |
-| ATL (fatigue) | one tick per day as CTL, **1.5px** thick, `--text` | hollow dots r 1.5, stroke 1 `--text`, same cadence |
+| CTL (fitness, the answer) | `<Line>` **1px solid** `--text` (user, 2026-10-14) | hollow dots: `<Scatter>` r 2, fill none, stroke 1 `--text`, every 2nd day below `lg`, every day from `lg` |
+| ATL (fatigue) | `<Line>` **1px dashed 4 3** `--text` | hollow dots r 1.5, stroke 1 `--text`, same cadence |
 | TSB (form) | **one tick per day**: a vertical needle from 0 to the value, **1px** wide, `--text` (`<Bar dataKey=tsb barSize=1>`) | the same needles dashed (`strokeDasharray 1 2`, 1px outline, no fill) |
 | CTL band after the block | – | a 1px `--text-muted` vertical range tick from `ctl_low` to `ctl_high` every 4th day (a comb, behind the dots). No area fill |
 | Zero line | 1px `--text-muted` | same |
@@ -51,7 +51,7 @@ Each day row (`<summary>` of the `<details>`) gets an `aria-hidden` SVG in the r
 1. Fold 390 × 844 (disclosure closed, 2-line reading, one notice, both themes): plot incl. x labels ends ≤ 844 − `--bottom-bar` (owner computes). 1280 × 800: hero visible, plot incl. x labels ≤ 800, week card starts ≤ 800.
 2. Exactly two `--accent` marks on the page: the ruler's today tick and the chart's today tick (both are "today"). No other red.
 3. No zone colour, `--slab*`, `--block-fill`, area fill, gradient or gridline; every mark per §3 (DOM inspect in `band`).
-4. CTL, ATL and TSB ticks: one per day each in the window, all `--text`, weights 3 / 1.5 / 1px; prognose marks hollow/dashed only after `lastActual`.
+4. CTL a 1px solid line and ATL a 1px dashed line over the measured days; TSB one 1px needle per day; all `--text`; prognose marks hollow/dashed only after `lastActual`.
 5. Brackets: one per block in the window, deload part dashed; labels never clipped.
 6. Day barcode: tick count = round(tss/10) per part in a fixture week; rest rows draw nothing.
 7. Readout, tooltip, keyboard per DESIGN.md "Charts: interaction"; all contrast ≥ AA computed (marks ≥ 3:1, text ≥ 4.5:1).

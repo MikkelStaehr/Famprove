@@ -5,7 +5,6 @@ import { test } from "node:test";
 import {
   bracketGeometry,
   bracketLabel,
-  dayTickWidth,
   eftpDot,
   eftpDotRadius,
   isCombDay,
@@ -15,17 +14,9 @@ import {
   prognoseEvery,
 } from "../src/lib/chart-marks.ts";
 
-test("day tick: pitch − 1, never under 1.5px", () => {
-  assert.equal(dayTickWidth(6), 5);
-  assert.equal(dayTickWidth(2.5), 1.5);
-  assert.equal(dayTickWidth(1), 1.5);
-  assert.equal(dayTickWidth(0), 1.5);
-  assert.equal(dayTickWidth(Number.NaN), 1.5);
-});
-
-test("series weights: CTL 3, ATL 1.5, TSB 1; prognose dots r 2 / 1.5 stroke 1; TSB prognose dashed 1 2", () => {
-  assert.equal(MARKS.ctl.thickness, 3);
-  assert.equal(MARKS.atl.thickness, 1.5);
+test("series: CTL a 1px solid line, ATL a 1px dashed line, TSB a 1px needle; prognose dots r 2 / 1.5 stroke 1; TSB prognose dashed 1 2", () => {
+  assert.deepEqual([MARKS.ctl.width, MARKS.ctl.dash], [1, undefined]);
+  assert.deepEqual([MARKS.atl.width, MARKS.atl.dash], [1, "4 3"]);
   assert.equal(MARKS.tsb.width, 1);
   assert.deepEqual(MARKS.ctl.prognose, { r: 2, stroke: 1 });
   assert.deepEqual(MARKS.atl.prognose, { r: 1.5, stroke: 1 });

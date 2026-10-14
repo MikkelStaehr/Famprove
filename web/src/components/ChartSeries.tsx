@@ -1,7 +1,7 @@
 import { MARKS } from "@/lib/chart-marks";
 import { formatLoad, formatSigned } from "@/lib/format";
 
-import { CombSwatch, HollowDotSwatch, NeedleSwatch, TickSwatch } from "./ChartMarks";
+import { CombSwatch, HollowDotSwatch, LineSwatch, NeedleSwatch } from "./ChartMarks";
 
 /**
  * The chart's three series and their stroke sample, shared by TrendChart (client) and the
@@ -14,25 +14,25 @@ export type Series = {
   readonly label: string;
   readonly short: string; // the readout cell's label (DESIGN.md "Charts: interaction")
   readonly color: string;
-  /** Mark form (Revision 5): CTL/ATL a horizontal day tick, TSB a vertical needle from 0. */
-  readonly form: "tick" | "needle";
-  /** Tick thickness / needle width in px (lib/chart-marks.ts): told apart by weight and form, never colour. */
+  /** Mark form (Revision 5, user 2026-10-14): CTL/ATL a 1px line, TSB a vertical needle per day from 0. */
+  readonly form: "line" | "needle";
+  /** Line / needle width in px (lib/chart-marks.ts): told apart by dash and form, never colour. */
   readonly width: number;
-  /** Kept for the transition only: no series is dashed in Revision 5 (the TSB prognose needle is, see MARKS.tsb). */
+  /** ATL's dash; CTL and TSB are solid (the TSB prognose needle is dashed, see MARKS.tsb). */
   readonly dash: string | undefined;
   readonly format: (value: number) => string;
 };
 
-/** Legend and tooltip order. Revision 5: all ink; CTL 3px tick, ATL 1.5px tick, TSB 1px needle. */
+/** Legend and tooltip order. Revision 5: all ink; CTL 1px line, ATL 1px dashed line, TSB 1px needle. */
 export const SERIES: readonly Series[] = [
-  { key: "ctl", label: "Fitness (CTL)", short: "Fitness", color: MARKS.ctl.color, form: "tick", width: MARKS.ctl.thickness, dash: undefined, format: formatLoad },
-  { key: "atl", label: "Træthed (ATL)", short: "Træthed", color: MARKS.atl.color, form: "tick", width: MARKS.atl.thickness, dash: undefined, format: formatLoad },
+  { key: "ctl", label: "Fitness (CTL)", short: "Fitness", color: MARKS.ctl.color, form: "line", width: MARKS.ctl.width, dash: MARKS.ctl.dash, format: formatLoad },
+  { key: "atl", label: "Træthed (ATL)", short: "Træthed", color: MARKS.atl.color, form: "line", width: MARKS.atl.width, dash: MARKS.atl.dash, format: formatLoad },
   { key: "tsb", label: "Form (TSB)", short: "Form", color: MARKS.tsb.color, form: "needle", width: MARKS.tsb.width, dash: undefined, format: formatSigned },
 ];
 
 /** The series' mark as its legend / readout swatch, 24×12 (decorative; the label names it). */
 export function SeriesSwatch({ series }: { readonly series: Series }) {
-  return series.form === "needle" ? <NeedleSwatch /> : <TickSwatch thickness={series.width} />;
+  return series.form === "needle" ? <NeedleSwatch /> : <LineSwatch dash={series.dash} />;
 }
 
 /** Former name of SeriesSwatch (TrendChart, LoadExplainer); same mark-form swatch. */

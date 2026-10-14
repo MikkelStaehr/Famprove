@@ -135,17 +135,6 @@ export type BarShapeProps = { readonly x?: number; readonly y?: number; readonly
 
 const EMPTY = <g />;
 
-/**
- * A CTL/ATL day tick for `<Scatter shape={dayTickShape(MARKS.ctl.thickness, dayTickWidth(pitch))}>`:
- * a horizontal ink dash centred on the day's value.
- */
-export function dayTickShape(thickness: number, width: number, color: string = "var(--text)") {
-  return function DayTick({ cx, cy }: PointShapeProps): ReactElement {
-    if (cx === undefined || cy === undefined || !Number.isFinite(cx) || !Number.isFinite(cy)) return EMPTY;
-    return <rect x={cx - width / 2} y={cy - thickness / 2} width={width} height={thickness} fill={color} />;
-  };
-}
-
 /** A prognose hollow dot for `<Scatter shape={hollowDotShape(MARKS.ctl.prognose.r)}>`. */
 export function hollowDotShape(r: number, stroke: string = "var(--text)", strokeWidth = 1) {
   return function HollowDotShape({ cx, cy }: PointShapeProps): ReactElement {
@@ -198,12 +187,11 @@ function Swatch({ children }: { readonly children: ReactNode }) {
   );
 }
 
-/** A horizontal day tick (CTL 3px, ATL 1.5px): two dashes, as on the plot. */
-export function TickSwatch({ thickness }: { readonly thickness: number }) {
+/** A 1px ink line (CTL solid, ATL dashed), as on the plot. */
+export function LineSwatch({ dash }: { readonly dash: string | undefined }) {
   return (
     <Swatch>
-      <rect x="2" y={6 - thickness / 2} width="9" height={thickness} fill="var(--text)" />
-      <rect x="13" y={6 - thickness / 2} width="9" height={thickness} fill="var(--text)" />
+      <line x1="0" x2="24" y1="6" y2="6" stroke="var(--text)" strokeWidth={1} strokeDasharray={dash} />
     </Swatch>
   );
 }

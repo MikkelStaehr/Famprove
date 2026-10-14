@@ -2,9 +2,9 @@
 
 import { catchError, type ErrorInfo } from "next/error";
 import { type ReactElement, type ReactNode, useCallback, useState, useSyncExternalStore } from "react";
-import { Bar, ComposedChart, ReferenceDot, ReferenceLine, Scatter, XAxis, YAxis } from "recharts";
+import { Bar, ComposedChart, Line, ReferenceDot, ReferenceLine, Scatter, XAxis, YAxis } from "recharts";
 
-import { bracketLabel, dayTickWidth, isCombDay, MARKS, monoLabelWidth, prognoseEvery } from "@/lib/chart-marks";
+import { bracketLabel, isCombDay, MARKS, monoLabelWidth, prognoseEvery } from "@/lib/chart-marks";
 import {
   type BlockSpan,
   CHART_WINDOW_DAYS,
@@ -22,7 +22,6 @@ import {
   type BarShapeProps,
   BlockBracket,
   BracketSwatch,
-  dayTickShape,
   hollowDotShape,
   HollowDotSwatch,
   needleShape,
@@ -250,7 +249,6 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
   // Plot geometry in px from the measured box (the x scale Recharts uses: [y axis, width − right]).
   const plotW = size === null ? 0 : Math.max(0, size.w - Y_AXIS_WIDTH - MARGIN_RIGHT);
   const px = (day: number) => Y_AXIS_WIDTH + (plotW * (day - lo)) / (hi - lo);
-  const tickW = dayTickWidth(plotW / (hi - lo));
   const todayPx = px(today);
   const axisY = size === null ? 0 : size.h - X_AXIS_HEIGHT;
   const todayCaptionLeft = todayPx - TODAY_CAPTION_GAP - captionWidth(TODAY_CAPTION);
@@ -357,8 +355,9 @@ function Chart({ points, blocks, lastActual, today: todayDate, title }: ChartPro
           />
           {/* TSB: a 1px needle from 0 per day; the prognose needles dashed (spec §3). */}
           <Bar dataKey="tsb" barSize={MARKS.tsb.width} shape={tsbNeedle} isAnimationActive={false} />
-          <Scatter dataKey="atlM" shape={dayTickShape(MARKS.atl.thickness, tickW)} isAnimationActive={false} />
-          <Scatter dataKey="ctlM" shape={dayTickShape(MARKS.ctl.thickness, tickW)} isAnimationActive={false} />
+          {/* CTL and ATL: 1px ink lines over the measured days, ATL dashed (user, 2026-10-14). */}
+          <Line dataKey="atlM" stroke={MARKS.atl.color} strokeWidth={MARKS.atl.width} strokeDasharray={MARKS.atl.dash} dot={false} activeDot={false} isAnimationActive={false} />
+          <Line dataKey="ctlM" stroke={MARKS.ctl.color} strokeWidth={MARKS.ctl.width} dot={false} activeDot={false} isAnimationActive={false} />
           <Scatter dataKey="atlP" shape={hollowDotShape(MARKS.atl.prognose.r, MARKS.atl.color, MARKS.atl.prognose.stroke)} isAnimationActive={false} />
           <Scatter dataKey="ctlP" shape={hollowDotShape(MARKS.ctl.prognose.r, MARKS.ctl.color, MARKS.ctl.prognose.stroke)} isAnimationActive={false} />
           {todayRow !== undefined &&
