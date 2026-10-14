@@ -96,3 +96,9 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | review-belastning | Week card as card 2 with done / ~planned (weekly_plan view), one WeekCard on Belastning and Træning, curve through weekly anchors, no rest readouts or tooltips on /load, no today line on the curve, grid week numbers and seven day labels | L |
 | review-traening | Træning: no "intet forslag" (visible or spoken), every exercise collapsed to name + set dots | M |
 | review-faelles | Forecast-form guard tests, one isoWeek helper, TrendChart gone, one "opdateret" formatter | M |
+| answers-round | The user's answers after the review round: intervals.icu rides in the prognose, Analyse readout rule, rolling e1RM board, footnote, "endnu", desktop gap | L |
+| planned-rides-icu | Prognose cycling from intervals.icu calendar events when the week has any, else the typical week | L |
+| analyse-calm | Analyse charts: no values or tooltips before a tap, one readout row under the chart | M |
+| board-rolling-e1rm | Styrke board shows the rolling 4-week e1RM (the suggestions' number), not the block best | M |
+| small-fixes | Træning footnote only with a suggestion, Styrke "endnu" gone once the block has ended, /load desktop gap if small | S |
+| cli-pin | Supabase CLI pinned to v2.120.0 in CLAUDE.md | S |
