@@ -78,3 +78,8 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | score-final | Persist compute's final set score (strength_sets.score_final) so the week view shows what feeds daily_load | S |
 | instrument-fokus | New direction (editorial instrument panel, replaces Spurt): DESIGN.md Part B + Fokus restyled as the pilot | M |
 | instrument-rest | Restyle Træning, Belastning and Analyse to the instrument direction (after the Fokus pilot) | L |
+| visual-reset | Visual reset to the dark card mockup (design/reference, local only): replaces Instrument on every screen, no data or feature changes | L |
+| reset-base | Reset base: DESIGN.md rewritten from the mockup, tokens, Geist + Geist Mono, icon tab bar, card primitives | M |
+| reset-belastning | Belastning from the mockup: form card with zone bar, stat cards, fitness curve with 4U/12U/Sæson, 12-week day grid, daily TSS bars, week list | L |
+| reset-traening | Træning with the light "I dag" card and card lists; Fokus on the new tokens and fonts | M |
+| reset-analyse | Analyse (Cykel, Styrke) on the card system | M |
