@@ -30,7 +30,7 @@ export function RestTimer({ seconds, label }: { readonly seconds: number; readon
       aria-live="off"
       aria-label={label}
       suppressHydrationWarning
-      className="font-sans text-56 leading-none font-normal text-text tabular-nums"
+      className="font-mono text-56 leading-none font-medium text-text tabular-nums"
     >
       {formatTimer(seconds)}
     </p>

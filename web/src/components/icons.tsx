@@ -18,7 +18,10 @@ export type IconName =
   | "check"
   | "arrow-up"
   | "arrow-down"
-  | "arrow-flat";
+  | "arrow-flat"
+  | "x"
+  | "minus"
+  | "plus";
 
 /** Part B sizes: 22 phone tab bar, 20 desktop tabs / card corners / icon buttons, 18 ListRow, 16 WarningLine and chevrons. */
 export type IconSize = 16 | 18 | 20 | 22;
@@ -43,6 +46,10 @@ const PATHS: Readonly<Record<IconName, ReactNode>> = {
   "arrow-up": <path d="M12 19V5M6 11l6-6 6 6" />,
   "arrow-down": <path d="M12 5v14M6 13l6 6 6-6" />,
   "arrow-flat": <path d="M5 12h14M13 6l6 6-6 6" />,
+  // Fokus (reset-fokus.md §4): Afslut's x, the reps stepper's minus / plus.
+  x: <path d="M6 6l12 12M18 6L6 18" />,
+  minus: <path d="M5 12h14" />,
+  plus: <path d="M5 12h14M12 5v14" />,
 };
 
 type IconProps = {

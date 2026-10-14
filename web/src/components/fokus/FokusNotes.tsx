@@ -3,20 +3,27 @@ import Link from "next/link";
 import { type DataError, describeDataError } from "@/lib/data-error";
 import { formatUpdatedAt } from "@/lib/format";
 
-import { Hairline, INK_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { Icon } from "@/components/icons";
+
+import { COMPACT_SECONDARY, Hairline, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+
+/** reset-fokus.md §7: the no-session and error states sit in a Card (radius 22, padding 20). */
+const CARD = "flex flex-col rounded-card border border-border bg-card p-5";
 
 /** No session to train (§5 states c/d/e, DEV_FIXTURE=empty): a note and the way back (the view's one fill). */
 export function NoSessionNote({ sentence, devSwitches }: { readonly sentence: string; readonly devSwitches: boolean }) {
   return (
     <div className="flex flex-col">
       <h1 className="sr-only">Fokus</h1>
-      {devSwitches && <p className="text-14 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
+      {devSwitches && <p className="font-mono text-13 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
       <section aria-labelledby="fokus-none" className="mt-2 flex flex-col gap-3">
-        <h2 id="fokus-none" className="font-sans text-20 font-normal">
-          Ingen styrkesession at træne nu.
-        </h2>
-        <Hairline />
-        <p className="text-16">{sentence}</p>
+        <div className={`${CARD} gap-3`}>
+          <h2 id="fokus-none" className="font-sans text-20 font-semibold tracking-[-0.01em]">
+            Ingen styrkesession at træne nu.
+          </h2>
+          <Hairline />
+          <p className="text-16">{sentence}</p>
+        </div>
         <div className={`mt-4 ${PRIMARY_DOCK}`}>
           <Link href="/" className={PRIMARY_BOX}>
             Til Træning
@@ -36,11 +43,12 @@ export function FokusError({ error, at }: { readonly error: DataError; readonly 
     <div className="flex flex-col gap-4">
       <h1 className="sr-only">Fokus</h1>
       <div>
-        <Link href="/" className={`inline-flex items-center ${INK_LINK}`}>
+        <Link href="/" className={COMPACT_SECONDARY}>
+          <Icon name="x" size={18} />
           Afslut
         </Link>
       </div>
-      <div role="alert" className="flex flex-col items-start gap-2">
+      <div role="alert" className={`${CARD} items-start gap-2`}>
         <p className="flex items-center gap-2 text-16 text-text">
           <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 shrink-0" fill="currentColor">
             <path d="M8 1 15 8 8 15 1 8Z" />

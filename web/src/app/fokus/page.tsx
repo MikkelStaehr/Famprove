@@ -103,10 +103,10 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
 }
 
 /**
- * Phone-first screen (DESIGN.md Part A): one max-w-phone column at every width, centred from lg
- * (no nav, no edge to hang from). main's top padding puts the top bar 12px (or the safe-area
+ * Phone-first screen (DESIGN.md Part A, reset-fokus.md §6): one 480px column at every width,
+ * centred (no nav, no edge to hang from). main's top padding puts the top bar 12px (or the safe-area
  * inset) from the top.
  */
 function FokusColumn({ children }: { readonly children: ReactNode }) {
-  return <div className="mx-auto flex w-full max-w-phone flex-1 flex-col">{children}</div>;
+  return <div className="mx-auto flex w-full max-w-[30rem] flex-1 flex-col">{children}</div>;
 }

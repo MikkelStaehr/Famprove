@@ -24,10 +24,15 @@ import type { LoggedSet, SetRef } from "@/lib/set-taps";
 import { formatKg } from "@/lib/format";
 import { dotField, FIELD_WIDTH } from "@/lib/fokus-marks";
 
+import { Icon } from "@/components/icons";
+
 import { ArrowIcon, CAPTION, INK_LINK, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
+
+/** reset-fokus.md §3: the pause and warm-up surfaces are Cards (radius 22, padding 20). */
+const CARD = "flex flex-col rounded-card border border-border bg-card p-5";
 
 export function PrimaryButton({ primary, onClick, children }: { readonly primary: PrimaryRef; readonly onClick: () => void; readonly children: string }) {
   return (
@@ -66,11 +71,16 @@ export function FeelBlock({
   const felt = logged?.feltRpe ?? null;
   return (
     <section aria-labelledby={`${id}-q`} className="mt-2 flex flex-col">
-      <h2 id={`${id}-q`} className="font-sans text-20 font-normal">
+      <h2 id={`${id}-q`} className="font-sans text-20 font-medium">
         {feelQuestion(set, named)}
       </h2>
-      {/* Round 4: one segmented control, a 1px --text-muted box, --border hairlines inside only. */}
-      <div role="group" aria-labelledby={`${id}-q`} className="mt-3 grid grid-cols-3 border border-text-muted">
+      {/* reset-fokus.md §4: the SegmentedControl look with 56px segments; the chosen one has the
+          --raised fill and a check icon, so the choice is never carried by fill alone. */}
+      <div
+        role="group"
+        aria-labelledby={`${id}-q`}
+        className="mt-3 grid grid-cols-3 gap-0.5 rounded-control border border-text-muted bg-bg p-0.75"
+      >
         {FEEL_OPTIONS.map((o) => {
           const on = felt === o.value;
           return (
@@ -80,10 +90,11 @@ export function FeelBlock({
               aria-pressed={on}
               aria-label={o.label}
               onClick={() => onTap("feel", set.ref, nextFeel(felt, o.value))}
-              className={`relative flex min-h-14 items-center justify-center px-2 font-sans text-16 leading-tight font-medium not-first:border-l not-first:border-border focus-visible:z-10 focus-visible:outline-offset-2 ${
-                on ? "bg-text text-bg" : "text-text"
+              className={`relative flex min-h-14 items-center justify-center gap-1.5 rounded-segment px-2 font-sans text-16 leading-tight font-medium text-text transition-colors duration-[120ms] ease-out focus-visible:z-10 ${
+                on ? "bg-raised" : "bg-transparent"
               }`}
             >
+              {on && <Icon name="check" size={16} />}
               {o.label}
             </button>
           );
@@ -133,7 +144,7 @@ function RepsStepper({
     timer.current = window.setTimeout(() => pending.current?.(), 600);
   };
   const stepButton =
-    "flex size-14 items-center justify-center border border-text-muted text-text disabled:border-dashed disabled:text-text-muted";
+    "flex size-14 items-center justify-center rounded-button border border-text-muted bg-card text-text active:opacity-85 disabled:border-dashed disabled:text-text-muted";
   return (
     <div role="group" aria-labelledby={`${id}-l`} className="mt-3 flex items-center justify-between gap-3">
       <p id={`${id}-l`} className="flex flex-col">
@@ -145,18 +156,14 @@ function RepsStepper({
       </p>
       <div className="flex items-center gap-2">
         <button type="button" disabled={value <= min} aria-disabled={value <= min} onClick={() => change(-1)} className={stepButton}>
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M5 12h14" />
-          </svg>
+          <Icon name="minus" size={22} />
           <span className="sr-only">Færre reps</span>
         </button>
-        <output aria-live="polite" className="min-w-[3ch] text-center font-sans text-28 font-normal tabular-nums">
+        <output aria-live="polite" className="min-w-[3ch] text-center font-mono text-28 font-medium tabular-nums">
           {value}
         </output>
         <button type="button" disabled={value >= max} aria-disabled={value >= max} onClick={() => change(1)} className={stepButton}>
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M5 12h14M12 5v14" />
-          </svg>
+          <Icon name="plus" size={22} />
           <span className="sr-only">Flere reps</span>
         </button>
       </div>
@@ -180,7 +187,7 @@ export function PauseCard({ since, exercise, onAnnounce }: { readonly since: str
   // rest_min_s or rest_max_s null: no field (§3.1).
   const rail = exercise.restMinS !== null && exercise.restMaxS !== null;
   return (
-    <section aria-label="Pause" className="mt-10 flex flex-col">
+    <section aria-label="Pause" className={`mt-10 ${CARD}`}>
       <p className={CAPTION}>Pause</p>
       <div className="mt-3">
         <RestTimer seconds={seconds} label="Pause" />
@@ -225,7 +232,7 @@ function Scale({ seconds, scaleS, minS, maxS }: { readonly seconds: number; read
           d.kind === "over" ? (
             <circle key={i} cx={d.cx} cy={d.cy} r={1.25} fill="none" stroke="var(--text)" strokeWidth={1} />
           ) : (
-            <circle key={i} cx={d.cx} cy={d.cy} r={1.5} fill={d.kind === "filled" ? "var(--text)" : "var(--border)"} />
+            <circle key={i} cx={d.cx} cy={d.cy} r={1.5} fill={d.kind === "filled" ? "var(--text)" : emptyFill(d.cx, f.minX, f.maxX)} />
           ),
         )}
         {marks && f.minX !== null && f.maxX !== null && (
@@ -244,6 +251,14 @@ function Scale({ seconds, scaleS, minS, maxS }: { readonly seconds: number; read
   );
 }
 
+/**
+ * An empty dot's colour (reset-fokus.md §5): inside the recommended rest (MIN..MAX) --shade-2, the
+ * rest of the track --axis (on --card the --track value is near-invisible, 1.11:1). Decorative.
+ */
+function emptyFill(cx: number, minX: number | null, maxX: number | null): string {
+  return minX !== null && maxX !== null && cx >= minX && cx <= maxX + 1 ? "var(--shade-2)" : "var(--axis)";
+}
+
 /** The warm-up's scale: 0-10 minutes (round 2). */
 const WARMUP_SCALE_S = 600;
 
@@ -252,8 +267,8 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
   const ramp = rampState(exercise, mainLift);
   const basis = rampBasis(exercise);
   return (
-    <section aria-labelledby="fokus-warmup" className="flex flex-col">
-      <h2 id="fokus-warmup" className="font-sans text-28 font-normal [overflow-wrap:anywhere]">
+    <section aria-labelledby="fokus-warmup" className={CARD}>
+      <h2 id="fokus-warmup" className="font-sans text-28 font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">
         {warmupTitle(exercise)}
       </h2>
       <div className="mt-14">
@@ -261,21 +276,18 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
         {since === null ? <WarmupClock seconds={0} /> : <WarmupTimer since={since} />}
       </div>
       {ramp === "ramp" && exercise.ramp !== null && (
-        <div className="@container mt-14 flex flex-col">
+        <div className="mt-14 flex flex-col">
           {basis !== null && <p className={CAPTION}>{basis}</p>}
-          {/* One row of columns while they fit (21rem at 100 % text); stacked at 200 % text. */}
-          <ol aria-label="Opvarmningssæt" className="mt-3 grid gap-x-3 gap-y-4 @min-[21rem]:auto-cols-fr @min-[21rem]:grid-flow-col">
+          {/* reset-fokus.md §5: ListRow-style rows (1px --border top, min 44px): % | kg | reps. */}
+          <ol aria-label="Opvarmningssæt" className="mt-3 flex flex-col">
             {exercise.ramp.map((r) => (
-              <li key={r.pct} className="flex flex-col @min-[21rem]:not-first:border-l @min-[21rem]:not-first:border-border @min-[21rem]:not-first:pl-3">
-                <span className={CAPTION}>{Math.round(r.pct)}&nbsp;%</span>
-                <span className="flex flex-wrap items-baseline">
-                  <span className="text-24 text-text">{formatKg(r.kg)}</span>
+              <li key={r.pct} className="flex min-h-11 flex-wrap items-center gap-x-3 border-t border-border py-2.5 font-mono tabular-nums">
+                <span className="w-12 shrink-0 text-14 text-text-muted">{Math.round(r.pct)}&nbsp;%</span>
+                <span className="flex flex-1 items-baseline">
+                  <span className="text-24 font-medium text-text">{formatKg(r.kg)}</span>
                   <span className="text-14 text-text-muted">&nbsp;kg</span>
                 </span>
-                <span className="font-mono text-14 text-text-muted">{r.reps} reps</span>
-                <span aria-hidden="true" className="relative mt-2 block h-px bg-text" style={{ width: `${Math.min(100, r.pct)}%` }}>
-                  <span className="absolute right-0 bottom-0 block h-2 w-px bg-text" />
-                </span>
+                <span className="shrink-0 text-14 text-text-muted">{r.reps} reps</span>
               </li>
             ))}
           </ol>
@@ -316,8 +328,11 @@ export function NextSetCard({
   const summary = nextSetSummary(next, inWarmup);
   const kg = summary.kg;
   return (
-    <section aria-label="Næste sæt" className={`${afterTimer ? "mt-14" : "mt-10"} flex flex-col gap-1`}>
-      <p className="font-sans text-20 [overflow-wrap:anywhere]">{summary.title}</p>
+    <section
+      aria-label="Næste sæt"
+      className={`${afterTimer ? "mt-14" : "mt-10"} flex flex-col gap-1 rounded-card border border-dashed border-shade-1 bg-card p-5`}
+    >
+      <p className="font-sans text-20 font-medium [overflow-wrap:anywhere]">{summary.title}</p>
       {(summary.line !== "" || kg !== null) && (
         <p className="text-16 [overflow-wrap:anywhere]">
           {summary.line}
@@ -339,7 +354,7 @@ export function Note({ text }: { readonly text: string }) {
   const [open, setOpen] = useState(false);
   const long = text.length > NOTE_CLAMP_CHARS;
   return (
-    <div className="flex flex-col items-start">
+    <div className="flex flex-col items-start rounded-tile border border-border bg-card p-3.5">
       <p className={`font-sans text-16 text-text-muted [overflow-wrap:anywhere] ${long && !open ? "line-clamp-3" : ""}`}>Note: {text}</p>
       {long && !open && (
         <button type="button" onClick={() => setOpen(true)} className={`-my-2.5 ${INK_LINK}`}>

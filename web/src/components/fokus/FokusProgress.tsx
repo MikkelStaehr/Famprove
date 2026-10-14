@@ -1,11 +1,9 @@
 import { type SetRef, setKey, type SetState } from "@/lib/set-taps";
 
 /**
- * Progress barcode (DESIGN.md Part B signature 2, fokus-instrument.md §1): one tick per set in
- * sheet order, bottom-aligned on a hairline. Done 2×16px ink, skipped 2×6px muted, open 1×6px
- * muted, the current set 2×24px ink (taller than done; none when finished). The primary button
- * and the rest scale's tick are the only red (round 2). Shape carries state; aria-hidden:
- * the count text carries it.
+ * Progress strip (reset-fokus.md §5): one segment per set in sheet order, equal height, 2px gaps,
+ * radius 2, on a --border baseline. Done --text, skipped --shade-2, open --track, the current set
+ * a 1px --text outline (none when finished). aria-hidden: the count text carries it.
  */
 export function FokusProgress({
   order,
@@ -18,19 +16,15 @@ export function FokusProgress({
 }) {
   const now = current === null ? null : setKey(current);
   return (
-    <div aria-hidden="true" className="flex h-6 items-end justify-between border-b border-border">
+    <div aria-hidden="true" className="flex h-6 items-end gap-0.5 border-b border-border pb-1">
       {order.map((ref) => {
         const key = setKey(ref);
         const state = stateOf(ref);
-        const tick =
-          key === now
-            ? "h-6 w-0.5 bg-text"
-            : state === "done"
-              ? "h-4 w-0.5 bg-text"
-              : state === "skipped"
-                ? "h-1.5 w-0.5 bg-text-muted"
-                : "h-1.5 w-px bg-text-muted";
-        return <span key={key} data-state={key === now ? "current" : state} className={`block shrink-0 ${tick}`} />;
+        const fill = state === "done" ? "bg-text" : state === "skipped" ? "bg-shade-2" : "bg-track";
+        const ring = key === now ? " outline-1 -outline-offset-1 outline-text" : "";
+        return (
+          <span key={key} data-state={key === now ? "current" : state} className={`block h-2 min-w-0 flex-1 rounded-[2px] ${fill}${ring}`} />
+        );
       })}
     </div>
   );

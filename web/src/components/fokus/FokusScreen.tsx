@@ -49,7 +49,8 @@ import {
 } from "@/lib/set-taps";
 
 import { FokusProgress } from "./FokusProgress";
-import { CAPTION, CheckIcon, FokusWarning as WarningLine, INK_LINK, MUTED_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { Icon } from "@/components/icons";
+import { CAPTION, CheckIcon, COMPACT_SECONDARY, FokusWarning as WarningLine, MUTED_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { SessionSignature } from "./SessionSignature";
 import { FeelBlock, Footer, NextSetCard, Note, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
@@ -199,11 +200,12 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
       {/* Top bar: fixed in layout, so the card never jumps (§4.1). */}
       <div className="flex items-center justify-between gap-3">
-        <HomeLink flush={flush} className={`inline-flex shrink-0 items-center ${INK_LINK}`}>
+        <HomeLink flush={flush} className={COMPACT_SECONDARY}>
+          <Icon name="x" size={18} />
           Afslut
         </HomeLink>
       </div>
-      {(devSwitches || dev) && <p className="text-14 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
+      {(devSwitches || dev) && <p className="mt-2 font-mono text-13 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
       {/* The progress with its count beside it (round 3): "0/19" on screen, the full sentence spoken. */}
       <div className="mt-2 flex items-end gap-3">
         <div className="min-w-0 flex-1">
@@ -213,7 +215,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
             current={now}
           />
         </div>
-        <p className="shrink-0 font-mono text-16 leading-none tabular-nums">
+        <p className="shrink-0 font-mono text-16 leading-none font-medium tabular-nums">
           <span aria-hidden="true">
             {p.done}/{p.total}
           </span>
@@ -240,7 +242,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         {/* Fortryd alone on its row (round 3); what it undoes is the sr-only rest of its name (WCAG 2.5.3: starts with the label). */}
         {lastLine !== null && (
           <p className="flex justify-end">
-            <button type="button" onClick={onUndo} className={`shrink-0 px-0 ${INK_LINK}`}>
+            <button type="button" onClick={onUndo} className={COMPACT_SECONDARY}>
               Fortryd<span className="sr-only">: {lastLine}</span>
             </button>
           </p>
@@ -334,7 +336,9 @@ function SetView({
   return (
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       <section aria-labelledby="fokus-set" className="mt-4 flex flex-1 flex-col">
-        <h2 id="fokus-set" className="font-sans text-28 font-normal [overflow-wrap:anywhere]">
+        {/* reset-fokus.md §3: the figure block in a hero Card (26, padding 20); its old margins are the card's. */}
+        <div className="mb-10 flex flex-col rounded-hero border border-border bg-card p-5">
+        <h2 id="fokus-set" className="font-sans text-28 font-semibold tracking-[-0.01em] [overflow-wrap:anywhere]">
           {exerciseName(e)}
         </h2>
         <p className={`${CAPTION} mt-3`}>{setTitle(current)}</p>
@@ -345,14 +349,14 @@ function SetView({
             {e.repsText !== null && (
               <p className="flex flex-col [overflow-wrap:anywhere]">
                 <span className={CAPTION}>Reps</span>
-                <span className="text-48">{rangeFigure(e.repsText)}</span>
+                <span className={FIGURE}>{rangeFigure(e.repsText)}</span>
               </p>
             )}
             {cell !== null && (
               <p className="flex flex-col [overflow-wrap:anywhere]">
                 <span className={CAPTION}>{cell.caption ?? "\u00a0"}</span>
                 <span>
-                  <span className="text-48">{cell.value}</span>
+                  <span className={FIGURE}>{cell.value}</span>
                   {cell.unit !== null && <span className="text-20 text-text-muted">{cell.unit}</span>}
                 </span>
               </p>
@@ -365,7 +369,7 @@ function SetView({
               >
                 <span className={CAPTION}>{kg.label}</span>
                 <span>
-                  {kg.kind === "suggestion" ? <span className="text-48">{kg.figure}</span> : <FigureWithWords figure={kg.figure} />}
+                  {kg.kind === "suggestion" ? <span className={FIGURE}>{kg.figure}</span> : <FigureWithWords figure={kg.figure} />}
                   {kg.unit !== null && <span className="text-20 text-text-muted">{"\u00a0"}kg</span>}
                 </span>
               </p>
@@ -373,7 +377,7 @@ function SetView({
           </div>
         </div>
 
-        <div className="mt-3 mb-10 flex flex-col gap-3">
+        <div className="mt-3 flex flex-col gap-3">
           <DotRow dots={dots} />
           {kg?.kind === "suggestion" && adjustment !== null && (
             <p className="text-16 text-text-muted">
@@ -382,9 +386,18 @@ function SetView({
             </p>
           )}
           {lastWeek !== null && (
-            <p className="text-16 text-text-muted">{lastWeek.kind === "kg" ? `Sidste uge ${lastWeek.text}` : lastWeek.text}</p>
+            <p className="text-16 text-text-muted">
+              {lastWeek.kind === "kg" ? (
+                <>
+                  Sidste uge <span className="font-mono text-20 font-medium tabular-nums">{lastWeek.text}</span>
+                </>
+              ) : (
+                lastWeek.text
+              )}
+            </p>
           )}
           {note !== "" && <Note text={note} />}
+        </div>
         </div>
 
         {/* Secondary action above the primary: nothing sits below Udført (round 2). mt-auto takes the
@@ -524,10 +537,11 @@ function FinishedView({
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
       <section aria-labelledby={`fokus-finished-${session}`} className={`${feel !== null ? "mt-10" : "mt-4"} flex flex-col`}>
-        <h2 id={`fokus-finished-${session}`} className="font-sans text-48 font-normal">
+        <h2 id={`fokus-finished-${session}`} className="font-sans text-28 font-semibold tracking-[-0.01em]">
           {card.title}
         </h2>
-        <div className="mt-10 flex flex-col gap-3">
+        {/* reset-fokus.md §3: the counts in a hero Card. */}
+        <div className="mt-10 flex flex-col gap-3 rounded-hero border border-border bg-card px-5 pt-5.5 pb-4">
           <CountsFigure text={card.counts} />
           <SessionSignature marks={marks} />
           {card.times !== null && <p className={CAPTION}>{card.times}</p>}
@@ -551,11 +565,14 @@ function CountsFigure({ text }: { readonly text: string }) {
   return (
     <p className="text-16 text-text-muted">
       {m[1]}
-      <span className="text-56 text-text">{m[2]}</span>
+      <span className="font-mono text-56 font-medium text-text tabular-nums">{m[2]}</span>
       {m[3]}
     </p>
   );
 }
+
+/** Reps, RPE and kg (DESIGN.md text-56: Fokus reps / kg / timer): Geist Mono 500, −0.03em, tabular. */
+const FIGURE = "font-mono text-56 font-medium tabular-nums";
 
 /** A kg figure with words in it ("kropsvægt + 10"), not a plain number. */
 const hasWords = (figure: string): boolean => /\p{L}/u.test(figure);
@@ -567,11 +584,11 @@ const hasWords = (figure: string): boolean => /\p{L}/u.test(figure);
  */
 function FigureWithWords({ figure }: { readonly figure: string }) {
   const m = /^(\D+?)\s*(\d[\d,.]*)$/.exec(figure);
-  if (m === null) return <span className="text-48">{figure}</span>;
+  if (m === null) return <span className={FIGURE}>{figure}</span>;
   return (
     <>
-      <span className="text-24">{m[1]} </span>
-      <span className="text-48">{m[2]}</span>
+      <span className="font-sans text-24">{m[1]} </span>
+      <span className={FIGURE}>{m[2]}</span>
     </>
   );
 }

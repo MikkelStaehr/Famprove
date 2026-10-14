@@ -17,12 +17,14 @@ export const PRIMARY_DOCK =
   "sticky bottom-0 z-10 bg-bg pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] before:pointer-events-none before:absolute before:inset-x-0 before:-top-3 before:h-3 before:bg-linear-to-b before:from-transparent before:to-bg";
 /** A secondary control (reset-fokus.md §4): --card fill, 1px --text-muted border (≥ 3:1), Geist 16/500, --radius-button. */
 export const OUTLINED = "rounded-button border border-text-muted bg-card font-sans text-16 font-medium text-text active:opacity-85";
+/** Afslut and Fortryd (reset-fokus.md §4): compact secondary buttons, padding 0 14, 44px tall. */
+export const COMPACT_SECONDARY = `inline-flex min-h-11 shrink-0 items-center gap-2 px-3.5 ${OUTLINED}`;
 /** Fokus captions (reset-fokus.md §1): MonoCaption at 13px, read at arm's length. */
 export const CAPTION = "font-mono text-13 font-normal text-text-muted uppercase";
 /** Spring over (round 4): a centred muted underlined text link, 44px target, no box. */
 export const MUTED_LINK =
   "min-h-11 px-4 font-sans text-16 font-normal text-text-muted underline decoration-1 underline-offset-4";
-/** An ink text action (Afslut, Fortryd, Hele noten): Inter 500, underlined 1px at 4px. */
+/** An ink text action (Hele noten): Geist 500, underlined 1px at 4px. */
 export const INK_LINK = "min-h-11 font-sans text-16 font-medium text-text underline decoration-1 underline-offset-4";
 
 /** A 1px divider in --border (never an outline, [A5]). */
