@@ -92,4 +92,4 @@ Next.js (web/), server components only
 ## Where to change what
 Strength session rule → `domain/sessions.py` · ride-analysis thresholds and the EF intensity basis → `domain/ride_analysis.py` · program phases, competition-lift names and e1RM rules → `domain/strength_analysis.py` · Decay variant → `domain/load.py` `DECAY` · form-zone bands → `domain/form.py` + `web/src/lib/zone-scale.ts` (drawing only; `web/tests/zone-scale.test.ts` fails if they drift) · strength formula →
 don't (it's the coach's, in `sources/strength_sheet.py`) · muscle factor / bodyweight fraction per exercise → `public.exercises` rows (Supabase table editor) · `STRENGTH_K` / `BODYWEIGHT` → env ·
-tokens and layout rules → `DESIGN.md` (Part B = the Instrument direction) and `web/src/app/globals.css` · zone labels shown in the UI → `web/src/lib/dashboard-view.ts`.
+tokens and layout rules → `DESIGN.md` (Part B = the Ember direction, the visual reset of 2026-10-14) and `web/src/app/globals.css` · zone labels shown in the UI → `web/src/lib/dashboard-view.ts`.

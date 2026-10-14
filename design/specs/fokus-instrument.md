@@ -1,3 +1,5 @@
+Superseded (visual) by the reset-*.md specs, 2026-10-14.
+
 # Spec – Fokus in Instrument (pilot, 2026-10-13)
 
 > **Revision 3 (user, 2026-10-13)** overrides Revisions 1–2 where they differ: the pause is four things (rating, timer with scale, next set, button); see DESIGN.md Part B "Revision 3".

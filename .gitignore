@@ -55,3 +55,5 @@ Thumbs.db
 # --- Design samples with real training data (design-lead Mode 0) ---
 design/directions/
 design/Claude outputs/
+# The visual-reset mockup (2026-10-14) shows real numbers; DESIGN.md carries every value it needs.
+design/reference/

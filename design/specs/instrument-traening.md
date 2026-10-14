@@ -1,3 +1,5 @@
+Superseded (visual) by the reset-*.md specs, 2026-10-14.
+
 # Spec – Instrument restyle: Træning (`/`) (slice `instrument-rest`, 2026-10-13)
 
 Restyles `traening.md` §3 and §5 to DESIGN.md Part B Revision 5. **Same data, flow, writes, copy, sr text and states** as `traening.md`; only the look changes, plus the living element (§2), which is a drawing scale over data the page already has. Fokus is the reference and is not touched.

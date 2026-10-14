@@ -47,7 +47,9 @@ contain personal training data: write them to the session scratchpad or `%TEMP%`
 `shoot.mjs` options: `--out <png>` (required) · `--path /load?week=2026-W33` (default `/`) ·
 `--width 390` · `--open` (open every `<details>`) · `--dark` · `--reduce-motion` (emulates
 `prefers-reduced-motion: reduce`) · `--zoom200` (root font 200 %) ·
-`--base http://localhost:3100` · `--timeout 90` (seconds for the whole shot: a hung browser is killed
+`--base http://localhost:3100` · `--ready "<css selector>"` (a page outside the app, e.g. the local design
+reference: `--base file://$PWD/design/reference/ --path belastning-mockup.html --width 1400`; a bundle that
+renders inside a frame never matches, so the shot waits 30 s, exits 1 and still writes the PNG) · `--timeout 90` (seconds for the whole shot: a hung browser is killed
 and the shot exits 1, never waited on; one stalled a run for hours on 2026-10-13). It prints one JSON line (height, horizontal overflow, console
 errors) and exits 1 on overflow, console errors or a page that never got ready. Then **Read the
 PNG** — a screenshot you haven't looked at proves nothing.

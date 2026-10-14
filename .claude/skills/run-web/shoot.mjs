@@ -2,6 +2,8 @@
 // (CDP): Edge on Windows, Chrome on macOS, google-chrome on Linux; BROWSER_PATH (or EDGE_PATH) overrides.
 // node .claude/skills/run-web/shoot.mjs --out <file.png> [--path /load] [--width 390]
 //   [--open] [--dark] [--reduce-motion] [--zoom200] [--base http://localhost:3100] [--timeout 90]
+//   [--ready "<css selector>"]  (default: the app's own readiness; a selector for a page outside the app,
+//   e.g. a design reference opened with --base file:///…/design/reference/ --path mockup.html)
 // Prints one JSON line; exits 1 on horizontal overflow, console errors, a page that never got ready,
 // or when the whole shot takes longer than --timeout seconds (a hung browser is killed, never waited on).
 import { spawn } from "node:child_process";
@@ -21,6 +23,7 @@ const { values: opt } = parseArgs({
     "reduce-motion": { type: "boolean", default: false },
     zoom200: { type: "boolean", default: false },
     timeout: { type: "string", default: "90" },
+    ready: { type: "string" },
   },
 });
 if (!opt.out) {
@@ -110,10 +113,12 @@ try {
   for (let i = 0; i < 150 && !ready; i++) {
     await sleep(200);
     ready = await evaluate(
-      `!!document.querySelector('main h1')` +
-        ` && ![...document.querySelectorAll('[role=status]')].some((e) => /^\\s*(Loading|Henter|Indlæser)/.test(e.textContent))` +
-        ` && !document.querySelector('[class*="animate-pulse"]')` +
-        ` && [...document.querySelectorAll('.recharts-wrapper')].every((w) => w.querySelector('.recharts-line-curve'))`,
+      opt.ready !== undefined
+        ? `!!document.querySelector(${JSON.stringify(opt.ready)})`
+        : `!!document.querySelector('main h1')` +
+            ` && ![...document.querySelectorAll('[role=status]')].some((e) => /^\\s*(Loading|Henter|Indlæser)/.test(e.textContent))` +
+            ` && !document.querySelector('[class*="animate-pulse"]')` +
+            ` && [...document.querySelectorAll('.recharts-wrapper')].every((w) => w.querySelector('.recharts-line-curve'))`,
     );
   }
   if (!ready) {

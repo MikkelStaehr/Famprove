@@ -1,3 +1,5 @@
+Superseded (visual) by the reset-*.md specs, 2026-10-14.
+
 # Spec – Fokus round 4: red only as a tick, real buttons, one living element (2026-10-13)
 
 Overrides `fokus-instrument.md` and DESIGN.md Part B Revisions 2–3 where they differ (recorded as **Revision 4**). Flow, writes, copy not named here, focus and sr text stay as `traening.md` §4 + `fokus-pause.md`. **Nothing new is stored or fetched.** The three generative elements are drawing scales computed in the browser from the set log and sheet rows Fokus already has (like the rest tick's position): no number is derived, shown or stored by them. Reps for drawing = `reps_done` when present, else the prescribed reps (a range's stored midpoint). A warm-up (set 0) is never a set.

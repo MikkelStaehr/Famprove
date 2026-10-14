@@ -1,3 +1,5 @@
+Superseded (visual) by the reset-*.md specs, 2026-10-14.
+
 # Spec – Instrument restyle: Belastning (`/load`) (slice `instrument-rest`, 2026-10-13)
 
 Restyles `load.md` (§2–§11) to DESIGN.md Part B Revision 5. **Same data, copy, readout behaviour, sr text, week-card behaviour and desktop grid** (`load.md` §11a: rail hero, main chart, rail week card). Only the look changes. The chart is the living element; the zone ruler is the hero's scale.

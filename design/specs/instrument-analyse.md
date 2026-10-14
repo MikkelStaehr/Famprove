@@ -1,3 +1,5 @@
+Superseded (visual) by the reset-*.md specs, 2026-10-14.
+
 # Spec – Instrument restyle: Analyse, Cykel (`/analyse`) and Styrke (`/analyse/styrke`) (slice `instrument-rest`, 2026-10-13)
 
 Restyles `analyse.md` (§3–§12) and `analyse-styrke.md` (§3–§11) to DESIGN.md Part B Revision 5. **Same data, copy, answer sentences, readouts, sr text, states and desktop grid** (rail = answers / lift board, `lg:sticky`; main = charts). One data read may widen: Cykel's dots need `ride_metrics.load`, an existing column (no migration); if the select lacks it, add it to the data layer.
