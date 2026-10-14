@@ -40,6 +40,9 @@ htmlcov/
 supabase/.branches/
 supabase/.temp/
 
+# --- Agent worktrees (parallel ui runs, isolation: worktree) ---
+.claude/worktrees/
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db
