@@ -179,16 +179,25 @@ def best_e1rm(sets: Iterable[tuple[StrengthSet, KgStatus]]) -> tuple[E1rmPoint |
     return best, dropped
 
 
-def rolling_e1rm_at(weeks: Iterable[StrengthWeek], lift: str, week_start: date) -> float | None:
-    """The rolling e1RM: the best weekly e1RM of ``lift`` in the ROLLING_E1RM_WEEKS ISO weeks
-    ending with ``week_start``; None when there is none."""
+def rolling_e1rm_source(
+    weeks: Iterable[StrengthWeek], lift: str, week_start: date
+) -> tuple[float, date] | None:
+    """The rolling e1RM and the week it comes from: the best weekly e1RM of ``lift`` in the
+    ROLLING_E1RM_WEEKS ISO weeks ending with ``week_start`` (ties: the latest week); None when
+    there is none. The one window rolling_e1rm_at and strength_weeks' rolling columns share."""
     first = week_start - timedelta(weeks=ROLLING_E1RM_WEEKS - 1)
-    values = [
-        w.e1rm_kg
+    window = [
+        (w.e1rm_kg, w.week_start)
         for w in weeks
         if w.lift == lift and w.e1rm_kg is not None and first <= w.week_start <= week_start
     ]
-    return max(values, default=None)
+    return max(window, default=None)
+
+
+def rolling_e1rm_at(weeks: Iterable[StrengthWeek], lift: str, week_start: date) -> float | None:
+    """The rolling e1RM value of rolling_e1rm_source."""
+    source = rolling_e1rm_source(weeks, lift, week_start)
+    return source[0] if source is not None else None
 
 
 def _block_of(week: date, blocks: Sequence[Block]) -> Block | None:
@@ -262,20 +271,15 @@ def strength_weeks(
 
 
 def _with_rolling(weeks: list[StrengthWeek]) -> list[StrengthWeek]:
-    """Each row's rolling e1RM (the value rolling_e1rm_at gives) and its source week."""
+    """Each row's rolling e1RM and its source week (rolling_e1rm_source)."""
     out: list[StrengthWeek] = []
     for w in weeks:
-        first = w.week_start - timedelta(weeks=ROLLING_E1RM_WEEKS - 1)
-        window = [
-            x
-            for x in weeks
-            if x.lift == w.lift and x.e1rm_kg is not None and first <= x.week_start <= w.week_start
-        ]
-        if not window:
-            out.append(w)
-            continue
-        source = max(window, key=lambda x: (x.e1rm_kg or 0.0, x.week_start))
-        out.append(replace(w, rolling_e1rm_kg=source.e1rm_kg, rolling_e1rm_week=source.week_start))
+        source = rolling_e1rm_source(weeks, w.lift, w.week_start)
+        out.append(
+            w
+            if source is None
+            else replace(w, rolling_e1rm_kg=source[0], rolling_e1rm_week=source[1])
+        )
     return out
 
 
