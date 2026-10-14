@@ -6,7 +6,6 @@ import { DailyTssBars, TrainingDaysGrid } from "@/components/DayCharts";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { FitnessCurve } from "@/components/FitnessCurve";
-import { Icon } from "@/components/icons";
 import { LoadExplainer } from "@/components/LoadExplainer";
 import { MonoCaption } from "@/components/MonoCaption";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -38,7 +37,9 @@ import {
   formatUpdatedAt,
   updatedText,
   stopAfter,
+  TSS_PER_DAY,
 } from "@/lib/format";
+import { formatOneDecimal, rampText, rampVerdict } from "@/lib/ramp-verdict";
 import { isoWeek } from "@/lib/dates";
 import {
   COARSE_ZONES_NOTE,
@@ -59,13 +60,6 @@ type ReadyView = Extract<DashboardView, { kind: "ready" }>;
 type Failed = { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 type PageState = DashboardView | Failed;
 type WeekState = { readonly kind: "ready"; readonly days: readonly DayDetail[] } | Failed;
-
-type Direction = "up" | "down" | "flat";
-type Delta = {
-  /** null: no trend available yet (text explains why). */
-  readonly direction: Direction | null;
-  readonly text: string;
-};
 
 /**
  * Loads and shapes the data. Only the data layer's own errors become an ErrorState;
@@ -187,26 +181,12 @@ function FormCard({ view }: { readonly view: ReadyView }) {
   );
 }
 
-/** §2b: Fitness (ramp from Python), Træthed, this ISO week's total from weekly_load. */
+/** fitness-round.md §2: Træthed and this ISO week's total from weekly_load, two equal tiles. */
 function Tiles({ view }: { readonly view: ReadyView }) {
   const { hero, thisWeek } = view;
-  const delta = fitnessDelta(hero.ctlRamp7d);
-  const ramp = hero.ctlRamp7d === null ? null : formatSigned(hero.ctlRamp7d).replace("+", "");
   const weekNo = thisWeek?.isoWeek ?? isoWeek(hero.date).week;
   return (
-    <dl className={`grid grid-cols-3 gap-3 ${LOAD_PLACE.tiles}`}>
-      <Tile
-        label={<dt>Fitness</dt>}
-        value={<dd>{formatLoad(hero.ctl)}</dd>}
-        supportTone={ramp === null ? "muted" : "text"}
-        support={
-          <dd className="flex items-center gap-1">
-            {delta.direction !== null && <Icon name={delta.direction === "up" ? "arrow-up" : delta.direction === "down" ? "arrow-down" : "arrow-flat"} size={16} className="size-3" />}
-            <span aria-hidden="true">{ramp ?? "–"} / 7 d</span>
-            <span className="sr-only">{delta.text}</span>
-          </dd>
-        }
-      />
+    <dl className={`grid grid-cols-2 gap-3 ${LOAD_PLACE.tiles}`}>
       <Tile label={<dt>Træthed</dt>} value={<dd>{formatLoad(hero.atl)}</dd>} support={<dd>TSS/DAG</dd>} />
       <Tile
         label={<dt>Uge {weekNo}</dt>}
@@ -217,18 +197,46 @@ function Tiles({ view }: { readonly view: ReadyView }) {
   );
 }
 
+/**
+ * fitness-round.md §1: the curve card's header. FITNESS caption (the h2), fitness on the last
+ * measured day with one decimal, Python's 7-day ramp beside it and the verdict word under it in its
+ * zone colour (a plain word, never a pill). Stale data adds the last measured day to the verdict line.
+ */
+function FitnessHeader({ view }: { readonly view: ReadyView }) {
+  const { hero } = view;
+  const ramp = rampText(hero.ctlRamp7d);
+  const verdict = rampVerdict(hero.ctlRamp7d);
+  const stale = view.freshness.kind !== "fresh";
+  return (
+    <div className="flex flex-col">
+      <h2 id="trend" aria-label="Fitness" className="font-mono text-12 font-normal text-text-muted uppercase">
+        Fitness
+      </h2>
+      <p className="sr-only">
+        Fitness {formatOneDecimal(hero.ctl)} {TSS_PER_DAY}
+        {stale ? ` den ${formatDay(hero.date)}` : ""}. {ramp.sr}
+      </p>
+      <div aria-hidden="true" className="mt-1 flex flex-wrap items-baseline gap-x-2.5">
+        <span className="font-mono text-48 font-medium text-text tabular-nums">{formatOneDecimal(hero.ctl)}</span>
+        <span className={`font-mono text-14 font-medium tabular-nums ${hero.ctlRamp7d === null ? "text-text-muted" : "text-text"}`}>{ramp.text}</span>
+      </div>
+      {verdict !== null && (
+        <p className="mt-1.5 font-sans text-13 font-medium">
+          <span className={ZONE_CLASS[verdict.zone].text}>{verdict.label}</span>
+          {stale && <span className="font-normal text-text-muted"> · seneste {formatDate(hero.date)}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Dashboard({ view }: { readonly view: ReadyView }) {
   const today = resolveToday(new Date(), process.env);
   const cyclingNote = cyclingBasisNote(view.typicalRides, view.calendar, view.allCalendar);
   return (
     <>
-      <Card
-        id="trend"
-        title="Fitness"
-        shape="hero"
-        action={<MonoCaption>TSS/dag</MonoCaption>}
-        className={`gap-4.5 ${LOAD_PLACE.curve}`}
-      >
+      <section aria-labelledby="trend" className={`flex min-w-0 flex-col gap-4.5 rounded-hero border border-border bg-card px-5 pt-5.5 pb-4 ${LOAD_PLACE.curve}`}>
+        <FitnessHeader view={view} />
         {view.chart.filter((p) => p.kind === "actual").length < 2 ? (
           <EmptyState message="Trenden vises, når der er mindst to dages træningsbelastning." />
         ) : (
@@ -247,7 +255,7 @@ function Dashboard({ view }: { readonly view: ReadyView }) {
           <p className="max-w-[60ch] text-13 text-text-muted">{strengthUnknownNote(strengthUnknownFrom(view.chart) ?? view.lastActual)}</p>
         )}
         <LoadExplainer />
-      </Card>
+      </section>
 
       <Card id="days" title="Træningsdage" action={<MonoCaption uppercase={false}>12 uger</MonoCaption>} className={LOAD_PLACE.grid}>
         <TrainingDaysGrid days={view.days} today={today} logStart={view.logStart} />
@@ -377,15 +385,6 @@ async function WeekSessions({
       className={LOAD_PLACE.week}
     />
   );
-}
-
-/** CTL ramp as "is fitness going up?". Direction follows the displayed (rounded) value. */
-function fitnessDelta(ramp: number | null): Delta {
-  if (ramp === null) return { direction: null, text: "Fitness-trenden kræver 7 dages data" };
-  const signed = formatSigned(ramp);
-  if (signed.startsWith("+")) return { direction: "up", text: `Fitness stiger: ${signed} på 7 dage` };
-  if (signed.startsWith("−")) return { direction: "down", text: `Fitness falder: ${signed} på 7 dage` };
-  return { direction: "flat", text: "Fitness uændret over 7 dage" };
 }
 
 function LoadError({ error, at }: { readonly error: DataError; readonly at: Date }) {

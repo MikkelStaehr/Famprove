@@ -18,7 +18,7 @@ import { SegmentedControl } from "./SegmentedControl";
 /**
  * Belastning's fitness curve (design/specs/reset-belastning.md §3, review-round.md §2/§3/§5): CTL only,
  * measured as a 2px --text line, the prognose 1.5px --text-muted dashed 3 4, the band after the block
- * as a 12 % area, three dashed gridlines, block brackets in a 16px strip, the ring on the last
+ * as a 12 % area, a dashed gridline per y step (lib/load-days.ts curveScale), block brackets in a 16px strip, the ring on the last
  * measured day. Lines and band edges are monotone curves through weekly anchors (lib/load-days.ts
  * curveAnchors), so the line bends only at Sundays and the window ends. No today line. Nothing at
  * rest: a tap, click or key shows a 1px hairline and the readout. Python's values as-is; the only
@@ -37,14 +37,6 @@ const STRIP = 16;
 const PAD_L = 2;
 const PAD_R = 6;
 const READOUT_LINES = 3; // date, cells, one fact (block · spænd)
-/** The ring on the last measured anchor (review-round.md §2), drawn the same in the legend. */
-function Ring() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3">
-      <circle cx={6} cy={6} r={4.5} fill="var(--bg)" stroke="var(--text)" strokeWidth={1.5} />
-    </svg>
-  );
-}
 const RANGES = [
   { value: "4U", label: "4U", ariaLabel: "4 uger" },
   { value: "12U", label: "12U", ariaLabel: "12 uger" },
@@ -56,8 +48,8 @@ export function FitnessCurve({ points, blocks, today, lastActual, summary }: Fit
   const seriesStart = points[0]?.date ?? today;
   const win = curveWindow(range, today, seriesStart);
   const shown = points.filter((p) => p.date >= win.from && p.date <= win.to);
-  const band = shown.some((p) => ctlBandArea(p) !== null);
-  const blockInView = blocks.some((b) => b.start <= win.to && b.end >= win.from);
+  // "spænd" exactly when the band is drawn: Plot draws it from ≥ 2 band anchors.
+  const band = curveAnchors(shown, (p) => ctlBandArea(p) !== null).band.length >= 2;
   const end = shown.findLast((p) => p.kind === "projected");
   const rangeSentence = `Fitness (CTL) i TSS/dag fra ${formatDay(win.from)} til ${formatDay(lastActual)}${
     end === undefined ? "" : `, og en anslået prognose til ${formatDay(end.date)}`
@@ -70,29 +62,18 @@ export function FitnessCurve({ points, blocks, today, lastActual, summary }: Fit
       </p>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <SegmentedControl label="Periode" segments={RANGES} value={range} onChange={setRange} size="hero" />
-        <ul aria-label="Forklaring" className="flex flex-col items-end gap-1 font-mono text-11 text-text-muted sm:flex-row sm:items-center sm:gap-x-3">
-          {lastActual >= win.from && (
-            <li className="flex items-center gap-1.5">
-              <Ring />
-              {lastActual === today ? "i dag" : "seneste"}
-            </li>
-          )}
-          {end !== undefined && <li>- - - prognose</li>}
-          {band && (
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden="true" className="block size-2.5 bg-text-muted/12" />
-              spænd
-            </li>
-          )}
-          {blockInView && (
-            <li className="flex items-center gap-1.5">
-              <svg aria-hidden="true" viewBox="0 0 14 8" className="h-2 w-3.5" fill="none" stroke="var(--text-muted)" strokeWidth="1.5">
-                <path d="M0.75 8V1.5h12.5V8" />
-              </svg>
-              Blok
-            </li>
-          )}
-        </ul>
+        {/* fitness-round.md §1: only the prognose and, exactly when drawn, its band (no ring, no Blok). */}
+        {(end !== undefined || band) && (
+          <ul aria-label="Forklaring" className="flex flex-col items-end gap-1 font-mono text-11 text-text-muted sm:flex-row sm:items-center sm:gap-x-3">
+            {end !== undefined && <li>- - - prognose</li>}
+            {band && (
+              <li className="flex items-center gap-1.5">
+                <span aria-hidden="true" className="block size-2.5 bg-text-muted/12" />
+                spænd
+              </li>
+            )}
+          </ul>
+        )}
       </div>
     </>
   );
@@ -163,7 +144,7 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
           <svg key={range} aria-hidden="true" width={w} height={height} className="block overflow-visible motion-safe:animate-[fade-in_150ms_ease-out]">
             {scale.lines.map((v) => (
               <g key={v}>
-                <line x1={0} x2={w} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeWidth={1} strokeDasharray="2 4" />
+                {v !== scale.lo && <line x1={0} x2={w} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeWidth={1} strokeDasharray="2 4" />}
                 <text x={w} y={y(v) - 4} textAnchor="end" fontSize={11} fontFamily="var(--font-mono)" fill="var(--text-muted)">
                   {v}
                 </text>

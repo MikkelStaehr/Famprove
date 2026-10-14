@@ -147,15 +147,33 @@ export function curveWindow(range: CurveRange, today: IsoDate, seriesStart: IsoD
   return { from: back < seriesStart ? seriesStart : back, to: addDays(today, r.forward) };
 }
 
+/** fitness-round.md §1: the most intervals the curve's y axis may have. */
+export const CURVE_MAX_INTERVALS = 4;
+
+/** The step candidates 1, 2, 5, 10, 20, 50, 100, … in order. */
+function* niceSteps(): Generator<number> {
+  for (let p = 1; ; p *= 10) for (const m of [1, 2, 5]) yield m * p;
+}
+
 /**
- * The curve's y scale (drawing only): the visible min/max rounded out to 10, split into three equal
- * steps that are multiples of 10. Returns the domain and the three gridline values.
+ * The curve's y scale (drawing only; fitness-round.md §1): the first step in 1, 2, 5, 10, 20, …
+ * that gives ≤ 4 intervals; bottom = the largest step multiple ≤ the window's lowest value (never
+ * below 0), top = the smallest multiple ≥ the highest (bottom + step when they meet). `lines` holds
+ * every tick from bottom to top, one gridline and label each (the bottom one sits on the axis).
  */
-export function curveScale(min: number, max: number): { readonly lo: number; readonly hi: number; readonly lines: readonly number[] } {
-  const lo = Math.floor(Math.min(min, max) / 10) * 10;
-  const top = Math.ceil(Math.max(min, max) / 10) * 10;
-  const step = Math.max(10, Math.ceil((top - lo) / 3 / 10) * 10);
-  return { lo, hi: lo + 3 * step, lines: [lo + step, lo + 2 * step, lo + 3 * step] };
+export function curveScale(min: number, max: number): { readonly lo: number; readonly hi: number; readonly step: number; readonly lines: readonly number[] } {
+  const a = Math.max(0, Math.min(min, max));
+  const b = Math.max(0, min, max);
+  for (const step of niceSteps()) {
+    const lo = Math.floor(a / step) * step;
+    const top = Math.ceil(b / step) * step;
+    const hi = top > lo ? top : lo + step;
+    if ((hi - lo) / step <= CURVE_MAX_INTERVALS) {
+      const n = Math.round((hi - lo) / step);
+      return { lo, hi, step, lines: Array.from({ length: n + 1 }, (_, i) => lo + i * step) };
+    }
+  }
+  throw new Error("unreachable: the step candidates are unbounded");
 }
 
 /**

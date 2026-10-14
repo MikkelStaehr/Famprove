@@ -22,8 +22,8 @@ export default function Loading() {
           <Bar className="w-2/3 text-13" />
         </section>
 
-        <div aria-hidden="true" className={`grid grid-cols-3 gap-3 ${LOAD_PLACE.tiles}`}>
-          {[0, 1, 2].map((i) => (
+        <div aria-hidden="true" className={`grid grid-cols-2 gap-3 ${LOAD_PLACE.tiles}`}>
+          {[0, 1].map((i) => (
             <div key={i} className="flex flex-col gap-1.5 rounded-tile border border-border bg-card p-3.5">
               <Bar className="w-2/3 text-11" />
               <Bar className="w-1/2 text-24" />
@@ -34,10 +34,15 @@ export default function Loading() {
 
         <WeekCard variant="full" head={null} body={{ kind: "loading", rows: 7 }} className={LOAD_PLACE.week} />
 
-        <Card id="trend" title="Fitness" shape="hero" className={LOAD_PLACE.curve}>
-          <div aria-hidden="true" className="h-[196px] w-full rounded-control bg-raised motion-safe:animate-pulse sm:h-[216px] lg:h-[296px]" />
+        {/* fitness-round.md §1: the FITNESS caption and a 48px bar for the figure. */}
+        <section aria-hidden="true" className={`flex min-w-0 flex-col gap-4.5 rounded-hero border border-border bg-card px-5 pt-5.5 pb-4 ${LOAD_PLACE.curve}`}>
+          <div className="flex flex-col gap-1">
+            <Bar className="w-1/4 text-12" />
+            <Bar className="h-12 w-1/3" />
+          </div>
+          <div className="h-[196px] w-full rounded-control bg-raised motion-safe:animate-pulse sm:h-[216px] lg:h-[296px]" />
           <Bar className="w-1/2 text-13" />
-        </Card>
+        </section>
 
         <Card id="days" title="Træningsdage" className={LOAD_PLACE.grid}>
           <div aria-hidden="true" className="h-[164px] w-[300px] max-w-full rounded-cell bg-raised motion-safe:animate-pulse" />
