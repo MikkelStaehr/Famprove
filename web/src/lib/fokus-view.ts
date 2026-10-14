@@ -128,7 +128,7 @@ export function referenceText(reference: Reference): string {
  * (null when the figure carries no kg, e.g. "kropsvægt"). italic = computed by the app.
  *   suggestion  label Forslag, the suggestion, italic
  *   last_week   no suggestion: label Sidste uge, last week's kg upright
- * Neither: null, and the block is not shown (round 3: "intet forslag" shows nothing).
+ * Neither: null, and the block is not shown (review round §8: no suggestion shows nothing).
  */
 export type KgBlock =
   | {
@@ -219,9 +219,9 @@ export function unsavedText(n: number): string {
   return `${n} sæt er ikke gemt.`;
 }
 
-/** The spoken suggestion: "forslag 82,5 kg (begrænset) …" or "intet forslag" (status sentences only). */
-function suggestionWords(e: FokusExercise): string {
-  if (e.suggestedKg === null) return "intet forslag";
+/** The spoken suggestion: "forslag 82,5 kg (begrænset) …"; null without one (review round §8: nothing is said). */
+function suggestionWords(e: FokusExercise): string | null {
+  if (e.suggestedKg === null) return null;
   return `forslag ${formatKg(e.suggestedKg)} kg${e.suggestionCapped ? ` ${CAPPED_WORD}` : ""}${spokenAdjustment(e)}`;
 }
 
@@ -267,7 +267,8 @@ export function setSentence(s: SetInContext, week: number): string {
   const what = reps !== null && load !== null ? `${reps} ved ${load}` : (reps ?? load);
   const parts: string[] = [];
   if (what !== null) parts.push(what);
-  parts.push(suggestionWords(e));
+  const suggestion = suggestionWords(e);
+  if (suggestion !== null) parts.push(suggestion);
   if (week > 1) parts.push(e.reference === null ? "intet logget sidste uge" : `sidste uge ${referenceText(e.reference)}`);
   return `${exerciseName(e)}, ${setTitle(s).toLowerCase()}: ${parts.join(", ")}.`;
 }

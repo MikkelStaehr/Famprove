@@ -159,8 +159,9 @@ test("set line accessible names (spec §6)", () => {
   const ranged = row(10, { repsText: "8 - 12", prescribed: "RPE 5 - 7", suggestedKg: null, suggestionBasis: "not_rpe", reference: null });
   assert.equal(
     spokenSetLine(ranged, 3, checklistView([ranged], ranged.sets, new Map()).groups[0].sets[1]),
-    "Squat, sæt 2 af 2, 8 til 12 reps ved RPE 5 til 7, intet forslag, intet logget sidste uge",
-  );
+    "Squat, sæt 2 af 2, 8 til 12 reps ved RPE 5 til 7, intet logget sidste uge",
+  ); // no suggestion: nothing about one is said (review round §8)
+  assert.doesNotMatch(spokenSetLine(ranged, 3, checklistView([ranged], ranged.sets, new Map()).groups[0].sets[0]), /forslag/i);
   // Week 1: no last-week part.
   assert.equal(spokenSetLine(e, 1, open.groups[0].sets[1]), "Squat, sæt 2 af 2, 5 reps ved RPE 7, forslag 142,5 kg");
 });

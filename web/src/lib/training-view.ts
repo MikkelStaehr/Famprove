@@ -586,7 +586,7 @@ export function spokenSetLine(e: ExerciseView, week: number, line: SetLineView):
   const parts = [e.name.trim(), `sæt ${line.n} af ${line.of}`];
   if (what !== null) parts.push(what);
   const suggestion = suggestionView(e);
-  parts.push(suggestion.kg !== null ? `forslag ${suggestion.kg}${spokenAdjustment(e)}` : "intet forslag");
+  if (suggestion.kg !== null) parts.push(`forslag ${suggestion.kg}${spokenAdjustment(e)}`); // none: nothing said (§8)
   const lastWeek = lastWeekText(e, week);
   if (lastWeek === null) parts.push("intet logget sidste uge");
   else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);

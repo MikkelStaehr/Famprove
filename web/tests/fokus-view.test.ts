@@ -247,8 +247,9 @@ test("setSentence: the spoken set, ranges as words, week 1 without last week", (
   assert.equal(setSentence(squat2, 1), "Squat, sæt 2 af 2: 5 reps ved RPE 7, forslag 142,5 kg.");
   assert.equal(
     setSentence(pull, 3),
-    "Lat pulldowns, sæt 1 af 1: 8 til 12 reps ved -12.5%, intet forslag, intet logget sidste uge.",
-  );
+    "Lat pulldowns, sæt 1 af 1: 8 til 12 reps ved -12.5%, intet logget sidste uge.",
+  ); // no suggestion: nothing about one is said (review round §8)
+  assert.doesNotMatch(setSentence(pull, 1), /forslag/i);
   assert.equal(undoSentence(squat2), "Fortrudt: Squat, sæt 2 er åben igen.");
 });
 

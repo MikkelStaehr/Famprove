@@ -1,6 +1,6 @@
 "use client";
 
-import { type FocusEvent, useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 
 import type { SetState } from "@/lib/set-taps";
 import {
@@ -51,60 +51,20 @@ export function SetCount() {
 
 /**
  * One collapsible row per exercise (user 2026-10-14, slice exercise-collapse): an exercise is its
- * run of same-named sheet rows. Expanded = the user's toggle, else whether it holds the NÆSTE set,
- * so after its last set the next exercise opens unless the user chose otherwise.
- * When ticking the last set auto-collapses an exercise that held focus, the ticked checkbox is
- * hidden; focus moves to the next exercise's header (or, for the last exercise, its own header),
- * so keyboard and screen-reader users keep their place.
+ * run of same-named sheet rows. Every exercise starts collapsed (review round §9): expanded = the
+ * user's toggle only, so nothing opens or collapses on its own and focus stays where the user put it.
  */
 export function SetChecklist() {
   const { session, view } = useSession();
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const runs = exerciseRuns(view.groups);
-  const expandedByKey = new Map(runs.map((run) => [run.key, toggled.get(run.key) ?? run.isNext] as const));
-  const items = useRef(new Map<string, HTMLLIElement>());
-  const headers = useRef(new Map<string, HTMLButtonElement>());
-  const focusedRun = useRef<string | null>(null); // the exercise focus was last inside
-  const wasExpanded = useRef<ReadonlyMap<string, boolean>>(new Map());
-
-  useEffect(() => {
-    const before = wasExpanded.current;
-    wasExpanded.current = expandedByKey;
-    const key = focusedRun.current;
-    if (key === null || before.get(key) !== true || expandedByKey.get(key) !== false || toggled.has(key)) return;
-    // Only when focus is still in the collapsed exercise (or was dropped to the body by the hide).
-    const active = document.activeElement;
-    const item = items.current.get(key);
-    if (active !== null && active !== document.body && !(item?.contains(active) ?? false)) return;
-    const at = runs.findIndex((r) => r.key === key);
-    const target = headers.current.get(runs[at + 1]?.key ?? key);
-    target?.focus();
-  });
-
-  const onBlur = (key: string) => (e: FocusEvent<HTMLLIElement>) => {
-    // Focus moving to another element outside this exercise; a hide (relatedTarget null) keeps the key.
-    if (e.relatedTarget !== null && !e.currentTarget.contains(e.relatedTarget) && focusedRun.current === key) {
-      focusedRun.current = null;
-    }
-  };
 
   return (
     <ol aria-label="Øvelser" className="flex flex-col">
       {runs.map((run, i) => {
-        const expanded = expandedByKey.get(run.key) ?? false;
+        const expanded = toggled.get(run.key) ?? false;
         return (
-          <li
-            key={run.key}
-            ref={(el) => {
-              if (el === null) items.current.delete(run.key);
-              else items.current.set(run.key, el);
-            }}
-            onFocus={() => {
-              focusedRun.current = run.key;
-            }}
-            onBlur={onBlur(run.key)}
-            className={`relative${i === 0 ? "" : " border-t border-border"}`}
-          >
+          <li key={run.key} className={`relative${i === 0 ? "" : " border-t border-border"}`}>
             {/* The NÆSTE exercise: a 2px --text bar on its left edge at x −12px, full height (§2.5). */}
             {run.isNext && <span aria-hidden="true" data-next-edge="true" className="absolute inset-y-0 -left-3 w-0.5 bg-text" />}
             <ExerciseRun
@@ -112,10 +72,6 @@ export function SetChecklist() {
               week={session.week}
               expanded={expanded}
               onToggle={() => setToggled((m) => new Map(m).set(run.key, !expanded))}
-              headerRef={(el) => {
-                if (el === null) headers.current.delete(run.key);
-                else headers.current.set(run.key, el);
-              }}
             />
           </li>
         );
@@ -129,13 +85,11 @@ function ExerciseRun({
   week,
   expanded,
   onToggle,
-  headerRef,
 }: {
   readonly run: ExerciseRunView;
   readonly week: number;
   readonly expanded: boolean;
   readonly onToggle: () => void;
-  readonly headerRef: (el: HTMLButtonElement | null) => void;
 }) {
   const regionId = useId();
   const e = run.focus;
@@ -146,35 +100,37 @@ function ExerciseRun({
   const multi = run.groups.length > 1;
   return (
     <div className="flex flex-col">
+      {/* Collapsed (review round §9): the name, one dot per set and the chevron. Nothing else. */}
       <button
-        ref={headerRef}
         type="button"
         aria-expanded={expanded}
         aria-controls={regionId}
         onClick={onToggle}
-        className="flex min-h-11 w-full cursor-pointer flex-col gap-1.5 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
-        <span className="flex w-full items-start justify-between gap-3">
-          <span className={`min-w-0 font-sans text-16 font-medium break-words ${muted}`}>
-            {run.name}
-            <span className="sr-only">, {runCountText(run)}</span>
-          </span>
-          <span aria-hidden="true" className="flex shrink-0 items-center gap-2.5 pt-1">
-            <SetDots dots={run.dots} />
-            <Icon
-              name="chevron-down"
-              size={16}
-              className={`text-text-muted transition-transform duration-[120ms] motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
-            />
-          </span>
+        <span className={`min-w-0 font-sans text-16 font-medium break-words ${muted}`}>
+          {run.name}
+          <span className="sr-only">, {runCountText(run)}</span>
         </span>
+        <span aria-hidden="true" className="flex shrink-0 items-center gap-2.5">
+          <SetDots dots={run.dots} />
+          <Icon
+            name="chevron-down"
+            size={16}
+            className={`text-text-muted transition-transform duration-[120ms] motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+          />
+        </span>
+      </button>
+      {/* Expanded: the prescription, FORSLAG (only with a suggestion), SIDSTE UGE, then the set rows.
+          The visual copy is aria-hidden: each set row's sr sentence says the same values. */}
+      <div id={regionId} hidden={!expanded} className="pb-2">
         {run.prescription !== "" && (
-          <span aria-hidden="true" className={`block min-w-0 font-mono text-14 tabular-nums break-words ${muted}`}>
+          <p aria-hidden="true" className={`min-w-0 pb-1.5 font-mono text-14 tabular-nums break-words ${muted}`}>
             <KeepRanges text={run.prescription} />
-          </span>
+          </p>
         )}
         {(suggestion.kg !== null || lastWeek !== undefined) && (
-          <span aria-hidden="true" className={`flex min-w-0 flex-wrap gap-x-6 gap-y-1 ${run.closed ? "text-text-muted" : ""}`}>
+          <div aria-hidden="true" className={`flex min-w-0 flex-wrap gap-x-6 gap-y-1 pb-3 ${run.closed ? "text-text-muted" : ""}`}>
             {suggestion.kg !== null && (
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
@@ -193,10 +149,8 @@ function ExerciseRun({
                   <span className="font-mono text-16 tabular-nums">{lastWeek}</span>
                 </span>
               ))}
-          </span>
+          </div>
         )}
-      </button>
-      <div id={regionId} hidden={!expanded} className="pb-2">
         {run.groups.map((group) => {
           const caption = multi ? compactPrescription(group.exercise) : null;
           return (
