@@ -1,5 +1,4 @@
 import { SECONDARY } from "./instrument";
-import { DiamondIcon } from "./WarningLine";
 
 type EmptyStateProps = {
   /** One sentence. */
@@ -7,16 +6,11 @@ type EmptyStateProps = {
   readonly action?: { readonly href: string; readonly label: string };
 };
 
-/** DESIGN.md EmptyState (Revision 5): an ink ◆, one sentence, optional action as the secondary. */
+/** DESIGN.md EmptyState (Ember): one Geist text-15 --text-muted sentence, optional action as the secondary. */
 export function EmptyState({ message, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-start gap-3 py-2">
-      <p className="flex items-start gap-2 text-16 text-text">
-        <span className="flex h-lh shrink-0 items-center">
-          <DiamondIcon />
-        </span>
-        {message}
-      </p>
+    <div className="flex flex-col items-start gap-3 py-1">
+      <p className="max-w-[60ch] font-sans text-15 text-text-muted">{message}</p>
       {action !== undefined && (
         <a href={action.href} className={SECONDARY}>
           {action.label}

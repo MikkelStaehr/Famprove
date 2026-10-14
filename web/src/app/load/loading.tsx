@@ -1,61 +1,51 @@
 import { Card } from "@/components/Card";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { SkeletonBar as Bar } from "@/components/Skeleton";
 import { WeekDaysSkeleton } from "@/components/WeekDays";
 import { ZoneBarSkeleton } from "@/components/ZoneBar";
 import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
 
-/** Skeleton in the exact shape of page.tsx: header row, then the grid with hero, chart card, week card. */
+/** Skeleton in the exact shape of page.tsx (reset-belastning.md §7): the same cards and grid classes. */
 export default function Loading() {
   return (
     <>
-      <header className="flex flex-col">
-        <h1 className="font-sans text-28 font-normal break-words hyphens-auto">Belast&shy;ning</h1>
-        <div aria-hidden="true" className="mt-1">
-          <Bar className="w-1/3 text-14" />
-        </div>
-      </header>
+      <ScreenHeader title="Belastning" line={<Bar className="w-40 text-12" />} />
       <p className="sr-only" role="status">
         Henter træningsdata…
       </p>
 
       <div className={LOAD_GRID}>
-        <div className={LOAD_PLACE.hero}>
-          <ZoneBarSkeleton size="hero" />
-          <div aria-hidden="true">
-            <Bar className="mt-3 w-3/4 text-16" />
-            <Bar className="mt-2 w-1/2 text-16" />
-            <Bar className="mt-1 w-2/3 text-14" />
-          </div>
+        <section aria-hidden="true" className={`flex flex-col gap-4 rounded-card border border-border bg-card p-5 ${LOAD_PLACE.form}`}>
+          <Bar className="w-1/3 text-12" />
+          <Bar className="h-14 w-1/2" />
+          <ZoneBarSkeleton />
+          <Bar className="w-2/3 text-13" />
+        </section>
+
+        <div aria-hidden="true" className={`grid grid-cols-3 gap-3 ${LOAD_PLACE.tiles}`}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex flex-col gap-1.5 rounded-tile border border-border bg-card p-3.5">
+              <Bar className="w-2/3 text-11" />
+              <Bar className="w-1/2 text-24" />
+              <Bar className="w-3/4 text-11" />
+            </div>
+          ))}
         </div>
 
-        <Card id="trend" variant="calm" title="Fitness, træthed og form" className={LOAD_PLACE.chart}>
-          <div aria-hidden="true" className="flex flex-col gap-2">
-            {/* Legend row, the TSS/dag unit, then the plot block (spec §5). */}
-            <Bar className="w-3/4 text-14" />
-            <Bar className="w-12 text-12" />
-            <div className="h-(--chart-height) w-full bg-raised motion-safe:animate-pulse" />
-            {/* "Hvad betyder det?" summary row under the plot (load.md §8b, §11b), so nothing jumps. */}
-            <div className="flex min-h-11 items-center">
-              <Bar className="w-1/3 text-16" />
-            </div>
-          </div>
-          {/* The strength-estimate and coarse-zones note in the card's foot (load.md §11b), two lines at 390px. */}
-          <div aria-hidden="true" className="flex flex-col">
-            <Bar className="w-full text-14" />
-            <Bar className="w-2/3 text-14" />
-          </div>
+        <Card id="trend" title="Fitness" shape="hero" className={LOAD_PLACE.curve}>
+          <div aria-hidden="true" className="h-[196px] w-full rounded-control bg-raised motion-safe:animate-pulse sm:h-[216px] lg:h-[296px]" />
+          <Bar className="w-1/2 text-13" />
         </Card>
 
-        <Card id="week" variant="calm" title="Denne uge" className={LOAD_PLACE.week}>
-          {/* Week switcher: two 44px step links around the date range. */}
-          <div aria-hidden="true" className="flex items-center gap-2">
-            <span className="size-11 shrink-0 border border-text-muted" />
-            <span className="flex flex-1 flex-col items-center">
-              <Bar className="w-2/3 text-14" />
-              <Bar className="w-1/3 text-12" />
-            </span>
-            <span className="size-11 shrink-0" />
-          </div>
+        <Card id="days" title="Træningsdage" className={LOAD_PLACE.grid}>
+          <div aria-hidden="true" className="h-[164px] w-[300px] max-w-full rounded-cell bg-raised motion-safe:animate-pulse" />
+        </Card>
+
+        <Card id="bars" title="TSS pr. dag" className={LOAD_PLACE.bars}>
+          <div aria-hidden="true" className="h-[147px] w-full rounded-cell bg-raised motion-safe:animate-pulse" />
+        </Card>
+
+        <Card id="week" title="Denne uge" className={`gap-1 ${LOAD_PLACE.week}`}>
           <WeekDaysSkeleton rows={7} />
         </Card>
       </div>

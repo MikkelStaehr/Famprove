@@ -11,12 +11,12 @@ type UpdatedLineProps = {
   readonly unknownNote: string;
 };
 
-/** "Opdateret <time>" in Inter 14 muted; stale or unknown = ◆ + words in --text (WarningLine), never colour alone. */
+/** "opdateret <time>" in Geist Mono 12 muted; stale or unknown = ◆ + words in --text (WarningLine), never colour alone. */
 export function UpdatedLine({ freshness, staleNote, unknownNote }: UpdatedLineProps) {
   if (freshness.kind === "fresh") {
     return (
-      <p className="font-sans text-14 text-text-muted">
-        Opdateret <time dateTime={freshness.computedAt}>{formatUpdatedAt(freshness.computedAt)}</time>
+      <p className="font-mono text-12 text-text-muted">
+        opdateret <time dateTime={freshness.computedAt}>{formatUpdatedAt(freshness.computedAt)}</time>
       </p>
     );
   }

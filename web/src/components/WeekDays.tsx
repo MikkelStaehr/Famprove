@@ -19,130 +19,93 @@ import {
   formatWatts,
 } from "@/lib/format";
 
-import { DayBarcode } from "./DayBarcode";
+import { Icon } from "./icons";
 import { ActivityWords, hasActivityWords } from "./MovingTime";
 import { SkeletonBar } from "./Skeleton";
 import { DiamondIcon } from "./WarningLine";
 
 /**
- * The selected week's days (daily_load rows) with per-day sessions behind native
- * <details>/<summary> (keyboard and screen-reader accessible without JS), plus the week total
- * from weekly_load. Displays values only; every number comes from Python or SQL.
- *
- * Layout per row: day + three 64px TSS columns when the list is at least 20rem wide (390px
- * phones). Narrower, e.g. at 200% text, the day moves onto its own line above the numbers
- * instead of scrolling sideways. The day barcode (instrument-load.md §4) sits under the day label
- * in the day cell: the cell is the row's 1fr, so the barcodes line up across rows.
+ * The selected week's days (reset-belastning.md §6, mockup A): one ListRow-shaped row per day, day |
+ * icon | text | value, behind native <details>/<summary> (keyboard and screen reader without JS),
+ * then the `I alt` row from weekly_load. Displays values only; every number comes from Python or SQL.
  */
-const ROW = "grid grid-cols-3 gap-x-2 @xs:grid-cols-[minmax(0,1fr)_repeat(3,4rem)]";
-const DAY_CELL = "col-span-3 @xs:col-span-1";
-/** Day text lines up with the text after a summary's chevron (16px icon + 8px gap). */
-const DAY_INDENT = "pl-6";
+const SHORT_DAY: readonly string[] = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+const ROW = "flex min-h-11 items-center gap-3 border-t border-border py-2.5";
+const DAY_COL = "w-9 shrink-0 font-mono text-12";
+const VALUE = "shrink-0 text-right font-mono text-14 text-text tabular-nums";
 
 type WeekDaysProps = {
   readonly week: WeekView;
   readonly days: readonly DayDetail[];
+  /** The strength log's first day (earliest block start): days before it read "styrke ikke registreret". */
+  readonly logStart: string | null;
+  readonly today: string;
 };
 
-export function WeekDays({ week, days }: WeekDaysProps) {
+export function WeekDays({ week, days, logStart, today }: WeekDaysProps) {
   return (
-    <div className="@container flex flex-col">
-      <ColumnHeads />
+    <div className="flex flex-col">
       <ul aria-label={`Dage i uge ${week.isoWeek}`} className="flex flex-col">
-        {days.map((day) => (
-          <li key={day.date} className="border-b border-border">
-            <DayRow day={day} />
+        {days.map((day, i) => (
+          <li key={day.date}>
+            <DayRow day={day} short={SHORT_DAY[i] ?? formatDay(day.date)} beforeLog={logStart === null || day.date < logStart} today={day.date === today} />
           </li>
         ))}
       </ul>
-      <p className={`${ROW} items-center pt-2 text-14 font-medium`}>
-        {/* Flush left (no chevron indent) so "Uge NN i alt" fits one line at 390px. */}
-        <span className={DAY_CELL}>Uge {week.isoWeek} i alt</span>
-        <Tss label="cykling" value={week.cyclingTss} />
-        <Tss label="styrke" value={week.strengthTss} />
-        <Tss label="i alt" value={week.totalTss} />
+      <p className={ROW}>
+        <span className={DAY_COL} />
+        <span className="min-w-0 flex-1 font-sans text-14 font-medium text-text">I alt</span>
+        <span className={`${VALUE} font-medium`}>
+          <span className="sr-only">uge {week.isoWeek}: cykling {formatLoad(week.cyclingTss)} TSS, styrke {formatLoad(week.strengthTss)} TSS, i alt </span>
+          {formatLoad(week.totalTss)}
+          <span className="sr-only"> TSS</span>
+        </span>
       </p>
     </div>
   );
 }
 
-/** Visual column heads; each row carries the same words for screen readers. */
-function ColumnHeads() {
-  return (
-    <div
-      aria-hidden="true"
-      className={`${ROW} border-b border-border py-2 text-14 font-medium text-text-muted`}
-    >
-      <span className={`hidden @xs:block ${DAY_INDENT}`}>Dag</span>
-      {["Cykel", "Styrke", "I alt"].map((label) => (
-        <span key={label} className="text-right">
-          {label}
-          <br />
-          <span className="font-normal">TSS</span>
-        </span>
-      ))}
-    </div>
-  );
+function rideNames(day: DayDetail): string {
+  return day.rides.map((r) => r.name ?? "Tur uden navn").join(" · ");
 }
 
-/** One TSS cell; the label and unit are spoken, the column head shows them visually. */
-function Tss({ label, value }: { readonly label: string; readonly value: number }) {
-  return (
-    <span className="text-right tabular-nums">
-      <span className="sr-only">, {label} </span>
-      {formatLoad(value)}
-      <span className="sr-only"> TSS</span>
-    </span>
-  );
+function strengthWords(day: DayDetail): string | null {
+  if (day.strength === null) return null;
+  return day.strength.sessions.map((s) => (s.block === null ? "Styrke · ikke i programmet" : `Styrke · session ${s.session}`)).join(" · ");
 }
 
-function DayRow({ day }: { readonly day: DayDetail }) {
-  const numbers = (
+function DayRow({ day, short, beforeLog, today }: { readonly day: DayDetail; readonly short: string; readonly beforeLog: boolean; readonly today: boolean }) {
+  const strength = strengthWords(day);
+  const ride = day.rides.length > 0;
+  const text = [ride ? rideNames(day) : null, strength].filter((t): t is string => t !== null).join(" · ");
+  const muted = day.rest;
+  const label = day.rest ? (beforeLog ? "Ingen cykling · styrke ikke registreret" : "Hvile") : text;
+  const loaded = formatLoad(day.totalTss) !== "0";
+  const spoken = `${formatDay(day.date)}: cykling ${formatLoad(day.cyclingTss)} TSS, styrke ${beforeLog ? "ikke registreret" : `${formatLoad(day.strengthTss)} TSS`}, i alt ${formatLoad(day.totalTss)} TSS`;
+  const inner = (
     <>
-      <Tss label="cykling" value={day.cyclingTss} />
-      <Tss label="styrke" value={day.strengthTss} />
-      <Tss label="i alt" value={day.totalTss} />
+      <span aria-hidden="true" className={`${DAY_COL} ${today ? "font-medium text-text" : "text-text-muted"}`}>
+        {short}
+      </span>
+      <span aria-hidden="true" className="flex shrink-0 items-center gap-1 empty:hidden">
+        {ride && <Icon name="bike" size={18} className="text-text" />}
+        {strength !== null && <Icon name="barbell" size={18} className="text-text" />}
+      </span>
+      <span aria-hidden="true" className={`min-w-0 flex-1 font-sans text-14 ${muted ? "text-text-muted" : "text-text"}`}>
+        {label}
+      </span>
+      <span aria-hidden="true" className="flex shrink-0 items-center gap-2">
+        {today && <span className="font-mono text-11 text-today">I DAG</span>}
+        {(loaded || !day.rest) && <span className={VALUE}>{formatLoad(day.totalTss)}</span>}
+      </span>
+      <span className="sr-only">{spoken}</span>
     </>
   );
-  if (day.rest) {
-    // No session behind the day. "Hvile" only when it also carries no load (else show the load).
-    const load = formatLoad(day.totalTss) !== "0";
-    return (
-      <div className={`${ROW} min-h-11 items-center py-2 text-14`}>
-        <span className={`${DAY_CELL} ${DAY_INDENT} flex flex-col gap-1`}>
-          {formatDay(day.date)}
-          {load && <DayBarcode cycling={day.cyclingTss} strength={day.strengthTss} />}
-        </span>
-        {load ? numbers : <span className="col-span-3 text-right text-text-muted">Hvile</span>}
-      </div>
-    );
-  }
+  if (day.rest) return <div className={ROW}>{inner}</div>;
   return (
     <details className="group">
-      <summary className={`${ROW} min-h-11 cursor-pointer list-none items-center py-2 text-14`}>
-        <span className={`${DAY_CELL} flex flex-col gap-1`}>
-          <span className="flex items-center gap-2">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            className="size-4 shrink-0 text-text-muted group-open:rotate-90"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m6 3 5 5-5 5" />
-          </svg>
-          {formatDay(day.date)}
-          </span>
-          <span className={`block ${DAY_INDENT}`}>
-            <DayBarcode cycling={day.cyclingTss} strength={day.strengthTss} />
-          </span>
-        </span>
-        {numbers}
-      </summary>
-      <div className={`flex flex-col gap-4 pb-4 ${DAY_INDENT}`}>
+      <summary className={`${ROW} cursor-pointer list-none`}>{inner}</summary>
+      <div className="flex flex-col gap-4 pt-2 pb-3 pl-12">
         {day.rides.length > 0 && <Cycling date={day.date} tss={day.cyclingTss} rides={day.rides} />}
         {day.strength !== null && <Strength strength={day.strength} />}
       </div>
@@ -152,7 +115,7 @@ function DayRow({ day }: { readonly day: DayDetail }) {
 
 function SectionHeading({ title, tss }: { readonly title: string; readonly tss: number }) {
   return (
-    <h3 className="flex items-baseline justify-between gap-2 text-14 font-medium">
+    <h3 className="flex items-baseline justify-between gap-2 text-13 font-medium">
       <span>{title}</span>
       <span className="tabular-nums">{formatLoad(tss)} TSS</span>
     </h3>
@@ -172,14 +135,14 @@ function Cycling({ date, tss, rides }: CyclingProps) {
       <ul className="flex flex-col">
         {rides.map((ride) => (
           <li key={ride.id} className="flex flex-col gap-1 border-t border-border py-2 first:border-t-0">
-            <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14">
+            <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-13">
               <span className="font-medium">{ride.name ?? "Tur uden navn"}</span>
-              <span className="text-14 text-text-muted">
+              <span className="text-13 text-text-muted">
                 Start kl. <time dateTime={`${date}T${ride.startTime}`}>{ride.startTime.replace(":", ".")}</time>
               </span>
             </p>
             {ride.dataWarning !== null && <DataWarning warning={ride.dataWarning} />}
-            <dl className="flex flex-wrap gap-x-4 gap-y-1 text-14 tabular-nums">
+            <dl className="flex flex-wrap gap-x-4 gap-y-1 text-13 tabular-nums">
               <Metric
                 term="Bevægelsestid"
                 value={ride.movingTimeS === null ? null : `${formatDuration(ride.movingTimeS)} t`}
@@ -205,7 +168,7 @@ function Cycling({ date, tss, rides }: CyclingProps) {
 function DataWarning({ warning }: { readonly warning: string }) {
   return (
     // Named group: this <details> sits inside a day row's (also a group), which is always open here.
-    <details className="group/data text-14">
+    <details className="group/data text-13">
       <summary
         title={warning}
         className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 font-medium text-warning"
@@ -283,7 +246,7 @@ function Strength({ strength }: { readonly strength: StrengthDetail }) {
         <StrengthSession key={s.key} session={s} />
       ))}
       {anyExercises && (
-        <p className="text-14 text-text-muted">
+        <p className="text-13 text-text-muted">
           Score pr. sæt er den rå score for ét sæt, før styrkefaktoren gør den til TSS.
         </p>
       )}
@@ -298,8 +261,8 @@ function StrengthSession({ session: s }: { readonly session: SessionDetail }) {
       : `Session ${s.session} · ${s.block}${s.week === null ? "" : ` · uge ${s.week}`}`;
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-16 font-medium">{title}</h3>
-      <p className="text-14 text-text-muted">
+      <h3 className="text-14 font-medium">{title}</h3>
+      <p className="text-13 text-text-muted">
         {hasActivityWords(s.activityName, s.movingTimeS) && (
           <>
             <ActivityWords name={s.activityName} movingTimeS={s.movingTimeS} />
@@ -324,13 +287,13 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
   const score = formatScore(e.scorePerSet);
   return (
     <li className="flex flex-col border-t border-border py-2 first:border-t-0">
-      <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14">
+      <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-13">
         <span className="font-medium">{e.name}</span>
         {e.prescribed !== null && (
-          <span className="text-14 text-text-muted">Foreskrevet {e.prescribed}</span>
+          <span className="text-13 text-text-muted">Foreskrevet {e.prescribed}</span>
         )}
       </p>
-      <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-14 tabular-nums">
+      <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-13 tabular-nums">
         <span>
           <span aria-hidden="true">
             {e.sets} × {e.reps}
@@ -353,7 +316,7 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
             </span>
           )}
         </span>
-        <span className="text-14 text-text-muted">
+        <span className="text-13 text-text-muted">
           <span aria-hidden="true">{score} score/sæt</span>
           <span className="sr-only">rå score {score} pr. sæt</span>
         </span>
@@ -362,40 +325,19 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
   );
 }
 
-/** Skeleton in the shape of WeekDays: column heads, `rows` day rows, the total row. */
+/** Skeleton in the shape of WeekDays: `rows` day rows and the total row. */
 export function WeekDaysSkeleton({ rows }: { readonly rows: number }) {
-  const numbers = ["cycling", "strength", "total"].map((key) => (
-    <span key={key} className="flex justify-end">
-      <SkeletonBar className="w-1/2 text-14" />
-    </span>
-  ));
   return (
-    <div aria-hidden="true" className="@container flex flex-col">
-      <div className={`${ROW} border-b border-border py-2 text-14`}>
-        <span className={`hidden @xs:block ${DAY_INDENT}`}>
-          <SkeletonBar className="w-1/3" />
-        </span>
-        {["cycling", "strength", "total"].map((key) => (
-          <span key={key} className="flex flex-col items-end">
-            <SkeletonBar className="w-3/4" />
-            <SkeletonBar className="w-1/2" />
+    <div aria-hidden="true" className="flex flex-col">
+      {Array.from({ length: rows + 1 }, (_, i) => (
+        <div key={i} className={ROW}>
+          <span className={DAY_COL}>
+            <SkeletonBar className="w-2/3 text-12" />
           </span>
-        ))}
-      </div>
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className={`${ROW} min-h-11 items-center border-b border-border py-2 text-14`}>
-          <span className={`${DAY_CELL} ${DAY_INDENT}`}>
-            <SkeletonBar className="w-2/3" />
-          </span>
-          {numbers}
+          <SkeletonBar className="w-1/2 flex-1 text-14" />
+          <SkeletonBar className="w-6 text-14" />
         </div>
       ))}
-      <div className={`${ROW} items-center pt-2 text-14`}>
-        <span className={DAY_CELL}>
-          <SkeletonBar className="w-3/4" />
-        </span>
-        {numbers}
-      </div>
     </div>
   );
 }

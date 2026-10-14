@@ -84,7 +84,9 @@ test("today tick 2px in --today; 12 / 8 / 28 tall; the only today colour in the 
 test("shared marks and the zone ruler use no retired token", () => {
   for (const file of ["../src/components/ChartMarks.tsx", "../src/components/ZoneBar.tsx", "../src/components/ChartSeries.tsx", "../src/components/ChartReadout.tsx"]) {
     const src = readFileSync(new URL(file, import.meta.url), "utf8");
-    for (const retired of ["--zone-", "bg-zone", "slab", "block-fill", "prognose-band", "shadow-", "rounded-", "font-display", "italic"]) {
+    // Ember (reset-belastning, 2026-10-14): the ZoneBar's segments are zone colours with rounded ends,
+    // and the tooltip has --radius-control, so "--zone-" / "bg-zone" / "rounded-" are no longer retired.
+    for (const retired of ["slab", "block-fill", "prognose-band", "shadow-", "font-display", "italic"]) {
       assert.ok(!src.includes(retired), `${file} uses ${retired}`);
     }
   }

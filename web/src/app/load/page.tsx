@@ -2,13 +2,19 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { Card } from "@/components/Card";
+import { DailyTssBars, TrainingDaysGrid } from "@/components/DayCharts";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { FitnessCurve } from "@/components/FitnessCurve";
+import { Icon } from "@/components/icons";
 import { LoadExplainer } from "@/components/LoadExplainer";
-import { TrendChart } from "@/components/TrendChart";
+import { MonoCaption } from "@/components/MonoCaption";
+import { ScreenHeader } from "@/components/ScreenHeader";
+import { Tile } from "@/components/Tile";
 import { UpdatedLine } from "@/components/UpdatedLine";
 import { WarningLine } from "@/components/WarningLine";
 import { ZoneBar } from "@/components/ZoneBar";
+import { ZonePill } from "@/components/ZonePill";
 import { WeekDays, WeekDaysSkeleton } from "@/components/WeekDays";
 import { LatestWeekLink, weekHref, WeekSwitcher } from "@/components/WeekSwitcher";
 import {
@@ -25,16 +31,23 @@ import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
 import { noticeText } from "@/lib/notices";
 import {
   formatDate,
+  formatDateRange,
   formatDay,
   formatLoad,
   formatSigned,
   formatUpdatedAt,
   stopAfter,
-  TSS_PER_DAY,
 } from "@/lib/format";
-import { COARSE_ZONES_NOTE, prognoseSentence, STRENGTH_ESTIMATE_NOTE, typicalRidesNote } from "@/lib/prognose-text";
+import { isoWeekNumber } from "@/lib/dates";
+import {
+  COARSE_ZONES_NOTE,
+  prognoseSentence,
+  STRENGTH_ESTIMATE_NOTE,
+  strengthUnknownNote,
+  typicalRidesNote,
+} from "@/lib/prognose-text";
 import { resolveToday } from "@/lib/training-view";
-import { zoneReading } from "@/lib/zone-scale";
+import { isZoneKey, ZONE_CLASS, zoneReading, zoneSentence } from "@/lib/zone-scale";
 
 export const metadata: Metadata = {
   title: "Belastning",
@@ -44,8 +57,6 @@ type ReadyView = Extract<DashboardView, { kind: "ready" }>;
 type Failed = { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 type PageState = DashboardView | Failed;
 type WeekState = { readonly kind: "ready"; readonly days: readonly DayDetail[] } | Failed;
-
-const CHART_TITLE = "Fitness, træthed og form";
 
 type Direction = "up" | "down" | "flat";
 type Delta = {
@@ -94,40 +105,49 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
   ]);
   return (
     <>
-      <header className="flex flex-col">
-        <h1 className="font-sans text-28 font-normal break-words hyphens-auto">Belast&shy;ning</h1>
-        {state.kind === "ready" && (
-          <div className="mt-1">
-            <UpdatedLine
-              freshness={state.freshness}
-              staleNote="Jobbet skal køre dagligt omkring kl. 05.00."
-              unknownNote="Opdateringstidspunkt ukendt, så data kan være forældet."
-            />
-          </div>
+      <ScreenHeader
+        title="Belastning"
+        line={
+          state.kind === "ready" && state.freshness.kind === "fresh" ? (
+            <>
+              opdateret <time dateTime={state.freshness.computedAt}>{formatUpdatedAt(state.freshness.computedAt)}</time>
+            </>
+          ) : undefined
+        }
+      >
+        {state.kind === "ready" && state.freshness.kind !== "fresh" && (
+          <UpdatedLine
+            freshness={state.freshness}
+            staleNote="Jobbet skal køre dagligt omkring kl. 05.00."
+            unknownNote="Opdateringstidspunkt ukendt, så data kan være forældet."
+          />
         )}
-        {/* Python's notices (app_notices), e.g. the FTP sanity check: one line each. */}
+        {/* Python's notices (app_notices), e.g. the FTP sanity check: one line each, 8px apart. */}
         {notices.map((n) => (
-          <div key={n.kind} className="mt-2">
-            <WarningLine>{noticeText(n.kind, n.message)}</WarningLine>
-          </div>
+          <WarningLine key={n.kind}>{noticeText(n.kind, n.message)}</WarningLine>
         ))}
-      </header>
-      {/* States replace the whole grid, full width under the header row, text capped at 60ch. */}
+      </ScreenHeader>
+      {/* States replace the whole grid: one full-width card, text capped at 60ch. */}
       {state.kind === "error" && (
-        <div className="max-w-[60ch]">
-          <LoadError error={state.error} at={state.at} />
-        </div>
+        <section aria-label="Fejl" className="rounded-card border border-border bg-card p-4.5">
+          <div className="max-w-[60ch]">
+            <LoadError error={state.error} at={state.at} />
+          </div>
+        </section>
       )}
       {state.kind === "empty" && (
-        <div className="max-w-[60ch]">
-          <EmptyState message="Der er ikke beregnet nogen træningsbelastning endnu. Det daglige job udfylder den omkring kl. 05.00." />
-        </div>
+        <section aria-label="Ingen data" className="rounded-card border border-border bg-card p-4.5">
+          <div className="max-w-[60ch]">
+            <EmptyState message="Der er ikke beregnet nogen træningsbelastning endnu. Det daglige job udfylder den omkring kl. 05.00." />
+          </div>
+        </section>
       )}
       {state.kind === "ready" && (
-        // load.md §11a: phone order hero → chart → week; from lg hero and week in the rail (cols 1–4),
-        // the chart in the main column (cols 5–12, rows 1–2). Grid placement only; DOM order stays.
+        // reset-belastning.md §2 / §8: phone order form → tiles → curve → grid → bars → week; from lg
+        // a 3-column grid by placement only (DOM order stays).
         <div className={LOAD_GRID}>
-          <Hero view={state} />
+          <FormCard view={state} />
+          <Tiles view={state} />
           <Dashboard view={state} />
         </div>
       )}
@@ -135,110 +155,132 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
   );
 }
 
-/**
- * The zone ruler (instrument-load.md §2), hero size, on --bg; then the zone reading (load.md §8a,
- * from form_zone, never from TSB), the fitness delta and the detail line.
- */
-function Hero({ view }: { readonly view: ReadyView }) {
+/** §2a: FORM I DAG, the zone pill, the TSB figure in its zone colour beside the zone reading, the ZoneBar, the coarse-zones note. */
+function FormCard({ view }: { readonly view: ReadyView }) {
   const { hero } = view;
-  const delta = fitnessDelta(hero.ctlRamp7d);
+  const zone = hero.zone !== null && isZoneKey(hero.zone.key) ? hero.zone.key : null;
+  const today = resolveToday(new Date(), process.env);
   return (
-    <div className={LOAD_PLACE.hero}>
-      <ZoneBar
-        header={{ date: hero.date, tsb: hero.tsb, zone: hero.zone, freshness: view.freshness }}
-        today={resolveToday(new Date(), process.env)}
-        size="hero"
-      />
-      <p className="mt-3 max-w-[60ch] text-16 text-text">{zoneReading(hero.zone?.key ?? null)}</p>
-      <p className="mt-2 flex items-center gap-1.5 text-16 text-text">
-        {delta.direction !== null && <DirectionIcon direction={delta.direction} />}
-        {delta.text}
-      </p>
-      <p className="mt-1 text-14 text-text-muted tabular-nums">
-        Fitness (CTL) {formatLoad(hero.ctl)} − træthed (ATL) {formatLoad(hero.atl)}
-      </p>
-    </div>
+    <section aria-labelledby="form" className={`flex min-w-0 flex-col gap-4 rounded-card border border-border bg-card p-5 ${LOAD_PLACE.form}`}>
+      <p className="sr-only">{zoneSentence(hero.tsb, zone, hero.date !== today ? formatDay(hero.date) : undefined)}</p>
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="form" className="font-mono text-12 font-normal text-text-muted uppercase">
+          Form i dag
+        </h2>
+        {zone !== null && hero.zone !== null && <ZonePill zone={zone} label={hero.zone.label} />}
+      </div>
+      <div className="flex flex-wrap items-baseline gap-2.5">
+        <span aria-hidden="true" className={`font-mono text-56 font-medium tabular-nums ${zone === null ? "text-text" : ZONE_CLASS[zone].text}`}>
+          {formatSigned(hero.tsb)}
+        </span>
+        <p className="min-w-0 font-sans text-15 text-text-muted" style={{ flex: "1 1 12rem" }}>
+          {zoneReading(zone)}
+        </p>
+      </div>
+      <ZoneBar tsb={hero.tsb} zone={zone} />
+      {zone === null && <p className="text-13 text-text-muted">Zone ikke beregnet.</p>}
+      <p className="text-13 text-text-muted">{COARSE_ZONES_NOTE}</p>
+    </section>
   );
 }
 
-/** Arrow for the delta; decorative because the text states the direction in words. */
-function DirectionIcon({ direction }: { readonly direction: Direction }) {
-  const d =
-    direction === "up" ? "M8 3v10M4 7l4-4 4 4" : direction === "down" ? "M8 13V3M4 9l4 4 4-4" : "M3 8h10M9 4l4 4-4 4";
+/** §2b: Fitness (ramp from Python), Træthed, this ISO week's total from weekly_load. */
+function Tiles({ view }: { readonly view: ReadyView }) {
+  const { hero, thisWeek } = view;
+  const delta = fitnessDelta(hero.ctlRamp7d);
+  const ramp = hero.ctlRamp7d === null ? null : formatSigned(hero.ctlRamp7d).replace("+", "");
+  const weekNo = thisWeek?.isoWeek ?? isoWeekNumber(hero.date);
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      className="size-4 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d={d} />
-    </svg>
+    <dl className={`grid grid-cols-3 gap-3 ${LOAD_PLACE.tiles}`}>
+      <Tile
+        label={<dt>Fitness</dt>}
+        value={<dd>{formatLoad(hero.ctl)}</dd>}
+        supportTone={ramp === null ? "muted" : "text"}
+        support={
+          <dd className="flex items-center gap-1">
+            {delta.direction !== null && <Icon name={delta.direction === "up" ? "arrow-up" : delta.direction === "down" ? "arrow-down" : "arrow-flat"} size={16} className="size-3" />}
+            <span aria-hidden="true">{ramp ?? "–"} / 7 d</span>
+            <span className="sr-only">{delta.text}</span>
+          </dd>
+        }
+      />
+      <Tile label={<dt>Træthed</dt>} value={<dd>{formatLoad(hero.atl)}</dd>} support={<dd>TSS/DAG</dd>} />
+      <Tile
+        label={<dt>Uge {weekNo}</dt>}
+        value={<dd>{thisWeek === null ? "–" : formatLoad(thisWeek.totalTss)}</dd>}
+        support={<dd>TSS · {thisWeek === null ? "–" : thisWeek.dayCount}/7 d</dd>}
+      />
+    </dl>
   );
 }
 
 function Dashboard({ view }: { readonly view: ReadyView }) {
   const { week } = view;
+  const today = resolveToday(new Date(), process.env);
   return (
     <>
-      <Card id="trend" variant="calm" title={CHART_TITLE} className={LOAD_PLACE.chart}>
-        <figure className="flex flex-col gap-2">
-          <TrendChart
-            points={view.chart}
-            blocks={view.blocks}
-            lastActual={view.lastActual}
-            today={resolveToday(new Date(), process.env)}
-            projection={view.projection}
-            title={CHART_TITLE}
-            explainer={<LoadExplainer />}
-          />
-          <figcaption className="sr-only">{chartSummary(view)}</figcaption>
-        </figure>
-        {view.projection === "ready" && view.typicalRides !== null && (
-          <p className="max-w-[60ch] text-14 text-text-muted">{typicalRidesNote(view.typicalRides)}</p>
+      <Card
+        id="trend"
+        title="Fitness"
+        shape="hero"
+        action={<MonoCaption>TSS/dag</MonoCaption>}
+        className={`gap-4.5 ${LOAD_PLACE.curve}`}
+      >
+        {view.chart.filter((p) => p.kind === "actual").length < 2 ? (
+          <EmptyState message="Trenden vises, når der er mindst to dages træningsbelastning." />
+        ) : (
+          <FitnessCurve points={view.chart} blocks={view.blocks} today={today} lastActual={view.lastActual} summary={chartSummary(view)} />
         )}
-        {/* User, 2026-10-02: STRENGTH_K = 0.035 is an anchor (~60 TSS per heavy session), not a
-            calibration. In the chart card's foot since load.md §11b (phone fold with the bottom bar). */}
-        <p className="max-w-[60ch] text-14 text-text-muted">
-          {STRENGTH_ESTIMATE_NOTE} {COARSE_ZONES_NOTE}
-        </p>
+        {view.projection === "error" && (
+          <WarningLine>Prognosen kunne ikke hentes, så grafen viser kun målte dage. Genindlæs siden for at prøve igen.</WarningLine>
+        )}
+        {view.projection === "none" && (
+          <p className="text-13 text-text-muted">Ingen prognose endnu. Den beregnes af det daglige job omkring kl. 05.00.</p>
+        )}
+        {view.projection === "ready" && view.typicalRides !== null && (
+          <p className="max-w-[60ch] text-13 text-text-muted">{typicalRidesNote(view.typicalRides)}</p>
+        )}
+        {strengthUnknownFrom(view.chart) !== null && (
+          <p className="max-w-[60ch] text-13 text-text-muted">{strengthUnknownNote(strengthUnknownFrom(view.chart) ?? view.lastActual)}</p>
+        )}
+        <LoadExplainer />
       </Card>
+
+      <Card id="days" title="Træningsdage" action={<MonoCaption uppercase={false}>12 uger</MonoCaption>} className={LOAD_PLACE.grid}>
+        <TrainingDaysGrid days={view.days} today={today} logStart={view.logStart} />
+      </Card>
+
+      <section aria-labelledby="bars" className={`flex min-w-0 flex-col gap-3.5 rounded-card border border-border bg-card p-4.5 ${LOAD_PLACE.bars}`}>
+        <DailyTssBars titleId="bars" days={view.days} today={today} logStart={view.logStart} />
+        <p className="text-13 text-text-muted">{STRENGTH_ESTIMATE_NOTE}</p>
+      </section>
 
       <Card
         id="week"
-        variant="calm"
-        title={weekTitle(week)}
-        action={week !== null && !week.isLatest ? <LatestWeekLink /> : undefined}
-        className={LOAD_PLACE.week}
+        title={week === null ? "Denne uge" : `Uge ${week.selected.isoWeek}`}
+        action={week === null ? undefined : <MonoCaption uppercase={false}>{formatDateRange(week.selected.weekStart, week.selected.weekEnd)}</MonoCaption>}
+        className={`gap-1 ${LOAD_PLACE.week}`}
       >
         {week === null ? (
           <EmptyState message="Ingen ugetotal for denne uge endnu." />
         ) : (
           <>
-            <WeekSwitcher nav={week} />
             {week.selected.days.length === 0 ? (
               <EmptyState message={`Ingen træningsdage registreret i uge ${week.selected.isoWeek}.`} />
             ) : (
-              // Keyed by week: switching weeks shows this skeleton; hero and chart stay put.
+              // Keyed by week: switching weeks shows this skeleton; the other cards stay put.
               <Suspense key={week.param} fallback={<WeekFallback nav={week} />}>
-                <WeekSessions nav={week} />
+                <WeekSessions nav={week} logStart={view.logStart} today={today} />
               </Suspense>
             )}
+            <div className="mt-3">
+              <WeekSwitcher nav={week} latest={week.isLatest ? null : <LatestWeekLink />} />
+            </div>
           </>
         )}
       </Card>
     </>
   );
-}
-
-function weekTitle(week: WeekNav | null): string {
-  if (week === null) return "Denne uge";
-  const n = week.selected.isoWeek;
-  return week.isLatest ? `Denne uge · uge ${n}` : `Uge ${n}`;
 }
 
 function WeekFallback({ nav }: { readonly nav: WeekNav }) {
@@ -253,7 +295,7 @@ function WeekFallback({ nav }: { readonly nav: WeekNav }) {
 }
 
 /** Streams in under the week's Suspense boundary; a failure stays inside the week card. */
-async function WeekSessions({ nav }: { readonly nav: WeekNav }) {
+async function WeekSessions({ nav, logStart, today }: { readonly nav: WeekNav; readonly logStart: string | null; readonly today: string }) {
   const state = await loadWeekState(nav);
   if (state.kind === "error") {
     const at = state.at.toISOString();
@@ -267,7 +309,7 @@ async function WeekSessions({ nav }: { readonly nav: WeekNav }) {
       />
     );
   }
-  return <WeekDays week={nav.selected} days={state.days} />;
+  return <WeekDays week={nav.selected} days={state.days} logStart={logStart} today={today} />;
 }
 
 /** CTL ramp as "is fitness going up?". Direction follows the displayed (rounded) value. */
@@ -294,9 +336,7 @@ function LoadError({ error, at }: { readonly error: DataError; readonly at: Date
 /** Text alternative for the chart: today's values, the 7-day fitness change and the blocks. */
 function chartSummary({ hero, chart, blocks }: ReadyView): string {
   const end = chart.findLast((p) => p.kind === "projected");
-  const range = `Daglig fitness (CTL), træthed (ATL) og form (TSB) i ${TSS_PER_DAY} fra ${formatDay(chart[0].date)} til ${formatDay(hero.date)}`;
   const parts = [
-    end === undefined ? range : `${range}, og en anslået prognose til ${formatDay(end.date)}`,
     `Den ${formatDay(hero.date)}: fitness ${formatLoad(hero.ctl)}, træthed ${formatLoad(hero.atl)}, form ${formatSigned(hero.tsb)}.`,
   ];
   if (end !== undefined) {

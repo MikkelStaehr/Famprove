@@ -9,6 +9,7 @@
  * back to the latest week, so user input never reaches a query.
  */
 import { addDays } from "./dates.ts";
+import { strengthLogStart } from "./load-days.ts";
 import type {
   ActivityRow,
   Band,
@@ -97,6 +98,7 @@ export type WeekView = {
   readonly cyclingTss: number; // from weekly_load (SQL owns the ISO-week SUM)
   readonly strengthTss: number;
   readonly totalTss: number;
+  readonly dayCount: number; // weekly_load.days (< 7: a partial week)
   readonly days: readonly WeekDay[]; // daily_load rows inside the week, ascending
 };
 
@@ -113,6 +115,12 @@ export type DashboardView =
       readonly typicalRides: number | null; // Python's rides behind the prognose's typical week
       readonly blocks: readonly BlockSpan[];
       readonly week: WeekNav | null; // null if weekly_load has no row for the latest date
+      /** The current ISO week's weekly_load row (the UGE tile), whatever week the list shows. */
+      readonly thisWeek: WeekView | null;
+      /** Every daily_load day's TSS, ascending (the training-day grid and the daily bars). */
+      readonly days: readonly WeekDay[];
+      /** The strength log's first day: the earliest blocks.start_date; null without blocks. */
+      readonly logStart: IsoDate | null;
     };
 
 /** The selected ISO week plus `?week=` values for its neighbours (null at either end). */
@@ -254,6 +262,7 @@ export function weekView(data: DashboardData, week: WeeklyLoadRow): WeekView {
     cyclingTss: week.cyclingTss,
     strengthTss: week.strengthTss,
     totalTss: week.totalTss,
+    dayCount: week.days,
     days,
   };
 }
@@ -405,14 +414,13 @@ export function strengthUnknownFrom(points: readonly ChartPoint[]): IsoDate | nu
 }
 
 /**
- * The chart's points: the last CHART_WINDOW_DAYS actual days, then the prognose strictly after
- * the latest actual day (older projection rows are from a stale run and are never drawn).
+ * The chart's points: every actual day (the curve's Sæson range starts at the series start;
+ * reset-belastning.md §3), then the prognose strictly after the latest actual day, up to
+ * CHART_WINDOW_DAYS ahead (older projection rows are from a stale run and are never drawn).
  */
 export function chartPoints(data: DashboardData, lastActual: IsoDate): ChartPoint[] {
-  const from = addDays(lastActual, -CHART_WINDOW_DAYS);
   const to = addDays(lastActual, CHART_WINDOW_DAYS);
   const actual: ChartPoint[] = data.daily
-    .filter((d) => d.date >= from)
     .map((d) => ({ date: d.date, ctl: d.ctl, atl: d.atl, tsb: d.tsb, kind: "actual", estimate: null, bands: null }));
   const projected: ChartPoint[] = (data.projection ?? [])
     .filter((p) => p.date > lastActual && p.date <= to)
@@ -463,5 +471,8 @@ export function buildDashboardView(
     blocks: blockSpans(data.blocks, latest.date),
     typicalRides: typicalRidesOf(data.projection),
     week: selectWeek(data, latest.date, week),
+    thisWeek: currentWeek(data, latest.date),
+    days: data.daily.map((d) => ({ date: d.date, cyclingTss: d.cyclingTss, strengthTss: d.strengthTss, totalTss: d.totalTss })),
+    logStart: strengthLogStart(data.blocks),
   };
 }

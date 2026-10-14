@@ -208,3 +208,10 @@ main:has(> [data-screen="fokus"]) {
     transition-duration: 0s !important;
   }
 }
+
+/* A range change cross-fades the plot (Part B "Motion": 150ms; paths never morph). */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}

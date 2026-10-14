@@ -130,7 +130,7 @@ function projected(date: string, ctl: number): DailyProjectionRow {
   };
 }
 
-test("chart: today ± 56 days, prognose only after the latest actual day, stale rows dropped", () => {
+test("chart: every actual day (the Sæson range), prognose up to 56 days, only after the latest actual day, stale rows dropped", () => {
   const daily = Array.from({ length: 80 }, (_, i) => day(addDays("2026-07-12", i)));
   const last = daily.at(-1)?.date ?? "";
   const projection = [projected(last, 1), ...Array.from({ length: 60 }, (_, i) => projected(addDays(last, i + 1), 10))];
@@ -139,7 +139,7 @@ test("chart: today ± 56 days, prognose only after the latest actual day, stale 
   if (view.kind !== "ready") return;
   const actual = view.chart.filter((p) => p.kind === "actual");
   const future = view.chart.filter((p) => p.kind === "projected");
-  assert.equal(actual[0]?.date, addDays(last, -56));
+  assert.equal(actual[0]?.date, daily[0]?.date); // reset-belastning.md §3: Sæson starts at the series start
   assert.equal(actual.at(-1)?.date, last);
   assert.equal(future[0]?.date, addDays(last, 1)); // the stale row dated `last` is not drawn
   assert.equal(future.at(-1)?.date, addDays(last, 56));
