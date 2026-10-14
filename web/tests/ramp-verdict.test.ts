@@ -16,6 +16,8 @@ test("1b verdict on the ramp rounded to one decimal", () => {
     [8.04, "Hård opbygning"], // rounds to 8,0
     [8.06, "For hurtigt"], // rounds to 8,1
     [null, null],
+    [Number.NaN, null], // never "For hurtigt" for a NaN
+    [Number.POSITIVE_INFINITY, null],
   ];
   for (const [ramp, label] of cases) assert.equal(rampVerdict(ramp)?.label ?? null, label, `ramp ${ramp}`);
 });

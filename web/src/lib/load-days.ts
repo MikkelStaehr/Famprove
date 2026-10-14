@@ -156,10 +156,11 @@ function* niceSteps(): Generator<number> {
 }
 
 /**
- * The curve's y scale (drawing only; fitness-round.md §1): the first step in 1, 2, 5, 10, 20, …
- * that gives ≤ 4 intervals; bottom = the largest step multiple ≤ the window's lowest value (never
- * below 0), top = the smallest multiple ≥ the highest (bottom + step when they meet). `lines` holds
- * every tick from bottom to top, one gridline and label each (the bottom one sits on the axis).
+ * The curve's y scale (drawing only; fitness-round.md §1, user 2026-10-14): the first step in 1,
+ * 2, 5, 10, 20, … that gives ≤ 4 intervals; bottom `lo` = the whole number at or below the window's
+ * lowest value (never below 0), so the axis starts at the data; top = the smallest step multiple
+ * ≥ the highest. `lines` holds the step multiples inside [lo, hi], one gridline and label each (the
+ * first can sit above the axis, e.g. lo 9 with lines from 10).
  */
 export function curveScale(min: number, max: number): { readonly lo: number; readonly hi: number; readonly step: number; readonly lines: readonly number[] } {
   if (!Number.isFinite(min) || !Number.isFinite(max)) throw new RangeError("curveScale: min and max must be finite");

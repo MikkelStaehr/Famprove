@@ -410,8 +410,6 @@ function chartSummary({ hero, chart, blocks }: ReadyView): string {
       prognoseSentence(end, strengthUnknownFrom(chart) !== null),
     );
   }
-  if (hero.ctlRamp7d !== null) {
-  }
   if (blocks.length === 0) parts.push("Ingen styrkeblokke i perioden.");
   for (const b of blocks) {
     const span = b.ongoing
