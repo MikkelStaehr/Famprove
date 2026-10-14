@@ -14,7 +14,7 @@ All Python commands run from `python/` (they read the repo-root `.env.local`).
 - run: `uv run collect-intervals [--since 2024-12-30]` · `uv run collect-strength` · `uv run compute` · `uv run collect-plan` (in that order)
 - test: `uv run pytest` (offline, synthetic fixtures) · `uv run pytest -m live` (hits intervals.icu, read-only)
 - lint: `uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy`
-- db: `supabase db push` from the repo root (migrations in `supabase/migrations/`)
+- db: `npx -y supabase@2.120.0 db push` from the repo root (migrations in `supabase/migrations/`; the CLI version is pinned, see Environment)
 - web (from `web/`, reads `web/.env.local`): `pnpm dev` · `pnpm build && pnpm start` · checks: `pnpm lint && pnpm typecheck && pnpm test`
 - **Run & screenshot:** use the `run-web` skill (`.claude/skills/run-web/`: `serve.sh` on macOS/Linux, `serve.ps1` on Windows, `shoot.mjs` with a hard per-shot `--timeout`). Never invent a new screenshot method; if the skill falls short, fix the skill.
 - **Dev switches** (only under `next dev`, ignored in production): `DEV_TODAY=YYYY-MM-DD` shows another day; `DEV_FIXTURE=empty|stale|error|band|midsession|answers` (`answers`: all three Cykel answers answered, block 3 with a plan; `midsession`: an illustrative set log for today, 3 sets done and 1 skipped per session, so Træning/Fokus can be shot mid-session without a write) makes the data layer show that state (`empty` and `error` without reading Supabase; `stale` ages real rows by 3 days; `band` gives real prognose rows after the strength block an illustrative uncertainty band), so every designed state can be screenshotted: `serve.ps1 -DevFixture <state>`. Specs name their states with these words.
@@ -26,6 +26,7 @@ CTL/ATL decay variant is one switch: `DECAY` in `python/src/training_load/domain
 - Stop every server you started before the session ends.
 - Run Python with `PYTHONIOENCODING=utf-8` (not set machine-wide yet; the Windows console chokes on "−" and "æ"). Write commit messages via a file (`git commit -F`), not inline quoting.
 - Windows with Git Bash and PowerShell. uv, pnpm and the Supabase CLI are per-user installs; if a shell can't find them, restart VS Code.
+- **Supabase CLI pinned to v2.120.0** (retro 2026-10-14): `supabase/config.toml` uses keys older CLIs reject (v2.95 fails on `[local_smtp]`). Run it as `npx -y supabase@2.120.0 <command>` (log in once with `npx -y supabase@2.120.0 login`, link once with `… link --project-ref iutgmfnqlmogfitezjnj`) or install exactly that version. Never edit config.toml to suit another CLI version; raise the pin here instead.
 - CI secrets: the daily job needs 7 `.env.example` variables as **repository** secrets on `MikkelStaehr/Famprove` (Settings → Secrets and variables → Actions → Secrets), and `STRENGTH_K` as a **repository variable** (→ Variables; `vars.STRENGTH_K`, a tunable, not a secret).
 
 ## Conventions
