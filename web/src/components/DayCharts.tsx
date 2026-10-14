@@ -26,17 +26,20 @@ const UNKNOWN = "border border-dashed border-shade-1";
 const HATCH = "repeating-linear-gradient(135deg, var(--shade-2) 0 1.5px, transparent 1.5px 4px)";
 const EMPTY_REST = "Tryk på grafen for at se en dag";
 
-/** The day readout (DESIGN.md "Charts: interaction"): `tirs. 13. okt.` · Cykel · Styrke · I alt; strength `–` before the log. */
+/**
+ * The day readout (DESIGN.md "Charts: interaction"): `tirs. 13. okt.` · Cykel · Styrke · I alt; strength `–`
+ * before the log, said on line 1 (`… · Styrke ikke registreret`) so the row stays two lines tall.
+ */
 export function dayReadout(c: DayCell): Readout {
   const v = (n: number | null) => (n === null ? MISSING : formatLoad(n));
   return {
-    head: formatDay(c.date),
+    head: c.beforeLog ? `${formatDay(c.date)} · Styrke ikke registreret` : formatDay(c.date),
     cells: [
       { key: "cycling", label: "Cykel", value: v(c.cycling), sr: c.cycling === null ? "ikke registreret" : undefined },
       { key: "strength", label: "Styrke", value: v(c.strength), sr: c.strength === null ? "ikke registreret" : undefined },
       { key: "total", label: "I alt", value: v(c.total), sr: c.total === null ? "ikke registreret" : undefined },
     ],
-    facts: c.beforeLog ? ["Styrke ikke registreret"] : [],
+    facts: [],
   };
 }
 
@@ -163,7 +166,7 @@ export function TrainingDaysGrid({ days, today, logStart }: GridProps) {
           Styrke er ikke registreret før {formatDate(logStart)}; dage uden cykling er ukendte.
         </p>
       )}
-      <ChartReadout readout={readout} all={[resting, ...drawn.map(dayReadout)]} lines={3} cells />
+      <ChartReadout readout={readout} all={[resting, ...drawn.map(dayReadout)]} lines={2} cells />
       <DayTable cells={drawn} />
     </>
   );
@@ -330,7 +333,7 @@ export function DailyTssBars({ days, today, logStart, titleId }: GridProps & { r
           Styrke
         </li>
       </ul>
-      <ChartReadout readout={readout} all={[resting, ...cells.map(dayReadout)]} lines={3} cells />
+      <ChartReadout readout={readout} all={[resting, ...cells.map(dayReadout)]} lines={2} cells />
     </>
   );
 }

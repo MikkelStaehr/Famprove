@@ -7,9 +7,8 @@ import { MISSING, nearestIndex, type Readout, restingReadout } from "@/lib/chart
 import { type BlockSpan, type ChartPoint, ctlBandArea } from "@/lib/dashboard-view";
 import { addDays, dayNumber } from "@/lib/dates";
 import type { IsoDate } from "@/lib/db/rows";
-import { formatDate, formatDay, formatLoad, formatSigned, LOCALE } from "@/lib/format";
+import { formatDate, formatDay, formatLoad, formatSigned } from "@/lib/format";
 import { type CurveRange, curveScale, curveWindow } from "@/lib/load-days";
-import { prognoseStatus, strengthLine } from "@/lib/prognose-text";
 
 import { useMedia, useWidth } from "./chart-hooks";
 import { ChartReadout, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
@@ -33,13 +32,12 @@ type FitnessCurveProps = {
 const STRIP = 16;
 const PAD_L = 2;
 const PAD_R = 6;
-const READOUT_LINES = 4;
+const READOUT_LINES = 3; // date, cells, one fact (block · spænd)
 const RANGES = [
   { value: "4U", label: "4U", ariaLabel: "4 uger" },
   { value: "12U", label: "12U", ariaLabel: "12 uger" },
   { value: "season", label: "Sæson" },
 ] as const;
-const WEEKDAY_FORMAT = new Intl.DateTimeFormat(LOCALE, { weekday: "long", timeZone: "UTC" });
 
 export function FitnessCurve({ points, blocks, today, lastActual, summary }: FitnessCurveProps) {
   const [range, setRange] = useState<CurveRange>("12U");
@@ -58,9 +56,9 @@ export function FitnessCurve({ points, blocks, today, lastActual, summary }: Fit
       <p className="sr-only" aria-live="polite">
         {rangeSentence} {summary}
       </p>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div className="flex flex-nowrap items-center justify-between gap-x-3">
         <SegmentedControl label="Periode" segments={RANGES} value={range} onChange={setRange} size="hero" />
-        <ul aria-label="Forklaring" className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-11 text-text-muted">
+        <ul aria-label="Forklaring" className="flex flex-col items-end gap-1 font-mono text-11 text-text-muted sm:flex-row sm:items-center sm:gap-x-3">
           {end !== undefined && <li>- - - prognose</li>}
           {band && (
             <li className="flex items-center gap-1.5">
@@ -262,28 +260,29 @@ function XLabels({ from, to, x, width, wide }: { readonly from: IsoDate; readonl
   );
 }
 
-/** DESIGN.md readout for the curve: date (+ prognose status), Fitness · Træthed · Form, then block or prognose basis. */
+/** DESIGN.md readout for the curve: date (+ prognose status), Fitness · Træthed · Form, then one line: block (· spænd on a prognose day). */
 function rowReadout(p: ChartPoint, blocks: readonly BlockSpan[]): Readout {
-  if (p.kind === "projected") {
-    const e = p.estimate;
-    const cycling = e === null ? null : cyclingLine(p.date, e);
-    const spans: string[] = [];
-    const b = p.bands;
-    if (b?.ctl != null && formatLoad(b.ctl.low) !== formatLoad(b.ctl.high)) spans.push(`fitness ${formatLoad(b.ctl.low)} til ${formatLoad(b.ctl.high)}`);
-    if (b?.atl != null && formatLoad(b.atl.low) !== formatLoad(b.atl.high)) spans.push(`træthed ${formatLoad(b.atl.low)} til ${formatLoad(b.atl.high)}`);
-    if (b?.tsb != null && formatSigned(b.tsb.low) !== formatSigned(b.tsb.high)) spans.push(`form ${formatSigned(b.tsb.low)} til ${formatSigned(b.tsb.high)}`);
-    return {
-      head: `${formatDay(p.date)} · ${prognoseStatus(e)}`,
-      cells: [
-        { key: "ctl", label: "Fitness", value: `≈ ${formatLoad(p.ctl)}` },
-        { key: "atl", label: "Træthed", value: `≈ ${formatLoad(p.atl)}` },
-        { key: "tsb", label: "Form", value: `≈ ${formatSigned(p.tsb)}` },
-      ],
-      facts: [...(cycling === null ? [] : [cycling]), ...(e?.sessions.map((s) => strengthLine(s)) ?? []), ...(spans.length === 0 ? [] : [`Spænd: ${spans.join(", ")}`])],
-    };
-  }
   const block = blocks.find((b) => b.start <= p.date && p.date <= b.end);
   const deload = block !== undefined && block.deloadStart !== null && block.deloadStart <= p.date;
+  // The bracket's short label (`Blok 12`), so block · deload · spænd stays one line at 390px.
+  const blockFact = block === undefined ? [] : [`Blok ${block.blockNo}${deload ? " · deload" : ""}`];
+  if (p.kind === "projected") {
+    // One fact line (polish 2026-10-14): block · the fitness span. The prognose basis (cycling's typical
+    // day, strength sessions and their estimated day) lives in the card foot, not per day.
+    const span = p.bands?.ctl;
+    const spanFact = span != null && formatLoad(span.low) !== formatLoad(span.high) ? [`spænd ${formatLoad(span.low)}–${formatLoad(span.high)}`] : [];
+    const fact = [...blockFact, ...spanFact].join(" · ");
+    return {
+      head: `${formatDay(p.date)} · Prognose${p.estimate?.strengthMethod === "recent" ? " · efter blokken" : ""}`,
+      cells: [
+        // No "≈ " per cell: line 1 says Prognose, and with it the cells wrapped to two lines at 390px.
+        { key: "ctl", label: "Fitness", value: formatLoad(p.ctl) },
+        { key: "atl", label: "Træthed", value: formatLoad(p.atl) },
+        { key: "tsb", label: "Form", value: formatSigned(p.tsb) },
+      ],
+      facts: fact === "" ? [] : [fact],
+    };
+  }
   return {
     head: formatDay(p.date),
     cells: [
@@ -291,14 +290,6 @@ function rowReadout(p: ChartPoint, blocks: readonly BlockSpan[]): Readout {
       { key: "atl", label: "Træthed", value: formatLoad(p.atl) },
       { key: "tsb", label: "Form", value: formatSigned(p.tsb) },
     ],
-    facts: block === undefined ? [] : [`${block.name}${deload ? " · deload" : ""}`],
+    facts: blockFact,
   };
 }
-
-function cyclingLine(date: IsoDate, e: NonNullable<ChartPoint["estimate"]>): string | null {
-  if (e.cyclingSource === "planned") return `Cykel ${Math.round(e.cyclingTss)} TSS · planlagt tur`;
-  const unread = e.rides.some((r) => r.tss === null) ? " (planlagt tur kunne ikke læses)" : "";
-  if (e.cyclingTss <= 0 && unread === "") return null;
-  return `Cykel ≈ ${Math.round(e.cyclingTss)} TSS · typisk ${WEEKDAY_FORMAT.format(new Date(`${date}T00:00:00Z`))}${unread}`;
-}
-
