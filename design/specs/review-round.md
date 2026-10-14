@@ -45,7 +45,7 @@ Acceptance:
 - 2c. One ring at the last measured anchor, and the legend names it. A selected day shows only a hairline.
 
 ## 3. /load charts: values only on selection
-This applies to the fitness curve, the training-day grid and the TSS bars. **Analyse is unchanged.**
+This applies to the fitness curve, the training-day grid and the TSS bars. ~~Analyse is unchanged.~~ Reversed 2026-10-14: Analyse follows the same rule (`answers-round.md` §2); 3d is void.
 - **At rest:** no values, no readout row and no reserved height. No `Seneste · …` row any more.
 - **No hover anything:** no tooltip and no hover-following marker. Mouse hover changes only the cursor (`pointer`).
 - **Select:** a tap, a click, a touch drag (scrub, `touch-action: pan-y` kept), or ←/→ (and ↑/↓ on the grid) once the plot has focus. The first arrow press selects the latest day. The selection shows **one readout** directly under that chart's x labels or legend: the existing readout layout (line 1 date, line 2 cells, facts), wrapping as needed, `aria-live="polite"`. It appears without animation, and the content below it moves down.

@@ -90,7 +90,7 @@ Two usage modes, two layouts. **Phone** (390px): in the gym and on the bike; Tr�
 - `ListRow` – day | icon | text | value, 1px `--border` top border.
 - `InverseCard` – the light card with one dark 48px button (Træning's "I dag").
 - `SectionTitle` (Geist 16/500) and `MonoCaption` (Geist Mono 11–12, `--text-muted`, uppercase).
-- `TrendChart` – line chart with readout row (and, on Analyse only, a tooltip) ("Charts: interaction"), empty state built in.
+- `TrendChart` – line chart with a readout row shown on selection only ("Charts: interaction"), empty state built in.
 - `WeekCard` – the one week card (`WeekDays` is deleted): `variant="full"` on `/load` (day `<details>` + week switcher), `variant="compact"` on Træning (plain 36px rows, no switcher, current week). Spec `design/specs/review-round.md` §1, §7.
 - `EmptyState` – icon, one sentence, optional action. `ErrorState` – what failed, when, retry. `WarningLine` – warning icon + sentence.
 
@@ -103,7 +103,7 @@ Two usage modes, two layouts. **Phone** (390px): in the gym and on the bike; Tr�
 - Undo over confirm: tapping a done set again reopens it; Fokus has Fortryd for the latest tap; Afslut needs no confirm (progress is kept).
 - Real buttons: anything that acts is a `<button>` or a link with a visible box or underline; a `SegmentedControl` segment is a button.
 
-## Charts: interaction (every chart, decided 2026-10-13)
+## Charts: interaction (every chart, decided 2026-10-13; one calm rule app-wide since 2026-10-14, `design/specs/answers-round.md` §2)
 Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cykel's eFTP, EF and weekly strips, and Styrke's e1RM panels and tonnage strips.
 - **Marker.** Selecting a day, ride or week draws a 1px `--text` vertical rule the full height of the plot. On a point chart it snaps to the nearest point and that point gets a 2px `--card` ring (not on Belastning's fitness curve: a hairline only, no dot; `review-round.md` §2). On bar and week strips it sits at the slot centre. On the training-day grid the selected cell gets a 1.5px `--text` outline (offset 1px). The marker is `--text`, never `--today` (`--today` means "today", not "selected").
 - **Touch and pen** (`pointerType` ≠ `mouse`): there is **no floating tooltip**. Tap or drag moves the marker, and the values show in the **readout row**. The plot has `touch-action: pan-y`, so a vertical drag still scrolls the page and a horizontal drag scrubs. A tap outside the card's plot clears the selection (a document `pointerdown` outside it), and so does Esc.
@@ -112,9 +112,9 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
   - Line 2 holds the value cells, Geist Mono `text-14` 500 tabular. Each cell is the series' legend swatch, then its label in `--text-muted`, then the value. Cells are 16px apart and wrap.
   - Further lines are `text-13` `--text-muted` facts.
   - **Line-series legend items move into the cells.** Only items with no value stay in the legend: block, deload, excluded, prognose, band, unknown.
-- **Readout at rest** (nothing selected): it shows the **latest** day, ride or week in the same layout, line 1 starting `Seneste · `, no marker drawn. Never blank. **Exception: Belastning (`/load`), user 2026-10-14, `review-round.md` §3:** its three charts (fitness curve, training-day grid, TSS bars) have no rest row, show no values at rest and reserve no space; there is no tooltip and no hover marker (the mouse only changes the cursor). A tap, click, touch drag or keyboard selection shows one readout under that chart; tapping the day again, Esc or a tap outside that card's plot closes it. The grid's values stay in the hidden table. Analyse keeps the rest readout and the tooltip below. If there is no latest value: `Tryk på grafen for at se en dag` (Belastning) or `… en uge` (week strips) in `--text-muted`.
-- **Pointer** (`pointerType = mouse`, **Analyse only**; `/load` has no hover behaviour): the marker follows the hover, and a floating tooltip (`--bg` fill, 1px `--raised` border, `--radius-control`, `max-w-72`, `pointer-events: none`, no shadow) shows the same lines as the readout, top-aligned 8px under the plot top, 12px right of the marker, flipping left at the plot's right edge. It hides on `pointerleave`. The readout row stays at rest, so values never appear twice.
-- **Keyboard.** The chart is one focusable group. ←/→ steps a day, ride or week (the grid also takes ↑/↓ for the day of the week), Esc clears. A keyboard selection uses the readout row. The focus ring sits on the plot.
+- **Nothing at rest** (user 2026-10-14; `/load` first, `review-round.md` §3, then Analyse, `answers-round.md` §2, reversing "Analyse is unchanged"): no readout row, no reserved space, no `Seneste · …`, no value inside a plot and no SVG `<title>` carrying a value. Text inside a plot is only axis ticks, panel/strip labels, `BLOK n`, `INGEN TURE` and `I DAG`; block-best and sheet-1RM marks stay without their numbers. A tap, click, touch drag or keyboard selection shows one readout under that chart; the same point again, Esc or a tap outside that card's plot closes it. sr sentences and hidden tables carry the values for screen readers.
+- **Pointer** (`pointerType = mouse`): no tooltip and no hover marker on any chart; hover changes only the cursor (`pointer`). A click selects, as a tap does.
+- **Keyboard.** The chart is one focusable group. The first ←/→ selects the latest point, then steps a day, ride or week (the grid also takes ↑/↓ for the day of the week), Esc clears. A keyboard selection uses the readout row. The focus ring sits on the plot.
 - **Prognose days:** line 1 reads `tors. 8. okt. · Prognose` (` · efter blokken` and ` · dag anslået` as `load.md` §10c), every value has `≈ `, ranges go to a facts line. Measured days never show `≈`.
 - **Gaps:** a gap is never read as 0. On a point chart, if the marker would snap to a point more than 14 days from the tap and the tap lies inside an `Ingen ture` seam, it stays at the tap and line 1 reads the seam (`Ingen ture · 30. sep. 2025 – 10. mar. 2026`). A week with no rides reads `Ingen ture`; a week between blocks reads `mellem blokke`. A missing value is `–`, spoken `ikke registreret`.
 - **Readout per chart** (copy and number formats as each spec: decimal comma, U+2212, W whole, EF 2 dp, hours `h:mm t`):
@@ -127,7 +127,7 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 | VI cell | | | Flagged: value `--warning` + warning icon, sr `, ujævn effekt på en Z2-dag`. No VI: `VI –` | |
 | EF (rolige ture) | 3 | `tirs. 3. jun. 2025` | `EF 1,24` · `Trend 1,22` (`Trend –` when null) | `NP 165 W · puls 133 · 1:45 t` |
 | Timer og belastning | 3 | `Uge 23 · 2.–8. jun. 2025` (+ ` · indtil videre`) | `Timer 4:30 t` · `Belastning 210 TSS` · `Ture 3` | `1 udeladt fra trends`; zero week: line 2 `Ingen ture`; null load: `Belastning –` + fact `Belastning ikke beregnet` |
-| Styrke e1RM | 4 | `Uge 39 · 22.–28. sep. · blok 12, uge 1` (+ suffixes per `analyse-styrke.md` §5c) | none: one line per lift, `Squat 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet` (` · bedst i blokken`) | the lift lines are lines 2–4 |
+| Styrke e1RM | 5 | `Uge 39 · 22.–28. sep. · blok 12, uge 1` (+ suffixes per `analyse-styrke.md` §5c) | none: one line per lift, `Squat 174,1 kg · 140 kg × 5 · RPE 6,5 foreskrevet` (` · blokkens bedste`) | the lift lines are lines 2–4; last fact `1RM i arket: squat 180 kg, bænkpres 102,5 kg (ikke testet)` (omitted when none) |
 | Styrke tonnage | 4 | as e1RM | none: one line per lift, `Squat 2.100 kg · 12 sæt` / `Squat ikke trænet` | lines 2–4 |
 
 ## Accessibility checklist (run before merge)
