@@ -1,4 +1,4 @@
--- Unilateral and dumbbell exercises (user, 2026-10-14, slice bodyweight-fractions): two more
+-- Unilateral and dumbbell exercises (user, 2026-10-14, slice per-side-dumbbell): two more
 -- per-exercise inputs to the coach's strength formula, next to muscle_factor and
 -- bodyweight_fraction (the formula itself is unchanged; CLAUDE.md, the 2026-10-12 exception).
 --   per_side         the sheet's reps are per side (split squat, single-leg ...): the set score

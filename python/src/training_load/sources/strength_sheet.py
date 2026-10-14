@@ -248,8 +248,10 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
             if not rpe_readable(load): issues[RPE_NOT_HALF] += 1   # tælles; cellens RPE bruges aldrig ("RPE ukendt")
             lsrpe = logged_rpe(cells[4], issues) if lsrpe_ok else None
             # Brugerens input pr. øvelse (2026-10-14): reps pr. side tælles for begge sider, kg pr.
-            # håndvægt for begge hænder. Formlen er uændret; kun dens input ganges op.
-            kg, rpe, score, bw = set_score(typ, name, reps * exercise.sides, kg * exercise.kg_factor, decimal_dots(load),
+            # håndvægt for begge hænder. Formlen er uændret; kun dens input ganges op. Aldrig på
+            # hovedløftenes TYPEs: deres %1RM-RPE må ikke regnes på dobbelte reps eller kg.
+            sides, kg_factor = (1, 1) if typ in ("SQUAT", "BENCH", "DEADLIFT") else (exercise.sides, exercise.kg_factor)
+            kg, rpe, score, bw = set_score(typ, name, reps * sides, kg * kg_factor, decimal_dots(load),
                                            exercise.bodyweight_kg, exercise.muscle_factor, e1rm, lsrpe)
             if typ != "ABS" and kg and pick_rpe(typ, name, reps, kg, decimal_dots(load), e1rm, lsrpe)[0] is None:
                 issues[RPE_UNKNOWN] += 1   # scoren hviler på UNKNOWN_RPE: logges, aldrig stille
@@ -257,7 +259,7 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
             for s in range(nsets):
                 sets.append(ParsedSet(date=date.date(), block=tab, row=ri, week=w+1, section=section, type=typ, name=name, set=s+1,
                                       reps=reps, logged_kg=logged if kg_ok and (logged or bw) else None, kg=kg, bodyweight=bw, rpe=rpe, score=round(score,1),
-                                      muscle_factor=exercise.muscle_factor, sides=exercise.sides, kg_factor=exercise.kg_factor,
+                                      muscle_factor=exercise.muscle_factor, sides=sides, kg_factor=kg_factor,
                                       prescribed=prescribed_text(load),
                                       sets_text=sets_text, reps_text=reps_text,
                                       e1rm=e1rm.get(typ), raw=raw, logged_rpe=lsrpe))
