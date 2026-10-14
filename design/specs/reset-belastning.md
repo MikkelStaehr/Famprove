@@ -1,5 +1,7 @@
 # Spec-lite – Visual reset: Belastning (`/load`) (2026-10-14)
 
+> **Superseded in part by `review-round.md` (2026-10-14):** the order (§2, §8: the week card comes after the tiles), the curve's line, today line and `I DAG` (§3), every readout at rest and the hover tooltip (§3–5), the grid's day labels and week numbers (§4), the week card's `I alt` and `—` rows (§6), acceptance 6, 7, 10, 11, and the dropped `72 / ~430`.
+
 Look and layout of `/load` in DESIGN.md Part B **Ember**, combining the user's mockup variants A, B and C (local, git-ignored; every value is restated here). **Behaviour, data and copy stay as `load.md`** (zone reading §8a, explainer §8b, prognose §9–10, week card §6, states §5) unless a section below replaces them. When this spec and the mockup disagree on look, the mockup wins; on numbers, CLAUDE.md wins (Python owns them, missing is never 0).
 
 ## 1. Question and primary action
@@ -13,6 +15,7 @@ Look and layout of `/load` in DESIGN.md Part B **Ember**, combining the user's m
 4. **Training-day grid card** (B) – §4.
 5. **TSS pr. dag card** (B) – §5.
 6. **Week list card** (A) – §6.
+(Superseded: the week card now comes third, after the tiles – `review-round.md` §1.)
 Above the fold at 390 × 844 (minus `--bottom-bar`): form card, tiles, and the curve card's header + plot top.
 
 ### 2a. Form card

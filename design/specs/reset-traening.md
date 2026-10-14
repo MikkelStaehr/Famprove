@@ -1,5 +1,7 @@
 # Træning (`/`) – visual reset (2026-10-14)
 
+> **Superseded in part by `review-round.md` (2026-10-14):** the order (§2: the compact `WeekCard` is the first card, then "I dag", then form), the Uge card (§2.6: replaced by `WeekCard` compact, TSS values, `–` for undated, no week notes), the exercise groups (§2.5: all collapsed by default, a collapsed row is name + dots + chevron), any "Intet forslag" text, the desktop right column (§4) and acceptance 1, 8 and 10.
+
 Supersedes the visual parts of `traening.md` and all of `instrument-traening.md`. Behaviour, copy, taps, set log, read-back and every state in `traening.md` stay as they are. Reference: `design/reference/Kurve.dc.html` (C, "I dag" card + 7-day box style), `Main.dc.html` (A, header + week list). Tokens, radii, fonts, icons and component names come from DESIGN.md. Where this spec and the mockup disagree, the mockup wins. Where the mockup and a guardrail disagree, the guardrail wins.
 
 ## 1. Question and primary action
