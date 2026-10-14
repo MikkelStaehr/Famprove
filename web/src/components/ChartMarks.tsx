@@ -31,18 +31,6 @@ export function TodayRule({ x, y0, y1 }: { readonly x: number; readonly y0: numb
   return <line x1={x} x2={x} y1={y0} y2={y1} stroke={m.color} strokeWidth={m.width} strokeDasharray={m.dash} />;
 }
 
-/** A pause seam edge: 1px dashed 3 3 muted, full height. */
-export function SeamRule({ x, y0, y1 }: { readonly x: number; readonly y0: number; readonly y1: number }) {
-  const m = MARKS.seam;
-  return <line x1={x} x2={x} y1={y0} y2={y1} stroke={m.color} strokeWidth={m.width} strokeDasharray={m.dash} />;
-}
-
-/** Styrke's phase change: 1px solid ink rule, full height. */
-export function PhaseRule({ x, y0, y1 }: { readonly x: number; readonly y0: number; readonly y1: number }) {
-  const m = MARKS.phaseRule;
-  return <line x1={x} x2={x} y1={y0} y2={y1} stroke={m.color} strokeWidth={m.width} />;
-}
-
 type BlockBracketProps = {
   /** Block start and end in px (ongoing: end = lastActual). */
   readonly x0: number;
@@ -140,14 +128,6 @@ export function hollowDotShape(r: number, stroke: string = "var(--text)", stroke
   return function HollowDotShape({ cx, cy }: PointShapeProps): ReactElement {
     if (cx === undefined || cy === undefined || !Number.isFinite(cx) || !Number.isFinite(cy)) return EMPTY;
     return <HollowDot cx={cx} cy={cy} r={r} stroke={stroke} strokeWidth={strokeWidth} />;
-  };
-}
-
-/** A filled dot for `<Scatter shape={dotShape(r, fill)}>` (EF rides, EF trend, logged e1RM). */
-export function dotShape(r: number, fill: string = "var(--text)") {
-  return function DotShape({ cx, cy }: PointShapeProps): ReactElement {
-    if (cx === undefined || cy === undefined || !Number.isFinite(cx) || !Number.isFinite(cy)) return EMPTY;
-    return <circle cx={cx} cy={cy} r={r} fill={fill} />;
   };
 }
 

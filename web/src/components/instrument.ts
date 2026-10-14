@@ -10,6 +10,3 @@ export const PRIMARY =
 /** A secondary action (Prøv igen, Gem igen): 1px --text-muted outline ([A5]), 44px, Inter 500 16px, radius 0. */
 export const SECONDARY =
   "inline-flex min-h-11 items-center justify-center border border-text-muted px-4 font-sans text-16 font-medium text-text";
-
-/** A section heading outside Card (Inter 400 text-20, sentence case). */
-export const SECTION_HEADING = "font-sans text-20 font-normal";
