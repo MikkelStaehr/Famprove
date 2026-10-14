@@ -92,3 +92,7 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | forecast-needle | Forecast form reaching −50 around 11 Nov: find the day, explain, fix the source value | M |
 | e1rm-one-rule | Analyse › Styrke e1RM uses the suggestions' rule (≤ 5 reps, RPE ≥ 7): one function, an agreement test | M |
 | styrke-today-tick | Analyse › Styrke chart: the lone today tick gets a date label or goes | S |
+| review-round | Review round after Ember: the user's 12 points, tech-lead coordinating | L |
+| review-belastning | Week card as card 2 with done / ~planned (weekly_plan view), one WeekCard on Belastning and Træning, curve through weekly anchors, no rest readouts or tooltips on /load, no today line on the curve, grid week numbers and seven day labels | L |
+| review-traening | Træning: no "intet forslag" (visible or spoken), every exercise collapsed to name + set dots | M |
+| review-faelles | Forecast-form guard tests, one isoWeek helper, TrendChart gone, one "opdateret" formatter | M |
