@@ -80,6 +80,9 @@ export type Reference = { readonly kg: number; readonly bodyweight: boolean };
 export type ExerciseView = {
   readonly key: string; // stable per sheet row, for the local "done" state
   readonly name: string;
+  /** The variant's display name (variants.md §1: the title, the exercise muted under it); null = none/ukendt. */
+  readonly variant: string | null;
+  readonly variantId: number | null; // strength_sets.variant_id; last week matches only the same id (null only null)
   readonly type: string;
   readonly setsText: string | null;
   readonly repsText: string | null;
@@ -201,13 +204,18 @@ function rowKey(s: { readonly block: string; readonly sheetRow: number }): strin
   return `${s.block}#${s.sheetRow}`;
 }
 
-/** Last week's logged kg per sheet row. Nothing logged (null) is no reference; on a bodyweight
+/** Last week's key: the sheet row and the variant (variants.md: null matches only null). */
+function refKey(s: { readonly block: string; readonly sheetRow: number; readonly variantId: number | null }): string {
+  return `${rowKey(s)}#${s.variantId ?? "ukendt"}`;
+}
+
+/** Last week's logged kg per sheet row and variant. Nothing logged (null) is no reference; on a bodyweight
  * exercise 0 is a real entry ("kropsvægt"), on a weighted one the parser already made it null. */
 function references(previous: readonly PrescribedSetRow[]): Map<string, Reference> {
   const refs = new Map<string, Reference>();
   for (const s of previous) {
-    if (s.loggedKg !== null && (s.loggedKg > 0 || s.bodyweight) && !refs.has(rowKey(s))) {
-      refs.set(rowKey(s), { kg: s.loggedKg, bodyweight: s.bodyweight });
+    if (s.loggedKg !== null && (s.loggedKg > 0 || s.bodyweight) && !refs.has(refKey(s))) {
+      refs.set(refKey(s), { kg: s.loggedKg, bodyweight: s.bodyweight });
     }
   }
   return refs;
@@ -235,13 +243,15 @@ function exercisesOf(
       rows.set(key, {
         key,
         name: s.name,
+        variant: s.variant,
+        variantId: s.variantId,
         type: s.type,
         setsText: s.setsText,
         repsText: s.repsText,
         prescribed: s.prescribed,
         bodyweight: s.bodyweight,
         kg: s.loggedKg,
-        reference: refs.get(key) ?? null,
+        reference: refs.get(refKey(s)) ?? null,
         row: s.sheetRow,
         suggestedKg: suggestion?.suggestedKg ?? null,
         suggestionBasis: suggestion?.basis ?? null,
@@ -448,6 +458,24 @@ export function adjustmentLine(e: AdjustmentFields): { readonly signed: string; 
   return e.suggestionCapped ? { signed: "", rest: `${CAPPED_WORD} i forhold til sidste uge` } : null;
 }
 
+/** variants.md §2–§3: a named variant with nothing from last week (Python's basis new_variant). */
+export const NEW_VARIANT_TEXT = "Ny variant – intet fra sidste uge";
+
+/** The row has a variant and no last week (week 1 keeps its own text, which wins). */
+export function isNewVariant(e: Pick<ExerciseView, "variant" | "reference">, week: number): boolean {
+  return week >= 2 && e.variant !== null && e.reference === null;
+}
+
+/** The title (variants.md §1): the variant's display name, else the exercise name, trimmed. */
+export function titleName(e: Pick<ExerciseView, "name" | "variant">): string {
+  return e.variant ?? e.name.trim();
+}
+
+/** The spoken name: "DB Preacher Curl, Bicep of choice"; without a variant the exercise alone. */
+export function spokenName(e: Pick<ExerciseView, "name" | "variant">): string {
+  return e.variant === null ? e.name.trim() : `${e.variant}, ${e.name.trim()}`;
+}
+
 /** Last week's logged load: undefined in week 1 (no item), null when nothing was logged. */
 export function lastWeekText(e: Pick<ExerciseView, "reference">, week: number): string | null | undefined {
   if (week < 2) return undefined;
@@ -588,12 +616,13 @@ export function spokenSetLine(e: ExerciseView, week: number, line: SetLineView):
   const spokenReps = reps === null ? null : spokenRange(reps);
   const load = e.prescribed === null ? null : spokenRange(e.prescribed);
   const what = spokenReps !== null && load !== null ? `${spokenReps} ved ${load}` : (spokenReps ?? load);
-  const parts = [e.name.trim(), `sæt ${line.n} af ${line.of}`];
+  const parts = [spokenName(e), `sæt ${line.n} af ${line.of}`];
   if (what !== null) parts.push(what);
   const suggestion = suggestionView(e);
   if (suggestion.kg !== null) parts.push(`forslag ${suggestion.kg}${spokenAdjustment(e)}`); // none: nothing said (§8)
   const lastWeek = lastWeekText(e, week);
-  if (lastWeek === null) parts.push("intet logget sidste uge");
+  if (isNewVariant(e, week)) parts.push("ny variant, intet fra sidste uge");
+  else if (lastWeek === null) parts.push("intet logget sidste uge");
   else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);
   if (line.state === "done") parts.push(line.endedAt !== null ? `udført ${formatClock(line.endedAt)}` : "udført");
   else if (line.state === "skipped") parts.push("sprunget over");
@@ -700,6 +729,7 @@ export type SetDot = { readonly key: string; readonly state: SetState; readonly 
 export type ExerciseRunView = {
   readonly key: string; // the run's first row key
   readonly name: string;
+  readonly variant: string | null; // the run's head row's variant (rows of a run follow their head)
   readonly groups: readonly SetGroupView[]; // its sheet rows, sheet order
   readonly prescription: string; // the rows' compact prescriptions joined " · " ("" when none)
   /** The row whose suggestion and last week the head shows: the NÆSTE row, else the first open one, else the first. */
@@ -726,6 +756,7 @@ export function exerciseRuns(groups: readonly SetGroupView[]): readonly Exercise
     return {
       key: run[0].exercise.key,
       name: run[0].exercise.name.trim(),
+      variant: run[0].exercise.variant,
       groups: run,
       prescription: run
         .map((g) => compactPrescription(g.exercise))

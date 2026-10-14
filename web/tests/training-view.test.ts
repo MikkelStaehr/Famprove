@@ -38,6 +38,8 @@ function set(overrides: Partial<PrescribedSetRow>): PrescribedSetRow {
     loggedKg: null, // missing kg is null (never 0) since the no-silent-defaults change
     bodyweight: false,
     notes: null,
+    variantId: null,
+    variant: null,
     ...overrides,
   };
 }
@@ -321,6 +323,8 @@ test("parsers for the Træning rows", () => {
     logged_kg: 0,
     bodyweight: false,
     notes: "Pause 2 sek. i bunden",
+    variant_id: null,
+    exercise_variants: null,
   });
   assert.deepEqual([row.weekStart, row.session, row.repsText, row.notes], ["2026-09-28", 1, "8 - 12", "Pause 2 sek. i bunden"]);
 

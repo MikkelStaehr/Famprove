@@ -980,6 +980,10 @@ export type PrescribedSetRow = {
   readonly loggedKg: number | null; // null: not entered/unreadable; 0 is real only if bodyweight (bodyweight only)
   readonly bodyweight: boolean;
   readonly notes: string | null; // the coach's NOTES cell as written; null = blank
+  /** strength_sets.variant_id: the sheet's "V:" variant in force; null = ukendt (matches only null). */
+  readonly variantId: number | null;
+  /** exercise_variants.display_name as shown; null without a variant or when it equals the exercise name. */
+  readonly variant: string | null;
 };
 
 /** public.app_notices: one current notice per kind (e.g. ftp_mismatch), written by Python. */
@@ -1001,8 +1005,9 @@ export function parseAppNoticeRow(raw: unknown): AppNoticeRow {
 }
 
 /** Why a planned set has (or has no) suggested kg (python domain/planned_sets.py). */
-export type SuggestionBasis = "rpe_e1rm" | "not_rpe" | "no_e1rm" | "no_lift" | "progression";
-const SUGGESTION_BASES: readonly SuggestionBasis[] = ["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift", "progression"];
+/** new_variant: a named variant with nothing logged last week (no suggestion, no last week). */
+export type SuggestionBasis = "rpe_e1rm" | "not_rpe" | "no_e1rm" | "no_lift" | "progression" | "new_variant";
+const SUGGESTION_BASES: readonly SuggestionBasis[] = ["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift", "progression", "new_variant"];
 
 /** One step of a main lift's warm-up ramp (planned_sets.ramp): pct of the first working set's kg. */
 export type RampStep = { readonly pct: number; readonly reps: number; readonly kg: number };
@@ -1154,7 +1159,7 @@ export function parseSetLogRow(raw: unknown): SetLogRow {
 export const PRESCRIBED_SETS_SELECT = {
   table: "strength_sets",
   columns:
-    "week_start,session,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight,notes",
+    "week_start,session,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight,notes,variant_id,exercise_variants(display_name)",
   order: "week_start,session,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
 } as const;
 
@@ -1175,7 +1180,27 @@ export function parsePrescribedSetRow(raw: unknown): PrescribedSetRow {
     loggedKg: f.numberOrNull("logged_kg"),
     bodyweight: f.boolean("bodyweight"),
     notes: f.stringOrNull("notes"),
+    ...variantOf(f, PRESCRIBED_SETS_SELECT.table, f.string("name")),
   };
+}
+
+/**
+ * variant_id + the embedded exercise_variants(display_name) (PostgREST: an object, or null without
+ * a variant). Both or neither. The display name is shown verbatim; one equal to the exercise name
+ * (trimmed, case-insensitive) is no variant for the screens (variants.md). The web never resolves
+ * aliases or normalises names: Python does.
+ */
+function variantOf(f: Fields, table: string, exerciseName: string): { variantId: number | null; variant: string | null } {
+  const variantId = f.numberOrNull("variant_id");
+  const embedded = f.unknown("exercise_variants");
+  if (variantId === null) {
+    if (embedded !== null) throw new RowError(`${table}.exercise_variants: expected null without a variant_id`);
+    return { variantId: null, variant: null };
+  }
+  const display = new Fields(`${table}.exercise_variants`, embedded).string("display_name").trim();
+  if (display === "") throw new RowError(`${table}.exercise_variants.display_name: expected a name`);
+  const same = display.toLocaleLowerCase("da-DK") === exerciseName.trim().toLocaleLowerCase("da-DK");
+  return { variantId, variant: same ? null : display };
 }
 
 /** A planned-ride step with Python's watt targets (null watts when no FTP). */
@@ -1261,14 +1286,16 @@ export function parsePlannedTargetRow(raw: unknown): PlannedTargetRow {
 export type ExerciseFeelRow = {
   readonly exerciseId: number;
   readonly name: string; // public.exercises.name, embedded
+  readonly variantId: number | null; // null = ukendt: its own line
+  readonly variant: string | null; // exercise_variants.display_name; null as on Træning (variantOf)
   readonly ratedN: number;
   readonly verdictText: string;
 };
 
 export const EXERCISE_FEEL_SELECT = {
   table: "exercise_feel",
-  columns: "exercise_id,rated_n,verdict_text,exercises(name)",
-  order: "exercise_id",
+  columns: "exercise_id,variant_id,rated_n,verdict_text,exercises(name),exercise_variants(display_name)",
+  order: "exercise_id,variant_id", // unique (nulls not distinct)
 } as const;
 
 export function parseExerciseFeelRow(raw: unknown): ExerciseFeelRow {
@@ -1278,7 +1305,8 @@ export function parseExerciseFeelRow(raw: unknown): ExerciseFeelRow {
   if (ratedN < 4) throw new RowError("exercise_feel.rated_n: expected at least 4");
   const verdictText = f.string("verdict_text");
   if (verdictText.trim() === "") throw new RowError("exercise_feel.verdict_text: expected a sentence");
-  return { exerciseId: f.number("exercise_id"), name: embedded.string("name"), ratedN, verdictText };
+  const name = embedded.string("name");
+  return { exerciseId: f.number("exercise_id"), name, ...variantOf(f, EXERCISE_FEEL_SELECT.table, name), ratedN, verdictText };
 }
 
 /** public.exercises.category (schema check constraint; not null). */

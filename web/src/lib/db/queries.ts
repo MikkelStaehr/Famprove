@@ -17,6 +17,7 @@ import {
   isPauseFixture,
   midsessionLog,
   midsessionPlanned,
+  midsessionVariants,
   pauseFixture,
   staleComputedAt,
 } from "./dev-fixture.ts";
@@ -360,7 +361,12 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
   };
   // Dev fixtures (never in production, never written): illustrative logs, ramps, notes.
   if (fixture === "midsession") {
-    return { ...base, ...midsessionPlanned(sets, plannedSets), setLog: midsessionLog(sets, today, new Date()) };
+    const m = midsessionPlanned(sets, plannedSets);
+    return {
+      ...base,
+      ...midsessionVariants(m.sets, base.previousWeek, m.plannedSets),
+      setLog: midsessionLog(sets, today, new Date()),
+    };
   }
   if (isPauseFixture(fixture)) return { ...base, ...pauseFixture(fixture, sets, plannedSets, today, new Date()) };
   return base;

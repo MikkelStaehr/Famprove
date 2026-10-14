@@ -276,7 +276,10 @@ async function FeelCard() {
       <ul className="flex flex-col">
         {items.map((r) => (
           <li key={r.id} className="flex max-w-[60ch] flex-col gap-0.5 border-t border-border py-3 first:border-t-0 first:pt-0">
-            <span className="font-sans text-15 font-medium text-text">{r.name}</span>
+            <span className="font-sans text-15 font-medium text-text">
+              {r.name}
+              {r.variant !== null && <span className="font-normal"> · {r.variant}</span>}
+            </span>
             <span className="font-sans text-15 text-text">{r.verdict}</span>
             <span className="font-sans text-13 text-text-muted">{r.basis}</span>
           </li>

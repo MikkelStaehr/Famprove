@@ -10,11 +10,13 @@ const rows: unknown[] = JSON.parse(readFileSync(new URL("./fixtures/exercise_fee
 test("contract: every exercise_feel row Python writes parses; the sentence passes through verbatim", () => {
   const parsed = rows.map(parseExerciseFeelRow);
   assert.deepEqual(
-    parsed.map((r) => [r.name, r.ratedN]),
-    [["Bænk", 4], ["Low incline DB press", 4], ["Lat pulldowns", 4]],
+    parsed.map((r) => [r.name, r.variant, r.ratedN]),
+    [["Bænk", null, 4], ["Low incline DB press", null, 4], ["Lat pulldowns", null, 4], ["Bicep of choice", "DB Preacher Curl", 4]],
   );
   assert.equal(parsed[0]?.verdictText, (rows[0] as { verdict_text: string }).verdict_text);
-  assert.ok(parsed.every((r) => !/Benjamin/.test(r.verdictText)), "no coach name in a public repo");
+  // No coach name in a public repo: the sentences say "trænerens RPE", never "<Name>s RPE".
+  assert.ok(parsed.every((r) => !/\b[A-ZÆØÅ][a-zæøå]+s RPE\b/.test(r.verdictText)), "no '<Name>s RPE' in a sentence");
+  assert.ok(parsed.some((r) => /trænerens RPE/.test(r.verdictText)));
 });
 
 test("exercise_feel: fewer than 4 rated sets or an empty sentence is refused", () => {

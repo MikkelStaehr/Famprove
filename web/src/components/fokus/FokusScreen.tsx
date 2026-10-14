@@ -9,7 +9,8 @@ import {
   begunText,
   BEGIN_UNDONE_HREF,
   begunWarmup,
-  exerciseName,
+  displayName,
+  exerciseUnder,
   FINISHED_SENTENCE,
   finishCard,
   type FokusExercise,
@@ -33,7 +34,7 @@ import {
   isMainLift,
   rampState,
 } from "@/lib/fokus-view";
-import { adjustmentLine } from "@/lib/training-view";
+import { adjustmentLine, spokenName } from "@/lib/training-view";
 import { type DotRow as DotRowMarks, dotRow, type Signature, signature } from "@/lib/fokus-marks";
 import {
   applyTap,
@@ -179,7 +180,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       undone === null
         ? ""
         : isWarmup(latest.ref)
-          ? `Fortrudt: ${exerciseName(undone.exercise)}, opvarmning er i gang igen.`
+          ? `Fortrudt: ${spokenName(undone.exercise)}, opvarmning er i gang igen.`
           : undoSentence(undone),
     );
   };
@@ -266,6 +267,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           since={view.since}
           done={at(view.done)}
           next={at(view.next)}
+          week={session.week}
           logged={log.get(setKey(view.done))}
           primary={primary}
           onNext={onNext}
@@ -280,6 +282,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           mainLifts={mainLifts}
           warmup={view.warmup}
           setOne={at(setOneOf(view.warmup))}
+          week={session.week}
           feel={view.feel === null ? null : at(view.feel)}
           logged={view.feel === null ? undefined : log.get(setKey(view.feel))}
           primary={primary}
@@ -328,19 +331,22 @@ function SetView({
 }) {
   if (current === null) return null; // the order and the rows come from the same sets: not reached
   const e = current.exercise;
-  const kg = kgBlock(e);
+  const kg = kgBlock(e, week);
   const adjustment = adjustmentLine(e);
   const note = e.notes === null ? "" : e.notes.trim();
   const lastWeek = lastWeekLine(e, week);
   const cell = prescribedCell(e.prescribed);
+  const under = exerciseUnder(e);
   return (
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       <section aria-labelledby="fokus-set" className="mt-4 flex flex-1 flex-col">
         {/* reset-fokus.md §3: the figure block in a hero Card (26, padding 20); its old margins are the card's. */}
         <div className="mb-10 flex flex-col rounded-hero border border-border bg-card p-5">
-        <h2 id="fokus-set" className="font-sans text-32 font-semibold [overflow-wrap:anywhere]">
-          {exerciseName(e)}
+        <h2 id="fokus-set" className="font-sans text-32 font-semibold [overflow-wrap:anywhere] text-balance">
+          {displayName(e)}
         </h2>
+        {/* variants.md §3: the sheet's exercise muted under the variant (4px, same block). */}
+        {under !== null && <p className="mt-1 font-sans text-16 text-balance text-text-muted">{under}</p>}
         <p className={`${CAPTION} mt-3`}>{setTitle(current)}</p>
 
         {/* One value row; below 21rem the kg column takes its own line (200 % text). */}
@@ -361,7 +367,11 @@ function SetView({
                 </span>
               </p>
             )}
-            {kg !== null && (
+            {kg?.kind === "new_variant" && (
+              // variants.md §3: no FORSLAG and no figure, one muted line where the kg block was.
+              <p className="col-span-full self-end text-16 text-text-muted">{kg.text}</p>
+            )}
+            {kg !== null && kg.kind !== "new_variant" && (
               <p
                 className={`flex flex-col [overflow-wrap:anywhere] ${
                   hasWords(kg.figure) ? "col-span-full @min-[21rem]:col-span-full" : "col-span-2 @min-[21rem]:col-span-1"
@@ -445,6 +455,7 @@ function PauseView({
   since,
   done,
   next,
+  week,
   logged,
   primary,
   onNext,
@@ -454,6 +465,7 @@ function PauseView({
   readonly since: string;
   readonly done: SetInContext | null;
   readonly next: SetInContext | null;
+  readonly week: number;
   readonly logged: LoggedSet | undefined;
   readonly primary: PrimaryRef;
   readonly onNext: (since: string, next: SetInContext | null) => void;
@@ -464,7 +476,7 @@ function PauseView({
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       {done !== null && <FeelBlock set={done} logged={logged} named={false} onTap={onTap} />}
       {done !== null && <PauseCard since={since} exercise={done.exercise} onAnnounce={onAnnounce} />}
-      {next !== null && <NextSetCard next={next} inWarmup={false} afterTimer />}
+      {next !== null && <NextSetCard next={next} week={week} inWarmup={false} afterTimer />}
       <PrimaryButton primary={primary} onClick={() => onNext(since, next)}>
         Til næste sæt
       </PrimaryButton>
@@ -478,6 +490,7 @@ function WarmupView({
   mainLifts,
   warmup,
   setOne,
+  week,
   feel,
   logged,
   primary,
@@ -488,6 +501,7 @@ function WarmupView({
   readonly mainLifts: readonly string[] | null;
   readonly warmup: SetRef;
   readonly setOne: SetInContext | null;
+  readonly week: number;
   readonly feel: SetInContext | null;
   readonly logged: LoggedSet | undefined;
   readonly primary: PrimaryRef;
@@ -502,7 +516,7 @@ function WarmupView({
       <div className={feel !== null ? "mt-10" : "mt-4"}>
         <WarmupCard since={since} exercise={setOne.exercise} mainLift={mainLift} />
       </div>
-      <NextSetCard next={setOne} inWarmup afterTimer={rampState(setOne.exercise, mainLift) === "hidden"} />
+      <NextSetCard next={setOne} week={week} inWarmup afterTimer={rampState(setOne.exercise, mainLift) === "hidden"} />
       <PrimaryButton primary={primary} onClick={() => onWarmupEnd(warmup)}>
         Til sæt 1
       </PrimaryButton>

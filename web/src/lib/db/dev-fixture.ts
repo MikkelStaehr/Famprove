@@ -325,9 +325,44 @@ export function midsessionPlanned(
 /** DEV_FIXTURE=feel: two exercise_feel rows in Python's sentence form (not real verdicts). */
 export const ILLUSTRATIVE_FEEL: readonly ExerciseFeelRow[] = [
   // Python's own sentences (domain/set_feedback.exercise_feel; tests/fixtures/exercise_feel.json).
-  { exerciseId: -2, name: "Low incline DB press", ratedN: 6, verdictText: "Du melder oftest som foreskrevet." },
-  { exerciseId: -1, name: "Squat", ratedN: 12, verdictText: "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE." },
+  { exerciseId: -2, name: "Low incline DB press", variantId: null, variant: null, ratedN: 6, verdictText: "Du melder oftest som foreskrevet." },
+  { exerciseId: -1, name: "Squat", variantId: null, variant: null, ratedN: 12, verdictText: "Du melder oftest lettere end foreskrevet – forslaget ligger 5 kg over trænerens RPE." },
+  // A named variant (variants.md §4): "Bicep of choice · DB Preacher Curl".
+  { exerciseId: -3, name: "Bicep of choice", variantId: -1, variant: "DB Preacher Curl", ratedN: 4, verdictText: "Du melder oftest lettere end foreskrevet." },
 ];
+
+/**
+ * DEV_FIXTURE=midsession's variants (variants.md §5): the rows of MIDSESSION_VARIANTS' exercises,
+ * this week's and last week's, get that variant; the one marked `fresh` has nothing from last week
+ * (basis new_variant: its planned rows lose their suggestion, last week's rows keep no variant, so
+ * no last week matches). Illustrative only; Python owns the real variants.
+ */
+export const MIDSESSION_VARIANTS: readonly { readonly exercise: string; readonly variantId: number; readonly variant: string; readonly fresh: boolean }[] = [
+  { exercise: "tricep of choice", variantId: -1, variant: "Single arm cable triceps pushdown", fresh: false },
+  { exercise: "bicep of choice", variantId: -2, variant: "DB Preacher Curl", fresh: true },
+];
+
+export function midsessionVariants(
+  sets: readonly PrescribedSetRow[],
+  previousWeek: readonly PrescribedSetRow[],
+  planned: readonly PlannedSetRow[],
+): { sets: PrescribedSetRow[]; previousWeek: PrescribedSetRow[]; plannedSets: PlannedSetRow[] } {
+  const of = (s: PrescribedSetRow) => MIDSESSION_VARIANTS.find((v) => v.exercise === s.name.trim().toLowerCase());
+  const named = (s: PrescribedSetRow): PrescribedSetRow => {
+    const v = of(s);
+    return v === undefined ? s : { ...s, variantId: v.variantId, variant: v.variant };
+  };
+  const fresh = new Set(sets.filter((s) => of(s)?.fresh === true).map((s) => `${s.block}#${s.sheetRow}#${s.week}`));
+  return {
+    sets: sets.map(named),
+    previousWeek: previousWeek.map((s) => (of(s)?.fresh === true ? s : named(s))),
+    plannedSets: planned.map((p) =>
+      fresh.has(`${p.block}#${p.sheetRow}#${p.week}`)
+        ? { ...p, suggestedKg: null, basis: "new_variant", uncappedKg: null, adjustmentKg: null, adjustmentReason: null }
+        : p,
+    ),
+  };
+}
 
 /** DEV_FIXTURE=midsession: sets done per session before the skipped one. */
 export const MIDSESSION_DONE = 3;

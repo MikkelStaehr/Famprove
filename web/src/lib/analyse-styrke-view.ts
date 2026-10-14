@@ -603,13 +603,40 @@ const FEEL_FIRST = ["squat", "bench", "bench press", "bænkpres", "deadlift", "d
  * An empty list means no card.
  */
 export function feelRows(
-  rows: readonly { readonly exerciseId: number; readonly name: string; readonly ratedN: number; readonly verdictText: string }[],
-): { readonly id: number; readonly name: string; readonly verdict: string; readonly basis: string }[] {
+  rows: readonly {
+    readonly exerciseId: number;
+    readonly name: string;
+    readonly variantId: number | null;
+    readonly variant: string | null;
+    readonly ratedN: number;
+    readonly verdictText: string;
+  }[],
+): {
+  readonly id: string;
+  readonly name: string;
+  /** variants.md §4: shown after the name as " · <variant>" (400); null = the exercise alone. */
+  readonly variant: string | null;
+  readonly verdict: string;
+  readonly basis: string;
+}[] {
   const rank = (name: string) => {
     const i = FEEL_FIRST.indexOf(name.trim().toLowerCase());
     return i === -1 ? FEEL_FIRST.length : i;
   };
   return rows
-    .toSorted((a, b) => rank(a.name) - rank(b.name) || a.name.trim().localeCompare(b.name.trim(), "da-DK"))
-    .map((r) => ({ id: r.exerciseId, name: r.name.trim(), verdict: r.verdictText, basis: `Ud fra ${r.ratedN} vurderede sæt` }));
+    .toSorted(
+      (a, b) =>
+        rank(a.name) - rank(b.name) ||
+        a.name.trim().localeCompare(b.name.trim(), "da-DK") ||
+        // The exercise alone (ukendt) first, then its variants alphabetically.
+        (a.variant === null ? -1 : 0) - (b.variant === null ? -1 : 0) ||
+        (a.variant ?? "").localeCompare(b.variant ?? "", "da-DK"),
+    )
+    .map((r) => ({
+      id: `${r.exerciseId}#${r.variantId ?? "ukendt"}`,
+      name: r.name.trim(),
+      variant: r.variant,
+      verdict: r.verdictText,
+      basis: `Ud fra ${r.ratedN} vurderede sæt`,
+    }));
 }

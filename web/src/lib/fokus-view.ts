@@ -22,15 +22,20 @@ import {
 import {
   CAPPED_WORD,
   type ExerciseView,
+  isNewVariant,
+  NEW_VARIANT_TEXT,
   type Reference,
   runPositions,
   spokenAdjustment,
+  spokenName,
+  titleName,
 } from "./training-view.ts";
 
 /** What Fokus needs of one sheet row (a subset of ExerciseView, so fixtures stay small). */
 export type FokusExercise = Pick<
   ExerciseView,
   | "name"
+  | "variant"
   | "repsText"
   | "prescribed"
   | "bodyweight"
@@ -109,6 +114,16 @@ export function exerciseName(e: FokusExercise): string {
   return e.name.trim();
 }
 
+/** The title (variants.md §1): the variant's display name, else the exercise name. */
+export function displayName(e: FokusExercise): string {
+  return titleName(e);
+}
+
+/** The muted line under the title: the exercise name when a variant is the title, else null. */
+export function exerciseUnder(e: FokusExercise): string | null {
+  return e.variant === null ? null : exerciseName(e);
+}
+
 /**
  * The word after the reps cell: "rep" after "1", "reps" after any other count, nothing after a
  * cell without a digit ("AMRAP" stays as written, never "AMRAP reps").
@@ -131,6 +146,7 @@ export function referenceText(reference: Reference): string {
  * Neither: null, and the block is not shown (review round §8: no suggestion shows nothing).
  */
 export type KgBlock =
+  | { readonly kind: "new_variant"; readonly text: typeof NEW_VARIANT_TEXT }
   | {
       readonly kind: "suggestion";
       readonly label: "Forslag";
@@ -145,7 +161,8 @@ export type KgBlock =
       readonly unit: "kg" | null;
     };
 
-export function kgBlock(e: FokusExercise): KgBlock | null {
+export function kgBlock(e: FokusExercise, week: number): KgBlock | null {
+  if (isNewVariant(e, week)) return { kind: "new_variant", text: NEW_VARIANT_TEXT }; // variants.md §3: in place of the kg block
   if (e.suggestedKg !== null) {
     return { kind: "suggestion", label: "Forslag", figure: formatKg(e.suggestedKg), unit: "kg", capped: e.suggestionCapped };
   }
@@ -207,7 +224,7 @@ export function skippedText(p: Progress): string | null {
 export function lastTapText(exercises: readonly FokusExercise[], tap: LastTap): string | null {
   const s = setInContext(exercises, tap.ref);
   if (s === null) return null;
-  const name = exerciseName(s.exercise);
+  const name = spokenName(s.exercise);
   if (isWarmup(tap.ref)) return `${name}, opvarmning færdig kl. ${clockTime(tap.at)}`;
   return tap.kind === "done"
     ? `${name}, sæt ${s.number} udført kl. ${clockTime(tap.at)}`
@@ -233,10 +250,22 @@ function suggestionWords(e: FokusExercise): string | null {
  */
 export type NextKg = { readonly source: "forslag" | "sidste uge"; readonly text: string };
 
+/**
+ * `exercise`: the muted line under the title when a variant is the title (variants.md §3; null
+ * otherwise and in a warm-up, whose heading names it); `newVariant`: the Sidste uge line's
+ * "Ny variant – intet fra sidste uge" (null otherwise).
+ */
 export function nextSetSummary(
   s: SetInContext,
-  inWarmup = false,
-): { readonly title: string; readonly line: string; readonly kg: NextKg | null } {
+  inWarmup: boolean,
+  week: number,
+): {
+  readonly title: string;
+  readonly exercise: string | null;
+  readonly line: string;
+  readonly kg: NextKg | null;
+  readonly newVariant: typeof NEW_VARIANT_TEXT | null;
+} {
   const e = s.exercise;
   const parts: string[] = [];
   if (e.repsText !== null) {
@@ -251,8 +280,14 @@ export function nextSetSummary(
       : e.reference !== null
         ? { source: "sidste uge", text: referenceText(e.reference).replace(/ kg$/, "\u00a0kg") }
         : null;
-  const title = inWarmup ? `Sæt ${s.number} af ${s.count}` : `${exerciseName(e)} · sæt ${s.number} af ${s.count}`;
-  return { title, line: parts.join(" · "), kg };
+  const title = inWarmup ? `Sæt ${s.number} af ${s.count}` : `${displayName(e)} · sæt ${s.number} af ${s.count}`;
+  return {
+    title,
+    exercise: inWarmup ? null : exerciseUnder(e),
+    line: parts.join(" · "),
+    kg,
+    newVariant: kg === null && isNewVariant(e, week) ? NEW_VARIANT_TEXT : null,
+  };
 }
 
 /**
@@ -269,8 +304,9 @@ export function setSentence(s: SetInContext, week: number): string {
   if (what !== null) parts.push(what);
   const suggestion = suggestionWords(e);
   if (suggestion !== null) parts.push(suggestion);
-  if (week > 1) parts.push(e.reference === null ? "intet logget sidste uge" : `sidste uge ${referenceText(e.reference)}`);
-  return `${exerciseName(e)}, ${setTitle(s).toLowerCase()}: ${parts.join(", ")}.`;
+  if (isNewVariant(e, week)) parts.push("ny variant, intet fra sidste uge");
+  else if (week > 1) parts.push(e.reference === null ? "intet logget sidste uge" : `sidste uge ${referenceText(e.reference)}`);
+  return `${spokenName(e)}, ${setTitle(s).toLowerCase()}: ${parts.join(", ")}.`;
 }
 
 function spokenReps(repsText: string): string {
@@ -281,7 +317,7 @@ function spokenReps(repsText: string): string {
 
 /** "Squat, sæt 1 udført. Pause." */
 export function doneSentence(s: SetInContext): string {
-  return `${exerciseName(s.exercise)}, sæt ${s.number} udført. Pause.`;
+  return `${spokenName(s.exercise)}, sæt ${s.number} udført. Pause.`;
 }
 
 /** "Sæt 2 sprunget over." */
@@ -291,7 +327,7 @@ export function skipSentence(s: SetInContext): string {
 
 /** "Fortrudt: Squat, sæt 1 er åben igen." */
 export function undoSentence(s: SetInContext): string {
-  return `Fortrudt: ${exerciseName(s.exercise)}, sæt ${s.number} er åben igen.`;
+  return `Fortrudt: ${spokenName(s.exercise)}, sæt ${s.number} er åben igen.`;
 }
 
 export const FINISHED_SENTENCE = "Sessionen er klaret.";
@@ -359,9 +395,9 @@ export function setOneOf(warmup: SetRef): SetRef {
   return { row: warmup.row, set: 1 };
 }
 
-/** "Opvarmning · Squat". */
+/** "Opvarmning · Squat"; with a variant "Opvarmning · DB Preacher Curl" (the exercise muted under it). */
 export function warmupTitle(e: FokusExercise): string {
-  return `Opvarmning · ${exerciseName(e)}`;
+  return `Opvarmning · ${displayName(e)}`;
 }
 
 /**
@@ -485,19 +521,19 @@ export function pauseSentence(s: SetInContext): string {
     e.restMinS !== null && e.restMaxS !== null
       ? `Pause, anbefalet ${restMinutes(e.restMinS).replace("½", ",5")} til ${restMinutes(e.restMaxS).replace("½", ",5")} minutter.`
       : "Pause.";
-  return `${exerciseName(e)}, sæt ${s.number} udført. ${rest} ${feelQuestion(s, false)}`;
+  return `${spokenName(e)}, sæt ${s.number} udført. ${rest} ${feelQuestion(s, false)}`;
 }
 
 /** "Squat, sæt 4 udført. Opvarmning, Bænkpres: 5 reps 57,5 kg, 3 reps 85 kg, 2 reps 115 kg." */
 export function warmupSentence(done: SetInContext | null, next: FokusExercise): string {
   const ramp = spokenRamp(next);
-  const head = done === null ? "" : `${exerciseName(done.exercise)}, sæt ${done.number} udført. `;
-  return `${head}Opvarmning, ${exerciseName(next)}${ramp === null ? "." : `: ${ramp}.`}`;
+  const head = done === null ? "" : `${spokenName(done.exercise)}, sæt ${done.number} udført. `;
+  return `${head}Opvarmning, ${spokenName(next)}${ramp === null ? "." : `: ${ramp}.`}`;
 }
 
 /** "Hvordan var sæt 2?" / "Hvordan var sæt 4 i Squat?" (when the card below names another exercise). */
 export function feelQuestion(s: SetInContext, named: boolean): string {
-  return named ? `Hvordan var sæt ${s.number} i ${exerciseName(s.exercise)}?` : `Hvordan var sæt ${s.number}?`;
+  return named ? `Hvordan var sæt ${s.number} i ${displayName(s.exercise)}?` : `Hvordan var sæt ${s.number}?`;
 }
 
 export const FEEL_OPTIONS: readonly { readonly value: -1 | 0 | 1; readonly label: string }[] = [

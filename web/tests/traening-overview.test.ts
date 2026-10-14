@@ -22,6 +22,8 @@ function row(row: number, overrides: Partial<ExerciseView> = {}, sets = 2): Exer
   return {
     key: `B#${row}`,
     name: "Squat",
+    variant: null,
+    variantId: null,
     type: "SQUAT",
     setsText: String(sets),
     repsText: "5",

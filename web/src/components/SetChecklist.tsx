@@ -8,7 +8,9 @@ import {
   compactPrescription,
   type ExerciseRunView,
   exerciseRuns,
+  isNewVariant,
   lastWeekText,
+  NEW_VARIANT_TEXT,
   runCountText,
   type SetDot,
   type SetGroupView,
@@ -96,6 +98,7 @@ function ExerciseRun({
   const suggestion = suggestionView(e);
   const brackets = adjustmentBrackets(e, "long");
   const lastWeek = lastWeekText(e, week);
+  const newVariant = isNewVariant(e, week);
   const muted = run.closed ? "text-text-muted" : "text-text";
   const multi = run.groups.length > 1;
   return (
@@ -106,13 +109,31 @@ function ExerciseRun({
         aria-expanded={expanded}
         aria-controls={regionId}
         onClick={onToggle}
-        className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className={`flex min-h-11 w-full cursor-pointer justify-between gap-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+          run.variant === null ? "items-center" : "items-start"
+        }`}
       >
-        <span className={`min-w-0 font-sans text-16 font-medium break-words ${muted}`}>
-          {run.name}
-          <span className="sr-only">, {runCountText(run)}</span>
-        </span>
-        <span aria-hidden="true" className="flex shrink-0 items-center gap-2.5">
+        {run.variant === null ? (
+          <span className={`min-w-0 font-sans text-16 font-medium break-words ${muted}`}>
+            {run.name}
+            <span className="sr-only">, {runCountText(run)}</span>
+          </span>
+        ) : (
+          // variants.md §1–§2: the variant as the title, the sheet's exercise muted under it (4px).
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="sr-only">
+              {run.variant}, {run.name}, {runCountText(run)}
+            </span>
+            <span aria-hidden="true" className={`font-sans text-16 font-medium break-words text-balance ${muted}`}>
+              {run.variant}
+            </span>
+            <span aria-hidden="true" className="font-sans text-13 break-words text-balance text-text-muted">
+              {run.name}
+            </span>
+          </span>
+        )}
+        {/* With a variant the dots and chevron centre on the title's first line (text-16 at line-height 1.35). */}
+        <span aria-hidden="true" className={`flex shrink-0 items-center gap-2.5${run.variant === null ? "" : " h-[1.35rem]"}`}>
           <SetDots dots={run.dots} />
           <Icon
             name="chevron-down"
@@ -129,9 +150,9 @@ function ExerciseRun({
             <KeepRanges text={run.prescription} />
           </p>
         )}
-        {(suggestion.kg !== null || lastWeek !== undefined) && (
+        {((suggestion.kg !== null && !newVariant) || lastWeek !== undefined) && (
           <div aria-hidden="true" className={`flex min-w-0 flex-wrap gap-x-6 gap-y-1 pb-3 ${run.closed ? "text-text-muted" : ""}`}>
-            {suggestion.kg !== null && (
+            {suggestion.kg !== null && !newVariant && (
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
                 <span className="font-mono text-16 tabular-nums">
@@ -141,7 +162,12 @@ function ExerciseRun({
               </span>
             )}
             {lastWeek !== undefined &&
-              (lastWeek === null ? (
+              (newVariant ? (
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
+                  <span className="text-14 text-text-muted">{NEW_VARIANT_TEXT}</span>
+                </span>
+              ) : lastWeek === null ? (
                 <span className="min-w-0 self-end text-14 text-text-muted">Intet logget sidste uge</span>
               ) : (
                 <span className="flex min-w-0 flex-col gap-0.5">

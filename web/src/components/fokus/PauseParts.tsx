@@ -3,6 +3,7 @@
 import { type RefObject, useEffect, useId, useRef, useState } from "react";
 
 import {
+  exerciseUnder,
   FEEL_OPTIONS,
   feelQuestion,
   footerText,
@@ -266,11 +267,14 @@ const WARMUP_SCALE_S = 600;
 export function WarmupCard({ since, exercise, mainLift }: { readonly since: string | null; readonly exercise: FokusExercise; readonly mainLift: boolean }) {
   const ramp = rampState(exercise, mainLift);
   const basis = rampBasis(exercise);
+  const under = exerciseUnder(exercise);
   return (
     <section aria-labelledby="fokus-warmup" className={CARD}>
-      <h2 id="fokus-warmup" className="font-sans text-32 font-semibold [overflow-wrap:anywhere]">
+      <h2 id="fokus-warmup" className="font-sans text-32 font-semibold [overflow-wrap:anywhere] text-balance">
         {warmupTitle(exercise)}
       </h2>
+      {/* variants.md §3: the sheet's exercise muted under "Opvarmning · <variant>". */}
+      {under !== null && <p className="mt-1 font-sans text-14 text-balance text-text-muted">{under}</p>}
       <div className="mt-14">
         {/* No recorded start (§2.2): a static 0:00 with the tick at 0, never a clock from page load. */}
         {since === null ? <WarmupClock seconds={0} /> : <WarmupTimer since={since} />}
@@ -317,22 +321,26 @@ function WarmupClock({ seconds }: { readonly seconds: number }) {
  */
 export function NextSetCard({
   next,
+  week,
   inWarmup,
   afterTimer,
 }: {
   readonly next: SetInContext;
+  readonly week: number;
   readonly inWarmup: boolean;
   /** Straight under the timer group (56px of air), else after another group (40px). */
   readonly afterTimer: boolean;
 }) {
-  const summary = nextSetSummary(next, inWarmup);
+  const summary = nextSetSummary(next, inWarmup, week);
   const kg = summary.kg;
   return (
     <section
       aria-label="Næste sæt"
       className={`${afterTimer ? "mt-14" : "mt-10"} flex flex-col gap-1 rounded-card border border-dashed border-shade-1 bg-card p-5`}
     >
-      <p className="font-sans text-20 font-medium [overflow-wrap:anywhere]">{summary.title}</p>
+      <p className="font-sans text-20 font-medium [overflow-wrap:anywhere] text-balance">{summary.title}</p>
+      {/* variants.md §3: the sheet's exercise muted under the variant. */}
+      {summary.exercise !== null && <p className="font-sans text-14 text-balance text-text-muted">{summary.exercise}</p>}
       {(summary.line !== "" || kg !== null) && (
         <p className="text-16 [overflow-wrap:anywhere]">
           {summary.line}
@@ -345,6 +353,7 @@ export function NextSetCard({
           )}
         </p>
       )}
+      {summary.newVariant !== null && <p className="text-14 text-text-muted">{summary.newVariant}</p>}
     </section>
   );
 }
