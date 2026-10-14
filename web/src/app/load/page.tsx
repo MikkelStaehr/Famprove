@@ -26,7 +26,7 @@ import {
   type WeekNav,
 } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
-import { loadAppNotices, loadDashboardData, loadWeekDetail } from "@/lib/db/queries";
+import { loadAppNotices, loadDashboardData, loadTrainingPlan, loadWeekDetail } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
 import { noticeText } from "@/lib/notices";
@@ -47,7 +47,8 @@ import {
   strengthUnknownNote,
   typicalRidesNote,
 } from "@/lib/prognose-text";
-import { resolveToday } from "@/lib/training-view";
+import { resolveToday, strengthWeek } from "@/lib/training-view";
+import { type DatedPlan, datedPlan } from "@/lib/week-plan";
 import { isZoneKey, ZONE_CLASS, zoneReading, zoneSentence } from "@/lib/zone-scale";
 
 export const metadata: Metadata = {
@@ -295,9 +296,28 @@ function WeekFallback({ nav }: { readonly nav: WeekNav }) {
   );
 }
 
+/**
+ * The current ISO week's strength plan, from the same reads and rule as Træning's Uge card
+ * (lib/week-plan.ts). Other weeks have no plan input. A failed read leaves the list without the
+ * plan rows (the days still show); anything that is not a data-layer error is rethrown.
+ */
+async function loadWeekPlan(nav: WeekNav, today: IsoDate): Promise<DatedPlan | null> {
+  if (today < nav.selected.weekStart || nav.selected.weekEnd < today) return null;
+  try {
+    const strength = strengthWeek(await loadTrainingPlan(today), today);
+    return datedPlan(strength, today, nav.selected.days.map((d) => d.date));
+  } catch (error) {
+    if (isDataError(error)) {
+      console.error("dashboard: loading the week's plan failed", error);
+      return null;
+    }
+    throw error;
+  }
+}
+
 /** Streams in under the week's Suspense boundary; a failure stays inside the week card. */
 async function WeekSessions({ nav, logStart, today }: { readonly nav: WeekNav; readonly logStart: IsoDate | null; readonly today: IsoDate }) {
-  const state = await loadWeekState(nav);
+  const [state, plan] = await Promise.all([loadWeekState(nav), loadWeekPlan(nav, today)]);
   if (state.kind === "error") {
     const at = state.at.toISOString();
     return (
@@ -310,7 +330,7 @@ async function WeekSessions({ nav, logStart, today }: { readonly nav: WeekNav; r
       />
     );
   }
-  return <WeekDays week={nav.selected} days={state.days} logStart={logStart} today={today} />;
+  return <WeekDays week={nav.selected} days={state.days} logStart={logStart} today={today} plan={plan} />;
 }
 
 /** CTL ramp as "is fitness going up?". Direction follows the displayed (rounded) value. */

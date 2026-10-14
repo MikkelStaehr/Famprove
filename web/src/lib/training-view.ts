@@ -711,30 +711,72 @@ export function weekRange(today: IsoDate): string {
   return formatDateRange(monday, addDays(monday, 6));
 }
 
-/** One row of the Uge card (reset-traening.md §2.6), in session order; extras after the plan. */
-export type WeekRow =
-  | { readonly kind: "done"; readonly session: number; readonly sets: number | null; readonly done: DoneSession }
-  | { readonly kind: "extra"; readonly done: DoneSession }
-  | { readonly kind: "current"; readonly session: number; readonly sets: number }
-  | { readonly kind: "future"; readonly session: number; readonly sets: number };
+// --- Træning's Sæt card per exercise (user 2026-10-14, slice exercise-collapse) ---------------
 
 /**
- * The Uge list from the week's columns and done activities: a done session carries its date and
- * activity words; the current one (session k + 1) is today's; later ones have no date until done.
+ * One sheet row's prescription in compact form: "1 × 3 @6", "2 × 5 -12.5%", "3 × 6–10 @7–8". The
+ * set count is the row's ticks; reps and the load cell keep the sheet's words (ranges as one
+ * figure), only a leading "RPE " becomes "@". Null when the row has neither reps nor a load cell.
  */
-export function weekRows(strength: Pick<StrengthWeek, "columns" | "done">): readonly WeekRow[] {
-  const rows: WeekRow[] = [];
-  for (const c of strength.columns) {
-    const done = strength.done.find((d) => !d.extra && d.session === c.session);
-    if (done !== undefined) rows.push({ kind: "done", session: c.session, sets: c.sets, done });
-    else if (c.status === "current") rows.push({ kind: "current", session: c.session, sets: c.sets });
-    else rows.push({ kind: "future", session: c.session, sets: c.sets });
+export function compactPrescription(e: Pick<ExerciseView, "sets" | "repsText" | "prescribed">): string | null {
+  const reps = e.repsText === null || e.repsText.trim() === "" ? null : rangeFigure(e.repsText);
+  const load = e.prescribed === null || e.prescribed.trim() === "" ? null : rangeFigure(e.prescribed).replace(/^RPE\s*/i, "@");
+  if (reps === null && load === null) return null;
+  const head = reps === null ? `${e.sets.length} sæt` : `${e.sets.length} × ${reps}`;
+  return load === null ? head : `${head} ${load}`;
+}
+
+/** One dot per set of an exercise: its state, and whether it is the NÆSTE set. */
+export type SetDot = { readonly key: string; readonly state: SetState; readonly next: boolean };
+
+/** An exercise = a run of consecutive sheet rows with the same trimmed name (as runPositions counts them). */
+export type ExerciseRunView = {
+  readonly key: string; // the run's first row key
+  readonly name: string;
+  readonly groups: readonly SetGroupView[]; // its sheet rows, sheet order
+  readonly prescription: string; // the rows' compact prescriptions joined " · " ("" when none)
+  /** The row whose suggestion and last week the head shows: the NÆSTE row, else the first open one, else the first. */
+  readonly focus: ExerciseView;
+  readonly dots: readonly SetDot[];
+  readonly done: number;
+  readonly skipped: number;
+  readonly total: number;
+  readonly isNext: boolean; // holds the session's first open set
+  readonly closed: boolean; // every set is done or skipped
+};
+
+/** The checklist's groups folded into exercises (runs of the same name), sheet order kept. */
+export function exerciseRuns(groups: readonly SetGroupView[]): readonly ExerciseRunView[] {
+  const runs: SetGroupView[][] = [];
+  for (const g of groups) {
+    const last = runs.at(-1);
+    if (last !== undefined && last[0].exercise.name.trim() === g.exercise.name.trim()) last.push(g);
+    else runs.push([g]);
   }
-  for (const d of strength.done) {
-    if (d.extra) rows.push({ kind: "extra", done: d });
-    else if (!strength.columns.some((c) => c.session === d.session)) {
-      rows.push({ kind: "done", session: d.session, sets: null, done: d });
-    }
-  }
-  return rows;
+  return runs.map((run): ExerciseRunView => {
+    const lines = run.flatMap((g) => g.sets);
+    const focus = run.find((g) => g.isNext) ?? run.find((g) => !g.closed) ?? run[0];
+    return {
+      key: run[0].exercise.key,
+      name: run[0].exercise.name.trim(),
+      groups: run,
+      prescription: run
+        .map((g) => compactPrescription(g.exercise))
+        .filter((p): p is string => p !== null)
+        .join(" · "),
+      focus: focus.exercise,
+      dots: lines.map((l) => ({ key: setKey(l.ref), state: l.state, next: l.next })),
+      done: lines.filter((l) => l.state === "done").length,
+      skipped: lines.filter((l) => l.state === "skipped").length,
+      total: lines.length,
+      isNext: run.some((g) => g.isNext),
+      closed: run.every((g) => g.closed),
+    };
+  });
+}
+
+/** The exercise row's sr count: "2 af 4 sæt udført", ", 1 sprunget over" when any. */
+export function runCountText(run: Pick<ExerciseRunView, "done" | "skipped" | "total">): string {
+  const base = `${run.done} af ${run.total} sæt udført`;
+  return run.skipped > 0 ? `${base}, ${run.skipped} sprunget over` : base;
 }

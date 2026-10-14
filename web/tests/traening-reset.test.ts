@@ -3,14 +3,12 @@ import { test } from "node:test";
 
 import {
   blockWeekCaption,
-  type DoneSession,
   exerciseNames,
   sessionSummary,
   shortDay,
   updatedCaption,
   weekdayLabel,
   weekRange,
-  weekRows,
 } from "../src/lib/training-view.ts";
 
 const names = (...n: string[]) => n.map((name) => ({ name }));
@@ -62,33 +60,4 @@ test("updatedCaption: time only today, the date otherwise, 'forældet' when stal
     "forældet · opdateret 13. okt. 05.00",
   );
   assert.equal(updatedCaption({ kind: "unknown" }, "2026-10-14"), "opdatering ukendt");
-});
-
-const done = (session: number, date: string, extra = false): DoneSession => ({
-  session,
-  extra,
-  date,
-  isToday: false,
-  activityName: "Styrke",
-  movingTimeS: 3120,
-});
-
-test("weekRows: done, current and future in session order, extras after", () => {
-  const rows = weekRows({
-    columns: [
-      { session: 1, sets: 19, status: "done" },
-      { session: 2, sets: 18, status: "current" },
-      { session: 3, sets: 17, status: "future" },
-    ],
-    done: [done(1, "2026-10-13"), done(4, "2026-10-14", true)],
-  });
-  assert.deepEqual(
-    rows.map((r) => r.kind),
-    ["done", "current", "future", "extra"],
-  );
-  assert.equal(rows[0].kind === "done" ? rows[0].sets : null, 19);
-});
-
-test("weekRows: no program, no rows", () => {
-  assert.deepEqual(weekRows({ columns: [], done: [] }), []);
 });

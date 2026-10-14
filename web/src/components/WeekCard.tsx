@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 
 import type { IsoDate } from "@/lib/db/rows";
 import { formatDay, stopAfter } from "@/lib/format";
-import { type StrengthWeek, weekdayLabel, weekRange, type WeekRow, weekRows } from "@/lib/training-view";
+import { type StrengthWeek, weekdayLabel, weekRange } from "@/lib/training-view";
+import { planLabel, type WeekRow, weekRows } from "@/lib/week-plan";
 
 import { Icon } from "./icons";
 import { ActivityWords, hasActivityWords } from "./MovingTime";
@@ -11,7 +12,8 @@ import { ActivityWords, hasActivityWords } from "./MovingTime";
  * The Uge card (reset-traening.md §2.6, mockup A's list): this ISO week's strength sessions as
  * ListRows in session order. Done ones carry their day and activity words; today's (the next
  * session) says "I DAG" in --today, the page's only orange; later ones have no date until done.
- * `sentence` is the week's sr sentence (weekSentence), rendered after the head.
+ * `sentence` is the week's sr sentence (weekSentence), rendered after the head. The rows come from
+ * lib/week-plan.ts, the same source /load's week list uses.
  */
 export function WeekCard({
   strength,
@@ -90,7 +92,7 @@ function WeekRowItem({ row, today }: { readonly row: WeekRow; readonly today: Is
         </time>
         <Icon name="barbell" size={18} className="text-text" />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="font-sans text-14 text-text">{extra ? "Ekstra session" : `Styrke · session ${row.session}`}</span>
+          <span className="font-sans text-14 text-text">{extra ? "Ekstra session" : planLabel(row.session)}</span>
           {hasActivityWords(d.activityName, d.movingTimeS) && (
             <span className="font-sans text-13 text-text-muted">
               <ActivityWords name={d.activityName} movingTimeS={d.movingTimeS} />
@@ -116,7 +118,7 @@ function WeekRowItem({ row, today }: { readonly row: WeekRow; readonly today: Is
           {weekdayLabel(today)}
         </time>
         <Icon name="barbell" size={18} className="text-text" />
-        <span className="min-w-0 flex-1 font-sans text-14 text-text">Styrke · session {row.session}</span>
+        <span className="min-w-0 flex-1 font-sans text-14 text-text">{planLabel(row.session)}</span>
         <span className="shrink-0 font-mono text-11 text-today uppercase">I dag</span>
       </li>
     );
@@ -128,7 +130,7 @@ function WeekRowItem({ row, today }: { readonly row: WeekRow; readonly today: Is
         <span className="sr-only">ingen dato endnu</span>
       </span>
       <Icon name="barbell" size={18} className="text-text-muted" />
-      <span className="min-w-0 flex-1 font-sans text-14 text-text-muted">Styrke · session {row.session}</span>
+      <span className="min-w-0 flex-1 font-sans text-14 text-text-muted">{planLabel(row.session)}</span>
       <span className="shrink-0 font-mono text-12 text-text-muted">plan</span>
     </li>
   );

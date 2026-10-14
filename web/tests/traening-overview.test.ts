@@ -5,11 +5,14 @@ import { formatClock, spokenSigned } from "../src/lib/format.ts";
 import { type LoggedSet, sessionOrderWithWarmups, setKey, type SetRef } from "../src/lib/set-taps.ts";
 import {
   checklistView,
+  compactPrescription,
   type ExerciseView,
+  exerciseRuns,
   formSentence,
   lastWeekText,
   prescribedText,
   repsText,
+  runCountText,
   runPositions,
   setStatus,
   spokenSetLine,
@@ -220,4 +223,38 @@ test("warm-ups never show as ticks: the list, the segments and NÆSTE skip set 0
   assert.deepEqual(view.first, { row: 10, set: 1 });
   assert.equal(view.groups[0].sets[0].next, true);
   assert.equal(view.progress.total, 3);
+});
+
+test("compactPrescription: sets × reps, RPE as @, other load cells as written, ranges as one figure", () => {
+  assert.equal(compactPrescription(row(10, {}, 3)), "3 × 5 @7");
+  assert.equal(compactPrescription(row(10, { repsText: "6 - 10", prescribed: "RPE 7 - 8" }, 3)), "3 × 6–10 @7–8");
+  assert.equal(compactPrescription(row(10, { prescribed: "-12.5%" }, 2)), "2 × 5 -12.5%");
+  assert.equal(compactPrescription(row(10, { repsText: null, prescribed: null })), null);
+});
+
+test("exerciseRuns: same-named rows fold into one exercise with joined prescription, dots and counts", () => {
+  const exercises = [
+    row(10, { key: "B#10", prescribed: "RPE 6" }, 1),
+    row(11, { key: "B#11", prescribed: "RPE 7", suggestedKg: null, suggestionBasis: "no_e1rm" }, 1),
+    row(12, { key: "B#12", name: "Dips", prescribed: "RPE 8" }, 2),
+  ];
+  const order = exercises.flatMap((e) => e.sets);
+  const view = checklistView(exercises, order, logOf([{ row: 10, set: 1, startedAt: AT, endedAt: AT }]));
+  const runs = exerciseRuns(view.groups);
+  assert.equal(runs.length, 2);
+  assert.equal(runs[0].name, "Squat");
+  assert.equal(runs[0].prescription, "1 × 5 @6 · 1 × 5 @7");
+  assert.equal(runs[0].isNext, true);
+  assert.equal(runs[0].focus.key, "B#11"); // the NÆSTE row's values show in the head
+  assert.deepEqual(
+    runs[0].dots.map((d) => [d.state, d.next]),
+    [
+      ["done", false],
+      ["open", true],
+    ],
+  );
+  assert.equal(runCountText(runs[0]), "1 af 2 sæt udført");
+  assert.equal(runs[1].isNext, false);
+  const skipped = exerciseRuns(checklistView(exercises, order, logOf([{ row: 12, set: 1, skipped: true }])).groups);
+  assert.equal(runCountText(skipped[1]), "0 af 2 sæt udført, 1 sprunget over");
 });

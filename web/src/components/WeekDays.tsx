@@ -20,6 +20,9 @@ import {
   formatWatts,
 } from "@/lib/format";
 
+import { weekdayLabel } from "@/lib/training-view";
+import { type DatedPlan, planLabel, type PlannedSession } from "@/lib/week-plan";
+
 import { Icon } from "./icons";
 import { ActivityWords, hasActivityWords } from "./MovingTime";
 import { SkeletonBar } from "./Skeleton";
@@ -29,6 +32,8 @@ import { DiamondIcon } from "./WarningLine";
  * The selected week's days (reset-belastning.md §6, mockup A): one ListRow-shaped row per day, day |
  * icon | text | value, behind native <details>/<summary> (keyboard and screen reader without JS),
  * then the `I alt` row from weekly_load. Displays values only; every number comes from Python or SQL.
+ * The current ISO week also gets the strength plan from lib/week-plan.ts (the same source as
+ * Træning's Uge card): today's session on today's row with I DAG, later sessions as "—" + "plan".
  */
 const SHORT_DAY: readonly string[] = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
 const ROW = "flex min-h-11 items-center gap-3 border-t border-border py-2.5";
@@ -41,15 +46,28 @@ type WeekDaysProps = {
   /** The strength log's first day (earliest block start): days before it read "styrke ikke registreret". */
   readonly logStart: IsoDate | null;
   readonly today: IsoDate;
+  /** The current week's plan (lib/week-plan.ts datedPlan); null for other weeks or when unread. */
+  readonly plan?: DatedPlan | null;
 };
 
-export function WeekDays({ week, days, logStart, today }: WeekDaysProps) {
+export function WeekDays({ week, days, logStart, today, plan = null }: WeekDaysProps) {
   return (
     <div className="flex flex-col">
       <ul aria-label={`Dage i uge ${week.isoWeek}`} className="flex flex-col">
         {days.map((day, i) => (
           <li key={day.date}>
-            <DayRow day={day} short={SHORT_DAY[i] ?? formatDay(day.date)} beforeLog={logStart === null || day.date < logStart} today={day.date === today} />
+            <DayRow
+              day={day}
+              short={SHORT_DAY[i] ?? formatDay(day.date)}
+              beforeLog={logStart === null || day.date < logStart}
+              today={day.date === today}
+              planned={day.date === today ? (plan?.today ?? null) : null}
+            />
+          </li>
+        ))}
+        {plan?.undated.map((p) => (
+          <li key={`plan-${p.session}`}>
+            <PlanRow plan={p} today={today} />
           </li>
         ))}
       </ul>
@@ -82,14 +100,57 @@ function strengthWords(day: DayDetail): string | null {
   return day.strength.sessions.map((s) => (s.block === null ? "Styrke · ikke i programmet" : `Styrke · session ${s.session}`)).join(" · ");
 }
 
-function DayRow({ day, short, beforeLog, today }: { readonly day: DayDetail; readonly short: string; readonly beforeLog: boolean; readonly today: boolean }) {
+/**
+ * A planned session without a day row: "—" | barbell muted | "Styrke · session 3" muted | "plan", as
+ * Træning's Uge card. The current one (today has no daily_load row yet) shows today's day and I DAG.
+ */
+function PlanRow({ plan, today }: { readonly plan: PlannedSession; readonly today: IsoDate }) {
+  const current = plan.kind === "current";
+  return (
+    <div className={ROW}>
+      {current ? (
+        <time dateTime={today} className={`${DAY_COL} font-medium text-text`}>
+          {weekdayLabel(today)}
+        </time>
+      ) : (
+        <span className={`${DAY_COL} text-text-muted`}>
+          <span aria-hidden="true">—</span>
+          <span className="sr-only">ingen dato endnu</span>
+        </span>
+      )}
+      <Icon name="barbell" size={18} className={current ? "text-text" : "text-text-muted"} />
+      <span className={`min-w-0 flex-1 font-sans text-14 ${current ? "text-text" : "text-text-muted"}`}>{planLabel(plan.session)}</span>
+      {current ? (
+        <span className="shrink-0 font-mono text-11 text-today uppercase">I dag</span>
+      ) : (
+        <span className="shrink-0 font-mono text-12 text-text-muted">plan</span>
+      )}
+    </div>
+  );
+}
+
+function DayRow({
+  day,
+  short,
+  beforeLog,
+  today,
+  planned,
+}: {
+  readonly day: DayDetail;
+  readonly short: string;
+  readonly beforeLog: boolean;
+  readonly today: boolean;
+  /** Today's planned session (not done yet), from lib/week-plan.ts. */
+  readonly planned: PlannedSession | null;
+}) {
   const strength = strengthWords(day);
   const ride = day.rides.length > 0;
-  const text = [ride ? rideNames(day) : null, strength].filter((t): t is string => t !== null).join(" · ");
-  const muted = day.rest;
-  const label = day.rest ? (beforeLog ? "Ingen cykling · styrke ikke registreret" : "Hvile") : text;
+  const plan = planned === null ? null : planLabel(planned.session);
+  const text = [ride ? rideNames(day) : null, strength, plan].filter((t): t is string => t !== null).join(" · ");
+  const muted = day.rest && plan === null;
+  const label = muted ? (beforeLog ? "Ingen cykling · styrke ikke registreret" : "Hvile") : text;
   const loaded = formatLoad(day.totalTss) !== "0";
-  const spoken = `${formatDay(day.date)}: cykling ${formatLoad(day.cyclingTss)} TSS, styrke ${beforeLog ? "ikke registreret" : `${formatLoad(day.strengthTss)} TSS`}, i alt ${formatLoad(day.totalTss)} TSS`;
+  const spoken = `${formatDay(day.date)}: cykling ${formatLoad(day.cyclingTss)} TSS, styrke ${beforeLog ? "ikke registreret" : `${formatLoad(day.strengthTss)} TSS`}, i alt ${formatLoad(day.totalTss)} TSS${plan === null ? "" : `, planlagt ${plan.toLowerCase()}`}`;
   const inner = (
     <>
       <span aria-hidden="true" className={`${DAY_COL} ${today ? "font-medium text-text" : "text-text-muted"}`}>
@@ -97,7 +158,7 @@ function DayRow({ day, short, beforeLog, today }: { readonly day: DayDetail; rea
       </span>
       <span aria-hidden="true" className="flex shrink-0 items-center gap-1 empty:hidden">
         {ride && <Icon name="bike" size={18} className="text-text" />}
-        {strength !== null && <Icon name="barbell" size={18} className="text-text" />}
+        {(strength !== null || plan !== null) && <Icon name="barbell" size={18} className="text-text" />}
       </span>
       <span aria-hidden="true" className={`min-w-0 flex-1 font-sans text-14 ${muted ? "text-text-muted" : "text-text"}`}>
         {label}

@@ -83,7 +83,7 @@ Today sits at ≈ 67–84 % of the width, so the forward line reads as C's.
 - **Rows:** `ListRow` per day (behaviour DESIGN.md "Week list", `load.md` §6). Day `Man`…`Søn`. Icon: barbell for a strength day, bike for a ride day, both (bike then barbell, 4px apart) when both; none on rest. Text: `Styrke · session 2` / the ride name as in intervals.icu / both joined ` · `; rest `Hvile`; before the log `Ingen cykling · styrke ikke registreret` (muted). Value: the day's `total_tss` (mono 14). **Today:** day label `--text` 500; value column shows `I DAG` mono 11 `--today` (left of the value, gap 8, when there is load). The row is the `<summary>`; its expanded content (rides with NP/IF/VI, power badge, strength exercises) sits under it, indented 48px, Geist `text-13` / mono `text-13`, 8px top, 12px bottom.
 - **Total row:** last `ListRow`, text `I alt` (Geist 14/500), value `weekly_load.total_tss` mono 14/500.
 - **Switcher** (foot, 12px above): `‹ Uge 41` left and `Uge 43 ›` right as secondary buttons (44px, 1px `--text-muted` border, `--radius-button`, Geist 14/500, chevron 16); `Tilbage til denne uge` text link centred between them when another week is shown. Ends: the button is absent, an empty 44px box keeps the layout. `aria-label` names the target week (`Gå til uge 41`).
-- The mockup's future `plan` rows are dropped (see Dropped).
+- **Planned sessions (user, 2026-10-14, slice `week-shared`):** the current week's rows come from `lib/week-plan.ts`, the same source as Træning's week card: today's planned session reads `Styrke · session 2` with the barbell and `I DAG`; undated later sessions follow as `—` rows with a muted barbell and `plan`. Past weeks show no plan rows.
 
 ## 7. States (DEV_FIXTURE names)
 | State | Treatment |
@@ -155,7 +155,7 @@ DOM order stays §2. TabBar: desktop top bar (DESIGN.md).
 - `↑ 9 / 7 d` on fatigue (A, B): no stored ATL change.
 - B's `CYKEL / STYRKE / I ALT` window totals: sums over a window.
 - B's form/fitness/fatigue strip: A's form card + tiles were chosen.
-- A's `plan` rows and C's `72 / ~430 TSS`: planned sessions are not read by `/load` and undone strength sessions have no date (no feature change).
+- C's `72 / ~430 TSS`: a planned week total is not stored. (A's `plan` rows came back on 2026-10-14, see §6.)
 - 1M / 3M labels (A): the user's 4U / 12U / Sæson.
 - 10px axis labels: 11px minimum.
 - ZoneBar flex widths 2/2/1.5/1.5/1: the zone scale's true widths (10/20/15/15/10) so the today tick is truthful.

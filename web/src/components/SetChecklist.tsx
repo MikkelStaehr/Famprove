@@ -1,11 +1,16 @@
 "use client";
 
+import { useId, useState } from "react";
+
 import type { SetState } from "@/lib/set-taps";
 import {
   adjustmentBrackets,
+  compactPrescription,
+  type ExerciseRunView,
+  exerciseRuns,
   lastWeekText,
-  prescribedText,
-  repsText,
+  runCountText,
+  type SetDot,
   type SetGroupView,
   type SetLineView,
   setStatus,
@@ -44,89 +49,156 @@ export function SetCount() {
   );
 }
 
-/** The sheet rows in sheet order; runs of the same name share one visible name. */
+/**
+ * One collapsible row per exercise (user 2026-10-14, slice exercise-collapse): an exercise is its
+ * run of same-named sheet rows. Expanded = the user's toggle, else whether it holds the NÆSTE set,
+ * so after its last set the next exercise opens unless the user chose otherwise.
+ */
 export function SetChecklist() {
   const { session, view } = useSession();
+  const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const runs = exerciseRuns(view.groups);
   return (
     <ol aria-label="Øvelser" className="flex flex-col">
-      {view.groups.map((group, i) => (
-        <li
-          key={group.exercise.key}
-          className={i === 0 ? undefined : group.dividerBefore ? "mt-4 border-t border-border pt-4" : "mt-4"}
-        >
-          <SetGroup group={group} week={session.week} />
-        </li>
-      ))}
+      {runs.map((run, i) => {
+        const expanded = toggled.get(run.key) ?? run.isNext;
+        return (
+          <li key={run.key} className={`relative${i === 0 ? "" : " border-t border-border"}`}>
+            {/* The NÆSTE exercise: a 2px --text bar on its left edge at x −12px, full height (§2.5). */}
+            {run.isNext && <span aria-hidden="true" data-next-edge="true" className="absolute inset-y-0 -left-3 w-0.5 bg-text" />}
+            <ExerciseRun
+              run={run}
+              week={session.week}
+              expanded={expanded}
+              onToggle={() => setToggled((m) => new Map(m).set(run.key, !expanded))}
+            />
+          </li>
+        );
+      })}
     </ol>
   );
 }
 
-function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week: number }) {
-  const { exercise: e, isNext, closed } = group;
-  const reps = repsText(e);
-  const prescribed = prescribedText(e);
+function ExerciseRun({
+  run,
+  week,
+  expanded,
+  onToggle,
+}: {
+  readonly run: ExerciseRunView;
+  readonly week: number;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+}) {
+  const regionId = useId();
+  const e = run.focus;
   const suggestion = suggestionView(e);
   const brackets = adjustmentBrackets(e, "long");
   const lastWeek = lastWeekText(e, week);
-  const shared = closed ? "text-text-muted" : "";
+  const muted = run.closed ? "text-text-muted" : "text-text";
+  const multi = run.groups.length > 1;
   return (
-    // The NÆSTE group: no fill, a 2px --text bar on its left edge at x −12px, full group height (§2.5).
-    <div className="relative flex flex-col">
-      {isNext && <span aria-hidden="true" data-next-edge="true" className="absolute inset-y-0 -left-3 w-0.5 bg-text" />}
-      <p
-        className={`min-w-0 font-sans text-16 font-medium break-words ${group.showName ? "" : "sr-only"} ${
-          group.showName && group.nameMuted ? "text-text-muted" : "text-text"
-        }`}
+    <div className="flex flex-col">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={regionId}
+        onClick={onToggle}
+        className="flex min-h-11 w-full cursor-pointer flex-col gap-1.5 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
-        {e.name}
-      </p>
-      {(reps !== null || prescribed !== null) && (
-        <p
-          aria-hidden="true"
-          className={`mt-1 flex min-w-0 flex-wrap gap-x-4 gap-y-1 font-mono text-20 font-medium tabular-nums ${shared}`}
-        >
-          {reps !== null && (
-            <span>
-              <KeepRanges text={reps} />
-            </span>
-          )}
-          {prescribed !== null && (
-            <span>
-              <KeepRanges text={prescribed} />
-            </span>
-          )}
-        </p>
-      )}
-      <div aria-hidden="true" className={`mt-2.5 grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 ${shared}`}>
-        {suggestion.kg !== null ? (
-          <p className="flex min-w-0 flex-col gap-1">
-            <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
-            <span className="font-mono text-16 tabular-nums">
-              <span className="whitespace-nowrap">{suggestion.kg}</span>
-              {brackets !== null && <span className="font-sans text-13 text-text-muted"> {brackets}</span>}
-            </span>
-          </p>
-        ) : (
-          <p className="min-w-0 text-14 text-text-muted">{suggestion.words}</p>
+        <span className="flex w-full items-start justify-between gap-3">
+          <span className={`min-w-0 font-sans text-16 font-medium break-words ${muted}`}>
+            {run.name}
+            <span className="sr-only">, {runCountText(run)}</span>
+          </span>
+          <span aria-hidden="true" className="flex shrink-0 items-center gap-2.5 pt-1">
+            <SetDots dots={run.dots} />
+            <Icon
+              name="chevron-down"
+              size={16}
+              className={`text-text-muted transition-transform duration-[120ms] motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+            />
+          </span>
+        </span>
+        {run.prescription !== "" && (
+          <span aria-hidden="true" className={`block min-w-0 font-mono text-14 tabular-nums break-words ${muted}`}>
+            <KeepRanges text={run.prescription} />
+          </span>
         )}
-        {lastWeek !== undefined &&
-          (lastWeek === null ? (
-            <p className="col-start-2 min-w-0 text-14 text-text-muted">Intet logget sidste uge</p>
-          ) : (
-            <p className="col-start-2 flex min-w-0 flex-col gap-1">
-              <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
-              <span className="font-mono text-16 tabular-nums">{lastWeek}</span>
-            </p>
-          ))}
+        {(suggestion.kg !== null || lastWeek !== undefined) && (
+          <span aria-hidden="true" className={`flex min-w-0 flex-wrap gap-x-6 gap-y-1 ${run.closed ? "text-text-muted" : ""}`}>
+            {suggestion.kg !== null && (
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
+                <span className="font-mono text-16 tabular-nums">
+                  <span className="whitespace-nowrap">{suggestion.kg}</span>
+                  {brackets !== null && <span className="font-sans text-13 text-text-muted"> {brackets}</span>}
+                </span>
+              </span>
+            )}
+            {lastWeek !== undefined &&
+              (lastWeek === null ? (
+                <span className="min-w-0 self-end text-14 text-text-muted">Intet logget sidste uge</span>
+              ) : (
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
+                  <span className="font-mono text-16 tabular-nums">{lastWeek}</span>
+                </span>
+              ))}
+          </span>
+        )}
+      </button>
+      <div id={regionId} hidden={!expanded} className="pb-2">
+        {run.groups.map((group) => {
+          const caption = multi ? compactPrescription(group.exercise) : null;
+          return (
+            <div key={group.exercise.key} className="flex flex-col">
+              {caption !== null && (
+                <p aria-hidden="true" className="pt-2 pb-1 font-mono text-12 text-text-muted tabular-nums">
+                  <KeepRanges text={caption} />
+                </p>
+              )}
+              <ol aria-label="Sæt" className="flex flex-col">
+                {group.sets.map((line) => (
+                  <li key={`${line.ref.row}#${line.ref.set}`}>
+                    <SetLine group={group} line={line} week={week} />
+                  </li>
+                ))}
+              </ol>
+            </div>
+          );
+        })}
       </div>
-      <ol aria-label="Sæt" className="mt-2.5 flex flex-col">
-        {group.sets.map((line) => (
-          <li key={`${line.ref.row}#${line.ref.set}`}>
-            <SetLine group={group} line={line} week={week} />
-          </li>
-        ))}
-      </ol>
     </div>
+  );
+}
+
+/**
+ * One 8px dot per set (aria-hidden; the button's sr text says the count): done = a filled --text
+ * disc, open = a 1px --text-muted ring, skipped = that ring with a short diagonal stroke (shape,
+ * not colour), the NÆSTE set = a 1.5px --text ring.
+ */
+function SetDots({ dots }: { readonly dots: readonly SetDot[] }) {
+  return (
+    <span className="flex items-center gap-1">
+      {dots.map((d) =>
+        d.state === "done" ? (
+          <span key={d.key} data-dot="done" className="block size-2 rounded-pill bg-text" />
+        ) : (
+          <span
+            key={d.key}
+            data-dot={d.next ? "next" : d.state}
+            className={`relative block size-2 overflow-hidden rounded-pill ${
+              d.next ? "border-[1.5px] border-text" : "border border-text-muted"
+            }`}
+          >
+            {d.state === "skipped" && (
+              <span className="absolute top-1/2 left-1/2 block h-px w-2.5 -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-text-muted" />
+            )}
+          </span>
+        ),
+      )}
+    </span>
   );
 }
 
