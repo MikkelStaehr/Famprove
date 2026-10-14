@@ -1,6 +1,6 @@
 "use client";
 
-import { ComposedChart, CartesianGrid, Line, ReferenceDot, XAxis, YAxis } from "recharts";
+import { ComposedChart, Line, ReferenceDot, XAxis, YAxis } from "recharts";
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
 import { type AxisTick, type ChartRow, chartRows, eftpDots, formatEf, type LineChartView, type Mark, type Seam, seamReadout, slotCentre, type WeekBar } from "@/lib/analyse-view";
@@ -214,7 +214,6 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
         title={title}
         accessibilityLayer={false}
       >
-        <CartesianGrid vertical={false} stroke="var(--border)" strokeWidth={1} />
         <XAxis
           dataKey="x"
           type="number"
@@ -341,9 +340,8 @@ function WeekGroup<W extends PickWeek>({
           {ticks.map((t, i) => (
             <span
               key={t.x}
-              className="absolute top-1 font-mono whitespace-nowrap text-text-muted tabular-nums"
+              className="absolute top-1 font-sans text-12 whitespace-nowrap text-text-muted tabular-nums"
               style={{
-                ...tickStyle,
                 left: xCss(axis, t.x),
                 transform: i === 0 ? undefined : axis.hi - t.x < 30 ? "translateX(-100%)" : "translateX(-50%)",
               }}
@@ -398,7 +396,6 @@ function Strip({
       </p>
       <div className="relative" style={{ height }} aria-hidden="true">
         <div className="absolute border-b border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, bottom: 0 }} />
-        <div className="absolute border-t border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: STRIP_TOP }} />
         <span
           className="absolute left-0 font-mono leading-none text-text-muted tabular-nums"
           style={{ ...tickStyle, top: STRIP_TOP - 6 }}
@@ -577,18 +574,13 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
       ) : (
         <div className="relative" style={{ height: PANEL }} aria-hidden="true">
           {panel.ticks.map((t) => (
-            <div key={t}>
-              <div
-                className="absolute border-t border-border"
-                style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: top(t) }}
-              />
-              <span
-                className="absolute left-0 -translate-y-1/2 font-mono leading-none text-text-muted tabular-nums"
-                style={{ ...tickStyle, top: top(t) }}
-              >
-                {t.toLocaleString("da-DK")}
-              </span>
-            </div>
+            <span
+              key={t}
+              className="absolute left-0 -translate-y-1/2 font-mono leading-none text-text-muted tabular-nums"
+              style={{ ...tickStyle, top: top(t) }}
+            >
+              {t.toLocaleString("da-DK")}
+            </span>
           ))}
           {panel.sheet.map((s) => (
             <div key={s.x0}>

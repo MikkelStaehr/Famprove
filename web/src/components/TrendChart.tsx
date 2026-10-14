@@ -443,16 +443,19 @@ function blockBrackets(blocks: readonly BlockSpan[], c: BracketContext): Bracket
     const fitted = bracketLabel(x1 - x0, c.wide ? `Blok ${b.blockNo}` : `B${b.blockNo}`);
     const half = fitted === null ? 0 : monoLabelWidth(fitted) / 2;
     const gap = MARKS.bracket.label.gap;
-    const labelX = Math.min((x0 + x1) / 2, c.avoid - gap - half);
+    const labelX = Math.min((x0 + x1) / 2, c.avoid - CAPTION_CLEAR - half);
     // Still over its own bracket after the shift, else omitted (never clipped, never overlapping).
     const label = fitted !== null && labelX - half >= x0 + gap ? fitted : null;
     return [{ key: `${b.start}-${b.name}`, x0, x1, deloadX0, label, labelX }];
   });
 }
 
-/** The caption utility's advance: mono 0.6 em + 0.08 em tracking, at 12px. */
+/** Clear space between a block label and the "I DAG" caption (12px: never touching). */
+const CAPTION_CLEAR = 12;
+
+/** The caption utility's advance at 12px, kept on the safe side: 0.68 em per glyph + its 0.08 em tracking. */
 function captionWidth(text: string): number {
-  return [...text].length * 12 * 0.68;
+  return [...text].length * 12 * (0.68 + 0.08);
 }
 
 type Size = { readonly w: number; readonly h: number };

@@ -454,8 +454,27 @@ export function lastWeekText(e: Pick<ExerciseView, "reference">, week: number): 
   return e.reference === null ? null : formatSetLoad(e.reference.kg, e.reference.bodyweight);
 }
 
-/** The reps cell with its word, as written: "5 reps", "8 - 12 reps", "1 rep"; null when blank. */
+/**
+ * A range as one figure, as Fokus prints it: "8 - 12" -> "8–12" (en dash, no spaces); a leading
+ * minus stays. The same rule as fokus-view's rangeFigure, kept here because fokus-view imports
+ * this module (importing it back would be a cycle).
+ */
+function rangeFigure(text: string): string {
+  return text.trim().replace(/(\d)\s*[-–]\s*(?=\d)/g, "$1–");
+}
+
+/** The reps cell with its word, ranges as one figure: "5 reps", "8–12 reps", "1 rep"; null when blank. */
 export function repsText(e: Pick<ExerciseView, "repsText">): string | null {
+  return e.repsText === null ? null : formatSetsReps(null, rangeFigure(e.repsText));
+}
+
+/** The prescription as shown, ranges as one figure: "RPE 7 - 8" -> "RPE 7–8"; null when blank. */
+export function prescribedText(e: Pick<ExerciseView, "prescribed">): string | null {
+  return e.prescribed === null ? null : rangeFigure(e.prescribed);
+}
+
+/** The reps cell as written, for speech (spokenRange reads its ranges as "til"). */
+function writtenRepsText(e: Pick<ExerciseView, "repsText">): string | null {
   return e.repsText === null ? null : formatSetsReps(null, e.repsText);
 }
 
@@ -494,11 +513,11 @@ export type SetLineView = {
 
 export type SetGroupView = {
   readonly exercise: ExerciseView;
-  readonly showName: boolean; // first group of a run, or the slab group
+  readonly showName: boolean; // first group of a run, or the next group
   readonly nameMuted: boolean; // every set of the run is done or skipped
   readonly closed: boolean; // every set of this group is done or skipped
-  readonly slab: boolean; // holds the first open set (NÆSTE)
-  readonly dividerBefore: boolean; // between runs, unless the slab touches it
+  readonly isNext: boolean; // holds the first open set (NÆSTE)
+  readonly dividerBefore: boolean; // between runs, unless the next group touches it
   readonly sets: readonly SetLineView[];
 };
 
@@ -529,7 +548,7 @@ export function checklistView(
   const open = firstOpen(order, log);
   const first = open !== null && isWarmup(open) ? { row: open.row, set: 1 } : open;
   const closed = (refs: readonly SetRef[]) => refs.every((r) => stateOf(log.get(setKey(r))) !== "open");
-  const isSlab = (e: ExerciseView) => first !== null && e.sets.some((r) => r.row === first.row && r.set === first.set);
+  const holdsNext = (e: ExerciseView) => first !== null && e.sets.some((r) => r.row === first.row && r.set === first.set);
   const runs = runPositions(exercises);
   const groups = exercises.map((e, i): SetGroupView => {
     const name = e.name.trim();
@@ -538,14 +557,14 @@ export function checklistView(
     while (start > 0 && exercises[start - 1].name.trim() === name) start -= 1;
     let end = i + 1;
     while (end < exercises.length && exercises[end].name.trim() === name) end += 1;
-    const slab = isSlab(e);
+    const isNext = holdsNext(e);
     return {
       exercise: e,
-      showName: runStart || slab,
+      showName: runStart || isNext,
       nameMuted: closed(exercises.slice(start, end).flatMap((x) => x.sets)),
       closed: closed(e.sets),
-      slab,
-      dividerBefore: runStart && i > 0 && !slab && !isSlab(exercises[i - 1]),
+      isNext,
+      dividerBefore: runStart && i > 0 && !isNext && !holdsNext(exercises[i - 1]),
       sets: e.sets.map((ref, n) => {
         const logged = log.get(setKey(ref));
         const state = stateOf(logged);
@@ -588,7 +607,7 @@ export function setStatus(line: Pick<SetLineView, "state" | "endedAt">): string 
  * ranges are spoken " til "; week 1 has no last-week part.
  */
 export function spokenSetLine(e: ExerciseView, week: number, line: SetLineView): string {
-  const reps = repsText(e);
+  const reps = writtenRepsText(e);
   const spokenReps = reps === null ? null : spokenRange(reps);
   const load = e.prescribed === null ? null : spokenRange(e.prescribed);
   const what = spokenReps !== null && load !== null ? `${spokenReps} ved ${load}` : (spokenReps ?? load);

@@ -8,6 +8,7 @@ import {
   type ExerciseView,
   formSentence,
   lastWeekText,
+  prescribedText,
   repsText,
   runPositions,
   setStatus,
@@ -80,13 +81,19 @@ test("suggestion: kg, reasons per basis, never 0 kg", () => {
   assert.deepEqual(suggestionView(row(1, { suggestedKg: 0 })), { kg: null, words: "Intet forslag" });
 });
 
-test("last week and reps as written", () => {
+test("last week, and reps and RPE ranges printed as Fokus prints them", () => {
   assert.equal(lastWeekText(row(1), 1), undefined);
   assert.equal(lastWeekText(row(1), 3), "140 kg");
   assert.equal(lastWeekText(row(1, { reference: null }), 3), null);
   assert.equal(lastWeekText(row(1, { reference: { kg: 10, bodyweight: true } }), 3), "kropsvægt + 10 kg");
-  assert.equal(repsText(row(1, { repsText: "8 - 12" })), "8 - 12 reps");
+  assert.equal(repsText(row(1, { repsText: "8 - 12" })), "8\u201312 reps");
+  assert.equal(repsText(row(1, { repsText: "6-10" })), "6\u201310 reps");
+  assert.equal(repsText(row(1, { repsText: "5" })), "5 reps");
   assert.equal(repsText(row(1, { repsText: null })), null);
+  assert.equal(prescribedText(row(1, { prescribed: "RPE 7 - 8" })), "RPE 7\u20138");
+  assert.equal(prescribedText(row(1, { prescribed: "RPE 6.5-7" })), "RPE 6.5\u20137");
+  assert.equal(prescribedText(row(1, { prescribed: "-12.5%" })), "-12.5%"); // a leading minus stays
+  assert.equal(prescribedText(row(1, { prescribed: null })), null);
 });
 
 test("checklist: Begynd begins the open warm-up (set 0); the highlight stays on set 1", () => {
@@ -105,28 +112,28 @@ test("checklist: Begynd begins the open warm-up (set 0); the highlight stays on 
   assert.deepEqual(checklistView(exercises, order, squatDone).beginAt, { row: 20, set: 0 });
 });
 
-test("checklist: slab on the first open set's group, runs, dividers, progress", () => {
+test("checklist: next on the first open set's group, runs, dividers, progress", () => {
   const exercises = [row(10), row(11), row(20, { name: "Bench press" })];
   const order = exercises.flatMap((e) => e.sets);
   const empty = checklistView(exercises, order, new Map());
   assert.equal(empty.primary, "begin");
   assert.deepEqual(empty.first, { row: 10, set: 1 });
-  assert.deepEqual(empty.groups.map((g) => [g.showName, g.slab, g.dividerBefore]), [
+  assert.deepEqual(empty.groups.map((g) => [g.showName, g.isNext, g.dividerBefore]), [
     [true, true, false],
     [false, false, false], // continuation of the Squat run
-    [true, false, true], // a new run, not touching the slab
+    [true, false, true], // a new run, not touching the next group
   ]);
   assert.equal(empty.groups[0].sets[0].next, true);
 
-  // Row 10 done and skipped: the slab moves to row 11 (named, since it is NÆSTE); the divider before
-  // Bench press goes because the slab touches it.
+  // Row 10 done and skipped: the next group moves to row 11 (named, since it is NÆSTE); the divider before
+  // Bench press goes because the next group touches it.
   const log = logOf([
     { row: 10, set: 1, startedAt: AT, endedAt: AT },
     { row: 10, set: 2, skipped: true },
   ]);
   const mid = checklistView(exercises, order, log);
   assert.equal(mid.primary, "continue");
-  assert.deepEqual(mid.groups.map((g) => [g.showName, g.slab, g.closed, g.dividerBefore]), [
+  assert.deepEqual(mid.groups.map((g) => [g.showName, g.isNext, g.closed, g.dividerBefore]), [
     [true, false, true, false],
     [true, true, false, false],
     [true, false, false, false],
@@ -139,12 +146,12 @@ test("checklist: slab on the first open set's group, runs, dividers, progress", 
   assert.equal(setStatus(mid.groups[1].sets[0]), null);
 });
 
-test("checklist: every set closed has no slab and is finished", () => {
+test("checklist: every set closed has no next group and is finished", () => {
   const exercises = [row(10, {}, 1)];
   const view = checklistView(exercises, exercises[0].sets, logOf([{ row: 10, set: 1, skipped: true }]));
   assert.equal(view.primary, "finished");
   assert.equal(view.first, null);
-  assert.equal(view.groups[0].slab, false);
+  assert.equal(view.groups[0].isNext, false);
   assert.equal(view.groups[0].nameMuted, true);
 });
 

@@ -4,6 +4,7 @@ import type { SetState } from "@/lib/set-taps";
 import {
   adjustmentBrackets,
   lastWeekText,
+  prescribedText,
   repsText,
   type SetGroupView,
   type SetLineView,
@@ -61,8 +62,9 @@ export function SetChecklist() {
 }
 
 function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week: number }) {
-  const { exercise: e, slab, closed } = group;
+  const { exercise: e, isNext, closed } = group;
   const reps = repsText(e);
+  const prescribed = prescribedText(e);
   const suggestion = suggestionView(e);
   const brackets = adjustmentBrackets(e, "long");
   const lastWeek = lastWeekText(e, week);
@@ -70,7 +72,7 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
   return (
     // The NÆSTE group: no fill, a 2px ink bar on its left edge at x −12px, full group height (§1).
     <div className={`relative grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 px-1`}>
-      {slab && <span aria-hidden="true" data-next-edge="true" className="absolute inset-y-0 -left-3 w-0.5 bg-text" />}
+      {isNext && <span aria-hidden="true" data-next-edge="true" className="absolute inset-y-0 -left-3 w-0.5 bg-text" />}
       <p
         className={`col-start-2 min-w-0 font-sans text-20 font-medium break-words ${group.showName ? "" : "sr-only"} ${
           group.showName && group.nameMuted ? "text-text-muted" : ""
@@ -78,7 +80,7 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
       >
         {e.name}
       </p>
-      {(reps !== null || e.prescribed !== null) && (
+      {(reps !== null || prescribed !== null) && (
         <p
           aria-hidden="true"
           className={`col-start-2 flex min-w-0 flex-wrap gap-x-4 gap-y-1 font-sans text-32 font-medium tabular-nums ${shared}`}
@@ -88,9 +90,9 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
               <KeepRanges text={reps} />
             </span>
           )}
-          {e.prescribed !== null && (
+          {prescribed !== null && (
             <span>
-              <KeepRanges text={e.prescribed} />
+              <KeepRanges text={prescribed} />
             </span>
           )}
         </p>
@@ -177,11 +179,11 @@ export function SaveNotes() {
   );
 }
 
-const RANGE = /(\d+(?:[.,]\d+)?\s+-\s+\d+(?:[.,]\d+)?)/;
+const RANGE = /(\d+(?:[.,]\d+)?(?:\s+-\s+|–)\d+(?:[.,]\d+)?)/;
 
 /**
- * The text exactly as written, with each "8 - 12" kept on one line: at large text sizes a
- * break inside a range would leave "8 -" / "12", which reads like "-12".
+ * The text with each range ("8–12", or "8 - 12" as written) kept on one line: at large text sizes
+ * a break inside a range would leave "8–" / "12", which reads like "-12".
  */
 function KeepRanges({ text }: { readonly text: string }) {
   // split() with a capturing group puts the ranges at the odd indexes.
