@@ -5,7 +5,7 @@
  */
 import { freshness, zoneDisplay } from "./dashboard-view.ts";
 import type { Freshness, Hero } from "./dashboard-view.ts";
-import { addDays, isoWeekNumber } from "./dates.ts";
+import { addDays, isoWeekNumber, isoWeekStart } from "./dates.ts";
 import type { TrainingPlanData } from "./db/queries.ts";
 import type {
   DailyLoadRow,
@@ -17,7 +17,17 @@ import type {
   StrengthSessionRow,
   SuggestionBasis,
 } from "./db/rows.ts";
-import { formatClock, formatKg, formatSetLoad, formatSetsReps, spokenRange, spokenSigned } from "./format.ts";
+import {
+  formatClock,
+  formatDateRange,
+  formatDay,
+  formatKg,
+  formatSetLoad,
+  formatSetsReps,
+  formatUpdatedAt,
+  spokenRange,
+  spokenSigned,
+} from "./format.ts";
 import {
   firstOpen,
   isWarmup,
@@ -737,4 +747,95 @@ export function weekSentence(columns: readonly WeekColumn[], current: readonly S
     return `session ${c.session} i gang med ${states.filter((s) => s === "done").length} af ${c.sets} sæt`;
   });
   return `Ugen: ${parts.join(", ")}.`;
+}
+
+// --- Træning reset (design/specs/reset-traening.md): captions, the "I dag" summary, the Uge list ---
+
+/** "ons. 14. okt." -> "ons 14": the InverseCard's day ("I DAG · ONS 14", upper-cased by CSS). */
+export function shortDay(date: IsoDate): string {
+  return formatDay(date).replace(/\./g, "").split(" ").slice(0, 2).join(" ");
+}
+
+/** A ListRow day: "Tir", "Ons" (three letters of the da-DK weekday, capitalised). */
+export function weekdayLabel(date: IsoDate): string {
+  const day = formatDay(date).slice(0, 3);
+  return day.charAt(0).toUpperCase() + day.slice(1);
+}
+
+/** "Program - blok 12 (offseason)" + 3 -> "Blok 12 · uge 3"; a block without a number stays as written. */
+export function blockWeekCaption(block: string, week: number): string {
+  const no = /blok\s*(\d+)/i.exec(block);
+  return `${no === null ? block : `Blok ${no[1]}`} · uge ${week}`;
+}
+
+/**
+ * The InverseCard summary's names: the distinct exercise names in sheet order, the first three as
+ * written, then "og N øvelser mere". One name: "Squat"; two: "Squat og Bench".
+ */
+export function exerciseNames(exercises: readonly Pick<ExerciseView, "name">[]): string {
+  const names: string[] = [];
+  for (const e of exercises) {
+    const name = e.name.trim();
+    if (name !== "" && !names.includes(name)) names.push(name);
+  }
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length <= 3) return `${names.slice(0, -1).join(", ")} og ${names[names.length - 1]}`;
+  const more = names.length - 3;
+  return `${names.slice(0, 3).join(", ")} og ${more} ${more === 1 ? "øvelse" : "øvelser"} mere`;
+}
+
+/** "Dødløft, Dips, Pulldown og 3 øvelser mere · 19 sæt" / "… · 7 af 19 sæt udført" once a set is touched. */
+export function sessionSummary(
+  exercises: readonly Pick<ExerciseView, "name">[],
+  progress: { readonly done: number; readonly skipped: number; readonly total: number },
+): string {
+  const touched = progress.done + progress.skipped > 0;
+  const count = touched ? `${progress.done} af ${progress.total} sæt udført` : `${progress.total} sæt`;
+  const names = exerciseNames(exercises);
+  return names === "" ? count : `${names} · ${count}`;
+}
+
+/**
+ * The header's mono line after the date: "opdateret 05.00" (today), "opdateret 13. okt. 05.00"
+ * (an earlier day), "forældet · opdateret 13. okt. 05.00" (stale), "opdatering ukendt".
+ */
+export function updatedCaption(freshness: Freshness, today: IsoDate): string {
+  if (freshness.kind === "unknown") return "opdatering ukendt";
+  const [date, time] = formatUpdatedAt(freshness.computedAt).split(" kl. ");
+  const when = date === formatDay(today).split(" ").slice(1).join(" ") ? time : `${date} ${time}`;
+  return `${freshness.kind === "stale" ? "forældet · " : ""}opdateret ${when}`;
+}
+
+/** The ISO week of `today` as a caption: "12.–18. okt.". */
+export function weekRange(today: IsoDate): string {
+  const monday = isoWeekStart(today);
+  return formatDateRange(monday, addDays(monday, 6));
+}
+
+/** One row of the Uge card (reset-traening.md §2.6), in session order; extras after the plan. */
+export type WeekRow =
+  | { readonly kind: "done"; readonly session: number; readonly sets: number | null; readonly done: DoneSession }
+  | { readonly kind: "extra"; readonly done: DoneSession }
+  | { readonly kind: "current"; readonly session: number; readonly sets: number }
+  | { readonly kind: "future"; readonly session: number; readonly sets: number };
+
+/**
+ * The Uge list from the week's columns and done activities: a done session carries its date and
+ * activity words; the current one (session k + 1) is today's; later ones have no date until done.
+ */
+export function weekRows(strength: Pick<StrengthWeek, "columns" | "done">): readonly WeekRow[] {
+  const rows: WeekRow[] = [];
+  for (const c of strength.columns) {
+    const done = strength.done.find((d) => !d.extra && d.session === c.session);
+    if (done !== undefined) rows.push({ kind: "done", session: c.session, sets: c.sets, done });
+    else if (c.status === "current") rows.push({ kind: "current", session: c.session, sets: c.sets });
+    else rows.push({ kind: "future", session: c.session, sets: c.sets });
+  }
+  for (const d of strength.done) {
+    if (d.extra) rows.push({ kind: "extra", done: d });
+    else if (!strength.columns.some((c) => c.session === d.session)) {
+      rows.push({ kind: "done", session: d.session, sets: null, done: d });
+    }
+  }
+  return rows;
 }

@@ -13,6 +13,7 @@ import {
   suggestionView,
 } from "@/lib/training-view";
 
+import { Icon } from "./icons";
 import { SECONDARY } from "./instrument";
 import { useSession } from "./SetLogProvider";
 import { WarningLine } from "./WarningLine";
@@ -25,21 +26,20 @@ import { WarningLine } from "./WarningLine";
  * The state comes from the set log (useSetLog), so ticks survive a reload.
  */
 
-/** The strength head: "**0** af 24 sæt udført" / "Alle sæt klaret", plus "2 sprunget over". Not live. */
+/** The Sæt card's count, right of its title: "7 / 19" (7 in --text 500, "/ 19" muted), plus "2 sprunget over". Not live. */
 export function SetCount() {
   const { done, skipped, total } = useSession().view.progress;
   return (
-    <div className="flex flex-col">
-      <p className="font-sans text-16 font-normal tabular-nums">
-        {done + skipped === total ? (
-          "Alle sæt klaret"
-        ) : (
-          <>
-            <span className="text-24 font-medium">{done}</span> af {total} sæt udført
-          </>
-        )}
+    <div className="flex flex-col items-end">
+      <p className="font-mono text-14 text-text-muted tabular-nums">
+        <span className="sr-only">
+          {done} af {total} sæt udført
+        </span>
+        <span aria-hidden="true">
+          <span className="font-medium text-text">{done}</span> / {total}
+        </span>
       </p>
-      {skipped > 0 && <p className="text-14 text-text-muted tabular-nums">{skipped} sprunget over</p>}
+      {skipped > 0 && <p className="font-mono text-12 text-text-muted tabular-nums">{skipped} sprunget over</p>}
     </div>
   );
 }
@@ -52,7 +52,7 @@ export function SetChecklist() {
       {view.groups.map((group, i) => (
         <li
           key={group.exercise.key}
-          className={i === 0 ? undefined : group.dividerBefore ? "mt-4 border-t border-border pt-4" : "mt-3"}
+          className={i === 0 ? undefined : group.dividerBefore ? "mt-4 border-t border-border pt-4" : "mt-4"}
         >
           <SetGroup group={group} week={session.week} />
         </li>
@@ -70,12 +70,12 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
   const lastWeek = lastWeekText(e, week);
   const shared = closed ? "text-text-muted" : "";
   return (
-    // The NÆSTE group: no fill, a 2px ink bar on its left edge at x −12px, full group height (§1).
-    <div className={`relative grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 px-1`}>
+    // The NÆSTE group: no fill, a 2px --text bar on its left edge at x −12px, full group height (§2.5).
+    <div className="relative flex flex-col">
       {isNext && <span aria-hidden="true" data-next-edge="true" className="absolute inset-y-0 -left-3 w-0.5 bg-text" />}
       <p
-        className={`col-start-2 min-w-0 font-sans text-20 font-medium break-words ${group.showName ? "" : "sr-only"} ${
-          group.showName && group.nameMuted ? "text-text-muted" : ""
+        className={`min-w-0 font-sans text-16 font-medium break-words ${group.showName ? "" : "sr-only"} ${
+          group.showName && group.nameMuted ? "text-text-muted" : "text-text"
         }`}
       >
         {e.name}
@@ -83,7 +83,7 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
       {(reps !== null || prescribed !== null) && (
         <p
           aria-hidden="true"
-          className={`col-start-2 flex min-w-0 flex-wrap gap-x-4 gap-y-1 font-sans text-28 font-medium tabular-nums ${shared}`}
+          className={`mt-1 flex min-w-0 flex-wrap gap-x-4 gap-y-1 font-mono text-20 font-medium tabular-nums ${shared}`}
         >
           {reps !== null && (
             <span>
@@ -97,29 +97,29 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
           )}
         </p>
       )}
-      <div aria-hidden="true" className={`col-start-2 mt-1 flex min-w-0 flex-wrap gap-x-6 gap-y-2 ${shared}`}>
+      <div aria-hidden="true" className={`mt-2.5 flex min-w-0 flex-wrap gap-x-6 gap-y-2 ${shared}`}>
         {suggestion.kg !== null ? (
-          <p className="flex flex-col">
-            <span className="caption">Forslag</span>
-            <span className="font-sans text-20 font-normal tabular-nums">
+          <p className="flex flex-col gap-1">
+            <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
+            <span className="font-mono text-16 tabular-nums">
               <span className="whitespace-nowrap">{suggestion.kg}</span>
-              {brackets !== null && <span className="text-16 text-text-muted"> {brackets}</span>}
+              {brackets !== null && <span className="font-sans text-13 text-text-muted"> {brackets}</span>}
             </span>
           </p>
         ) : (
-          <p className="text-16 text-text-muted">{suggestion.words}</p>
+          <p className="text-14 text-text-muted">{suggestion.words}</p>
         )}
         {lastWeek !== undefined &&
           (lastWeek === null ? (
-            <p className="text-16 text-text-muted">Intet logget sidste uge</p>
+            <p className="text-14 text-text-muted">Intet logget sidste uge</p>
           ) : (
-            <p className="flex flex-col">
-              <span className="caption">Sidste uge</span>
-              <span className="font-sans text-20 font-normal whitespace-nowrap tabular-nums">{lastWeek}</span>
+            <p className="flex flex-col gap-1">
+              <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
+              <span className="font-mono text-16 whitespace-nowrap tabular-nums">{lastWeek}</span>
             </p>
           ))}
       </div>
-      <ol aria-label="Sæt" className="col-span-2 -mx-1 mt-1 flex flex-col">
+      <ol aria-label="Sæt" className="mt-2.5 flex flex-col">
         {group.sets.map((line) => (
           <li key={`${line.ref.row}#${line.ref.set}`}>
             <SetLine group={group} line={line} week={week} />
@@ -133,26 +133,29 @@ function SetGroup({ group, week }: { readonly group: SetGroupView; readonly week
 function SetLine({ group, line, week }: { readonly group: SetGroupView; readonly line: SetLineView; readonly week: number }) {
   const { setLog } = useSession();
   const status = setStatus(line);
-  const muted = line.state !== "open" ? "text-text-muted" : "";
+  const muted = line.state !== "open" ? "text-text-muted" : "text-text";
   // open -> done; done -> open (undo); skipped -> done.
   const toggle = () => setLog.tap(line.state === "done" ? "undo" : "done", line.ref);
   return (
+    // A ListRow: 1px --border top, ≥ 52px; the whole row is the target, Space toggles the native checkbox.
     <label
-      className={`grid min-h-11 cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-1 py-2 has-focus-visible:outline-3 has-focus-visible:outline-offset-3 has-focus-visible:outline-focus ${muted}`}
+      className={`grid min-h-13 cursor-pointer grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center gap-x-2 border-t border-border has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus ${muted}`}
     >
       <input type="checkbox" className="sr-only" checked={line.state === "done"} onChange={toggle} />
       <span className="sr-only">{spokenSetLine(group.exercise, week, line)}</span>
-      <span aria-hidden="true" className="flex items-center justify-center">
+      <span aria-hidden="true" className="flex size-11 items-center justify-center">
         <SetTick state={line.state} />
       </span>
-      <span aria-hidden="true" className="min-w-0 font-sans text-20 font-normal tabular-nums">
-        Sæt {line.n} af {line.of}
+      <span aria-hidden="true" className="min-w-0 font-sans text-15">
+        Sæt <span className="font-mono">{line.n}</span> af <span className="font-mono">{line.of}</span>
       </span>
       <span aria-hidden="true" className="justify-self-end text-right">
         {line.next ? (
-          <span className="caption text-text">Næste</span>
+          <span className="rounded-pill border border-shade-2 px-2 py-0.75 font-mono text-11 font-medium text-text uppercase">
+            Næste
+          </span>
         ) : status !== null ? (
-          <span className="text-14 text-text-muted tabular-nums">{status}</span>
+          <span className="font-mono text-12 text-text-muted tabular-nums">{status}</span>
         ) : null}
       </span>
     </label>
@@ -199,15 +202,21 @@ function KeepRanges({ text }: { readonly text: string }) {
 }
 
 /**
- * The set tick (§2.1), a 12 × 28 rect in the 28px column; read down the list the ticks are a
- * vertical barcode of the session. Open = 1px --text-muted outline ([A5], ≥ 3:1); done = --text
- * fill; skipped = the outline + a 12 × 2 --text-muted bar across the middle. No motion.
+ * The set tick (reset-traening.md §2.5): a 24px circle in the 44 × 44 target. Open = a 1.5px
+ * --shade-2 ring (5.93:1); done = an --inverse-bg disc with a 1.5px --inverse-text check; skipped =
+ * the ring with a 1.5px dash. Shape, not colour, tells them apart. No motion.
  */
 function SetTick({ state }: { readonly state: SetState }) {
-  if (state === "done") return <span data-tick="done" className="block h-7 w-3 shrink-0 bg-text" />;
+  if (state === "done") {
+    return (
+      <span data-tick="done" className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-inverse-bg">
+        <Icon name="check" size={16} className="text-inverse-text" />
+      </span>
+    );
+  }
   return (
-    <span data-tick={state} className="flex h-7 w-3 shrink-0 items-center border border-text-muted">
-      {state === "skipped" && <span className="-mx-px block h-0.5 w-3 shrink-0 bg-text-muted" />}
+    <span data-tick={state} className="flex size-6 shrink-0 items-center justify-center rounded-pill border-[1.5px] border-shade-2">
+      {state === "skipped" && <span className="block h-[1.5px] w-2.5 bg-shade-2" />}
     </span>
   );
 }

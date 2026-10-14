@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import type { ReactNode } from "react";
 
 import { ErrorState } from "@/components/ErrorState";
-import { RestCard } from "@/components/RestCard";
+import { FormCard } from "@/components/FormCard";
 import { RideCard } from "@/components/RideCard";
-import { SessionBlock } from "@/components/SessionBlock";
+import { SessionBlock, SessionWeekCard } from "@/components/SessionBlock";
 import { SetLogProvider } from "@/components/SetLogProvider";
 import { StrengthCard } from "@/components/StrengthCard";
-import { UpdatedLine } from "@/components/UpdatedLine";
-import { ZoneBarError, ZoneFlagRow } from "@/components/ZoneBar";
+import { RestToday, RideToday } from "@/components/TodayCard";
+import { WarningLine } from "@/components/WarningLine";
+import { WeekCard } from "@/components/WeekCard";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { devFixture } from "@/lib/db/dev-fixture";
 import { loadTrainingForm, loadTrainingPlan, NEXT_SESSION_DAYS } from "@/lib/db/queries";
@@ -20,6 +22,8 @@ import {
   trainingHeader,
   type TrainingHeader,
   type TrainingPlan,
+  updatedCaption,
+  weekSentence,
 } from "@/lib/training-view";
 
 export const metadata: Metadata = {
@@ -72,37 +76,41 @@ export default async function TrainingPage() {
   const [form, plan] = await Promise.all([loadFormState(today, now), loadPlanState(today)]);
   const header = form.kind === "ready" ? form.header : null;
   const session = plan.kind === "ready" && plan.plan.strength.state === "next" ? plan.plan.strength.next : null;
-  const columns = plan.kind === "ready" ? plan.plan.strength.columns : [];
-  // Phone-first screen: one column at every width, max-w-phone and left-aligned from lg (DESIGN.md Part A).
+  const formCard =
+    form.kind === "error" ? (
+      <FormCard kind="error" retry={plan.kind !== "error"} className={RIGHT_1} />
+    ) : (
+      <FormCard kind="ready" header={form.header} today={today} className={RIGHT_1} />
+    );
+  // Phone: one column (max 640 from sm). Desktop (lg): 7fr | 5fr, DOM order = phone order (reset-traening.md §4).
   const page = (
-    <div className="flex w-full max-w-phone flex-col gap-10">
-      <header className="flex flex-col">
-        <h1 className="flex flex-wrap items-baseline gap-x-3">
-          <span className="font-sans text-28 font-normal">Træning</span>
-          <span className="sr-only">, </span>
-          <time dateTime={today} className="font-sans text-16 font-normal text-text-muted">
-            {formatDay(today)}
-          </time>
-        </h1>
-        {header !== null && (
-          <div className="mt-1">
-            <UpdatedLine
-              freshness={header.freshness}
-              staleNote="Form og styrkeprogrammet kan være forældet."
-              unknownNote="Opdateringstidspunkt ukendt, så form og styrkeprogrammet kan være forældet."
-            />
-          </div>
-        )}
-        <div className="mt-4">
-          {form.kind === "error" ? (
-            <ZoneBarError retry={plan.kind !== "error"} />
-          ) : (
-            <ZoneFlagRow header={form.header} today={today} />
-          )}
+    <div className="mx-auto flex w-full max-w-160 flex-col gap-3 lg:max-w-none lg:gap-4">
+      <header className="flex flex-col gap-2 px-1 pt-1 pb-2">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="font-sans text-22 font-semibold text-text">Træning</h1>
+          <p className="font-mono text-12 text-text-muted tabular-nums">
+            <time dateTime={today}>{formatDay(today)}</time>
+            {header !== null && <> · {updatedCaption(header.freshness, today)}</>}
+          </p>
         </div>
-        {session !== null && <SessionBlock columns={columns} />}
+        {header !== null && header.freshness.kind !== "fresh" && (
+          <WarningLine>
+            {header.freshness.kind === "stale"
+              ? "Form og styrkeprogrammet kan være forældet."
+              : "Opdateringstidspunkt ukendt, så form og styrkeprogrammet kan være forældet."}
+          </WarningLine>
+        )}
       </header>
-      {plan.kind === "error" ? <PlanError error={plan.error} at={plan.at} /> : <DayCards plan={plan.plan} />}
+      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[7fr_5fr] lg:grid-rows-[auto_auto_auto_1fr] lg:items-start lg:gap-4">
+        {plan.kind === "error" ? (
+          <>
+            <PlanError error={plan.error} at={plan.at} />
+            {formCard}
+          </>
+        ) : (
+          <DayCards plan={plan.plan} today={today} form={formCard} />
+        )}
+      </div>
     </div>
   );
   return session === null ? (
@@ -114,20 +122,56 @@ export default async function TrainingPage() {
   );
 }
 
+/** Desktop grid slots (lg): left = the "I dag" card, then the main list; right = form, rides, Uge. */
+const LEFT_1 = "lg:col-start-1 lg:row-start-1";
+const LEFT_REST = "lg:col-start-1 lg:row-start-2 lg:row-span-3";
+const RIGHT_1 = "lg:col-start-2 lg:row-start-1";
+const RIGHT_2 = "lg:col-start-2 lg:row-start-2";
+const RIGHT_3 = "lg:col-start-2 lg:row-start-3";
+
 /**
- * Ride card(s) first (short, so a strength list can't push them out of sight), then this ISO
- * week's strength (every state of spec §5, including "no program"), then the Rest card when no
- * ride is planned today and no strength session is left.
+ * Phone order (reset-traening.md §2): the "I dag" card, the form card, ride card(s), the Sæt card,
+ * the Uge card. On desktop the Sæt card (or the rides, when there is no strength) sits under the
+ * "I dag" card; the form card, rides next to strength, and the Uge card go right.
  */
-function DayCards({ plan }: { readonly plan: TrainingPlan }) {
+function DayCards({ plan, today, form }: { readonly plan: TrainingPlan; readonly today: IsoDate; readonly form: ReactNode }) {
+  const strength = plan.strength.state === "next" ? plan.strength.next : null;
+  const rides =
+    plan.rides.length === 0 ? null : (
+      <div className={`flex flex-col gap-3 lg:gap-4 ${strength === null ? LEFT_REST : RIGHT_2}`}>
+        {plan.rides.map((ride, i) => (
+          <RideCard key={`ride-${i}`} id={`ride-${i + 1}`} ride={ride} />
+        ))}
+      </div>
+    );
+  const weekSlot = strength !== null && plan.rides.length > 0 ? RIGHT_3 : RIGHT_2;
   return (
     <>
-      {plan.rides.map((ride, i) => (
-        <RideCard key={`ride-${i}`} id={`ride-${i + 1}`} ride={ride} />
-      ))}
-      <StrengthCard id="strength" strength={plan.strength} />
-      {plan.kind === "rest" && (
-        <RestCard next={plan.next} lookaheadDays={NEXT_SESSION_DAYS} doneToday={plan.doneToday} />
+      {strength !== null ? (
+        <SessionBlock today={today} className={LEFT_1} />
+      ) : plan.rides.length > 0 ? (
+        <RideToday today={today} rides={plan.rides} className={LEFT_1} />
+      ) : (
+        <RestToday
+          today={today}
+          next={plan.next}
+          lookaheadDays={NEXT_SESSION_DAYS}
+          doneToday={plan.doneToday}
+          className={LEFT_1}
+        />
+      )}
+      {form}
+      {rides}
+      {strength !== null && <StrengthCard session={strength} className={LEFT_REST} />}
+      {strength !== null ? (
+        <SessionWeekCard strength={plan.strength} today={today} className={weekSlot} />
+      ) : (
+        <WeekCard
+          strength={plan.strength}
+          today={today}
+          sentence={plan.strength.columns.length === 0 ? null : weekSentence(plan.strength.columns, null)}
+          className={weekSlot}
+        />
       )}
     </>
   );
@@ -135,12 +179,14 @@ function DayCards({ plan }: { readonly plan: TrainingPlan }) {
 
 function PlanError({ error, at }: { readonly error: DataError; readonly at: Date }) {
   return (
-    <ErrorState
-      title="Kunne ikke hente dagens træning"
-      what={describeDataError(error)}
-      detail={error.message}
-      at={{ iso: at.toISOString(), text: formatUpdatedAt(at.toISOString()) }}
-      retry={{ href: "/" }}
-    />
+    <section aria-label="Dagens træning" className={`rounded-card border border-border bg-card p-5 ${LEFT_1}`}>
+      <ErrorState
+        title="Kunne ikke hente dagens træning"
+        what={describeDataError(error)}
+        detail={error.message}
+        at={{ iso: at.toISOString(), text: formatUpdatedAt(at.toISOString()) }}
+        retry={{ href: "/" }}
+      />
+    </section>
   );
 }

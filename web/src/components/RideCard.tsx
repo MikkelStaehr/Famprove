@@ -8,8 +8,8 @@ import {
 } from "@/lib/format";
 import type { RideView } from "@/lib/training-view";
 
-import { Card } from "./Card";
 import { EmptyState } from "./EmptyState";
+import { Icon } from "./icons";
 import { WarningLine } from "./WarningLine";
 
 type RideCardProps = {
@@ -25,20 +25,23 @@ type RideCardProps = {
 export function RideCard({ id, ride }: RideCardProps) {
   const readable = ride.problem === null && ride.steps.length > 0;
   return (
-    <Card
-      id={id}
-      variant="session"
-      title="Cykel"
-      action={
-        readable ? (
-          <p className="font-sans text-16 font-medium tabular-nums">
+    <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3.5 rounded-card border border-border bg-card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="flex h-lh shrink-0 items-center text-16">
+            <Icon name="bike" size={18} className="text-text" />
+          </span>
+          <h2 id={id} className="min-w-0 font-sans text-16 font-medium text-text">
+            Cykel · {ride.name}
+          </h2>
+        </div>
+        {readable && (
+          <p className="shrink-0 font-mono text-12 text-text-muted uppercase tabular-nums">
             I alt {formatDuration(ride.totalMinutes * 60)} t
           </p>
-        ) : undefined
-      }
-    >
-      <p className="font-sans text-20 font-medium">{ride.name}</p>
-      {ride.notes !== null && ride.notes.trim() !== "" && <p className="text-16">{ride.notes}</p>}
+        )}
+      </div>
+      {ride.notes !== null && ride.notes.trim() !== "" && <p className="text-14 text-text">{ride.notes}</p>}
       {ride.problem !== null ? (
         <WarningLine>
           {`Kunne ikke læse trinene, så der vises ingen mål. Ret dem i planned_sessions (${ride.problem}).`}
@@ -47,7 +50,7 @@ export function RideCard({ id, ride }: RideCardProps) {
         <EmptyState message="Der er ikke indtastet trin for denne tur." />
       ) : (
         <>
-          <p className="text-14 text-text-muted">
+          <p className="text-13 text-text-muted">
             {ride.ftp === null ? (
               "Ingen FTP fra intervals.icu, så målene står kun i % FTP."
             ) : (
@@ -58,17 +61,17 @@ export function RideCard({ id, ride }: RideCardProps) {
           </p>
           <ol aria-label="Trin" className="flex flex-col">
             {ride.steps.map((item, i) => (
-              <li key={i} className={i > 0 ? "border-t border-border" : undefined}>
+              <li key={i} className="border-t border-border">
                 {item.kind === "step" ? (
                   <StepRow step={item} />
                 ) : (
                   <>
-                    <p id={`${id}-repeat-${i}`} className="caption pt-4 pb-1">
-                      Gentag {item.repeat} {item.repeat === 1 ? "gang" : "gange"}
+                    <p id={`${id}-repeat-${i}`} className="pt-2.5 pb-1 font-mono text-12 text-text-muted uppercase">
+                      Gentag <span className="tabular-nums">{item.repeat}</span> {item.repeat === 1 ? "gang" : "gange"}
                     </p>
                     <ol
                       aria-labelledby={`${id}-repeat-${i}`}
-                      className="flex flex-col border-l border-text-muted pl-4"
+                      className="flex flex-col border-l border-axis pl-3"
                     >
                       {item.steps.map((step, j) => (
                         <li key={j} className={j > 0 ? "border-t border-border" : undefined}>
@@ -83,7 +86,7 @@ export function RideCard({ id, ride }: RideCardProps) {
           </ol>
         </>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -105,15 +108,15 @@ function StepRow({ step }: { readonly step: PlanStep }) {
     .filter((part) => part !== null)
     .join(", ");
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5">
       <span className="sr-only">{spoken}</span>
-      <p aria-hidden="true" className="flex flex-col font-sans text-20 tabular-nums">
+      <p aria-hidden="true" className="flex flex-col">
         {step.label === null ? (
-          <span className="font-medium">{duration}</span>
+          <span className="font-mono text-15 font-medium tabular-nums">{duration}</span>
         ) : (
           <>
-            <span className="font-medium">{step.label}</span>
-            <span>{duration}</span>
+            <span className="font-sans text-15 font-medium">{step.label}</span>
+            <span className="font-mono text-13 text-text-muted tabular-nums">{duration}</span>
           </>
         )}
       </p>
@@ -121,17 +124,15 @@ function StepRow({ step }: { readonly step: PlanStep }) {
         {/* A range never breaks after its en dash ("125–" / "188 W" reads like a 188 W target).
             Only the unit may wrap under it, when the card is narrower than the value (200% text). */}
         {watts === null ? (
-          <span className="font-sans text-28 font-medium tabular-nums">
-            <span className="whitespace-nowrap">{pct}%</span>
-            <span className="text-20"> FTP</span>
+          <span className="font-mono text-20 font-medium tabular-nums">
+            <span className="whitespace-nowrap">{pct}%</span> FTP
           </span>
         ) : (
           <>
-            {/* Full-size unit: a smaller capital W beside 28px digits reads as a lowercase "w". */}
-            <span className="font-sans text-28 font-medium tabular-nums">
+            <span className="font-mono text-20 font-medium tabular-nums">
               <span className="whitespace-nowrap">{watts}</span> W
             </span>
-            <span className="text-14 text-text-muted tabular-nums">{pct}% FTP</span>
+            <span className="font-mono text-12 text-text-muted tabular-nums">{pct}% FTP</span>
           </>
         )}
       </p>

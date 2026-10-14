@@ -1,54 +1,45 @@
 import { SkeletonBar as Bar } from "@/components/Skeleton";
 
-const GROUPS = 3;
-
 /**
- * Træning's skeleton (instrument-traening.md §3; the nav is real, from the layout): the real h1
- * with a bar for the date, the updated line, the form row (24px), the session block (heading bar,
- * a 48px week-column box, the 56px primary box), then the strength section: heading, hairline, a
- * 20px barcode bar and three 72px group bars. --surface bars, radius 0; pulse only under motion-safe.
+ * Træning's skeleton (reset-traening.md §5; the nav is real, from the layout): the real h1 with a
+ * bar for the date line, then the "I dag", form and Sæt cards at their final heights (196, 132,
+ * 360) in --card, with --raised bars; the pulse runs only under motion-safe. Same frame and grid
+ * slots as the page, so nothing jumps when the data arrives.
  */
 export default function Loading() {
   return (
-    <div className="flex w-full max-w-phone flex-col gap-10">
-      <header className="flex flex-col">
-        <h1 className="flex items-baseline gap-x-3">
-          <span className="font-sans text-28 font-normal">Træning</span>
-          <Bar className="w-1/4 text-16" />
-        </h1>
-        <div aria-hidden="true" className="mt-1">
-          <Bar className="w-1/3 text-14" />
-        </div>
-        <div aria-hidden="true" className="mt-4 flex flex-col gap-1">
-          <Bar className="w-1/5 text-12" />
-          <span className="block h-6 w-1/3 bg-raised motion-safe:animate-pulse" />
-          <Bar className="w-2/3 text-16" />
-        </div>
-        <div aria-hidden="true" className="mt-6 flex flex-col">
-          <div className="flex items-end justify-between gap-x-4">
-            <div className="flex min-w-0 flex-1 flex-col">
-              <Bar className="w-2/3 text-20" />
-              <Bar className="w-1/2 text-16" />
-            </div>
-            <span className="block h-12 w-10 shrink-0 bg-raised motion-safe:animate-pulse" />
-          </div>
-          <span className="mt-4 block h-14 bg-raised motion-safe:animate-pulse" />
+    <div className="mx-auto flex w-full max-w-160 flex-col gap-3 lg:max-w-none lg:gap-4">
+      <header className="flex flex-col gap-0.5 px-1 pt-1 pb-2">
+        <h1 className="font-sans text-22 font-semibold text-text">Træning</h1>
+        <div aria-hidden="true">
+          <Bar className="w-1/2 rounded-cell text-12" />
         </div>
       </header>
       <p className="sr-only" role="status">
         Henter dagens træning …
       </p>
-
-      {/* Section shape (Card.tsx) without a heading: the title isn't known yet. */}
-      <div aria-hidden="true" className="flex flex-col gap-3">
-        <div className="mb-1 border-b border-border pb-2">
-          <Bar className="w-1/4 text-20" />
+      <div
+        aria-hidden="true"
+        className="flex flex-col gap-3 lg:grid lg:grid-cols-[7fr_5fr] lg:grid-rows-[auto_auto_1fr] lg:items-start lg:gap-4"
+      >
+        <div className="flex h-49 flex-col justify-end gap-3 rounded-half border border-border bg-card p-4.5 lg:col-start-1 lg:row-start-1">
+          <Bar className="w-2/3 rounded-cell text-20" />
+          <Bar className="w-1/2 rounded-cell text-13" />
+          <span className="mt-1 block h-12 rounded-button bg-raised motion-safe:animate-pulse" />
         </div>
-        <Bar className="w-1/3 text-24" />
-        <span className="block h-5 w-1/2 bg-raised motion-safe:animate-pulse" />
-        {Array.from({ length: GROUPS }, (_, g) => (
-          <span key={g} className="block h-18 bg-raised motion-safe:animate-pulse" />
-        ))}
+        <div className="flex h-33 flex-col gap-2.5 rounded-half border border-border bg-card p-4 lg:col-start-2 lg:row-start-1">
+          <Bar className="w-1/3 rounded-cell text-12" />
+          <Bar className="w-1/2 rounded-cell text-28" />
+          <span className="block h-3.5 rounded-cell bg-raised motion-safe:animate-pulse" />
+        </div>
+        <div className="flex h-90 flex-col gap-4 rounded-card border border-border bg-card p-5 lg:col-start-1 lg:row-start-2 lg:row-span-2">
+          <Bar className="w-1/3 rounded-cell text-16" />
+          <span className="block h-1.5 rounded-cell bg-raised motion-safe:animate-pulse" />
+          <Bar className="w-1/2 rounded-cell text-16" />
+          <Bar className="w-1/3 rounded-cell text-20" />
+          <span className="block h-13 rounded-cell bg-raised motion-safe:animate-pulse" />
+          <span className="block h-13 rounded-cell bg-raised motion-safe:animate-pulse" />
+        </div>
       </div>
     </div>
   );

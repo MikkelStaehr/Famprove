@@ -1,32 +1,21 @@
 "use client";
 
-import { headBarcode } from "@/lib/training-view";
-
 import { useSession } from "./SetLogProvider";
 
-const FILL = { done: "var(--text)", skipped: "var(--text-muted)", open: "var(--text-muted)" } as const;
+const FILL = { done: "bg-text", skipped: "bg-shade-2", open: "bg-track" } as const;
 
 /**
- * The strength section's head barcode (instrument-traening.md §2.1): one 2px tick per set by
- * position, done tall ink, skipped short muted, open a 4px stub at the baseline, +4px between
- * exercises. Geometry from training-view.headBarcode; aria-hidden (the count says it); no motion.
+ * The Sæt card's progress strip (reset-traening.md §2.5): one segment per set in session order,
+ * 6px tall, 2px apart, --radius-cell (no 2px radius token). Done --text, skipped --shade-2, open --track. aria-hidden: the
+ * set count and the week sentence say it. No motion.
  */
 export function SetBarcode() {
-  const bars = useSession().view.bars;
-  const code = headBarcode(bars);
+  const segments = useSession().view.segments;
   return (
-    <svg
-      aria-hidden="true"
-      data-testid="set-barcode"
-      width={code.width}
-      height={code.height}
-      viewBox={`0 0 ${code.width} ${code.height}`}
-      preserveAspectRatio="xMinYMax meet"
-      className="block max-w-full"
-    >
-      {code.ticks.map((t, i) => (
-        <rect key={i} data-state={t.state} x={t.x} y={t.y} width={code.tickWidth} height={t.height} fill={FILL[t.state]} />
+    <div aria-hidden="true" data-testid="set-barcode" className="flex h-1.5 w-full gap-0.5">
+      {segments.map((state, i) => (
+        <span key={i} data-state={state} className={`min-w-0 flex-1 rounded-cell ${FILL[state]}`} />
       ))}
-    </svg>
+    </div>
   );
 }
