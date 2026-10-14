@@ -4,12 +4,13 @@ import { CartesianGrid, ComposedChart, Line, ReferenceDot, XAxis, YAxis } from "
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
 import { type AxisTick, type ChartRow, chartRows, eftpDots, formatEf, type LineChartView, type Mark, type Seam, seamReadout, slotCentre, type WeekBar } from "@/lib/analyse-view";
-import { AMARKS, dashGradient, hatchGradient, isDeloadWeek } from "@/lib/analyse-marks";
+import { AMARKS, dashGradient, hatchGradient, isDeloadWeek, tickAnchor, ticksClearOfToday } from "@/lib/analyse-marks";
 import { MARKS } from "@/lib/chart-marks";
 import { gapSeam, highestAt, nearestIndex, type Readout, restingReadout, restingWeekIndex, xAtPointer } from "@/lib/chart-readout";
 import { formatLoad } from "@/lib/format";
 import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 
+import { useWidth } from "./chart-hooks";
 import { HollowDot } from "./ChartMarks";
 import { ChartReadout, Marker, PLOT_FOCUS, PointerTip, ReadoutSpace, useChartPick } from "./ChartReadout";
 import { ChartBoundary, useHydrated, useWide } from "./TrendChart";
@@ -51,7 +52,8 @@ function Skeleton({ height }: { readonly height: string }) {
 }
 
 /**
- * Today (reset-analyse-cykel.md §4): a 1.5px --today line the full plot height at today's x, with
+ * Today (reset-analyse-cykel.md §4): a 1.5px --today line the full plot height at today's x (a 1px
+ * --card halo each side, so it reads orange where it crosses the current week's --text bar), with
  * `I DAG` Geist Mono 11 in --today (4.91:1 on --card) under it, end-anchored 4px left of the line.
  * HTML so it shares xCss with the seams and strips, the same x in every card; aria-hidden.
  */
@@ -62,7 +64,7 @@ function TodayLine({ axis, x, top = 0 }: { readonly axis: { readonly lo: number;
       {/* Through the plot and the x-label row; the label sits under the tick labels, left of the line. */}
       <div
         className="pointer-events-none absolute bottom-0 z-[2]"
-        style={{ left: `calc(${xCss(axis, x)} - ${t.width / 2}px)`, top, width: t.width, background: t.color }}
+        style={{ left: `calc(${xCss(axis, x)} - ${t.width / 2}px)`, top, width: t.width, background: t.color, boxShadow: "0 0 0 1px var(--card)" }}
       />
       <span
         className="pointer-events-none absolute bottom-0 z-[2] -translate-x-full font-mono text-11 leading-none whitespace-nowrap text-today"
@@ -106,11 +108,20 @@ function SeamOverlay({ axis, bottom }: { readonly axis: Axis; readonly bottom: n
 
 type TickProps = { readonly x?: number | string; readonly y?: number | string; readonly payload?: { readonly value?: unknown } };
 
-function DateTick({ x, y, payload, ticks, hi }: TickProps & { readonly ticks: readonly AxisTick[]; readonly hi: number }) {
+/** An x label; one not in `shown` (it would reach the `I DAG` caption, or the plot isn't measured yet) draws nothing. */
+function DateTick({
+  x,
+  y,
+  payload,
+  ticks,
+  shown,
+  hi,
+}: TickProps & { readonly ticks: readonly AxisTick[]; readonly shown: ReadonlySet<number>; readonly hi: number }) {
   const value = payload?.value;
-  const tick = ticks.find((t) => t.x === value);
-  if (tick === undefined) return <g />;
-  const anchor = tick === ticks[0] ? "start" : hi - tick.x < 30 ? "end" : "middle";
+  const index = ticks.findIndex((t) => t.x === value);
+  const tick = ticks[index];
+  if (tick === undefined || !shown.has(tick.x)) return <g />;
+  const anchor = tickAnchor(index, tick.x, hi);
   return (
     <text x={Number(x)} y={Number(y)} dy={12} textAnchor={anchor} {...TICK}>
       {tick.label}
@@ -145,6 +156,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
   // Two rides on one day: the readout and ring show the one with the highest value (eFTP or EF).
   const ys = rows.map((r) => (r.marks[0]?.excluded === false ? r.marks[0].y : null));
   const latestIndex = Math.max(rows.findLastIndex((r) => r.marks.some((m) => m.latest)), rows.findLastIndex((r) => r.marks.some((m) => !m.excluded)));
+  const [widthRef, boxWidth] = useWidth();
   const { pick, plotProps } = useChartPick({
     count: rows.length,
     startIndex: latestIndex,
@@ -164,6 +176,13 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
       </>
     );
   const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
+  // Today = the domain's last day (analyse-view: hi = today + 0.5); the same x in all three cards.
+  const todayX = axis.hi - 0.5;
+  // No label at today: one reaching the `I DAG` caption is skipped; none before the plot is measured.
+  const plotWidth = boxWidth === null ? null : boxWidth - Y_AXIS_WIDTH - MARGIN_RIGHT;
+  const shownTicks = new Set(
+    plotWidth === null ? [] : ticksClearOfToday(ticks, { lo: axis.lo, hi: axis.hi, today: todayX, width: plotWidth }).map((t) => t.x),
+  );
   const gapX = pick?.x;
   const seam = gapX === undefined ? undefined : axis.seams[gapSeam(gapX, undefined, axis.seams)];
   const picked = pick === null || seam !== undefined ? undefined : rows[pick.index];
@@ -215,9 +234,6 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
     ) : (
       <circle key={`${cx}-${cy}-d`} cx={cx} cy={cy} r={AMARKS.efRide.r} fill={AMARKS.efRide.color} />
     );
-  // Today = the domain's last day (analyse-view: hi = today + 0.5); the same x in all three cards.
-  const todayX = axis.hi - 0.5;
-
   return (
     <>
     <div
@@ -225,6 +241,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
       aria-label={`${title}. Piletaster vælger en tur`}
       className={`relative h-(--chart-height) w-full ${PLOT_FOCUS}`}
     >
+      <div ref={widthRef} aria-hidden="true" className="pointer-events-none absolute inset-0" />
       {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
       {pickedReadout !== undefined && markerX !== null && pick?.mode === "mouse" && (
         <PointerTip readout={pickedReadout} left={markerX} rightInset={MARGIN_RIGHT} />
@@ -244,7 +261,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
           ticks={ticks.map((t) => t.x)}
           interval={0}
           height={X_AXIS_HEIGHT}
-          tick={(p: TickProps) => <DateTick {...p} ticks={ticks} hi={axis.hi} />}
+          tick={(p: TickProps) => <DateTick {...p} ticks={ticks} shown={shownTicks} hi={axis.hi} />}
           tickLine={false}
           axisLine={false}
         />
@@ -343,6 +360,7 @@ function WeekGroup<W extends PickWeek>({
   readonly todayX?: number;
 }) {
   const latestIndex = restingWeekIndex(weeks, hasData);
+  const [widthRef, boxWidth] = useWidth();
   const { pick, plotProps } = useChartPick({
     count: weeks.length,
     startIndex: latestIndex,
@@ -360,6 +378,11 @@ function WeekGroup<W extends PickWeek>({
   const resting = restingReadout(latest === undefined ? null : readout(latest), "Tryk på grafen for at se en uge");
   const shown = active !== null && pick?.mode !== "mouse" ? readout(active) : resting;
   const all = [resting, ...weeks.map(readout)];
+  // No label at today: one reaching the `I DAG` caption is skipped; none before the row is measured.
+  const shownTicks =
+    boxWidth === null
+      ? []
+      : ticksClearOfToday(ticks, { lo: axis.lo, hi: axis.hi, today: today ?? null, width: boxWidth - Y_AXIS_WIDTH - MARGIN_RIGHT });
 
   return (
     <div className="flex flex-col gap-2">
@@ -373,19 +396,22 @@ function WeekGroup<W extends PickWeek>({
         {markerX !== null && <Marker left={markerX} bottom={X_AXIS_HEIGHT} />}
         {children(active)}
         {today !== undefined && <TodayLine axis={axis} x={today} />}
-        <div className="relative h-[30px]" aria-hidden="true">
-          {ticks.map((t, i) => (
-            <span
-              key={t.x}
-              className="absolute top-1 font-mono text-11 whitespace-nowrap text-text-muted"
-              style={{
-                left: xCss(axis, t.x),
-                transform: i === 0 ? undefined : axis.hi - t.x < 30 ? "translateX(-100%)" : "translateX(-50%)",
-              }}
-            >
-              {t.label}
-            </span>
-          ))}
+        <div ref={widthRef} className="relative h-[30px]" aria-hidden="true">
+          {shownTicks.map((t) => {
+            const anchor = tickAnchor(ticks.indexOf(t), t.x, axis.hi);
+            return (
+              <span
+                key={t.x}
+                className="absolute top-1 font-mono text-11 whitespace-nowrap text-text-muted"
+                style={{
+                  left: xCss(axis, t.x),
+                  transform: anchor === "start" ? undefined : anchor === "end" ? "translateX(-100%)" : "translateX(-50%)",
+                }}
+              >
+                {t.label}
+              </span>
+            );
+          })}
         </div>
         {active !== null && markerX !== null && pick?.mode === "mouse" && (
           <PointerTip readout={readout(active)} left={markerX} rightInset={MARGIN_RIGHT} />
@@ -496,10 +522,13 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
       weeks={weeks}
       ticks={ticks}
       readout={(w) => w.readout}
-      lines={3}
+      // Min-height = head + cells (a week's readout); the stacked sizers grow the row to the
+      // tallest real readout (a week with "N udeladt fra trends"), so nothing extra is reserved.
+      lines={2}
       cells
       overlay={<SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />}
       hasData={(w) => !w.zero}
+      todayX={axis.hi - 0.5}
     >
       {(active) => (
         <>
@@ -738,7 +767,17 @@ function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels, todayX }: Pa
       padTop={BLOCK_ROOM}
       todayX={todayX}
     >
-      {() => panels.map((p) => <E1rmPlot key={p.lift} axis={axis} panel={p} />)}
+      {() => (
+        // 24px between panels (12 + a 1px --border rule + 12), so one panel's bottom y label never
+        // runs into the next one's top label.
+        <div className="flex flex-col">
+          {panels.map((p, i) => (
+            <div key={p.lift} className={i === 0 ? undefined : "mt-3 border-t border-border pt-3"}>
+              <E1rmPlot axis={axis} panel={p} />
+            </div>
+          ))}
+        </div>
+      )}
     </WeekGroup>
   );
 }

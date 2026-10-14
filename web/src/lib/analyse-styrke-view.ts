@@ -17,7 +17,7 @@ import { formatDate, formatDateRange, formatKg, LOCALE, stopAfter } from "./form
 import { LIFT_NAME, LIFTS, perLift, type StrengthLift } from "./lifts.ts";
 
 /** The e1RM panels' height: the client chart's hydration skeleton and loading.tsx share it. */
-export const E1RM_PANELS_HEIGHT = "h-[408px]";
+export const E1RM_PANELS_HEIGHT = "h-[442px]";
 
 /** A week row with an e1RM (and, for block bests, a block). */
 type E1rmRow = StrengthWeekRow & { readonly e1rmKg: number };

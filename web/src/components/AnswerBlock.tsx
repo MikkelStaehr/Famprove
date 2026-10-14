@@ -52,8 +52,8 @@ export function AnswerBlock({ block }: { readonly block: AnswerBlockView }) {
           <p className="flex flex-wrap items-baseline gap-x-2.5">
             {block.figure.arrow !== null && <Arrow direction={block.figure.arrow} />}
             <span className="sr-only">{block.figure.sr}</span>
-            {/* Spec: 40 (48 large); the scale has no text-40, so both use text-48 (reported to design-lead). */}
-            <span aria-hidden="true" className="font-mono text-48 font-medium text-text tabular-nums">
+            {/* Spec §3: Geist Mono 40, 48 when figure.large (the eFTP answer). */}
+            <span aria-hidden="true" className={`font-mono ${block.figure.large ? "text-48" : "text-40"} font-medium text-text tabular-nums`}>
               {block.figure.number}
             </span>
           </p>

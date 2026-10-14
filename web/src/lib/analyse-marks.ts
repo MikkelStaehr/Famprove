@@ -63,3 +63,49 @@ export function isDeloadWeek(week: Span, blocks: readonly Block[]): boolean {
   const mid = (week.x0 + week.x1) / 2;
   return blocks.some((b) => b.deloadX0 !== null && mid >= b.deloadX0 && mid < b.x1);
 }
+
+// --- x labels vs the `I DAG` caption (no label at today) -------------------------------------
+
+/** An x label's text anchor: the first starts at its tick, one within 30 days of the end ends at it, others centred. */
+export type TickAnchor = "start" | "middle" | "end";
+
+export function tickAnchor(index: number, x: number, hi: number): TickAnchor {
+  return index === 0 ? "start" : hi - x < 30 ? "end" : "middle";
+}
+
+/** Clear space between an x label and the `I DAG` caption's left edge (px): never touching. */
+export const TODAY_CLEAR = 8;
+
+/** Size of the x labels and the `I DAG` caption (Geist Mono 11). */
+const LABEL_SIZE = 11;
+
+/** Geist Mono's advance is 0.6 em, so a mono-11 label is 6.6px per character. */
+export function monoWidth(text: string, size: number = LABEL_SIZE): number {
+  return [...text].length * size * 0.6;
+}
+
+type Tick = { readonly x: number; readonly label: string };
+
+/**
+ * The x labels to draw: every tick except one whose label box reaches within TODAY_CLEAR px of the
+ * `I DAG` caption (end-anchored `today.labelGap` px left of the today line) or of the line itself.
+ * Anchors come from the full list, so dropping a label never moves another. `width` is the plot's
+ * width in px (the x scale's range, y-label column excluded); `today` null = no caption, keep all.
+ */
+export function ticksClearOfToday<T extends Tick>(
+  ticks: readonly T[],
+  g: { readonly lo: number; readonly hi: number; readonly today: number | null; readonly width: number },
+): T[] {
+  if (g.today === null) return [...ticks];
+  const px = (x: number) => ((x - g.lo) / (g.hi - g.lo)) * g.width;
+  const line = px(g.today);
+  const captionLeft = line - AMARKS.today.labelGap - monoWidth("I DAG");
+  const blockedFrom = captionLeft - TODAY_CLEAR;
+  const blockedTo = line + AMARKS.today.width / 2 + TODAY_CLEAR;
+  return ticks.filter((t, i) => {
+    const w = monoWidth(t.label);
+    const anchor = tickAnchor(i, t.x, g.hi);
+    const left = anchor === "start" ? px(t.x) : anchor === "end" ? px(t.x) - w : px(t.x) - w / 2;
+    return left + w <= blockedFrom || left >= blockedTo;
+  });
+}

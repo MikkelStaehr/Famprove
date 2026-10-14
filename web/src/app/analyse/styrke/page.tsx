@@ -105,29 +105,32 @@ function Board({ view }: { readonly view: Ready }) {
         {board.rows.map((r) => {
           const kg = r.value.endsWith(" kg");
           return (
+            // Row 1: name and value on one baseline; then the set line, provenance and reference line
+            // full width under them (a second <dd> of the same term), so no phrase breaks at 390.
             <div
               key={r.lift}
               className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 border-t border-border py-3 first:border-t-0 first:pt-0"
             >
-              <dt className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-sans text-16 font-medium text-text">{r.name}</span>
-                {r.lines.map((l) =>
-                  isSentence(l) ? (
-                    <span key={l} className="font-sans text-13 text-text-muted">
-                      {l}
-                    </span>
-                  ) : (
-                    <span key={l} className="font-mono text-12 text-text-muted">
-                      {l}
-                    </span>
-                  ),
-                )}
-              </dt>
-              {/* Spec: Geist Mono 40; the scale has no text-40, so text-48 (reported to design-lead). */}
-              <dd className={`text-right font-mono text-48 font-medium ${r.logged ? "text-text" : "text-text-muted"}`}>
+              <dt className="min-w-0 font-sans text-16 font-medium text-text">{r.name}</dt>
+              <dd className={`text-right font-mono text-40 font-medium ${r.logged ? "text-text" : "text-text-muted"}`}>
                 {kg ? r.value.slice(0, -3) : r.value}
                 {kg && <span className="ml-1 font-mono text-14 font-normal tracking-normal text-text-muted">kg</span>}
               </dd>
+              {r.lines.length > 0 && (
+                <dd className="col-span-2 flex min-w-0 flex-col gap-0.5 pt-1">
+                  {r.lines.map((l) =>
+                    isSentence(l) ? (
+                      <span key={l} className="font-sans text-13 text-text-muted">
+                        {l}
+                      </span>
+                    ) : (
+                      <span key={l} className="font-mono text-12 text-text-muted">
+                        {l}
+                      </span>
+                    ),
+                  )}
+                </dd>
+              )}
             </div>
           );
         })}
