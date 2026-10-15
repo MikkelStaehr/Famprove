@@ -4,7 +4,8 @@ import { useId, useState } from "react";
 
 import { RollingNumber } from "@/components/motion/RollingNumber";
 
-import type { SetState } from "@/lib/set-taps";
+import { type FreshTicks, tickAnimates } from "@/lib/fresh-ticks";
+import { setKey, type SetState } from "@/lib/set-taps";
 import {
   adjustmentBrackets,
   compactPrescription,
@@ -96,6 +97,7 @@ function ExerciseRun({
   readonly onToggle: () => void;
 }) {
   const regionId = useId();
+  const { fresh } = useSession().setLog;
   const e = run.focus;
   const suggestion = suggestionView(e);
   const brackets = adjustmentBrackets(e, "long");
@@ -136,68 +138,83 @@ function ExerciseRun({
         )}
         {/* With a variant the dots and chevron centre on the title's first line (text-16 at line-height 1.35). */}
         <span aria-hidden="true" className={`flex shrink-0 items-center gap-2.5${run.variant === null ? "" : " h-[1.35rem]"}`}>
-          <SetDots dots={run.dots} />
+          <SetDots dots={run.dots} fresh={fresh} />
           <Icon
             name="chevron-down"
             size={16}
-            className={`text-text-muted transition-transform duration-[120ms] motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+            className={`text-text-muted transition-transform duration-[350ms] ease-(--ease-ember) motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
           />
         </span>
       </button>
       {/* Expanded: the prescription, FORSLAG (only with a suggestion), SIDSTE UGE, then the set rows.
-          The visual copy is aria-hidden: each set row's sr sentence says the same values. */}
-      <div id={regionId} hidden={!expanded} className="pb-2">
-        {run.prescription !== "" && (
-          <p aria-hidden="true" className={`min-w-0 pb-1.5 font-mono text-14 tabular-nums break-words ${muted}`}>
-            <KeepRanges text={run.prescription} />
-          </p>
-        )}
-        {((suggestion.kg !== null && !newVariant) || lastWeek !== undefined) && (
-          <div aria-hidden="true" className={`flex min-w-0 flex-wrap gap-x-6 gap-y-1 pb-3 ${run.closed ? "text-text-muted" : ""}`}>
-            {suggestion.kg !== null && !newVariant && (
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
-                <span className="font-mono text-16 tabular-nums">
-                  <span className="whitespace-nowrap">{suggestion.kg}</span>
-                  {brackets !== null && <span className="font-sans text-13 text-text-muted"> {brackets}</span>}
-                </span>
-              </span>
+          The visual copy is aria-hidden: each set row's sr sentence says the same values.
+          Unfold (Part B "Motion"): grid rows 0fr <-> 1fr over 380 ms on the ember ease; a mount never
+          transitions, so the first paint is still. Closed = inert at once (out of the tab order and
+          the accessibility tree), never display:none, so a fresh tick's draw doesn't replay on reopen.
+          The inner -mx-1 px-1 keeps the set rows' 4px focus ring inside the clip. */}
+      <div
+        id={regionId}
+        inert={!expanded}
+        data-expanded={expanded}
+        className={`grid transition-[grid-template-rows] duration-[380ms] ease-(--ease-ember) motion-reduce:transition-none ${
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="-mx-1 min-h-0 overflow-hidden px-1">
+          <div className="pb-2">
+            {run.prescription !== "" && (
+              <p aria-hidden="true" className={`min-w-0 pb-1.5 font-mono text-14 tabular-nums break-words ${muted}`}>
+                <KeepRanges text={run.prescription} />
+              </p>
             )}
-            {lastWeek !== undefined &&
-              (newVariant ? (
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
-                  <span className="text-14 text-text-muted">{NEW_VARIANT_TEXT}</span>
-                </span>
-              ) : lastWeek === null ? (
-                <span className="min-w-0 self-end text-14 text-text-muted">Intet logget sidste uge</span>
-              ) : (
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
-                  <span className="font-mono text-16 tabular-nums">{lastWeek}</span>
-                </span>
-              ))}
+            {((suggestion.kg !== null && !newVariant) || lastWeek !== undefined) && (
+              <div aria-hidden="true" className={`flex min-w-0 flex-wrap gap-x-6 gap-y-1 pb-3 ${run.closed ? "text-text-muted" : ""}`}>
+                {suggestion.kg !== null && !newVariant && (
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
+                    <span className="font-mono text-16 tabular-nums">
+                      <span className="whitespace-nowrap">{suggestion.kg}</span>
+                      {brackets !== null && <span className="font-sans text-13 text-text-muted"> {brackets}</span>}
+                    </span>
+                  </span>
+                )}
+                {lastWeek !== undefined &&
+                  (newVariant ? (
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
+                      <span className="text-14 text-text-muted">{NEW_VARIANT_TEXT}</span>
+                    </span>
+                  ) : lastWeek === null ? (
+                    <span className="min-w-0 self-end text-14 text-text-muted">Intet logget sidste uge</span>
+                  ) : (
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
+                      <span className="font-mono text-16 tabular-nums">{lastWeek}</span>
+                    </span>
+                  ))}
+              </div>
+            )}
+            {run.groups.map((group) => {
+              const caption = multi ? compactPrescription(group.exercise) : null;
+              return (
+                <div key={group.exercise.key} className="flex flex-col">
+                  {caption !== null && (
+                    <p aria-hidden="true" className="pt-2 pb-1 font-mono text-12 text-text-muted tabular-nums">
+                      <KeepRanges text={caption} />
+                    </p>
+                  )}
+                  <ol aria-label="Sæt" className="flex flex-col">
+                    {group.sets.map((line) => (
+                      <li key={`${line.ref.row}#${line.ref.set}`}>
+                        <SetLine group={group} line={line} week={week} />
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            })}
           </div>
-        )}
-        {run.groups.map((group) => {
-          const caption = multi ? compactPrescription(group.exercise) : null;
-          return (
-            <div key={group.exercise.key} className="flex flex-col">
-              {caption !== null && (
-                <p aria-hidden="true" className="pt-2 pb-1 font-mono text-12 text-text-muted tabular-nums">
-                  <KeepRanges text={caption} />
-                </p>
-              )}
-              <ol aria-label="Sæt" className="flex flex-col">
-                {group.sets.map((line) => (
-                  <li key={`${line.ref.row}#${line.ref.set}`}>
-                    <SetLine group={group} line={line} week={week} />
-                  </li>
-                ))}
-              </ol>
-            </div>
-          );
-        })}
+        </div>
       </div>
     </div>
   );
@@ -208,12 +225,17 @@ function ExerciseRun({
  * disc, open = a 1px --text-muted ring, skipped = that ring with a short diagonal stroke (shape,
  * not colour), the NÆSTE set = a 1.5px --text ring.
  */
-function SetDots({ dots }: { readonly dots: readonly SetDot[] }) {
+function SetDots({ dots, fresh }: { readonly dots: readonly SetDot[]; readonly fresh: FreshTicks }) {
   return (
     <span className="flex items-center gap-1">
       {dots.map((d) =>
         d.state === "done" ? (
-          <span key={d.key} data-dot="done" className="block size-2 rounded-pill bg-text" />
+          // A tap's dot pops (.dot-pop, globals.css); a restored one doesn't.
+          <span
+            key={d.key}
+            data-dot="done"
+            className={`block size-2 rounded-pill bg-text${tickAnimates(fresh, d.key, d.state) ? " dot-pop" : ""}`}
+          />
         ) : (
           <span
             key={d.key}
@@ -235,6 +257,7 @@ function SetDots({ dots }: { readonly dots: readonly SetDot[] }) {
 function SetLine({ group, line, week }: { readonly group: SetGroupView; readonly line: SetLineView; readonly week: number }) {
   const { setLog } = useSession();
   const status = setStatus(line);
+  const draw = tickAnimates(setLog.fresh, setKey(line.ref), line.state);
   const muted = line.state !== "open" ? "text-text-muted" : "text-text";
   // open -> done; done -> open (undo); skipped -> done.
   const toggle = () => setLog.tap(line.state === "done" ? "undo" : "done", line.ref);
@@ -246,7 +269,7 @@ function SetLine({ group, line, week }: { readonly group: SetGroupView; readonly
       <input type="checkbox" className="sr-only" checked={line.state === "done"} onChange={toggle} />
       <span className="sr-only">{spokenSetLine(group.exercise, week, line)}</span>
       <span aria-hidden="true" className="flex size-11 items-center justify-center">
-        <SetTick state={line.state} />
+        <SetTick state={line.state} draw={draw} />
       </span>
       <span aria-hidden="true" className="min-w-0 font-sans text-15">
         Sæt <span className="font-mono">{line.n}</span> af <span className="font-mono">{line.of}</span>
@@ -306,13 +329,30 @@ function KeepRanges({ text }: { readonly text: string }) {
 /**
  * The set tick (reset-traening.md §2.5): a 24px circle in the 44 × 44 target. Open = a 1.5px
  * --shade-2 ring (5.93:1); done = an --inverse-bg disc with a 1.5px --inverse-text check; skipped =
- * the ring with a 1.5px dash. Shape, not colour, tells them apart. No motion.
+ * the ring with a 1.5px dash. Shape, not colour, tells them apart. The disc shows at once (T4); a
+ * tap's check then draws over 400 ms (`draw`, .tick-draw in globals.css); a restored one is still,
+ * and an undo has no reverse (T3). The check is Lucide's path drawn left to right, so the short
+ * stroke comes first; pathLength 1 makes the dash a fraction.
  */
-function SetTick({ state }: { readonly state: SetState }) {
+function SetTick({ state, draw }: { readonly state: SetState; readonly draw: boolean }) {
   if (state === "done") {
     return (
       <span data-tick="done" className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-inverse-bg">
-        <Icon name="check" size={16} className="text-inverse-text" />
+        <svg
+          width={16}
+          height={16}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          focusable="false"
+          className={`shrink-0 text-inverse-text${draw ? " tick-draw" : ""}`}
+        >
+          <path pathLength={1} d="M4 12l5 5L20 6" />
+        </svg>
       </span>
     );
   }

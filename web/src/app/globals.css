@@ -294,3 +294,28 @@ main:has(> [data-screen="fokus"]) {
     transform: scaleY(1);
   }
 }
+
+/* Træning's set check (Part B "Motion": ✓ stroke draw 400 ms / set dot pop 0.4 → 1.35 → 1 over
+   400 ms, the ember ease). SetChecklist adds .tick-draw / .dot-pop only to a set ticked by a tap
+   in this session (lib/fresh-ticks), never to a tick restored from the log; the check path has
+   pathLength 1, so the icon-draw keyframes above draw it. Only under no-preference. */
+@media (prefers-reduced-motion: no-preference) {
+  .tick-draw path {
+    stroke-dasharray: 1;
+    animation: icon-draw 400ms var(--ease-ember) both;
+  }
+  .dot-pop {
+    animation: dot-pop 400ms var(--ease-ember);
+  }
+}
+@keyframes dot-pop {
+  0% {
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

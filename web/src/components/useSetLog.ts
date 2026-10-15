@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { logExerciseTap } from "@/app/actions";
+import { freshAfterTap, type FreshTicks, initialFresh } from "@/lib/fresh-ticks";
 import {
   applyTap,
   type LoggedSet,
@@ -25,6 +26,8 @@ import {
  */
 export type SetLog = {
   readonly log: ReadonlyMap<string, LoggedSet>;
+  /** Sets ticked done by a tap since load (lib/fresh-ticks): only these draw / pop. Never a restored tick. */
+  readonly fresh: FreshTicks;
   /** `value`: a feel (-1/0/+1, null clears) or the reps done; omitted for the other kinds. */
   readonly tap: (kind: SetTapKind, ref: SetRef, value?: number | null) => void;
   readonly unsaved: number; // sets with a tap whose save failed, waiting for retry
@@ -58,6 +61,7 @@ export function useSetLog(
   const [log, setLog] = useState<ReadonlyMap<string, LoggedSet>>(
     () => new Map(initial.map((l) => [setKey(l), l])),
   );
+  const [fresh, setFresh] = useState<FreshTicks>(initialFresh);
   // Failed taps, in order, outside React state: a retry must send each exactly once.
   const failed = useRef<SetTapInput[]>([]);
   const [unsaved, setUnsaved] = useState(0);
@@ -101,6 +105,7 @@ export function useSetLog(
         countFailed();
       }
       setLog((previous) => applyTap(order, previous, kind, ref, new Date().toISOString(), value));
+      setFresh((previous) => freshAfterTap(previous, kind, setKey(ref)));
       const withValue = kind === "feel" || kind === "reps";
       const input: SetTapInput = { kind, date, session, row: ref.row, set: ref.set, undoes, ...(withValue ? { value } : {}) };
       queue.current = queue.current.then(() => send(input));
@@ -120,5 +125,5 @@ export function useSetLog(
   const flush = useCallback(() => queue.current, []);
   const failedNow = useCallback(() => failed.current.length, []);
 
-  return { log, tap, unsaved, retry, rejected, dev, flush, failedNow };
+  return { log, fresh, tap, unsaved, retry, rejected, dev, flush, failedNow };
 }
