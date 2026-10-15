@@ -176,7 +176,7 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
   };
 
   return (
-    <div className="flex h-dvh flex-col bg-bg">
+    <div className="@container/shell flex h-dvh flex-col bg-bg">
       <div
         ref={viewport}
         className="relative min-h-0 flex-1 overflow-hidden lg:order-last"
@@ -203,6 +203,8 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
               aria-hidden={!active}
             >
               <main className="h-full touch-pan-y overflow-y-auto overscroll-y-contain">
+                {/* 200 % text: the tab strip at the top of the page, scrolling away with it (TabBar). */}
+                <TabBar index={index} onSelect={goTo} placement="strip" />
                 <div className="mx-auto flex w-full max-w-content flex-col gap-3 pt-[max(20px,env(safe-area-inset-top))] pr-[max(16px,env(safe-area-inset-right))] pb-6 pl-[max(16px,env(safe-area-inset-left))] lg:max-w-wide lg:gap-6 lg:px-8 lg:pt-0 lg:pb-12">
                   {page}
                 </div>

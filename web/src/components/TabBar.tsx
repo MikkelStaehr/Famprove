@@ -24,14 +24,20 @@ const ICONS: readonly IconName[] = ["barbell", "trend", "bars"];
  * navigation); the href stays for a new tab or window. /fokus has no shell, so no bar.
  * Indicator (phone bar only): a track one tab wide on the bar's top edge, holding a 28px 2px --text
  * bar; TabShell translates it by p × 100 % of its own width. None at lg or on the 200 % strip.
+ * 200 % text (the shell narrower than 20.5rem): the shell's bar hides and each page carries a
+ * `placement="strip"` copy at the top of its scroll container, so the strip scrolls away with the
+ * page as before the shell (design-lead Must, motion-shell); the inactive pages' copies are inert.
  */
 export function TabBar({
   index,
   onSelect,
   indicatorRef,
+  placement = "bar",
 }: {
   readonly index: number;
   readonly onSelect: (i: number) => void;
+  /** "bar": the shell's own (hidden at 200 % text); "strip": a page's copy (shown only at 200 % text). */
+  readonly placement?: "bar" | "strip";
   /** The indicator's track: TabShell moves it to p every frame (its first paint sits at `index`). */
   readonly indicatorRef?: Ref<HTMLSpanElement>;
 }) {
@@ -43,7 +49,11 @@ export function TabBar({
     onSelect(i);
   };
   return (
-    <header className="@container/nav mx-auto w-full max-w-content lg:order-first lg:max-w-wide lg:px-8 lg:pt-4 lg:pb-6">
+    <header
+      className={`@container/nav mx-auto w-full max-w-content lg:order-first lg:max-w-wide lg:px-8 lg:pt-4 lg:pb-6 ${
+        placement === "bar" ? "@max-[20.5rem]/shell:hidden" : "hidden @max-[20.5rem]/shell:block"
+      }`}
+    >
       <nav
         aria-label="Hovedmenu"
         className="relative border-t border-border bg-bg pt-2.5 pr-[max(16px,env(safe-area-inset-right))] pb-[max(24px,env(safe-area-inset-bottom))] pl-[max(16px,env(safe-area-inset-left))] @max-[20.5rem]/nav:border-t-0 @max-[20.5rem]/nav:pb-2.5 lg:inline-flex lg:rounded-button lg:border lg:border-border lg:bg-card lg:p-1"

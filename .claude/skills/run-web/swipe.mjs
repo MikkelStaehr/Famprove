@@ -163,7 +163,11 @@ try {
     else if (step === "short-left" || step === "short-right") await swipe(step.slice(6), 0.15, 600);
     else if (step === "edge-left" || step === "edge-right") await swipe(step.slice(5), Number(opt.share), ms, true);
     // The tab bar's link (a page's own section links, e.g. Analyse's Cykel, share hrefs and are inert when hidden).
-    else if (step.startsWith("tap:")) await evaluate(`document.querySelector('nav[aria-label="Hovedmenu"] a[href="${step.slice(4)}"]')?.click(); true`);
+    else if (step.startsWith("tap:"))
+      await evaluate(
+        `[...document.querySelectorAll('nav[aria-label="Hovedmenu"] a[href="${step.slice(4)}"]')]` +
+          `.find((a) => a.offsetParent !== null && !a.closest('[inert]'))?.click(); true`, // the visible bar or strip
+      );
     else if (step === "back") await evaluate(`history.back(); true`);
     else throw new Error(`unknown step ${step}`);
     await sleep(700); // the 440 ms animation and a margin
