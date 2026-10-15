@@ -6,7 +6,13 @@
 //   [--reduce-motion] [--zoom200] [--base http://localhost:3100] [--timeout 120]
 // Steps: left | right (a swipe of --share x width over --ms, from the middle, never the edge zones),
 //   flick-left | flick-right (15 % of the width in 80 ms), short-left | short-right (15 % over 600 ms),
-//   edge-left | edge-right (starting 10 px from the edge), tap:<path> (a click on that tab), back (history).
+//   edge-left | edge-right (starting 10 px from the edge), tap:<path> (a click on that tab), back (history),
+//   scroll-down | scroll-up (a touch drag mostly in y: 300 px up/down with 20 px sideways),
+//   diag-left | diag-right (|dx| = |dy| = 60 px: below the 1.3 lock ratio, must not move a page),
+//   tabkeys (Tab pressed 60 times: reports whether focus ever reached an inactive page).
+// Per step also: each page's scrollTop, whether every inactive page is inert + visibility hidden, the
+// indicator's transform, and the card-stack frames that changed after the gesture ended (count and span in ms:
+// a 440 ms animation spans ~440, a snap 0-1 changes).
 // --mid shoots the screen half-way through the first swipe (the card stack mid-move).
 // Prints one JSON line: per step the URL and active page after it settles; long animation frames
 // (PerformanceObserver "long-animation-frame", > 50 ms) and the largest gap between animation frames
@@ -129,13 +135,40 @@ try {
       .observe({ type: 'long-animation-frame', buffered: false }); } catch {}
     window.__gap = 0; window.__measure = false; let last = 0;
     const tick = (t) => { if (window.__measure && last) window.__gap = Math.max(window.__gap, t - last); last = t; requestAnimationFrame(tick); };
-    requestAnimationFrame(tick); return true; })()`);
+    requestAnimationFrame(tick);
+    window.__tl = []; let sig = '';
+    const sample = (t) => { const s = [...document.querySelectorAll('[data-tab-page]')].map((e) => e.style.transform).join('|');
+      if (s !== sig) { sig = s; window.__tl.push(t); } requestAnimationFrame(sample); };
+    requestAnimationFrame(sample); return true; })()`);
+  const state = () =>
+    evaluate(`(() => { const pages = [...document.querySelectorAll('[data-tab-page]')];
+      const act = document.querySelector('[data-tab-page][data-active]');
+      return { url: location.pathname, active: act?.dataset.tabPage ?? null,
+        inactiveInert: pages.filter((e) => e !== act).every((e) => e.inert && getComputedStyle(e).visibility === 'hidden'),
+        notInert: pages.filter((e) => e !== act && !(e.inert && getComputedStyle(e).visibility === 'hidden'))
+          .map((e) => [e.dataset.tabPage, e.inert, getComputedStyle(e).visibility, e.style.transform]),
+        scroll: Object.fromEntries(pages.map((e) => [e.dataset.tabPage, Math.round(e.querySelector('main')?.scrollTop ?? -1)])),
+        transforms: pages.map((e) => e.style.transform),
+        navs: [...document.querySelectorAll('nav[aria-label="Hovedmenu"]')].filter((n) => n.offsetParent !== null && !n.closest('[inert]'))
+          .map((n) => ({ top: Math.round(n.getBoundingClientRect().top), indicator: [...n.querySelectorAll('span.block')].some((x) => x.offsetParent !== null) })),
+        indicator: [...document.querySelectorAll('nav[aria-label="Hovedmenu"] span[class*="w-1/3"]')].at(-1)?.style.transform ?? null }; })()`);
+  const initial = await state();
   const cpu = Number(opt.cpu);
   if (cpu > 1) await send("Emulation.setCPUThrottlingRate", { rate: cpu });
 
   const touch = (type, x, y) => send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y }] });
   const y = Math.round(height * 0.45);
   let midShot = opt.mid;
+  let midState = null;
+  async function vertical(sx, sy, dx, dy) {
+    const x0 = Math.round(width / 2), y0 = Math.round(height * 0.5);
+    await touch("touchStart", x0, y0);
+    for (let k = 1; k <= 12; k++) {
+      await sleep(25);
+      await touch("touchMove", Math.round(x0 + (sx * dx * k) / 12), Math.round(y0 + (sy * dy * k) / 12));
+    }
+    await touch("touchEnd", 0, 0);
+  }
   async function swipe(dir, share, ms, fromEdge = false) {
     const sign = dir === "left" ? -1 : 1;
     const x0 = fromEdge ? (sign < 0 ? width - 10 : 10) : sign < 0 ? Math.round(width * 0.75) : Math.round(width * 0.25);
@@ -146,6 +179,7 @@ try {
       await sleep(ms / n);
       await touch("touchMove", Math.round(x0 + (sign * dist * k) / n), y);
       if (midShot && k === Math.floor(n / 2)) {
+        midState = await state();
         const shot = await send("Page.captureScreenshot", { format: "png" });
         writeFileSync(midShot, Buffer.from(shot.data, "base64"));
         midShot = undefined;
@@ -158,6 +192,7 @@ try {
   for (const step of opt.steps.split(",").map((s) => s.trim()).filter(Boolean)) {
     const ms = Number(opt.ms);
     const t0 = await evaluate(`performance.now()`);
+    let tEnd = t0;
     if (step === "left" || step === "right") await swipe(step, Number(opt.share), ms);
     else if (step === "flick-left" || step === "flick-right") await swipe(step.slice(6), 0.18, 40); // < 22 %, > 0.45 px/ms
     else if (step === "short-left" || step === "short-right") await swipe(step.slice(6), 0.15, 600);
@@ -169,14 +204,28 @@ try {
           `.find((a) => a.offsetParent !== null && !a.closest('[inert]'))?.click(); true`, // the visible bar or strip
       );
     else if (step === "back") await evaluate(`history.back(); true`);
+    else if (step === "scroll-down") await vertical(1, -1, 20, 300);
+    else if (step === "scroll-up") await vertical(1, 1, 20, 300);
+    else if (step === "diag-left" || step === "diag-right") await vertical(step === "diag-left" ? -1 : 1, -1, 60, 60);
+    else if (step === "tabkeys") {
+      let leaked = 0;
+      for (let k = 0; k < 60; k++) {
+        await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+        await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+        if (await evaluate(`!!document.activeElement?.closest('[data-tab-page]:not([data-active])')`)) leaked += 1;
+      }
+      results.push({ step, focusInInactivePage: leaked });
+      continue;
+    }
     else throw new Error(`unknown step ${step}`);
+    if (!step.startsWith("tap:") && step !== "back") tEnd = await evaluate(`performance.now()`);
     await sleep(700); // the 440 ms animation and a margin
+    const after = await evaluate(`window.__tl.filter((t) => t > ${tEnd})`);
     results.push({
       step,
-      ...(await evaluate(
-        `({ url: location.pathname, active: document.querySelector('[data-tab-page][data-active]')?.dataset.tabPage ?? null,` +
-          ` long: (window.__longAt || []).filter(([t]) => t >= ${t0}).map(([, d]) => d) })`,
-      )),
+      ...(await state()),
+      settle: { changes: after.length, spanMs: after.length ? Math.round(after[after.length - 1] - after[0]) : 0 },
+      ...(await evaluate(`({ long: (window.__longAt || []).filter(([t]) => t >= ${t0}).map(([, d]) => d) })`)),
     });
     await evaluate(`window.__longAt = []; true`);
   }
@@ -192,7 +241,7 @@ try {
   }
   const long = timing.long === null ? null : timing.long.filter((d) => d > 50);
   console.log(
-    JSON.stringify({ path: opt.path, cpu, steps: results, longFramesOver50ms: long, maxFrameGapMs: timing.gap, horizontalOverflow: overflow, consoleErrors: errors }),
+    JSON.stringify({ path: opt.path, cpu, initial, mid: midState, steps: results, longFramesOver50ms: long, maxFrameGapMs: timing.gap, horizontalOverflow: overflow, consoleErrors: errors }),
   );
   if ((long !== null && long.length > 0) || errors.length > 0 || overflow) exitCode = 1;
   ws.close();

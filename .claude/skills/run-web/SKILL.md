@@ -70,7 +70,14 @@ gestures run, optionally under CPU throttling. Same browser and port rules as `s
 .claude/skills/run-web/serve.sh -- "node .claude/skills/run-web/swipe.mjs --path /load --cpu 4 --steps left,right,tap:/train,back --mid \$TMPDIR/mid.png"
 ```
 Steps: `left` / `right` (a swipe of `--share` x width over `--ms`), `flick-*` (15 % in 80 ms), `short-*`
-(15 % over 600 ms), `edge-*` (from 10 px off the edge: must not move), `tap:<path>`, `back`. `--mid` shoots
+(15 % over 600 ms), `edge-*` (from 10 px off the edge: must not move), `tap:<path>`, `back`,
+`scroll-down` / `scroll-up` (a touch drag mostly in y, 300 px with 20 px sideways: the page scrolls, no tab move),
+`diag-*` (|dx| = |dy| = 60 px, under the 1.3 lock ratio: must not move), `tabkeys` (Tab pressed 60 times; counts
+focus landing in an inactive page). Each step also reports every page's scrollTop, whether the inactive pages are
+`inert` + `visibility: hidden` (`notInert` lists any that aren't), the indicator's transform, the visible tab bars
+(top, indicator shown) and `settle` (card-stack frames changed after the gesture ended: ~440 ms span = animated,
+0-1 changes = a snap). The output starts with `initial` (the hard-loaded state) and `mid` (the state at `--mid`).
+Frame numbers are only meaningful on an idle machine: check `uptime` and report the load average with them. `--mid` shoots
 the card stack half-way through the first swipe. Prints the URL and active page after each step; exits 1 on
 a long frame over 50 ms, a console error or a horizontal overflow. Safari has no long-animation-frame API:
 the user's own phone stays a manual check.
