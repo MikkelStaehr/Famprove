@@ -1087,12 +1087,20 @@ export type PlannedSetRow = {
   readonly restMaxS: number | null;
   /** The warm-up ramp on a main lift's first set of a run; null = none. */
   readonly ramp: readonly RampStep[] | null;
+  /** Today's kg (fokus-kg.md, python domain/today_kg.py); null = no figure, never 0 for missing
+   * (0 only on a bodyweight exercise = bodyweight alone). Null exactly with todayBasis. */
+  readonly todayKg: number | null;
+  readonly todayBasis: TodayBasis | null;
 };
+
+/** Where today's kg comes from: the sheet, derived from a sibling set, the e1RM estimate, or last week. */
+export type TodayBasis = "sheet" | "derived" | "e1rm" | "last";
+const TODAY_BASES: readonly TodayBasis[] = ["sheet", "derived", "e1rm", "last"];
 
 export const PLANNED_SETS_SELECT = {
   table: "planned_sets",
   columns:
-    "sheet_id,block,sheet_row,week,set_no,suggested_kg,basis,uncapped_kg,adjustment_kg,adjustment_reason,rest_min_s,rest_max_s,ramp",
+    "sheet_id,block,sheet_row,week,set_no,suggested_kg,basis,uncapped_kg,adjustment_kg,adjustment_reason,rest_min_s,rest_max_s,ramp,today_kg,today_basis",
   order: "sheet_id,block,sheet_row,week,set_no", // the primary key
 } as const;
 
@@ -1120,7 +1128,20 @@ export function parsePlannedSetRow(raw: unknown): PlannedSetRow {
     ...adjustmentOf(f),
     ...restOf(f),
     ramp: rampOf(f),
+    ...todayOf(f),
   };
+}
+
+function todayOf(f: Fields): { todayKg: number | null; todayBasis: TodayBasis | null } {
+  const todayKg = f.numberOrNull("today_kg");
+  const raw = f.stringOrNull("today_basis");
+  const todayBasis = raw === null ? null : (TODAY_BASES.find((b) => b === raw) ?? null);
+  if (raw !== null && todayBasis === null) throw new RowError("planned_sets.today_basis: unknown value");
+  if ((todayKg === null) !== (todayBasis === null)) {
+    throw new RowError("planned_sets.today_kg: expected a kg exactly with a basis");
+  }
+  if (todayKg !== null && todayKg < 0) throw new RowError("planned_sets.today_kg: expected >= 0");
+  return { todayKg, todayBasis };
 }
 
 function adjustmentOf(f: Fields): { adjustmentKg: number | null; adjustmentReason: string | null } {

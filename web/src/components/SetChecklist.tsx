@@ -11,16 +11,14 @@ import {
   compactPrescription,
   type ExerciseRunView,
   exerciseRuns,
-  isNewVariant,
-  lastWeekText,
-  NEW_VARIANT_TEXT,
+  lastWeekItem,
   runCountText,
   type SetDot,
   type SetGroupView,
   type SetLineView,
   setStatus,
   spokenSetLine,
-  suggestionView,
+  todayKgView,
 } from "@/lib/training-view";
 
 import { Icon } from "./icons";
@@ -99,10 +97,9 @@ function ExerciseRun({
   const regionId = useId();
   const { fresh } = useSession().setLog;
   const e = run.focus;
-  const suggestion = suggestionView(e);
-  const brackets = adjustmentBrackets(e, "long");
-  const lastWeek = lastWeekText(e, week);
-  const newVariant = isNewVariant(e, week);
+  const today = todayKgView(e);
+  const brackets = today?.basis === "e1rm" ? adjustmentBrackets(e, "long") : null;
+  const lastWeek = lastWeekItem(e, week);
   const muted = run.closed ? "text-text-muted" : "text-text";
   const multi = run.groups.length > 1;
   return (
@@ -146,7 +143,7 @@ function ExerciseRun({
           />
         </span>
       </button>
-      {/* Expanded: the prescription, FORSLAG (only with a suggestion), SIDSTE UGE, then the set rows.
+      {/* Expanded: the prescription, today's kg (fokus-kg.md §3), SIDSTE UGE, then the set rows.
           The visual copy is aria-hidden: each set row's sr sentence says the same values.
           Unfold (Part B "Motion"): grid rows 0fr <-> 1fr over 380 ms on the ember ease; a mount never
           transitions, so the first paint is still. Closed = inert at once (out of the tab order and
@@ -167,31 +164,29 @@ function ExerciseRun({
                 <KeepRanges text={run.prescription} />
               </p>
             )}
-            {((suggestion.kg !== null && !newVariant) || lastWeek !== undefined) && (
+            {(today !== null || lastWeek !== null) && (
               <div aria-hidden="true" className={`flex min-w-0 flex-wrap gap-x-6 gap-y-1 pb-3 ${run.closed ? "text-text-muted" : ""}`}>
-                {suggestion.kg !== null && !newVariant && (
+                {today !== null && (
                   <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="font-mono text-12 text-text-muted uppercase">Forslag</span>
-                    <span className="font-mono text-16 tabular-nums">
-                      <span className="whitespace-nowrap">{suggestion.kg}</span>
-                      {brackets !== null && <span className="font-sans text-13 text-text-muted"> {brackets}</span>}
+                    <span className="font-mono text-12 text-text-muted uppercase">{today.caption}</span>
+                    <span className={`font-mono text-16 tabular-nums${today.italic ? " italic" : ""}`}>
+                      <span className="whitespace-nowrap">{today.unit === null ? today.figure : `${today.figure} kg`}</span>
+                      {brackets !== null && <span className="font-sans text-13 not-italic text-text-muted"> {brackets}</span>}
                     </span>
                   </span>
                 )}
-                {lastWeek !== undefined &&
-                  (newVariant ? (
-                    <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
-                      <span className="text-14 text-text-muted">{NEW_VARIANT_TEXT}</span>
-                    </span>
-                  ) : lastWeek === null ? (
-                    <span className="min-w-0 self-end text-14 text-text-muted">Intet logget sidste uge</span>
-                  ) : (
-                    <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
-                      <span className="font-mono text-16 tabular-nums">{lastWeek}</span>
-                    </span>
-                  ))}
+                {lastWeek?.kind === "new_variant" && (
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
+                    <span className="text-14 text-text-muted">{lastWeek.text}</span>
+                  </span>
+                )}
+                {lastWeek?.kind === "kg" && (
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
+                    <span className="font-mono text-16 tabular-nums">{lastWeek.text}</span>
+                  </span>
+                )}
               </div>
             )}
             {run.groups.map((group) => {

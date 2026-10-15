@@ -148,8 +148,34 @@ function plannedFor(s: PrescribedSetRow, planned: readonly PlannedSetRow[]): Pla
       restMinS: null,
       restMaxS: null,
       ramp: null,
+      todayKg: null,
+      todayBasis: null,
     }
   );
+}
+
+/**
+ * fokus-kg.md: illustrative today's kg so every caption can be shot. Per session, the sheet rows in
+ * order: 1st "sheet", 2nd "e1rm" (~, the suggestion), 3rd "derived", 4th "last", 5th none; later
+ * rows keep their own. Dev only; Python owns the real values (domain/today_kg.py).
+ */
+export function illustrativeToday(
+  sets: readonly PrescribedSetRow[],
+  planned: readonly PlannedSetRow[],
+): PlannedSetRow[] {
+  const rowsOf = (session: number) =>
+    [...new Set(sets.filter((s) => s.session === session).map((s) => s.sheetRow))].toSorted((a, b) => a - b);
+  const bases = ["sheet", "e1rm", "derived", "last", null] as const;
+  const out = new Map(planned.map((p) => [`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, p]));
+  for (const s of sets) {
+    const i = rowsOf(s.session).indexOf(s.sheetRow);
+    if (i === -1 || i >= bases.length) continue;
+    const p = out.get(`${s.block}#${s.sheetRow}#${s.week}#${s.setNo}`) ?? plannedFor(s, planned);
+    const basis = bases[i];
+    const kg = basis === "e1rm" ? (p.suggestedKg ?? s.loggedKg ?? FIXTURE_RAMP_BASIS_KG) : (s.loggedKg ?? p.suggestedKg ?? FIXTURE_RAMP_BASIS_KG);
+    out.set(`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, { ...p, todayKg: basis === null ? null : kg, todayBasis: basis });
+  }
+  return [...out.values()];
 }
 
 /**
@@ -313,7 +339,7 @@ export function midsessionPlanned(
     const capped = i === 1 ? { uncappedKg: kg + 2.5 } : {};
     out.set(`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, { ...p, suggestedKg: kg, basis: p.suggestedKg === null ? "rpe_e1rm" : p.basis, ...changes[i], ...capped });
   }
-  return [...out.values()];
+  return illustrativeToday(sets, [...out.values()]);
 }
 
 /** DEV_FIXTURE=feel: two exercise_feel rows in Python's sentence form (not real verdicts). */

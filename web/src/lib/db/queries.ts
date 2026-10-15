@@ -17,6 +17,7 @@ import {
   ILLUSTRATIVE_FEEL,
   isPauseFixture,
   midsessionLog,
+  illustrativeToday,
   midsessionPlanned,
   midsessionVariants,
   pauseFixture,
@@ -405,7 +406,10 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
       setLog: midsessionLog(sets, today, new Date()),
     };
   }
-  if (isPauseFixture(fixture)) return { ...base, ...pauseFixture(fixture, sets, plannedSets, today, new Date()) };
+  if (isPauseFixture(fixture)) {
+    const pause = pauseFixture(fixture, sets, plannedSets, today, new Date());
+    return { ...base, ...pause, plannedSets: illustrativeToday(pause.sets, pause.plannedSets) };
+  }
   return base;
 }
 

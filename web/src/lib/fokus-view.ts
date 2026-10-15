@@ -20,11 +20,12 @@ import {
   stateOf,
 } from "./set-taps.ts";
 import {
-  CAPPED_WORD,
   type ExerciseView,
-  isNewVariant,
-  NEW_VARIANT_TEXT,
+  lastWeekItem,
+  type LastWeekItem,
   type Reference,
+  todayKgView,
+  type TodayKgView,
   runPositions,
   spokenAdjustment,
   spokenName,
@@ -50,6 +51,8 @@ export type FokusExercise = Pick<
   | "restMinS"
   | "restMaxS"
   | "ramp"
+  | "todayKg"
+  | "todayBasis"
   | "sets"
 > & {
   /** This week's sheet kg (ExerciseView.kg): never shown (D3); only the finished signature's bar height reads it. */
@@ -139,60 +142,21 @@ export function referenceText(reference: Reference): string {
 }
 
 /**
- * The set card's kg block (§4.2.4). `figure` is the 56px part, `unit` the 32px " kg" after it
- * (null when the figure carries no kg, e.g. "kropsvægt"). italic = computed by the app.
- *   suggestion  label Forslag, the suggestion, italic
- *   last_week   no suggestion: label Sidste uge, last week's kg upright
- * Neither: null, and the block is not shown (review round §8: no suggestion shows nothing).
+ * The set card's kg block (fokus-kg.md §1): today's kg with its caption; italic = computed by the
+ * app (derived, e1rm). A new variant keeps its block (§2: its text is the Sidste uge line).
+ * No today's kg: null, and the block is not shown (no empty caption).
  */
-export type KgBlock =
-  | { readonly kind: "new_variant"; readonly text: typeof NEW_VARIANT_TEXT }
-  | {
-      readonly kind: "suggestion";
-      readonly label: "Forslag";
-      readonly figure: string;
-      readonly unit: "kg";
-      readonly capped: boolean; // the weekly cap changed it: "(begrænset)"
-    }
-  | {
-      readonly kind: "last_week";
-      readonly label: "Sidste uge";
-      readonly figure: string;
-      readonly unit: "kg" | null;
-    };
+export type KgBlock = TodayKgView;
 
-export function kgBlock(e: FokusExercise, week: number): KgBlock | null {
-  if (isNewVariant(e, week)) return { kind: "new_variant", text: NEW_VARIANT_TEXT }; // variants.md §3: in place of the kg block
-  if (e.suggestedKg !== null) {
-    return { kind: "suggestion", label: "Forslag", figure: formatKg(e.suggestedKg), unit: "kg", capped: e.suggestionCapped };
-  }
-  if (e.reference !== null) {
-    const words = referenceText(e.reference);
-    const withKg = words.endsWith(" kg");
-    return {
-      kind: "last_week",
-      label: "Sidste uge",
-      figure: withKg ? words.slice(0, -" kg".length) : words,
-      unit: withKg ? "kg" : null,
-    };
-  }
-  return null;
+export function kgBlock(e: FokusExercise): KgBlock | null {
+  return todayKgView(e);
 }
 
-/**
- * The last-week line under a shown suggestion (§4.2.5): null when the kg block already shows
- * last week (no suggestion). Week 1 has no last week by definition.
- */
-export type LastWeekLine =
-  | { readonly kind: "kg"; readonly text: string }
-  | { readonly kind: "none"; readonly text: "Intet logget sidste uge" }
-  | { readonly kind: "week1"; readonly text: "Uge 1 i blokken: ingen sidste uge" };
+/** The line under the kg block (fokus-kg.md §2): "Sidste uge 140 kg", a new variant's text, or null. */
+export type LastWeekLine = LastWeekItem;
 
 export function lastWeekLine(e: FokusExercise, week: number): LastWeekLine | null {
-  if (e.suggestedKg === null) return null;
-  if (week <= 1) return { kind: "week1", text: "Uge 1 i blokken: ingen sidste uge" };
-  if (e.reference === null) return { kind: "none", text: "Intet logget sidste uge" };
-  return { kind: "kg", text: referenceText(e.reference) };
+  return lastWeekItem(e, week);
 }
 
 /** A tap's time of day in Copenhagen: "2026-10-12T16:42:05Z" -> "18.42". */
@@ -236,19 +200,18 @@ export function unsavedText(n: number): string {
   return `${n} sæt er ikke gemt.`;
 }
 
-/** The spoken suggestion: "forslag 82,5 kg (begrænset) …"; null without one (review round §8: nothing is said). */
-function suggestionWords(e: FokusExercise): string | null {
-  if (e.suggestedKg === null) return null;
-  return `forslag ${formatKg(e.suggestedKg)} kg${e.suggestionCapped ? ` ${CAPPED_WORD}` : ""}${spokenAdjustment(e)}`;
-}
-
 /**
  * The next-set block (round 3): line 1 "Squat · sæt 2 af 2" (in a warm-up, whose heading names
  * the exercise: "Sæt 1 af 4"); line 2 "5 reps · RPE 7" (ranges as the set view writes them,
- * rangeFigure: "6–10 reps · RPE 7–8"; spoken sentences keep "til") and `kg`: the suggestion, else last week's
- * logged kg ("kropsvægt + 10 kg"), else null (nothing shown). `kg.source` is its sr-only prefix.
+ * rangeFigure: "6–10 reps · RPE 7–8"; spoken sentences keep "til") and `kg`: today's kg with its
+ * caption (fokus-kg.md §3), else null (nothing shown); `lastWeek`: §2's Sidste uge item.
  */
-export type NextKg = { readonly source: "forslag" | "sidste uge"; readonly text: string };
+export type NextKg = {
+  readonly caption: TodayKgView["caption"];
+  readonly text: string; // "142,5 kg", "~142,5 kg", "kropsvægt + 10 kg" (nbsp before kg)
+  readonly italic: boolean;
+  readonly spoken: string; // §4: "i dag cirka 142,5 kg, et skøn"
+};
 
 /**
  * `exercise`: the muted line under the title when a variant is the title (variants.md §3; null
@@ -264,7 +227,7 @@ export function nextSetSummary(
   readonly exercise: string | null;
   readonly line: string;
   readonly kg: NextKg | null;
-  readonly newVariant: typeof NEW_VARIANT_TEXT | null;
+  readonly lastWeek: LastWeekItem | null;
 } {
   const e = s.exercise;
   const parts: string[] = [];
@@ -274,25 +237,29 @@ export function nextSetSummary(
     parts.push(word === null ? figure : `${figure} ${word}`);
   }
   if (e.prescribed !== null) parts.push(rangeFigure(e.prescribed));
+  const today = todayKgView(e);
   const kg: NextKg | null =
-    e.suggestedKg !== null
-      ? { source: "forslag", text: `${formatKg(e.suggestedKg)}\u00a0kg` }
-      : e.reference !== null
-        ? { source: "sidste uge", text: referenceText(e.reference).replace(/ kg$/, "\u00a0kg") }
-        : null;
+    today === null
+      ? null
+      : {
+          caption: today.caption,
+          text: today.unit === null ? today.figure : `${today.figure}\u00a0kg`,
+          italic: today.italic,
+          spoken: today.spoken,
+        };
   const title = inWarmup ? `Sæt ${s.number} af ${s.count}` : `${displayName(e)} · sæt ${s.number} af ${s.count}`;
   return {
     title,
     exercise: inWarmup ? null : exerciseUnder(e),
     line: parts.join(" · "),
     kg,
-    newVariant: kg === null && isNewVariant(e, week) ? NEW_VARIANT_TEXT : null,
+    lastWeek: lastWeekItem(e, week),
   };
 }
 
 /**
  * The status sentence on entering a set (§4.7):
- * "Squat, sæt 2 af 2: 5 reps ved RPE 7, forslag 142,5 kg, sidste uge 140 kg."
+ * "Squat, sæt 2 af 2: 5 reps ved RPE 7, i dag 142,5 kg, sidste uge 140 kg." (fokus-kg.md §4)
  * Ranges are spoken ("8 til 12 reps"); week 1 has no last-week part.
  */
 export function setSentence(s: SetInContext, week: number): string {
@@ -302,10 +269,11 @@ export function setSentence(s: SetInContext, week: number): string {
   const what = reps !== null && load !== null ? `${reps} ved ${load}` : (reps ?? load);
   const parts: string[] = [];
   if (what !== null) parts.push(what);
-  const suggestion = suggestionWords(e);
-  if (suggestion !== null) parts.push(suggestion);
-  if (isNewVariant(e, week)) parts.push("ny variant, intet fra sidste uge");
-  else if (week > 1) parts.push(e.reference === null ? "intet logget sidste uge" : `sidste uge ${referenceText(e.reference)}`);
+  const today = todayKgView(e);
+  if (today !== null) parts.push(`${today.spoken}${today.basis === "e1rm" ? spokenAdjustment(e) : ""}`);
+  const lastWeek = lastWeekItem(e, week);
+  if (lastWeek?.kind === "new_variant") parts.push("ny variant, intet fra sidste uge");
+  else if (lastWeek !== null) parts.push(`sidste uge ${lastWeek.text}`);
   return `${spokenName(e)}, ${setTitle(s).toLowerCase()}: ${parts.join(", ")}.`;
 }
 
@@ -406,7 +374,7 @@ export function warmupTitle(e: FokusExercise): string {
  */
 export function rampBasis(e: FokusExercise): string | null {
   if (e.ramp === null) return null;
-  if (e.suggestedKg !== null) return `Op mod forslaget ${formatKg(e.suggestedKg)} kg`;
+  if (e.suggestedKg !== null) return `Op mod ${formatKg(e.suggestedKg)} kg`;
   if (e.reference !== null) return `Op mod sidste uge ${referenceText(e.reference)}`;
   return null;
 }

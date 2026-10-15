@@ -16,6 +16,7 @@ import type {
   RampStep,
   StrengthSessionRow,
   SuggestionBasis,
+  TodayBasis,
 } from "./db/rows.ts";
 import {
   formatClock,
@@ -103,12 +104,80 @@ export type ExerciseView = {
   readonly restMinS: number | null; // recommended rest after a set; null = none shown
   readonly restMaxS: number | null;
   readonly ramp: readonly RampStep[] | null; // a main lift's warm-up ramp (first row of a run)
+  /** Today's kg (fokus-kg.md, planned_sets.today_kg): null = no kg block; null exactly with todayBasis. */
+  readonly todayKg: number | null;
+  readonly todayBasis: TodayBasis | null;
   readonly sets: readonly SetRef[]; // this row's sets, 1..n (each has its own tick)
 };
 
-/** answers-round.md §4: the "Forslag er et skøn …" footnote only when a shown set has a suggested kg. */
-export function hasSuggestion(session: Pick<StrengthSession, "exercises">): boolean {
-  return session.exercises.some((e) => e.suggestedKg !== null && e.suggestedKg > 0);
+/** fokus-kg.md §3: the footnote's first sentence only when a shown set's kg is derived or an e1RM estimate. */
+export function hasEstimate(session: Pick<StrengthSession, "exercises">): boolean {
+  return session.exercises.some((e) => e.todayBasis === "derived" || e.todayBasis === "e1rm");
+}
+
+/**
+ * Today's kg as shown (fokus-kg.md §1): the caption, the figure ("142,5", "~142,5", "kropsvægt",
+ * "kropsvægt + 10") and its unit ("kg", or null when the figure is words alone). italic = computed
+ * by the app (derived, e1rm); `capped` only on an e1rm figure the weekly cap changed. `spoken` is
+ * §4's sentence part ("i dag cirka 142,5 kg, et skøn"). Null: no today's kg, no block.
+ */
+export type TodayKgView = {
+  readonly basis: TodayBasis;
+  readonly caption: "I dag" | "I dag · beregnet" | "I dag · skøn" | "Samme som sidst";
+  readonly figure: string;
+  readonly unit: "kg" | null;
+  readonly italic: boolean;
+  readonly capped: boolean;
+  readonly spoken: string;
+};
+
+const TODAY_CAPTION = {
+  sheet: "I dag",
+  derived: "I dag · beregnet",
+  e1rm: "I dag · skøn",
+  last: "Samme som sidst",
+} as const satisfies Record<TodayBasis, TodayKgView["caption"]>;
+
+export function todayKgView(
+  e: Pick<ExerciseView, "todayKg" | "todayBasis" | "bodyweight" | "suggestionCapped">,
+): TodayKgView | null {
+  if (e.todayKg === null || e.todayBasis === null) return null;
+  const words = formatSetLoad(e.todayKg, e.bodyweight) ?? `${formatKg(e.todayKg)} kg`;
+  const withKg = words.endsWith(" kg");
+  const bare = withKg ? words.slice(0, -" kg".length) : words;
+  const basis = e.todayBasis;
+  const capped = basis === "e1rm" && e.suggestionCapped;
+  const spoken = {
+    sheet: `i dag ${words}`,
+    derived: `i dag ${words}, beregnet`,
+    e1rm: `i dag cirka ${words}, et skøn${capped ? ", begrænset" : ""}`,
+    last: `samme som sidst: ${words}`,
+  }[basis];
+  return {
+    basis,
+    caption: TODAY_CAPTION[basis],
+    figure: basis === "e1rm" ? `~${bare}` : bare,
+    unit: withKg ? "kg" : null,
+    italic: basis === "derived" || basis === "e1rm",
+    capped,
+    spoken,
+  };
+}
+
+/**
+ * The Sidste uge item (fokus-kg.md §2): last week's logged load when it exists and today's kg isn't
+ * already last week's (basis last); a new variant's text in its place. Week 1 and nothing logged:
+ * null (no line, no text).
+ */
+export type LastWeekItem =
+  | { readonly kind: "kg"; readonly text: string }
+  | { readonly kind: "new_variant"; readonly text: typeof NEW_VARIANT_TEXT };
+
+export function lastWeekItem(e: Pick<ExerciseView, "reference" | "variant" | "todayBasis">, week: number): LastWeekItem | null {
+  if (week < 2) return null;
+  if (isNewVariant(e, week)) return { kind: "new_variant", text: NEW_VARIANT_TEXT };
+  if (e.reference === null || e.todayBasis === "last") return null;
+  return { kind: "kg", text: formatSetLoad(e.reference.kg, e.reference.bodyweight) ?? `${formatKg(e.reference.kg)} kg` };
 }
 
 /** The next session to do: session k + 1 of this ISO week. It has no date until it's done. */
@@ -260,6 +329,8 @@ function exercisesOf(
         restMinS: suggestion?.restMinS ?? null,
         restMaxS: suggestion?.restMaxS ?? null,
         ramp: suggestion?.ramp ?? null,
+        todayKg: suggestion?.todayKg ?? null,
+        todayBasis: suggestion?.todayBasis ?? null,
         sets: [],
       });
     }
@@ -417,7 +488,7 @@ function signedKg(kg: number): string {
 }
 
 /**
- * The suggestion's adjustment in brackets (fokus-pause.md §5), after "Forslag 87,5 kg":
+ * The suggestion's adjustment in brackets (fokus-pause.md §5), after the e1rm figure "~87,5 kg":
  *   long  "(+2,5 – de sidste to var lettere)", "(+2,5 – …, begrænset)", "(holdt – …)"
  *   short "(+2,5)", "(holdt)" (the Fokus mini card)
  * Cap only: "(begrænset)". No rule and no cap: null. "0 kg" never shows.
@@ -613,8 +684,8 @@ export function setStatus(line: Pick<SetLineView, "state" | "endedAt">): string 
 }
 
 /**
- * One set line's accessible name (spec §3.3, §6): "Squat, sæt 1 af 2, 5 reps ved RPE 7, forslag
- * 142,5 kg, sidste uge 140 kg" + ", udført kl. 18.42" / ", sprunget over" / ", næste". Sheet
+ * One set line's accessible name (spec §3.3, §6; fokus-kg.md §4): "Squat, sæt 1 af 2, 5 reps ved RPE 7,
+ * i dag 142,5 kg, sidste uge 140 kg" + ", udført kl. 18.42" / ", sprunget over" / ", næste". Sheet
  * ranges are spoken " til "; week 1 has no last-week part.
  */
 export function spokenSetLine(e: ExerciseView, week: number, line: SetLineView): string {
@@ -624,12 +695,11 @@ export function spokenSetLine(e: ExerciseView, week: number, line: SetLineView):
   const what = spokenReps !== null && load !== null ? `${spokenReps} ved ${load}` : (spokenReps ?? load);
   const parts = [spokenName(e), `sæt ${line.n} af ${line.of}`];
   if (what !== null) parts.push(what);
-  const suggestion = suggestionView(e);
-  if (suggestion.kg !== null) parts.push(`forslag ${suggestion.kg}${spokenAdjustment(e)}`); // none: nothing said (§8)
-  const lastWeek = lastWeekText(e, week);
-  if (isNewVariant(e, week)) parts.push("ny variant, intet fra sidste uge");
-  else if (lastWeek === null) parts.push("intet logget sidste uge");
-  else if (lastWeek !== undefined) parts.push(`sidste uge ${lastWeek}`);
+  const today = todayKgView(e);
+  if (today !== null) parts.push(`${today.spoken}${today.basis === "e1rm" ? spokenAdjustment(e) : ""}`); // none: nothing said
+  const lastWeek = lastWeekItem(e, week);
+  if (lastWeek?.kind === "new_variant") parts.push("ny variant, intet fra sidste uge");
+  else if (lastWeek !== null) parts.push(`sidste uge ${lastWeek.text}`);
   if (line.state === "done") parts.push(line.endedAt !== null ? `udført ${formatClock(line.endedAt)}` : "udført");
   else if (line.state === "skipped") parts.push("sprunget over");
   else if (line.next) parts.push("næste");

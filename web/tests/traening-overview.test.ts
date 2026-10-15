@@ -40,6 +40,8 @@ function row(row: number, overrides: Partial<ExerciseView> = {}, sets = 2): Exer
     restMinS: null,
     restMaxS: null,
     ramp: null,
+    todayKg: 142.5,
+    todayBasis: "e1rm",
     sets: Array.from({ length: sets }, (_, i) => ({ row, set: i + 1 })),
     ...overrides,
   };
@@ -149,22 +151,27 @@ test("set line accessible names (spec §6)", () => {
   const open = checklistView(exercises, e.sets, new Map());
   assert.equal(
     spokenSetLine(e, 3, open.groups[0].sets[0]),
-    "Squat, sæt 1 af 2, 5 reps ved RPE 7, forslag 142,5 kg, sidste uge 140 kg, næste",
+    "Squat, sæt 1 af 2, 5 reps ved RPE 7, i dag cirka 142,5 kg, et skøn, sidste uge 140 kg, næste",
   );
   assert.equal(
     spokenSetLine(e, 3, open.groups[0].sets[1]),
-    "Squat, sæt 2 af 2, 5 reps ved RPE 7, forslag 142,5 kg, sidste uge 140 kg",
+    "Squat, sæt 2 af 2, 5 reps ved RPE 7, i dag cirka 142,5 kg, et skøn, sidste uge 140 kg",
   );
   const done = checklistView(exercises, e.sets, logOf([{ row: 10, set: 1, startedAt: AT, endedAt: AT }]));
   assert.match(spokenSetLine(e, 3, done.groups[0].sets[0]), /, udført kl\. 18\.42$/);
-  const ranged = row(10, { repsText: "8 - 12", prescribed: "RPE 5 - 7", suggestedKg: null, suggestionBasis: "not_rpe", reference: null });
+  const ranged = row(10, { repsText: "8 - 12", prescribed: "RPE 5 - 7", suggestedKg: null, suggestionBasis: "not_rpe", todayKg: null, todayBasis: null, reference: null });
   assert.equal(
     spokenSetLine(ranged, 3, checklistView([ranged], ranged.sets, new Map()).groups[0].sets[1]),
-    "Squat, sæt 2 af 2, 8 til 12 reps ved RPE 5 til 7, intet logget sidste uge",
-  ); // no suggestion: nothing about one is said (review round §8)
+    "Squat, sæt 2 af 2, 8 til 12 reps ved RPE 5 til 7",
+  ); // no today's kg and nothing logged: nothing said (fokus-kg.md §2)
+  const sheet = row(10, { todayKg: 142.5, todayBasis: "sheet" });
+  assert.equal(
+    spokenSetLine(sheet, 3, checklistView([sheet], sheet.sets, new Map()).groups[0].sets[1]),
+    "Squat, sæt 2 af 2, 5 reps ved RPE 7, i dag 142,5 kg, sidste uge 140 kg",
+  );
   assert.doesNotMatch(spokenSetLine(ranged, 3, checklistView([ranged], ranged.sets, new Map()).groups[0].sets[0]), /forslag/i);
   // Week 1: no last-week part.
-  assert.equal(spokenSetLine(e, 1, open.groups[0].sets[1]), "Squat, sæt 2 af 2, 5 reps ved RPE 7, forslag 142,5 kg");
+  assert.equal(spokenSetLine(e, 1, open.groups[0].sets[1]), "Squat, sæt 2 af 2, 5 reps ved RPE 7, i dag cirka 142,5 kg, et skøn");
 });
 
 test("D11: sets are numbered across the run (same trimmed name, consecutive rows), not per row", () => {

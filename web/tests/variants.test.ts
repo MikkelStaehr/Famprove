@@ -14,6 +14,7 @@ import { feelRows } from "../src/lib/analyse-styrke-view.ts";
 import {
   feelQuestion,
   kgBlock,
+  lastWeekLine,
   nextSetSummary,
   setInContext,
   setSentence,
@@ -65,6 +66,7 @@ test("planned_sets: basis new_variant parses without a suggestion, never with on
   const raw = {
     sheet_id: "s", block: "B", sheet_row: 40, week: 3, set_no: 1, suggested_kg: null, basis: "new_variant",
     uncapped_kg: null, adjustment_kg: null, adjustment_reason: null, rest_min_s: 90, rest_max_s: 120, ramp: null,
+    today_kg: null, today_basis: null,
   };
   assert.equal(parsePlannedSetRow(raw).basis, "new_variant");
   assert.throws(() => parsePlannedSetRow({ ...raw, suggested_kg: 10 }), RowError);
@@ -149,15 +151,17 @@ test("Fokus: titles, status, warm-up, next set, feel question and the new-varian
     exercise: "Bicep of choice",
     line: "20–30 reps · RPE 8–9",
     kg: null,
-    newVariant: NEW_VARIANT_TEXT,
+    lastWeek: { kind: "new_variant", text: NEW_VARIANT_TEXT },
   });
   assert.equal(nextSetSummary(s2, true, 3).title, "Sæt 2 af 3");
   assert.equal(nextSetSummary(s2, true, 3).exercise, null);
   const s3 = setInContext(next.exercises, { row: 40, set: 3 });
   assert.ok(s3 !== null);
   assert.equal(feelQuestion(s3, true), "Hvordan var sæt 3 i DB Preacher Curl?");
-  assert.deepEqual(kgBlock(s2.exercise, 3), { kind: "new_variant", text: "Ny variant – intet fra sidste uge" });
-  assert.equal(kgBlock(s2.exercise, 1), null); // week 1 keeps its own text
+  // fokus-kg.md §2: a new variant keeps its kg block; its text is the Sidste uge line.
+  assert.equal(kgBlock(s2.exercise), null); // no today_kg here
+  assert.deepEqual(lastWeekLine(s2.exercise, 3), { kind: "new_variant", text: "Ny variant – intet fra sidste uge" });
+  assert.equal(lastWeekLine(s2.exercise, 1), null); // week 1: no line, no text
 });
 
 test("Analyse › Styrke feel lines carry the variant; the ukendt line first, keys unique", () => {

@@ -1,4 +1,4 @@
-import { hasSuggestion, type StrengthSession } from "@/lib/training-view";
+import { hasEstimate, type StrengthSession } from "@/lib/training-view";
 
 import { SetBarcode } from "./SetBarcode";
 import { SaveNotes, SetChecklist, SetCount } from "./SetChecklist";
@@ -26,13 +26,10 @@ export function StrengthCard({ session, className }: StrengthCardProps) {
         <SetCount />
       </div>
       <SetBarcode />
-      {session.week === 1 && (
-        <p className="text-13 text-text-muted">Uge 1 i blokken: ingen kg fra sidste uge at sammenligne med endnu.</p>
-      )}
       <SetChecklist />
       <SaveNotes />
       <p className="text-13 text-text-muted">
-        {hasSuggestion(session) && "Forslag er et skøn ud fra din e1RM og RPE, ikke trænerens tal. "}Hvert sæt gemmes, når
+        {hasEstimate(session) && "Beregnet og ~ kg er appens skøn ud fra dagens sæt og din e1RM, ikke trænerens tal. "}Hvert sæt gemmes, når
         du sætter flueben; kg logger du i arket.
       </p>
     </section>

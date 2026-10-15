@@ -34,7 +34,7 @@ import {
   isMainLift,
   rampState,
 } from "@/lib/fokus-view";
-import { adjustmentLine, spokenName } from "@/lib/training-view";
+import { adjustmentLine, CAPPED_WORD, spokenName } from "@/lib/training-view";
 import { type DotRow as DotRowMarks, dotRow, type Signature, signature } from "@/lib/fokus-marks";
 import {
   applyTap,
@@ -310,7 +310,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
 /**
- * §4.2 + round 4 §2: the current set. One value row (REPS · RPE/PROCENT · FORSLAG/SIDSTE UGE, the
+ * §4.2 + round 4 §2: the current set. One value row (REPS · RPE/PROCENT · today's kg, fokus-kg.md, the
  * unit once), then the dot row and the adjustment; Spring over as a muted link; Udført the one ink
  * slab. NOTES is never shown: its text is the variant (user, 2026-10-15), already the title.
  */
@@ -331,7 +331,7 @@ function SetView({
 }) {
   if (current === null) return null; // the order and the rows come from the same sets: not reached
   const e = current.exercise;
-  const kg = kgBlock(e, week);
+  const kg = kgBlock(e);
   const adjustment = adjustmentLine(e);
   const lastWeek = lastWeekLine(e, week);
   const cell = prescribedCell(e.prescribed);
@@ -366,20 +366,21 @@ function SetView({
                 </span>
               </p>
             )}
-            {kg?.kind === "new_variant" && (
-              // variants.md §3: no FORSLAG and no figure, one muted line where the kg block was.
-              <p className="col-span-full self-end text-16 text-text-muted">{kg.text}</p>
-            )}
-            {kg !== null && kg.kind !== "new_variant" && (
+            {kg !== null && (
+              // fokus-kg.md §1: today's kg; the visual copy is aria-hidden, §4's sentence is said once.
               <p
                 className={`flex flex-col [overflow-wrap:anywhere] ${
                   hasWords(kg.figure) ? "col-span-full @min-[21rem]:col-span-full" : "col-span-2 @min-[21rem]:col-span-1"
                 }`}
               >
-                <span className={CAPTION}>{kg.label}</span>
-                <span>
-                  {kg.kind === "suggestion" ? <span className={FIGURE}>{kg.figure}</span> : <FigureWithWords figure={kg.figure} />}
-                  {kg.unit !== null && <span className="text-20 text-text-muted">{"\u00a0"}kg</span>}
+                <span className="sr-only">{`${capitalise(kg.spoken)}.`}</span>
+                <span aria-hidden="true" className={CAPTION}>
+                  {kg.caption}
+                </span>
+                <span aria-hidden="true" className={kg.italic ? "italic" : undefined}>
+                  {hasWords(kg.figure) ? <FigureWithWords figure={kg.figure} /> : <span className={FIGURE}>{kg.figure}</span>}
+                  {kg.unit !== null && <span className="text-24 text-text-muted">{"\u00a0"}kg</span>}
+                  {kg.capped && <span className="font-sans text-16 not-italic text-text-muted"> {CAPPED_WORD}</span>}
                 </span>
               </p>
             )}
@@ -388,14 +389,14 @@ function SetView({
 
         <div className="mt-3 flex flex-col gap-3">
           <DotRow dots={dots} />
-          {kg?.kind === "suggestion" && adjustment !== null && (
+          {kg?.basis === "e1rm" && adjustment !== null && (
             <p className="text-16 text-text-muted">
               {adjustment.signed !== "" && <span className="font-medium text-text">{adjustment.signed}</span>}
               {adjustment.rest}
             </p>
           )}
           {lastWeek !== null && (
-            <p className="text-16 text-text-muted">
+            <p className="text-14 text-text-muted">
               {lastWeek.kind === "kg" ? (
                 <>
                   Sidste uge <span className="font-mono text-20 font-medium tabular-nums">{lastWeek.text}</span>
@@ -585,6 +586,9 @@ function CountsFigure({ text }: { readonly text: string }) {
 
 /** Reps, RPE and kg (DESIGN.md text-44: Fokus reps / kg figures; the timer is text-56): Geist Mono 500, −0.03em, tabular. */
 const FIGURE = "font-mono text-44 font-medium tabular-nums";
+
+/** fokus-kg.md §4: the spoken kg as its own sentence ("I dag 142,5 kg."). */
+const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** A kg figure with words in it ("kropsvægt + 10"), not a plain number. */
 const hasWords = (figure: string): boolean => /\p{L}/u.test(figure);

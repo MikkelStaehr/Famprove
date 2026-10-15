@@ -206,8 +206,8 @@ test("next session: each row lists its sets, Python's suggestion, and today's lo
         set({ session: 1, sheetRow: 27, setNo: 1, prescribed: "-10%" }),
       ],
       plannedSets: [
-        { block: BLOK, sheetRow: 25, week: 1, setNo: 1, suggestedKg: 142.5, basis: "rpe_e1rm", uncappedKg: null, adjustmentKg: null, adjustmentReason: null, restMinS: null, restMaxS: null, ramp: null },
-        { block: BLOK, sheetRow: 27, week: 1, setNo: 1, suggestedKg: null, basis: "not_rpe", uncappedKg: null, adjustmentKg: null, adjustmentReason: null, restMinS: null, restMaxS: null, ramp: null },
+        { block: BLOK, sheetRow: 25, week: 1, setNo: 1, suggestedKg: 142.5, basis: "rpe_e1rm", uncappedKg: null, adjustmentKg: null, adjustmentReason: null, restMinS: null, restMaxS: null, ramp: null, todayKg: 142.5, todayBasis: "e1rm" },
+        { block: BLOK, sheetRow: 27, week: 1, setNo: 1, suggestedKg: null, basis: "not_rpe", uncappedKg: null, adjustmentKg: null, adjustmentReason: null, restMinS: null, restMaxS: null, ramp: null, todayKg: null, todayBasis: null },
       ],
       setLog: [
         { date: "2026-09-28", session: 1, row: 25, set: 1, startedAt: "2026-09-28T16:00:00Z", endedAt: "2026-09-28T16:03:00Z", skipped: false, updatedAt: "2026-09-28T16:03:00Z", feltRpe: null, repsDone: null },
@@ -388,9 +388,34 @@ test("contract: the planned_sets rows Python writes parse; a capped row keeps it
   assert.throws(() => parsePlannedSetRow({ ...(rows.none as object), uncapped_kg: 85 }), RowError); // no suggestion
 });
 
-test("4a answers-round §4: the 'Forslag er et skøn' footnote only with a suggested kg", async () => {
-  const { hasSuggestion } = await import("../src/lib/training-view.ts");
-  const ex = (suggestedKg: number | null) => ({ suggestedKg }) as unknown as import("../src/lib/training-view.ts").ExerciseView;
-  assert.equal(hasSuggestion({ exercises: [ex(null), ex(null)] }), false);
-  assert.equal(hasSuggestion({ exercises: [ex(null), ex(142.5)] }), true);
+test("contract fokus-kg: today_kg and today_basis parse from Python's rows; both null together, a known basis", () => {
+  const rows: Record<string, Record<string, unknown>> = JSON.parse(
+    readFileSync(new URL("./fixtures/planned_sets.json", import.meta.url), "utf8"),
+  );
+  for (const raw of Object.values(rows)) {
+    const p = parsePlannedSetRow(raw);
+    assert.equal(p.todayKg, raw.today_kg);
+    assert.equal(p.todayBasis, raw.today_basis);
+  }
+  assert.deepEqual(
+    [parsePlannedSetRow(rows.suggestion).todayKg, parsePlannedSetRow(rows.suggestion).todayBasis],
+    [82.5, "e1rm"],
+  );
+  const base = rows.suggestion;
+  for (const basis of ["sheet", "derived", "e1rm", "last"]) {
+    assert.equal(parsePlannedSetRow({ ...base, today_kg: 100, today_basis: basis }).todayBasis, basis);
+  }
+  assert.equal(parsePlannedSetRow({ ...base, today_kg: null, today_basis: null }).todayKg, null);
+  assert.throws(() => parsePlannedSetRow({ ...base, today_kg: 100, today_basis: null }), RowError);
+  assert.throws(() => parsePlannedSetRow({ ...base, today_kg: null, today_basis: "sheet" }), RowError);
+  assert.throws(() => parsePlannedSetRow({ ...base, today_basis: "forslag" }), RowError);
+  assert.throws(() => parsePlannedSetRow({ ...base, today_kg: "100" }), RowError);
+});
+
+test("fokus-kg §3: the footnote's first sentence only when a shown set is derived or e1rm", async () => {
+  const { hasEstimate } = await import("../src/lib/training-view.ts");
+  const ex = (todayBasis: string | null) => ({ todayBasis }) as unknown as import("../src/lib/training-view.ts").ExerciseView;
+  assert.equal(hasEstimate({ exercises: [ex(null), ex("sheet"), ex("last")] }), false);
+  assert.equal(hasEstimate({ exercises: [ex("sheet"), ex("derived")] }), true);
+  assert.equal(hasEstimate({ exercises: [ex(null), ex("e1rm")] }), true);
 });

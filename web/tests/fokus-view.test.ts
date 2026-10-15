@@ -48,6 +48,8 @@ const SQUAT: FokusExercise = {
   restMinS: null,
   restMaxS: null,
   ramp: null,
+  todayKg: 142.5,
+  todayBasis: "e1rm",
   sets: [
     { row: 4, set: 1 },
     { row: 4, set: 2 },
@@ -70,6 +72,8 @@ const PULLDOWN: FokusExercise = {
   restMinS: null,
   restMaxS: null,
   ramp: null,
+  todayKg: null,
+  todayBasis: null,
   sets: [{ row: 7, set: 1 }],
 };
 const EXERCISES = [SQUAT, PULLDOWN];
@@ -155,37 +159,69 @@ test("repsWord: rep after 1, reps after counts, nothing after a cell without a d
   assert.equal(repsWord("AMRAP"), null);
 });
 
-test("kgBlock: suggestion first, italic figure with kg", () => {
-  assert.deepEqual(kgBlock(SQUAT, 2), { kind: "suggestion", label: "Forslag", figure: "142,5", unit: "kg", capped: false });
+/** fokus-kg.md K1–K3: the sheet's rows 77–79 (block 12, week 10), as Python writes them. */
+const ROW = (row: number, todayKg: number, todayBasis: "sheet" | "derived", lastKg: number): FokusExercise => ({
+  ...SQUAT,
+  row,
+  suggestedKg: null,
+  suggestionBasis: "not_rpe",
+  todayKg,
+  todayBasis,
+  reference: { kg: lastKg, bodyweight: false },
+  sets: [{ row, set: 1 }],
 });
 
-test("a suggestion the weekly cap changed says (begrænset), on screen and in the summary lines", () => {
-  const capped = { ...SQUAT, suggestedKg: 145, suggestionCapped: true };
-  assert.deepEqual(kgBlock(capped, 2), { kind: "suggestion", label: "Forslag", figure: "145", unit: "kg", capped: true });
-  const s = setInContext([capped], { row: 4, set: 2 });
+test("K1–K3: rows 77–79 show I DAG and the Sidste uge line, equal or not", () => {
+  const cases = [
+    [ROW(77, 142.5, "sheet", 140), "142,5", "140 kg"],
+    [ROW(78, 145, "sheet", 145), "145", "145 kg"],
+    [ROW(79, 127.5, "sheet", 130), "127,5", "130 kg"],
+  ] as const;
+  for (const [e, figure, last] of cases) {
+    const kg = kgBlock(e);
+    assert.equal(kg?.figure, figure);
+    assert.equal(kg?.unit, "kg");
+    assert.equal(kg?.caption, "I dag");
+    assert.equal(kg?.italic, false); // as written in the sheet: upright
+    assert.deepEqual(lastWeekLine(e, 10), { kind: "kg", text: last });
+  }
+  const s = setInContext([cases[0][0]], { row: 77, set: 1 });
   assert.ok(s !== null);
-  assert.match(setSentence(s, 2), /forslag 145 kg \(begrænset\), sidste uge 140/);
-  // The next-set block drops the cap note (round 3): it stays in the set view and the spoken sentence.
-  assert.deepEqual(nextSetSummary(s, false, 2).kg, { source: "forslag", text: "145\u00a0kg" });
+  assert.equal(nextSetSummary(s, false, 10).kg?.text, "142,5\u00a0kg"); // K4: the pause card reads the same
+  assert.deepEqual(nextSetSummary(s, false, 10).lastWeek, { kind: "kg", text: "140 kg" });
+  assert.equal(setSentence(s, 10), "Squat, sæt 1 af 1: 5 reps ved RPE 7, i dag 142,5 kg, sidste uge 140 kg.");
 });
 
-test("kgBlock: no suggestion -> last week upright; neither -> null (no block, never 'intet forslag')", () => {
-  assert.deepEqual(kgBlock({ ...PULLDOWN, reference: { kg: 60, bodyweight: false } }, 2), {
-    kind: "last_week",
-    label: "Sidste uge",
-    figure: "60",
-    unit: "kg",
-  });
-  assert.equal(kgBlock(PULLDOWN, 2), null);
-  const bw = kgBlock({ ...PULLDOWN, bodyweight: true, reference: { kg: 0, bodyweight: true } }, 2);
-  assert.equal(bw?.kind === "last_week" && bw.figure, "kropsvægt");
-  assert.equal(bw?.kind === "last_week" && bw.unit, null);
+test("kgBlock per basis: derived italic, e1rm ~ italic + cirka, last upright without a Sidste uge line, none null", () => {
+  const derived = kgBlock(ROW(79, 127.5, "derived", 130));
+  assert.deepEqual(
+    [derived?.caption, derived?.figure, derived?.italic, derived?.spoken],
+    ["I dag · beregnet", "127,5", true, "i dag 127,5 kg, beregnet"],
+  );
+  const e1rm = kgBlock(SQUAT);
+  assert.deepEqual(
+    [e1rm?.caption, e1rm?.figure, e1rm?.italic, e1rm?.spoken],
+    ["I dag · skøn", "~142,5", true, "i dag cirka 142,5 kg, et skøn"],
+  );
+  assert.equal(kgBlock({ ...SQUAT, suggestionCapped: true })?.capped, true);
+  const last = { ...SQUAT, todayKg: 140, todayBasis: "last" as const };
+  assert.deepEqual([kgBlock(last)?.caption, kgBlock(last)?.figure, kgBlock(last)?.italic], ["Samme som sidst", "140", false]);
+  assert.equal(kgBlock(last)?.spoken, "samme som sidst: 140 kg");
+  assert.equal(lastWeekLine(last, 3), null); // it would repeat the block
+  assert.equal(kgBlock(PULLDOWN), null);
+  assert.equal(kgBlock({ ...PULLDOWN, reference: { kg: 60, bodyweight: false } }), null); // no today_kg: no block
 });
 
-test("lastWeekLine: only under a suggestion; week 1 and nothing logged have their words", () => {
-  assert.deepEqual(lastWeekLine(SQUAT, 3), { kind: "kg", text: "140 kg" });
-  assert.deepEqual(lastWeekLine({ ...SQUAT, reference: null }, 3), { kind: "none", text: "Intet logget sidste uge" });
-  assert.deepEqual(lastWeekLine(SQUAT, 1), { kind: "week1", text: "Uge 1 i blokken: ingen sidste uge" });
+test("kgBlock: bodyweight reads kropsvægt (no unit) or kropsvægt + 10 kg; never 0 kg", () => {
+  const bw = kgBlock({ ...PULLDOWN, bodyweight: true, todayKg: 0, todayBasis: "sheet" });
+  assert.deepEqual([bw?.figure, bw?.unit, bw?.spoken], ["kropsvægt", null, "i dag kropsvægt"]);
+  const plus = kgBlock({ ...PULLDOWN, bodyweight: true, todayKg: 10, todayBasis: "sheet" });
+  assert.deepEqual([plus?.figure, plus?.unit], ["kropsvægt + 10", "kg"]);
+});
+
+test("K7: week 1 and nothing logged have no Sidste uge line and no text", () => {
+  assert.equal(lastWeekLine(SQUAT, 1), null);
+  assert.equal(lastWeekLine({ ...SQUAT, reference: null }, 3), null);
   assert.equal(lastWeekLine(PULLDOWN, 3), null);
 });
 
@@ -204,36 +240,25 @@ test("skippedText and unsavedText", () => {
   assert.equal(unsavedText(3), "3 sæt er ikke gemt.");
 });
 
-test("nextSetSummary line 2: the suggestion's kg, spoken as forslag", () => {
+test("nextSetSummary: today's kg with its caption, and the Sidste uge item", () => {
   const squat2 = setInContext(EXERCISES, { row: 4, set: 2 });
   assert.ok(squat2 !== null);
   assert.deepEqual(nextSetSummary(squat2, false, 2), {
     title: "Squat · sæt 2 af 2",
     exercise: null,
     line: "5 reps · RPE 7",
-    kg: { source: "forslag", text: "142,5\u00a0kg" },
-    newVariant: null,
+    kg: { caption: "I dag · skøn", text: "~142,5\u00a0kg", italic: true, spoken: "i dag cirka 142,5 kg, et skøn" },
+    lastWeek: { kind: "kg", text: "140 kg" },
   });
 });
 
-test("nextSetSummary line 2: no suggestion -> last week's logged kg, spoken as sidste uge", () => {
-  const withRef = setInContext([{ ...PULLDOWN, reference: { kg: 60, bodyweight: false } }], { row: 7, set: 1 });
-  assert.ok(withRef !== null);
-  assert.deepEqual(nextSetSummary(withRef, false, 2).kg, { source: "sidste uge", text: "60\u00a0kg" });
-  const bw = setInContext([{ ...PULLDOWN, bodyweight: true, reference: { kg: 10, bodyweight: true } }], { row: 7, set: 1 });
-  assert.ok(bw !== null);
-  const kg = nextSetSummary(bw, false, 2).kg;
-  assert.equal(kg?.source, "sidste uge");
-  assert.match(kg?.text ?? "", /^kropsvægt/);
-});
-
-test("nextSetSummary line 2: neither -> no kg and never 'intet forslag'", () => {
+test("nextSetSummary: no today's kg -> no kg, never 'forslag'", () => {
   const pull = setInContext(EXERCISES, { row: 7, set: 1 });
   assert.ok(pull !== null);
   const summary = nextSetSummary(pull, false, 2);
   assert.equal(summary.line, "8–12 reps · -12.5%"); // ranges as the set view writes them (rangeFigure)
   assert.equal(summary.kg, null);
-  assert.doesNotMatch(summary.line, /forslag/i);
+  assert.equal(summary.lastWeek, null);
 });
 
 test("nextSetSummary line 2: reps and RPE ranges with an en dash, no spaces (as the set view)", () => {
@@ -247,13 +272,10 @@ test("setSentence: the spoken set, ranges as words, week 1 without last week", (
   const squat2 = setInContext(EXERCISES, { row: 4, set: 2 });
   const pull = setInContext(EXERCISES, { row: 7, set: 1 });
   assert.ok(squat2 !== null && pull !== null);
-  assert.equal(setSentence(squat2, 3), "Squat, sæt 2 af 2: 5 reps ved RPE 7, forslag 142,5 kg, sidste uge 140 kg.");
-  assert.equal(setSentence(squat2, 1), "Squat, sæt 2 af 2: 5 reps ved RPE 7, forslag 142,5 kg.");
-  assert.equal(
-    setSentence(pull, 3),
-    "Lat pulldowns, sæt 1 af 1: 8 til 12 reps ved -12.5%, intet logget sidste uge.",
-  ); // no suggestion: nothing about one is said (review round §8)
-  assert.doesNotMatch(setSentence(pull, 1), /forslag/i);
+  assert.equal(setSentence(squat2, 3), "Squat, sæt 2 af 2: 5 reps ved RPE 7, i dag cirka 142,5 kg, et skøn, sidste uge 140 kg.");
+  assert.equal(setSentence(squat2, 1), "Squat, sæt 2 af 2: 5 reps ved RPE 7, i dag cirka 142,5 kg, et skøn.");
+  assert.equal(setSentence(pull, 3), "Lat pulldowns, sæt 1 af 1: 8 til 12 reps ved -12.5%."); // no kg, no last week: nothing said
+  assert.doesNotMatch(setSentence(squat2, 3), /forslag|tilde|~/i);
   assert.equal(undoSentence(squat2), "Fortrudt: Squat, sæt 2 er åben igen.");
 });
 

@@ -7,6 +7,7 @@ import {
   ILLUSTRATIVE_REMAINING_TSS,
   illustrativeWeeklyPlan,
   midsessionLog,
+  illustrativeToday,
   midsessionPlanned,
   pauseFixture,
   STALE_AGE_MS,
@@ -113,7 +114,19 @@ test("DEV_FIXTURE=midsession: adjustments (+2,5, capped, hold) and a note, illus
     setsText: "1", repsText: "5", prescribed: "RPE 7", loggedKg: 50, bodyweight: false, variantId: null, variant: null,
   });
   const out = midsessionPlanned([row(1), row(2), row(3), row(4)], []);
-  assert.deepEqual(out.map((p) => [p.sheetRow, p.adjustmentKg, p.uncappedKg !== null]), [[1, 2.5, false], [2, 2.5, true], [3, 0, false]]);
+  assert.deepEqual(out.map((p) => [p.sheetRow, p.adjustmentKg, p.uncappedKg !== null]), [[1, 2.5, false], [2, 2.5, true], [3, 0, false], [4, null, false]]);
+});
+
+test("DEV_FIXTURE midsession/pause: today's kg covers every basis (fokus-kg.md), none on the 5th row", () => {
+  const row = (sheetRow: number) => ({
+    weekStart: "2026-10-12", session: 1, block: "B", week: 3, sheetRow, setNo: 1, name: `E${sheetRow}`, type: "X",
+    setsText: "1", repsText: "5", prescribed: "RPE 7", loggedKg: 50, bodyweight: false, variantId: null, variant: null,
+  });
+  const out = illustrativeToday([1, 2, 3, 4, 5, 6].map(row), []);
+  assert.deepEqual(
+    out.map((p) => [p.sheetRow, p.todayBasis, p.todayKg]),
+    [[1, "sheet", 50], [2, "e1rm", 50], [3, "derived", 50], [4, "last", 50], [5, null, null]],
+  );
 });
 
 test("DEV_FIXTURE pause-rated / finished (fokus-round4.md §5): pure, nothing is written", () => {

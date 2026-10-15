@@ -316,7 +316,7 @@ function WarmupClock({ seconds }: { readonly seconds: number }) {
 
 /**
  * §1.2, round 3: the next set in two lines, nothing else. Line 1 "Squat · sæt 2 af 2"; line 2
- * "5 reps · RPE 7 · 142,5 kg", the kg's source (forslag / sidste uge) spoken, not shown.
+ * "5 reps · RPE 7"; then today's kg under its caption and the Sidste uge item (fokus-kg.md §3).
  */
 export function NextSetCard({
   next,
@@ -340,19 +340,30 @@ export function NextSetCard({
       <p className="font-sans text-20 font-medium [overflow-wrap:anywhere] text-balance">{summary.title}</p>
       {/* variants.md §3: the sheet's exercise muted under the variant. */}
       {summary.exercise !== null && <p className="font-sans text-14 text-balance text-text-muted">{summary.exercise}</p>}
-      {(summary.line !== "" || kg !== null) && (
-        <p className="text-16 [overflow-wrap:anywhere]">
-          {summary.line}
+      {summary.line !== "" && <p className="text-16 [overflow-wrap:anywhere]">{summary.line}</p>}
+      {/* fokus-kg.md §3: today's kg (caption + figure) and the Sidste uge item; visual copy aria-hidden. */}
+      {(kg !== null || summary.lastWeek !== null) && (
+        <div className="mt-2 flex min-w-0 flex-wrap gap-x-6 gap-y-1">
           {kg !== null && (
-            <>
-              {summary.line !== "" && " · "}
-              <span className="sr-only">{kg.source} </span>
-              {kg.text}
-            </>
+            <p className="flex min-w-0 flex-col gap-0.5">
+              <span className="sr-only">{`${kg.spoken}.`}</span>
+              <span aria-hidden="true" className="font-mono text-12 text-text-muted uppercase">
+                {kg.caption}
+              </span>
+              <span aria-hidden="true" className={`font-mono text-16 tabular-nums${kg.italic ? " italic" : ""}`}>
+                {kg.text}
+              </span>
+            </p>
           )}
-        </p>
+          {summary.lastWeek?.kind === "kg" && (
+            <p className="flex min-w-0 flex-col gap-0.5">
+              <span className="font-mono text-12 text-text-muted uppercase">Sidste uge</span>
+              <span className="font-mono text-16 tabular-nums">{summary.lastWeek.text}</span>
+            </p>
+          )}
+          {summary.lastWeek?.kind === "new_variant" && <p className="min-w-0 self-end text-14 text-text-muted">{summary.lastWeek.text}</p>}
+        </div>
       )}
-      {summary.newVariant !== null && <p className="text-14 text-text-muted">{summary.newVariant}</p>}
     </section>
   );
 }
