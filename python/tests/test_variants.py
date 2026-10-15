@@ -16,6 +16,7 @@ from training_load.domain.strength import StrengthSet
 from training_load.domain.strength_analysis import e1rm_point
 from training_load.sources.strength_sheet import (
     VARIANT_EMPTY,
+    VARIANT_NUMBER,
     VARIANT_TWICE,
     notes_text,
     parse_all,
@@ -51,6 +52,8 @@ def test_an_n_line_is_a_remark_and_never_the_variant() -> None:
 
 def test_empty_and_double_variant_lines() -> None:
     assert split_notes("V:") == ("", None, 0)
+    assert split_notes("V:\nTempo") == ("Tempo", None, 0)  # the name on the next line
+    assert split_notes("V:\nN: x") == ("", "x", 0)
     assert split_notes("V: A\nV: B") == ("A", None, 1)
     assert split_notes("A\nB") == ("A", None, 1)
     assert split_notes("A\nV: B\nN: c") == ("A", "c", 1)
@@ -113,6 +116,14 @@ def test_a_variant_holds_from_its_week_until_the_next_and_the_own_name_resets() 
     )
     assert [s[0] if s else None for s in states] == ["kabel curl", "kabel curl", "a"]
     assert issues[VARIANT_EMPTY] == 1 and issues[VARIANT_TWICE] == 1
+    states, _ = row_variants(
+        _row("Bicep of choice", {0: "Kabel curl", 1: "62,5", 2: "N: tung"}),
+        "Bicep of choice",
+        notes(3),
+        issues,
+    )
+    assert [s[0] if s else None for s in states] == ["kabel curl"] * 3  # a number names nothing
+    assert issues[VARIANT_NUMBER] == 1
 
 
 # --- parse_all: runs and a new tab (12, 13) ------------------------------------------------------

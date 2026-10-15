@@ -105,11 +105,12 @@ def split_notes(cell: object) -> tuple[str | None, str | None, int]:
     """(variant as written, the user's remark, extra variant lines) of a NOTES cell (user,
     2026-10-15): only the user writes in NOTES, so every line names the variant, with or without
     "V:" / "Variant:" (any case), except a line starting "N:" (any case), which is a remark and
-    never a variant. The first variant line wins (more are counted). Line breaks: \r\n, \r, \n."""
+    never a variant. The first variant line wins (more are counted); an empty "V:" names nothing,
+    so a later line may ("V:\nTempo" is Tempo; "V:" alone is ""). Line breaks: \r\n, \r, \n."""
     text = cell_text(cell)
     if text is None:
         return None, None, 0
-    variant, extra, note = None, 0, []
+    variant, extra, note, empty_v = None, 0, [], False
     for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         if not line.strip():
             continue
@@ -120,10 +121,14 @@ def split_notes(cell: object) -> tuple[str | None, str | None, int]:
             continue
         m = VARIANT_LINE.match(line)
         written = line.strip() if m is None else m.group(1).strip()
-        if variant is None:
+        if not written:
+            empty_v = True
+        elif variant is None:
             variant = written
         else:
             extra += 1
+    if variant is None and empty_v:
+        variant = ""
     return variant, ("\n".join(note) or None), extra
 
 
@@ -150,6 +155,7 @@ LSRPE_COLUMN_MISSING = "no LSRPE column in the header"
 RPE_UNKNOWN = "RPE unknown, set scored at RPE 6"   # en sæt-score afhænger af UNKNOWN_RPE (kg > 0)
 VARIANT_EMPTY = "variant line without a name"     # "V:" uden navn: varianten fortsætter uændret
 VARIANT_TWICE = "more than one variant line in a cell"   # den første vinder; "N:"-linjer tæller ikke
+VARIANT_NUMBER = "a number in NOTES, not a variant"      # fx en kg skrevet i NOTES: aldrig en variant
 RAW_KEYS = ("sets", "reps", "load", "weight", "lsrpe", "notes", "mean_weight")  # ugens 7 første kolonner
 
 
@@ -252,8 +258,8 @@ def row_variants(r, name, notes_cols, issues: Counter[str]):
     """(the variant in force per week, whether the week's own NOTES named one) for one sheet row
     (user, 2026-10-14; any text but "N:" since 2026-10-15): a variant in a week's NOTES holds
     from that week to the end of the block or the next variant; weeks before the first are None
-    (ukendt). The row's own name ends the variant. An empty "V:" keeps the current one
-    (counted). ``notes_cols``: each week's NOTES column from the header row."""
+    (ukendt). The row's own name ends the variant. An empty "V:" or a number (e.g. a kg) keeps
+    the current one (counted). ``notes_cols``: each week's NOTES column from the header row."""
     own = variant_key(name)
     current, states, named = None, [], []
     for col in notes_cols:
@@ -262,6 +268,8 @@ def row_variants(r, name, notes_cols, issues: Counter[str]):
         if extra: issues[VARIANT_TWICE] += 1
         if written is not None and not written.strip():
             issues[VARIANT_EMPTY] += 1; written = None
+        if written is not None and isinstance(text_number(written), float):
+            issues[VARIANT_NUMBER] += 1; written = None   # et tal er intet variantnavn
         if written is not None:
             key = variant_key(written)
             current = None if key == own else (key, " ".join(written.split()))
