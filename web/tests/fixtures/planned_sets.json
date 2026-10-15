@@ -37,6 +37,8 @@
         "kg": 65.0
       }
     ],
+    "today_kg": 82.5,
+    "today_basis": "e1rm",
     "computed_at": "2026-10-13T08:00:00+00:00"
   },
   "capped": {
@@ -61,6 +63,8 @@
     "rest_min_s": 180,
     "rest_max_s": 300,
     "ramp": null,
+    "today_kg": 82.5,
+    "today_basis": "e1rm",
     "computed_at": "2026-10-13T08:00:00+00:00"
   },
   "none": {
@@ -85,6 +89,8 @@
     "rest_min_s": 180,
     "rest_max_s": 300,
     "ramp": null,
+    "today_kg": 77.5,
+    "today_basis": "e1rm",
     "computed_at": "2026-10-13T08:00:00+00:00"
   }
 }

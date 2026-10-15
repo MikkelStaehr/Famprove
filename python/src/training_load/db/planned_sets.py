@@ -40,6 +40,8 @@ class PlannedSetRow(TypedDict):
     rest_min_s: int | None  # recommended rest after the set
     rest_max_s: int | None
     ramp: list[RampRow] | None  # a main lift's warm-up ramp on a run's first set; null: none
+    today_kg: float | None  # Fokus's "I DAG" kg (domain.today_kg); null with today_basis: none
+    today_basis: str | None  # sheet | derived | e1rm | last
     computed_at: str  # ISO timestamptz (UTC), the same on every row of one compute run
 
 
@@ -66,6 +68,8 @@ def to_row(p: PlannedSet, computed_at: datetime) -> PlannedSetRow:
         rest_min_s=p.rest_min_s,
         rest_max_s=p.rest_max_s,
         ramp=None if p.ramp is None else [RampRow(pct=s.pct, reps=s.reps, kg=s.kg) for s in p.ramp],
+        today_kg=p.today_kg,
+        today_basis=p.today_basis,
         computed_at=computed_at.isoformat(),
     )
 

@@ -49,6 +49,7 @@ from training_load.domain.strength_analysis import (
     best_e1rm,
     set_key,
 )
+from training_load.domain.today_kg import TodayBasis, today_kgs
 
 CAP_UPPER_KG: Final = 2.5
 CAP_LOWER_KG: Final = 5.0
@@ -67,13 +68,13 @@ ROUND_TO_KG: Final = 2.5
 
 type Basis = Literal["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift", "progression", "new_variant"]
 
-HEAVY_MAX_REPS: Final = 5
-HEAVY_MIN_RPE: Final = 7.0
-REST_HEAVY_S: Final = (180, 300)
-REST_OTHER_S: Final = (90, 120)
-"""Recommended rest after a set (user, 2026-10-13): a main lift or its variant (catalogue
-category main, or a parent lift, e.g. "3.0.0 Tempo squat") always 3-5 min; any other set 3-5 min
-when heavy (reps <= 5 at a prescribed RPE >= 7), else 1.5-2 min."""
+REST_MAIN_S: Final = (180, 300)
+REST_OTHER_S: Final = (90, 180)
+REST_SHORT_S: Final = (60, 120)
+"""Recommended rest after a set, by the exercise's type only (user, 2026-10-15, slice
+rest-by-type; was reps <= 5 at RPE >= 7 since 2026-10-13): a main lift or its variant (catalogue
+category main, or a parent lift, e.g. "3.0.0 Tempo squat") 3-5 min; isolation and abs 1-2 min;
+every other exercise (accessory, bodyweight, a name not in the catalogue) 1.5-3 min."""
 RAMP: Final = ((40, 5), (60, 3), (80, 2))
 """The warm-up ramp before a main lift: (% of the first working set's kg, reps)."""
 
@@ -112,6 +113,9 @@ class PlannedSet:
     ramp: tuple[RampStep, ...] | None = None  # main lifts, a run's first set; None: no ramp
     rpe_kg: float | None = None  # the e1RM x RPE suggestion before adjustment and cap (not stored)
     variant_id: int | None = None  # the set's exercise variant (not stored; 2026-10-14)
+    # Fokus's "I DAG" figure (domain.today_kg, slice fokus-kg); both None: no kg to show.
+    today_kg: float | None = None
+    today_basis: TodayBasis | None = None
 
 
 def pct_of_e1rm(reps: float, rpe: float) -> float:
@@ -182,11 +186,13 @@ def is_main_lift(exercise: Exercise | None) -> bool:
     )
 
 
-def rest_band(reps: float, rpe: float | None, *, main_lift: bool = False) -> tuple[int, int]:
-    if main_lift:
-        return REST_HEAVY_S
-    heavy = reps <= HEAVY_MAX_REPS and rpe is not None and rpe >= HEAVY_MIN_RPE
-    return REST_HEAVY_S if heavy else REST_OTHER_S
+def rest_band(exercise: Exercise | None) -> tuple[int, int]:
+    """The rest window after a set of ``exercise`` (REST_*_S)."""
+    if is_main_lift(exercise):
+        return REST_MAIN_S
+    if exercise is not None and exercise.category in ("isolation", "abs"):
+        return REST_SHORT_S
+    return REST_OTHER_S
 
 
 def ramp_of(base_kg: float) -> tuple[RampStep, ...] | None:
@@ -298,7 +304,7 @@ def planned_sets(
         uncapped = None
         if suggested is not None:
             suggested, uncapped = weekly_cap(suggested, anchor, step)
-        rest_min, rest_max = rest_band(s.reps, rpe, main_lift=is_main_lift(exercise))
+        rest_min, rest_max = rest_band(exercise)
         out.append(
             PlannedSet(
                 sheet_id=s.sheet_id,
@@ -327,6 +333,19 @@ def planned_sets(
                 variant_id=s.variant_id,
             )
         )
+    # Fokus's "I DAG": the sheet's kg, else derived from a sibling set, ~e1RM, last week's.
+    today_by_ref = today_kgs(
+        sets,
+        {(p.sheet_id, p.block, p.sheet_row, p.set_no, p.week_start): p.suggested_kg for p in out},
+        run_week=run_week,
+    )
+    out = [
+        replace(p, today_kg=t.kg, today_basis=t.basis)
+        if (t := today_by_ref.get((p.sheet_id, p.block, p.sheet_row, p.set_no, p.week_start)))
+        is not None
+        else p
+        for p in out
+    ]
     return _with_ramps(out, sets, catalog, anchors)
 
 

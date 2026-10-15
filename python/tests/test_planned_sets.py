@@ -334,18 +334,38 @@ def test_rest_band_and_the_warm_up_ramp_on_a_main_lifts_first_set(sheet: Sheet) 
     assert by_key[(pull.sheet_row, 1)].rest_max_s == 120
 
 
-def test_a_main_lift_or_its_variant_always_rests_3_to_5_minutes(sheet: Sheet) -> None:
+def test_the_rest_window_follows_the_exercise_type_only(sheet: Sheet) -> None:
+    """rest-by-type (user, 2026-10-15): main lift or variant 3-5 min, isolation and abs 1-2 min,
+    every other exercise 1.5-3 min; reps and RPE no longer matter."""
     light_squat = sheet.add(sheet_row=70, reps=5.0, prescribed="-10%")  # no RPE, 5 reps
     tempo = sheet.add(sheet_row=71, reps=3.0, prescribed="RPE 5.5", name="3.0.0 Tempo squat")
-    accessory = sheet.add(sheet_row=72, reps=10.0, reps_text="8 - 12", prescribed="RPE 7 - 8",
+    isolation = sheet.add(sheet_row=72, reps=10.0, reps_text="8 - 12", prescribed="RPE 7 - 8",
                           type="UPPER BACK", name="Facepulls")  # fmt: skip
-    heavy_accessory = sheet.add(sheet_row=73, reps=5.0, prescribed="RPE 8", type="UPPER BACK",
+    heavy_isolation = sheet.add(sheet_row=73, reps=5.0, prescribed="RPE 8", type="UPPER BACK",
                                 name="Facepulls")  # fmt: skip
+    unknown = sheet.add(sheet_row=74, reps=12.0, prescribed="RPE 8", type="UPPER BACK",
+                        name="Not in the catalogue")  # fmt: skip
     by_row = {p.sheet_row: (p.rest_min_s, p.rest_max_s) for p in sheet.plan()}
     assert by_row[light_squat.sheet_row] == (180, 300)  # category main
     assert by_row[tempo.sheet_row] == (180, 300)  # a variant: parent lift SQUAT
-    assert by_row[accessory.sheet_row] == (90, 120)
-    assert by_row[heavy_accessory.sheet_row] == (180, 300)  # reps <= 5 at RPE >= 7
+    assert by_row[isolation.sheet_row] == (60, 120)
+    assert by_row[heavy_isolation.sheet_row] == (60, 120)  # 5 reps at RPE 8 no longer counts
+    assert by_row[unknown.sheet_row] == (90, 180)  # not in the catalogue: an accessory
+
+
+def test_rest_band_per_category() -> None:
+    from training_load.domain.planned_sets import rest_band
+
+    def ex(category: str, parent: str | None = None) -> Exercise:
+        return lift(1, "x", parent, category)
+
+    assert rest_band(ex("main")) == (180, 300)
+    assert rest_band(ex("accessory", "BENCH")) == (180, 300)  # a variant of a main lift
+    assert rest_band(ex("accessory")) == (90, 180)
+    assert rest_band(ex("bodyweight")) == (90, 180)
+    assert rest_band(ex("isolation")) == (60, 120)
+    assert rest_band(ex("abs")) == (60, 120)
+    assert rest_band(None) == (90, 180)
 
 
 def test_a_variant_that_does_not_suggest_gets_no_kg_even_with_a_step_rule(sheet: Sheet) -> None:
