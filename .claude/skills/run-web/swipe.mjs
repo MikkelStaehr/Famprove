@@ -6,7 +6,7 @@
 //   [--reduce-motion] [--zoom200] [--base http://localhost:3100] [--timeout 120]
 // Steps: left | right (a swipe of --share x width over --ms, from the middle, never the edge zones),
 //   flick-left | flick-right (15 % of the width in 80 ms), short-left | short-right (15 % over 600 ms),
-//   edge-left | edge-right (starting 10 px from the edge), tap:<path> (a click on that tab), back (history),
+//   edge-left | edge-right (starting 10 px from the edge), tap:<path> (a click on that tab), key:<path> (focus + Enter), back | forward (history),
 //   scroll-down | scroll-up (a touch drag mostly in y: 300 px up/down with 20 px sideways),
 //   diag-left | diag-right (|dx| = |dy| = 60 px: below the 1.3 lock ratio, must not move a page),
 //   tabkeys (Tab pressed 60 times: reports whether focus ever reached an inactive page).
@@ -157,9 +157,12 @@ try {
     evaluate(`(() => { const pages = [...document.querySelectorAll('[data-tab-page]')];
       const act = document.querySelector('[data-tab-page][data-active]');
       return { url: location.pathname + location.search, active: act?.dataset.tabPage ?? null,
-        inactiveInert: pages.filter((e) => e !== act).every((e) => e.inert && getComputedStyle(e).visibility === 'hidden'),
-        notInert: pages.filter((e) => e !== act && !(e.inert && getComputedStyle(e).visibility === 'hidden'))
-          .map((e) => [e.dataset.tabPage, e.inert, getComputedStyle(e).visibility, e.style.transform]),
+        inactiveInert: pages.filter((e) => e !== act).every((e) => e.inert && e.getAttribute('aria-hidden') === 'true' && getComputedStyle(e).visibility === 'hidden'),
+        notInert: pages.filter((e) => e !== act && !(e.inert && e.getAttribute('aria-hidden') === 'true' && getComputedStyle(e).visibility === 'hidden'))
+          .map((e) => [e.dataset.tabPage, e.inert, e.getAttribute('aria-hidden'), getComputedStyle(e).visibility, e.style.transform]),
+        activeHidden: act ? [act.inert, act.getAttribute('aria-hidden'), getComputedStyle(act).visibility] : null,
+        focus: (() => { const a = document.activeElement; return a === document.body ? 'body'
+          : [a?.tagName, a?.getAttribute('href'), a?.closest('[data-tab-page]')?.dataset.tabPage ?? 'shell'].join(' '); })(),
         scroll: Object.fromEntries(pages.map((e) => [e.dataset.tabPage, Math.round(e.querySelector('main')?.scrollTop ?? -1)])),
         transforms: pages.map((e) => e.style.transform),
         navs: [...document.querySelectorAll('nav[aria-label="Hovedmenu"]')].filter((n) => n.offsetParent !== null && !n.closest('[inert]'))
@@ -218,6 +221,16 @@ try {
           `.find((a) => a.offsetParent !== null && !a.closest('[inert]'))?.click(); true`, // the visible bar or strip
       );
     else if (step === "back") await evaluate(`history.back(); true`);
+    else if (step === "forward") await evaluate(`history.forward(); true`);
+    // key:<path>: focus that tab's link in the visible bar or strip, then Enter (a keyboard activation).
+    else if (step.startsWith("key:")) {
+      await evaluate(
+        `[...document.querySelectorAll('nav[aria-label="Hovedmenu"] a[href="${step.slice(4)}"]')]` +
+          `.find((a) => a.offsetParent !== null && !a.closest('[inert]'))?.focus(); true`,
+      );
+      await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+      await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    }
     else if (step === "scroll-down") await vertical(1, -1, 20, 300);
     else if (step === "scroll-up") await vertical(1, 1, 20, 300);
     else if (step === "diag-left" || step === "diag-right") await vertical(step === "diag-left" ? -1 : 1, -1, 60, 60);
@@ -232,7 +245,7 @@ try {
       continue;
     }
     else throw new Error(`unknown step ${step}`);
-    if (!step.startsWith("tap:") && step !== "back") tEnd = await evaluate(`performance.now()`);
+    if (!step.startsWith("tap:") && !step.startsWith("key:") && step !== "back" && step !== "forward") tEnd = await evaluate(`performance.now()`);
     await sleep(700); // the 440 ms animation and a margin
     const after = await evaluate(`window.__tl.filter((t) => t > ${tEnd})`);
     results.push({
