@@ -163,6 +163,9 @@ export function AnalyseMotion({ root, ready }: { readonly root: RefObject<HTMLEl
     return () => {
       cancelAnimationFrame(frame);
       for (const a of running) a.cancel();
+      // A mount motion cancelled here (StrictMode's dev double effect) may play on the next run; an
+      // inactive page returns before playing, so leaving the tab never replays it.
+      if (base === 0) playedMount.current = false;
     };
   }, [root, ready, entry, away, mountedLate]);
 
