@@ -113,3 +113,5 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | sheet-layout | Parser guard: each week's columns from the day's header row, a training day bounded by its WEEK row and the next Micro Length/DAY/MICROCYCLE row; anything else stops collect-strength | M |
 | variants-notes | Variants from any NOTES text ("V:" optional, "N:" = a remark), Fokus shows no NOTES; one run, six cells checked | M |
 | refresh-button | "Hent data nu": ↻ on the updated line → POST /api/refresh → workflow_dispatch, token server-side only, one run at a time, 5 min apart | M |
+| ftp-confirm | FTP warning only when eFTP is credible (an 8-min effort at ≥ 90 % of FTP in 42 days, intervals.icu power curve), else a quiet "ikke testet siden" line; tap to confirm (60 days / FTP change / eFTP ±5 %) or "rettet"; ftp_status + ftp_ack, a second web write | L |
+| ftp-analyse | Analyse › Cykel: "FTP: 230 W · sat senest <dato>" and an FTP level line on the eFTP chart | M |
