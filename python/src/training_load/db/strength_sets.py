@@ -52,7 +52,7 @@ class StrengthSetRow(TypedDict):
     sides: int  # 1 | 2: exercises.per_side at collect time (not null, default 1)
     kg_factor: int  # 1 | 2: exercises.kg_per_dumbbell at collect time (not null, default 1)
     variant_id: int | None  # exercise_variants.id; null = ukendt
-    notes: str | None  # the coach's NOTES cell; null = blank
+    notes: str | None  # NOTES' "N:" remarks without the "N:" (since 2026-10-15); null = none
     raw: JsonRow | None  # the week's cells as written
     score_final: float | None  # the score that feeds TSS: collect writes score, compute overwrites
     rpe_final: float | None  # the RPE behind score_final

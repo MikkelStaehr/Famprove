@@ -75,7 +75,7 @@ class StrengthSet:
     # public.exercise_variants.id of the NOTES variant in force that week (user, 2026-10-14);
     # None = ukendt, its own group: never mixed with a named variant.
     variant_id: int | None = None
-    notes: str | None = None  # the coach's NOTES cell as written; None = blank
+    notes: str | None = None  # NOTES' "N:" remarks without the "N:" (since 2026-10-15); None = none
     raw: Mapping[str, object] | None = field(default=None, compare=False)
     """The week's cells as written (sets .. mean_weight); None for rows stored before raw."""
 
