@@ -2,43 +2,25 @@
 
 import { useEffect } from "react";
 
+import { type WakeLockApi, wakeLockController } from "@/lib/wake-lock";
+
 /**
- * Keeps the screen on while Fokus is visible (spec traening.md §4.5): requested on mount and
- * again whenever the page becomes visible, released when it is hidden and on unmount (Afslut,
+ * Keeps the screen on while a Fokus session is open (fokus-flow.md §4): requested while `active`
+ * (the log shows the session begun and it is not finished), again whenever the page becomes
+ * visible, released when `active` turns false (the finished view) and on unmount (Afslut,
  * Tilbage til Træning). Unsupported or refused: nothing happens and nothing is shown.
  */
-export function useWakeLock(): void {
+export function useWakeLock(active: boolean): void {
   useEffect(() => {
-    if (!("wakeLock" in navigator)) return;
-    let sentinel: WakeLockSentinel | null = null;
-    let mounted = true;
-
-    const release = () => {
-      const held = sentinel;
-      sentinel = null;
-      held?.release().catch(() => undefined); // already released by the browser: fine
-    };
-    const request = async () => {
-      if (sentinel !== null && !sentinel.released) return;
-      try {
-        const lock = await navigator.wakeLock.request("screen");
-        if (mounted && document.visibilityState === "visible") sentinel = lock;
-        else lock.release().catch(() => undefined);
-      } catch {
-        // refused (battery saver, no user activation): an enhancement only
-      }
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") void request();
-      else release();
-    };
-
-    void request();
+    if (!active) return;
+    const api: WakeLockApi | undefined = "wakeLock" in navigator ? navigator.wakeLock : undefined;
+    const lock = wakeLockController(api, () => document.visibilityState === "visible");
+    const onVisibility = () => void lock.visibility();
+    void lock.hold();
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      mounted = false;
       document.removeEventListener("visibilitychange", onVisibility);
-      release();
+      lock.release();
     };
-  }, []);
+  }, [active]);
 }

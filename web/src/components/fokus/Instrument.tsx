@@ -22,7 +22,7 @@ export const PRIMARY_DOCK =
   "sticky bottom-0 z-10 bg-bg pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] before:pointer-events-none before:absolute before:inset-x-0 before:-top-3 before:h-3 before:bg-linear-to-b before:from-transparent before:to-bg";
 /** A dark button (everything but the done): --card fill, 1px --text-muted border (5.02:1 on --card, 5.44:1 on --bg), --text label. */
 export const OUTLINED = "rounded-button border border-text-muted bg-card text-button text-text active:opacity-85";
-/** A full-width dark button in the primary's place (Til næste sæt, Til Træning): 56px, same dock. */
+/** A full-width dark button in the primary's place (Tilbage til Træning): 56px, same dock. */
 export const DARK_BOX = `flex min-h-14 w-full items-center justify-center gap-2 px-4 ${OUTLINED}`;
 /** Afslut and Fortryd: compact dark buttons, padding 0 14, 44px tall. */
 export const COMPACT_SECONDARY = `inline-flex min-h-11 shrink-0 items-center gap-2 px-3.5 ${OUTLINED}`;

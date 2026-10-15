@@ -60,35 +60,39 @@ export type FokusExercise = Pick<
 };
 
 /**
- * The view states (traening.md §4.5, fokus-pause.md §2–§4):
- *   set       the first open set (Udført, Spring over)
- *   pause     Variant B: the latest tap was a done of a set and the next open set is a set of the
- *             same run (unless "Til næste sæt" dismissed it: `dismissed` holds that rest start)
+ * The view states (fokus-flow.md §1–§2; there is no "start" step, the rest screen IS the next set):
+ *   set       the first open set, with its done as the primary. `rest`: the timer counts from the
+ *             latest tap when it was a done (a warm-up's done too: F5), `after` the item it ended;
+ *             null after a skip, before any done, or after Fortryd back to such a state. `showRest`
+ *             is the one switch for the rest strip (today: rest !== null). `feel`: the set whose
+ *             done is the latest tap (never a warm-up), rated optionally under the next set
  *   warmup    Variants A and C: the first open item is a warm-up. `feel` is the set whose done
- *             ended the previous exercise (C), null after a begin, a skip or a dismissed rest (A)
+ *             ended the previous exercise (C), null after a begin or a skip (A)
  *   finished  no open set; `feel` is the session's last set when the latest tap was its done
+ * The same log always gives the same view, so a reload shows what the tap showed.
  */
 export type FokusView =
-  | { readonly kind: "set"; readonly current: SetRef }
-  | { readonly kind: "pause"; readonly since: string; readonly done: SetRef; readonly next: SetRef }
+  | {
+      readonly kind: "set";
+      readonly next: SetRef;
+      readonly rest: { readonly since: string; readonly after: SetRef } | null;
+      readonly showRest: boolean;
+      readonly feel: SetRef | null;
+    }
   | { readonly kind: "warmup"; readonly warmup: SetRef; readonly since: string | null; readonly feel: SetRef | null }
   | { readonly kind: "finished"; readonly feel: SetRef | null };
 
-export function fokusView(
-  order: readonly SetRef[],
-  log: ReadonlyMap<string, LoggedSet>,
-  dismissed: string | null,
-): FokusView {
+export function fokusView(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): FokusView {
   const open = firstOpen(order, log);
-  const since = restStart(log);
   const latest = lastTap(log);
-  const done = since !== null && since !== dismissed && latest !== null ? latest.ref : null;
-  if (open === null) return { kind: "finished", feel: since !== null && latest !== null ? latest.ref : null };
+  // restStart excludes a warm-up's done; the feel row never rates a warm-up.
+  const feel = restStart(log) !== null && latest !== null ? latest.ref : null;
+  if (open === null) return { kind: "finished", feel };
   if (isWarmup(open)) {
-    return { kind: "warmup", warmup: open, since: log.get(setKey(open))?.startedAt ?? null, feel: done };
+    return { kind: "warmup", warmup: open, since: log.get(setKey(open))?.startedAt ?? null, feel };
   }
-  if (since !== null && done !== null) return { kind: "pause", since, done, next: open };
-  return { kind: "set", current: open };
+  const rest = latest !== null && latest.kind === "done" ? { since: latest.at, after: latest.ref } : null;
+  return { kind: "set", next: open, rest, showRest: rest !== null, feel };
 }
 
 /** One set in context: its sheet row, "Sæt n af m" numbered across the run (spec §10 D11). */
@@ -281,6 +285,53 @@ function spokenReps(repsText: string): string {
   const word = repsWord(repsText);
   const spoken = spokenRange(repsText);
   return word === null ? spoken : `${spoken} ${word}`;
+}
+
+/**
+ * After a done whose next item is a set (fokus-flow.md §5): "Squat, sæt 1 udført. Næste: sæt 2
+ * af 4, 5 reps, i dag 142,5 kg. Pause, anbefalet 3 til 5 minutter." `done` null after a warm-up's
+ * done (its own head), `restOf` the row whose rest values apply.
+ */
+export function nextSentence(done: SetInContext | null, next: SetInContext, restOf: FokusExercise): string {
+  const head = done === null ? `Opvarmning udført, ${spokenName(next.exercise)}.` : `${spokenName(done.exercise)}, sæt ${done.number} udført.`;
+  const e = next.exercise;
+  const parts = [setTitle(next).toLowerCase()];
+  if (e.repsText !== null) parts.push(spokenReps(e.repsText));
+  const today = todayKgView(e);
+  if (today !== null) parts.push(today.spoken);
+  const named = done !== null && done.exercise.row !== e.row && spokenName(done.exercise) !== spokenName(e);
+  const what = named ? `${spokenName(e)}, ${parts.join(", ")}` : parts.join(", ");
+  return `${head} Næste: ${what}. ${restWords(restOf)}`;
+}
+
+/** "Pause, anbefalet 3 til 5 minutter." / "Pause." without a recommended rest. */
+function restWords(e: FokusExercise): string {
+  return e.restMinS !== null && e.restMaxS !== null
+    ? `Pause, anbefalet ${restMinutes(e.restMinS).replace("½", ",5")} til ${restMinutes(e.restMaxS).replace("½", ",5")} minutter.`
+    : "Pause.";
+}
+
+/** The primary on a set (fokus-flow.md §1.5, §5): visible "Sæt 2 udført", spoken "Sæt 2 af 4 udført, Squat". */
+export function doneLabel(s: SetInContext): { readonly visible: string; readonly spoken: string } {
+  return { visible: `Sæt ${s.number} udført`, spoken: `Sæt ${s.number} af ${s.count} udført, ${spokenName(s.exercise)}` };
+}
+
+/** The next-set card's caption (§1.3): "Næste · sæt 2 af 4" (uppercase by its caption style). */
+export function nextCaption(s: SetInContext): string {
+  return `Næste · ${setTitle(s).toLowerCase()}`;
+}
+
+/** The rest strip's recommendation (§1.2): "Anbefalet 3–5 min"; null without a recommended rest. */
+export function restAdvice(minS: number | null, maxS: number | null): string | null {
+  return minS === null || maxS === null ? null : `Anbefalet ${restMinutes(minS)}–${restMinutes(maxS)} min`;
+}
+
+/** The rest strip's band line (§1.2): before "Hvil mindst 3:00"; ready / over get a check icon from the caller. */
+export function restBandLine(band: RestBand, minS: number | null, maxS: number | null): string | null {
+  if (band.kind === "before" && minS !== null) return `Hvil mindst ${formatTimer(minS)}`;
+  if (band.kind === "ready") return "Klar til næste sæt";
+  if (band.kind === "over" && maxS !== null) return `Klar · over ${restMinutes(maxS)} min pause`;
+  return null;
 }
 
 /** "Squat, sæt 1 udført. Pause." */

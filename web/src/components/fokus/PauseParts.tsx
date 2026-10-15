@@ -13,7 +13,10 @@ import {
   rampBasis,
   rampState,
   repsRange,
+  restAdvice,
   restBand,
+  restBandLine,
+  restRail,
   restSentence,
   type SetInContext,
   stepperBounds,
@@ -26,7 +29,8 @@ import { dotField, FIELD_WIDTH } from "@/lib/fokus-marks";
 
 import { Icon } from "@/components/icons";
 
-import { ArrowIcon, CAPTION, DARK_BOX, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { CAPTION, CheckIcon, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { type RestSignal, restSignal } from "@/lib/rest-signal";
 import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
@@ -34,26 +38,29 @@ type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 /** reset-fokus.md §3: the pause and warm-up surfaces are Cards (radius 22, padding 20). */
 const CARD = "flex flex-col rounded-card border border-border bg-card p-5";
 
-/** The view's action in the primary's place: light only when it is a done (Til sæt 1 ends the warm-up), else dark (Part B Buttons). */
-export function PrimaryButton({
+/**
+ * The done in the dock (fokus-flow.md §1.5, §2): the one light button, "✓ Sæt 2 udført" /
+ * "✓ Opvarmning udført"; `spoken` is its accessible name (§5, contains the visible words).
+ */
+export function DoneButton({
   primary,
   onClick,
-  children,
-  light = false,
+  visible,
+  spoken,
 }: {
   readonly primary: PrimaryRef;
   readonly onClick: () => void;
-  readonly children: string;
-  readonly light?: boolean;
+  readonly visible: string;
+  readonly spoken: string;
 }) {
   return (
     <>
       {/* Takes the free height of a short view, so the button sits at the bottom edge (user, 2026-10-13). */}
       <div aria-hidden="true" className="flex-1" />
-      <div className={`mt-10 ${PRIMARY_DOCK}`}>
-        <button ref={primary} type="button" onClick={onClick} className={light ? PRIMARY_BOX : DARK_BOX}>
-          {children}
-          <ArrowIcon />
+      <div className={`mt-3 ${PRIMARY_DOCK}`}>
+        <button ref={primary} type="button" aria-label={spoken} onClick={onClick} className={PRIMARY_BOX}>
+          <CheckIcon className="size-4.5" />
+          {visible}
         </button>
       </div>
     </>
@@ -81,13 +88,15 @@ export function FeelBlock({
   const range = repsRange(set.exercise.repsText);
   const felt = logged?.feltRpe ?? null;
   return (
-    <section aria-labelledby={`${id}-q`} className="mt-2 flex flex-col">
-      <h2 id={`${id}-q`} className="font-sans text-20 font-medium">
-        {feelQuestion(set, named)}
-      </h2>
+    // fokus-flow.md §1.4: optional, on --bg (no card); the group's name says so (§5).
+    <section role="group" aria-label={`${feelQuestion(set, named)} Valgfrit.`} className="flex flex-col">
+      <p aria-hidden="true" id={`${id}-q`} className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="font-sans text-16 font-medium">{feelQuestion(set, named)}</span>
+        <span className={CAPTION}>Valgfrit</span>
+      </p>
       {/* button-type.md B5: three separate dark buttons, 56px, gap 8px; the chosen one has the
           --raised fill and a check icon, so the choice is never carried by fill alone. */}
-      <div role="group" aria-labelledby={`${id}-q`} className="mt-3 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         {FEEL_OPTIONS.map((o) => {
           const on = felt === o.value;
           return (
@@ -178,33 +187,64 @@ function RepsStepper({
   );
 }
 
-/** §3: the pause between sets of one exercise; the scale's MIN and MAX carry the recommended rest (round 3). */
-export function PauseCard({ since, exercise, onAnnounce }: { readonly since: string; readonly exercise: FokusExercise; readonly onAnnounce: (s: string) => void }) {
+/**
+ * fokus-flow.md §1.2: the rest strip above the next set. PAUSE ↔ "Anbefalet 3–5 min", the timer,
+ * the rail (--track, the recommended span --shade-2, the now tick --text) and the band line with a
+ * check icon once ready (words carry it, never colour). Null rest values: the timer only. Crossing
+ * the minimum vibrates once (lib/rest-signal) and is announced once; the timer never is.
+ */
+export function RestStrip({ since, exercise, onAnnounce }: { readonly since: string; readonly exercise: FokusExercise; readonly onAnnounce: (s: string) => void }) {
   const seconds = useElapsed(since);
-  const band = restBand(seconds, exercise.restMinS, exercise.restMaxS);
+  const minS = exercise.restMinS;
+  const maxS = exercise.restMaxS;
+  const band = restBand(seconds, minS, maxS);
+  const signal = useRef<{ readonly since: string; readonly s: RestSignal } | null>(null);
   const said = useRef<string | null>(null);
   useEffect(() => {
-    // Once at the minimum and once at the maximum, never the timer itself (§9).
-    if (band.kind !== said.current && (band.kind === "ready" || band.kind === "over")) {
-      const sentence = restSentence(band, exercise.restMinS, exercise.restMaxS);
-      if (said.current !== null && sentence !== null) onAnnounce(sentence);
+    if (signal.current?.since !== since) signal.current = { since, s: restSignal(since, minS, navigator) };
+    const visible = document.visibilityState === "visible";
+    if (signal.current.s.tick(Date.now(), visible)) {
+      const sentence = restSentence({ kind: "ready" }, minS, maxS);
+      if (sentence !== null) onAnnounce(sentence);
+    }
+    // "Pausen er over 5 minutter." once, when the maximum is crossed while watched (not on load).
+    if (band.kind === "over" && said.current !== null && said.current !== "over") {
+      const sentence = restSentence(band, minS, maxS);
+      if (sentence !== null) onAnnounce(sentence);
     }
     said.current = band.kind;
-  }, [band, exercise.restMinS, exercise.restMaxS, onAnnounce]);
-  // rest_min_s or rest_max_s null: no field (§3.1).
-  const rail = exercise.restMinS !== null && exercise.restMaxS !== null;
+  }, [seconds, since, band, minS, maxS, onAnnounce]);
+  const advice = restAdvice(minS, maxS);
+  const line = restBandLine(band, minS, maxS);
+  const rail = minS !== null && maxS !== null ? restRail(seconds, minS, maxS) : null;
   return (
-    <section aria-label="Pause" className={`mt-10 ${CARD}`}>
-      <p className={CAPTION}>Pause</p>
-      <div className="mt-3">
+    <section aria-label="Pause" className="flex flex-col rounded-card border border-border bg-card p-4">
+      <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className={CAPTION}>Pause</span>
+        {advice !== null && <span className="font-mono text-13 text-text-muted">{advice}</span>}
+      </p>
+      <div className="mt-2">
         <RestTimer seconds={seconds} label="Pause" />
       </div>
-      {rail && exercise.restMaxS !== null && (
-        <Scale seconds={seconds} scaleS={1.2 * exercise.restMaxS} minS={exercise.restMinS} maxS={exercise.restMaxS} />
+      {rail !== null && (
+        <div aria-hidden="true" className="relative mt-3 h-4">
+          <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-pill bg-track" />
+          <div className="absolute top-1/2 h-1.5 -translate-y-1/2 bg-shade-2" style={{ left: frac(rail.min), width: frac(rail.max - rail.min) }} />
+          <div className="absolute top-0 h-4 w-0.5 -translate-x-1/2 bg-text" style={{ left: frac(rail.fill) }} />
+        </div>
+      )}
+      {line !== null && (
+        <p className={`mt-3 flex items-center gap-2 text-16 ${band.kind === "before" ? "text-text-muted" : "text-text"}`}>
+          {band.kind !== "before" && <CheckIcon className="size-4.5" />}
+          {line}
+        </p>
       )}
     </section>
   );
 }
+
+/** A 0..1 fraction as a CSS length. */
+const frac = (f: number): string => `${Math.min(1, Math.max(0, f)) * 100}%`;
 
 /** The scale's end value in minutes: 360 -> "6", 600 -> "10", 144 -> "2,4". */
 function endMinutes(scaleS: number): string {

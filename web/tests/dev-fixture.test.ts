@@ -95,13 +95,15 @@ test("DEV_FIXTURE warmup / pause / exercise-end: each gives its Fokus view (pure
   const viewOf = (f: "warmup" | "pause" | "exercise-end") => {
     const out = pauseFixture(f, sets, [], "2026-10-12", now);
     const log = new Map<string, LoggedSet>(out.setLog.map((l) => [setKey(l), l]));
-    return { out, view: fokusView(order, log, null) };
+    return { out, view: fokusView(order, log) };
   };
   assert.equal(viewOf("warmup").view.kind, "warmup");
   // A ramp only ever on a main lift: Dips (first here) warms up on the timer only.
   assert.ok(!viewOf("warmup").out.plannedSets.some((p) => p.ramp !== null));
+  // fokus-flow.md §1: the pause fixture is the next set, with its rest strip and the optional feel row.
   const pause = viewOf("pause");
-  assert.equal(pause.view.kind, "pause");
+  assert.equal(pause.view.kind, "set");
+  assert.ok(pause.view.kind === "set" && pause.view.showRest && pause.view.feel !== null);
   assert.ok(pause.out.setLog.some((l) => l.repsDone === 10)); // the server's default at Udført
   const end = viewOf("exercise-end");
   assert.deepEqual(end.view, { kind: "warmup", warmup: { row: 6, set: 0 }, since: new Date(now.getTime() - 40_000).toISOString(), feel: { row: 5, set: 2 } });
@@ -155,10 +157,11 @@ test("DEV_FIXTURE pause-rated / finished (fokus-round4.md §5): pure, nothing is
   const now = new Date("2026-10-12T16:00:00Z");
   const viewOf = (f: "pause-rated" | "finished") => {
     const out = pauseFixture(f, sets, [], "2026-10-12", now);
-    return { out, view: fokusView(order, new Map<string, LoggedSet>(out.setLog.map((l) => [setKey(l), l])), null) };
+    return { out, view: fokusView(order, new Map<string, LoggedSet>(out.setLog.map((l) => [setKey(l), l]))) };
   };
   const rated = viewOf("pause-rated");
-  assert.equal(rated.view.kind, "pause");
+  assert.equal(rated.view.kind, "set");
+  assert.ok(rated.view.kind === "set" && rated.view.showRest);
   const doneSet = rated.out.setLog.find((l) => l.row === 5 && l.set === 1);
   assert.equal(doneSet?.feltRpe, 1);
   assert.equal(doneSet?.endedAt, new Date(now.getTime() - 220_000).toISOString()); // 3:40, between MIN 3:00 and MAX 5:00

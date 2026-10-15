@@ -18,14 +18,15 @@ import {
   kgBlock,
   lastTapText,
   lastWeekLine,
-  pauseSentence,
+  doneLabel,
+  nextCaption,
+  nextSentence,
   prescribedCell,
   rangeFigure,
   type SetInContext,
   setInContext,
   setOneOf,
   setSentence,
-  setTitle,
   skippedText,
   skipSentence,
   undoSentence,
@@ -35,15 +36,13 @@ import {
   rampState,
 } from "@/lib/fokus-view";
 import { adjustmentLine, CAPPED_WORD, spokenName } from "@/lib/training-view";
-import { type DotRow as DotRowMarks, dotRow, type Signature, signature } from "@/lib/fokus-marks";
+import { type Signature, signature } from "@/lib/fokus-marks";
 import {
-  applyTap,
   isWarmup,
   lastTap,
   type LoggedSet,
   nextOpen,
   progress,
-  restStart,
   type SetRef,
   setKey,
   stateOf,
@@ -51,9 +50,9 @@ import {
 
 import { FokusProgress } from "./FokusProgress";
 import { Icon } from "@/components/icons";
-import { CAPTION, CheckIcon, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTLINED, PRIMARY_BOX, SKIP_BUTTON, PRIMARY_DOCK } from "./Instrument";
+import { CAPTION, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTLINED, SKIP_BUTTON, PRIMARY_DOCK } from "./Instrument";
 import { SessionSignature } from "./SessionSignature";
-import { FeelBlock, Footer, NextSetCard, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
+import { DoneButton, FeelBlock, Footer, NextSetCard, RestStrip, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
 
 export type FokusSession = {
@@ -71,7 +70,7 @@ type FokusScreenProps = {
   readonly staleNote: string | null;
   /** The dev switches are on (the server knows before the first tap): nothing is saved. */
   readonly devSwitches: boolean;
-  /** Entered from Træning (Begynd / Fortsæt): open the set view even mid-rest (§4.5). */
+  /** Entered from Træning (Begynd / Fortsæt) with ?view=set: the query is dropped (the view comes from the log alone). */
   readonly enteredFromTraening: boolean;
   /** The catalogue's main-lift name and alias keys (lib/fokus-view mainLiftKeys); null when unread. */
   readonly mainLifts: readonly string[] | null;
@@ -82,21 +81,17 @@ const FADE_IN = "transition-opacity duration-120 ease-out starting:opacity-0 mot
 
 /**
  * `/fokus` (spec traening.md §4): one set at a time, rebuilt from the set log on every load.
- * Three view states with one primary action each: set (Udført), rest (Til næste sæt), finished
- * (Tilbage til Træning). Taps go through useSetLog (optimistic, saved in order). "Til næste
- * sæt" writes nothing: it only dismisses the current rest.
+ * There is no "start" step (fokus-flow.md): the rest screen IS the next set, its primary the
+ * done of that set. Views: set (✓ Sæt n udført, with the rest strip after a done), warm-up
+ * (✓ Opvarmning udført), finished (Tilbage til Træning). Taps go through useSetLog (optimistic,
+ * saved in order).
  */
 export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts }: FokusScreenProps) {
   const { log, tap, unsaved, retry, rejected, dev, flush, failedNow } = useSetLog(session.log, session.order, date, session.session);
-  const [dismissed, setDismissed] = useState<string | null>(() =>
-    enteredFromTraening ? restStart(new Map(session.log.map((l) => [setKey(l), l]))) : null,
-  );
   const [announcement, setAnnouncement] = useState("");
   const [focusRequest, setFocusRequest] = useState(0);
   const primary = useRef<HTMLButtonElement & HTMLAnchorElement>(null);
   const router = useRouter();
-
-  useWakeLock();
 
   // Entered with ?view=set: drop it, so a reload rebuilds the view from the log alone (§4.5).
   useEffect(() => {
@@ -108,7 +103,9 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     if (focusRequest > 0) primary.current?.focus();
   }, [focusRequest]);
 
-  const view = fokusView(session.order, log, dismissed);
+  const view = fokusView(session.order, log);
+  // fokus-flow.md §4: the screen stays on from an open, begun session until it is finished.
+  useWakeLock(log.size > 0 && view.kind !== "finished");
   const p = progress(session.order, log);
   const latest = lastTap(log);
   const at = useCallback((ref: SetRef) => setInContext(session.exercises, ref), [session.exercises]);
@@ -127,7 +124,9 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         ? FINISHED_SENTENCE
         : isWarmup(following) && next !== null
           ? warmupSentence(current, next.exercise)
-          : pauseSentence(current),
+          : next === null
+            ? ""
+            : nextSentence(current, next, current.exercise),
     );
   };
 
@@ -144,16 +143,11 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     after(`${skipSentence(current)} ${then}`);
   };
 
-  /** "Til sæt 1": a done on the warm-up, which ends it and starts set 1 (no rest timer). */
+  /** "✓ Opvarmning udført": a done on the warm-up, which ends it and starts set 1 (its timer counts from this tap). */
   const onWarmupEnd = (warmup: SetRef) => {
     tap("done", warmup);
     const one = at(setOneOf(warmup));
-    after(one === null ? "" : setSentence(one, session.week));
-  };
-
-  const onNext = (since: string, next: SetInContext | null) => {
-    setDismissed(since);
-    after(next === null ? "" : setSentence(next, session.week));
+    after(one === null ? "" : nextSentence(null, one, one.exercise));
   };
 
   const onFeelOrReps = useCallback(
@@ -173,8 +167,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       return;
     }
     const undone = at(latest.ref);
-    // The reopened set shows in the set view, even if an earlier done tap is now the latest.
-    setDismissed(restStart(applyTap(session.order, log, "undo", latest.ref, new Date().toISOString())));
+    // The reopened set shows in the set layout, the timer counting from the tap before it (F8).
     tap("undo", latest.ref);
     after(
       undone === null
@@ -190,7 +183,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const skipped = skippedText(p);
   // The barcode's "now" tick (ink since round 2): the set the view is about (none when finished).
   const now =
-    view.kind === "set" ? view.current : view.kind === "pause" ? view.next : view.kind === "warmup" ? setOneOf(view.warmup) : null;
+    view.kind === "set" ? view.next : view.kind === "warmup" ? setOneOf(view.warmup) : null;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -252,25 +245,16 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
       {view.kind === "set" && (
         <SetView
-          key={`set-${setKey(view.current)}`}
-          current={at(view.current)}
+          key={`set-${setKey(view.next)}`}
+          next={at(view.next)}
+          rest={view.showRest ? view.rest : null}
+          restOf={view.rest === null ? null : at(isWarmup(view.rest.after) ? view.next : view.rest.after)}
+          feel={view.feel === null ? null : at(view.feel)}
+          logged={view.feel === null ? undefined : log.get(setKey(view.feel))}
           week={session.week}
-          dots={dotRow(session.exercises, session.order, log)}
           primary={primary}
           onDone={onDone}
           onSkip={onSkip}
-        />
-      )}
-      {view.kind === "pause" && (
-        <PauseView
-          key={`pause-${view.since}`}
-          since={view.since}
-          done={at(view.done)}
-          next={at(view.next)}
-          week={session.week}
-          logged={log.get(setKey(view.done))}
-          primary={primary}
-          onNext={onNext}
           onTap={onFeelOrReps}
           onAnnounce={setAnnouncement}
         />
@@ -309,176 +293,122 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
+type FeelTap = (kind: "feel" | "reps", ref: SetRef, value: number | null) => void;
+
 /**
- * §4.2 + round 4 §2: the current set. One value row (REPS · RPE/PROCENT · today's kg, fokus-kg.md, the
- * unit once), then the dot row and the adjustment; Spring over as a muted link; Udført the one ink
- * slab. NOTES is never shown: its text is the variant (user, 2026-10-15), already the title.
+ * fokus-flow.md §1: one layout for a set and the rest before it. The rest strip (only after a
+ * done; `rest` null hides it), the next-set hero card with Spring over inside it, the optional feel
+ * row of the set just done, and the done of the next set in the dock. NOTES is never shown.
  */
 function SetView({
-  current,
+  next,
+  rest,
+  restOf,
+  feel,
+  logged,
   week,
-  dots,
   primary,
   onDone,
   onSkip,
+  onTap,
+  onAnnounce,
 }: {
-  readonly current: SetInContext | null;
+  readonly next: SetInContext | null;
+  readonly rest: { readonly since: string } | null;
+  readonly restOf: SetInContext | null;
+  readonly feel: SetInContext | null;
+  readonly logged: LoggedSet | undefined;
   readonly week: number;
-  readonly dots: DotRowMarks;
   readonly primary: PrimaryRef;
   readonly onDone: (s: SetInContext) => void;
   readonly onSkip: (s: SetInContext) => void;
+  readonly onTap: FeelTap;
+  readonly onAnnounce: (s: string) => void;
 }) {
-  if (current === null) return null; // the order and the rows come from the same sets: not reached
-  const e = current.exercise;
+  if (next === null) return null; // the order and the rows come from the same sets: not reached
+  const e = next.exercise;
   const kg = kgBlock(e);
   const adjustment = adjustmentLine(e);
   const lastWeek = lastWeekLine(e, week);
   const cell = prescribedCell(e.prescribed);
   const under = exerciseUnder(e);
+  const label = doneLabel(next);
   return (
-    <div className={`flex flex-1 flex-col ${FADE_IN}`}>
-      <section aria-labelledby="fokus-set" className="mt-4 flex flex-1 flex-col">
-        {/* reset-fokus.md §3: the figure block in a hero Card (26, padding 20); its old margins are the card's. */}
-        <div className="mb-10 flex flex-col rounded-hero border border-border bg-card p-5">
-        <h2 id="fokus-set" className="font-sans text-32 font-semibold [overflow-wrap:anywhere] text-balance">
+    <div className={`mt-2 flex flex-1 flex-col gap-3 ${FADE_IN}`}>
+      {rest !== null && restOf !== null && (
+        <RestStrip key={rest.since} since={rest.since} exercise={restOf.exercise} onAnnounce={onAnnounce} />
+      )}
+      {/* §1.3: the next set in a hero Card (26, padding 20). */}
+      <section aria-labelledby="fokus-set" className="flex flex-col rounded-hero border border-border bg-card p-5">
+        <p className={CAPTION}>{nextCaption(next)}</p>
+        <h2 id="fokus-set" className="mt-2 font-sans text-32 font-semibold [overflow-wrap:anywhere] text-balance">
           {displayName(e)}
         </h2>
         {/* variants.md §3: the sheet's exercise muted under the variant (4px, same block). */}
         {under !== null && <p className="mt-1 font-sans text-16 text-balance text-text-muted">{under}</p>}
-        <p className={`${CAPTION} mt-3`}>{setTitle(current)}</p>
 
-        {/* One value row; below 21rem the kg column takes its own line (200 % text). */}
-        <div className="@container mt-10">
-          <div className="grid grid-cols-[auto_auto] gap-x-6 gap-y-3 @min-[21rem]:grid-cols-[auto_auto_1fr]">
+        {/* Two columns: reps | today's kg with Sidste uge under it; below 18rem one column (200 % text). */}
+        <div className="@container mt-4">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-3 @min-[18rem]:grid-cols-[auto_1fr]">
             {e.repsText !== null && (
               <p className="flex flex-col [overflow-wrap:anywhere]">
                 <span className={CAPTION}>Reps</span>
                 <span className={FIGURE}>{rangeFigure(e.repsText)}</span>
+                {cell !== null && (
+                  <span className="font-mono text-16 text-text-muted">
+                    {cell.caption === "RPE" ? `RPE ${cell.value}` : `${cell.value}${cell.unit ?? ""}`}
+                  </span>
+                )}
               </p>
             )}
-            {cell !== null && (
-              <p className="flex flex-col [overflow-wrap:anywhere]">
-                <span className={CAPTION}>{cell.caption ?? "\u00a0"}</span>
-                <span>
-                  <span className={FIGURE}>{cell.value}</span>
-                  {cell.unit !== null && <span className="text-20 text-text-muted">{cell.unit}</span>}
-                </span>
-              </p>
-            )}
-            {kg !== null && (
-              // fokus-kg.md §1: today's kg; the visual copy is aria-hidden, §4's sentence is said once.
-              <p
-                className={`flex flex-col [overflow-wrap:anywhere] ${
-                  hasWords(kg.figure) ? "col-span-full @min-[21rem]:col-span-full" : "col-span-2 @min-[21rem]:col-span-1"
-                }`}
-              >
-                <span className="sr-only">{`${capitalise(kg.spoken)}.`}</span>
-                <span aria-hidden="true" className={CAPTION}>
-                  {kg.caption}
-                </span>
-                <span aria-hidden="true" className={kg.italic ? "italic" : undefined}>
-                  {hasWords(kg.figure) ? <FigureWithWords figure={kg.figure} /> : <span className={FIGURE}>{kg.figure}</span>}
-                  {kg.unit !== null && <span className="text-24 text-text-muted">{"\u00a0"}kg</span>}
-                  {kg.capped && <span className="font-sans text-16 not-italic text-text-muted"> {CAPPED_WORD}</span>}
-                </span>
-              </p>
-            )}
+            <div className="flex min-w-0 flex-col gap-1">
+              {kg !== null && (
+                // fokus-kg.md §1: today's kg; the visual copy is aria-hidden, §4's sentence is said once.
+                <p className="flex flex-col [overflow-wrap:anywhere]">
+                  <span className="sr-only">{`${capitalise(kg.spoken)}.`}</span>
+                  <span aria-hidden="true" className={CAPTION}>
+                    {kg.caption}
+                  </span>
+                  <span aria-hidden="true" className={kg.italic ? "italic" : undefined}>
+                    {hasWords(kg.figure) ? <FigureWithWords figure={kg.figure} /> : <span className={FIGURE}>{kg.figure}</span>}
+                    {kg.unit !== null && <span className="text-24 text-text-muted">{"\u00a0"}kg</span>}
+                    {kg.capped && <span className="font-sans text-16 not-italic text-text-muted"> {CAPPED_WORD}</span>}
+                  </span>
+                </p>
+              )}
+              {lastWeek !== null && (
+                <p className="text-14 text-text-muted">
+                  {lastWeek.kind === "kg" ? (
+                    <>
+                      Sidste uge <span className="font-mono text-16 font-medium tabular-nums">{lastWeek.text}</span>
+                    </>
+                  ) : (
+                    lastWeek.text
+                  )}
+                </p>
+              )}
+            </div>
           </div>
         </div>
-
-        <div className="mt-3 flex flex-col gap-3">
-          <DotRow dots={dots} />
-          {kg?.basis === "e1rm" && adjustment !== null && (
-            <p className="text-16 text-text-muted">
-              {adjustment.signed !== "" && <span className="font-medium text-text">{adjustment.signed}</span>}
-              {adjustment.rest}
-            </p>
-          )}
-          {lastWeek !== null && (
-            <p className="text-14 text-text-muted">
-              {lastWeek.kind === "kg" ? (
-                <>
-                  Sidste uge <span className="font-mono text-20 font-medium tabular-nums">{lastWeek.text}</span>
-                </>
-              ) : (
-                lastWeek.text
-              )}
-            </p>
-          )}
-        </div>
-        </div>
-
-        {/* Secondary action above the primary: nothing sits below Udført (round 2). mt-auto takes the
-            free height, so on a short set Udført sits at the bottom edge like the pause's button. */}
-        <button type="button" onClick={() => onSkip(current)} className={`mt-auto self-center ${SKIP_BUTTON}`}>
-          Spring over
-        </button>
-
-        <div className={`mt-6 ${PRIMARY_DOCK}`}>
-          <button ref={primary} type="button" onClick={() => onDone(current)} className={PRIMARY_BOX}>
-            <CheckIcon className="size-4.5" />
-            Udført
+        {kg?.basis === "e1rm" && adjustment !== null && (
+          <p className="mt-3 text-16 text-text-muted">
+            {adjustment.signed !== "" && <span className="font-medium text-text">{adjustment.signed}</span>}
+            {adjustment.rest}
+          </p>
+        )}
+        {/* F4: Spring over acts on this set, so it sits inside its card, bottom right. */}
+        <p className="mt-4 flex justify-end">
+          <button type="button" onClick={() => onSkip(next)} className={SKIP_BUTTON}>
+            Spring over
           </button>
-        </div>
+        </p>
       </section>
-    </div>
-  );
-}
-
-/** Round 4 §3.2: sets tapped today, filled = done, ring = skipped, 8px dots with 8px gaps (16px between
- * exercises); the 8px row is reserved when empty. */
-function DotRow({ dots }: { readonly dots: DotRowMarks }) {
-  return (
-    <div className="flex min-h-2 flex-wrap gap-x-4 gap-y-2">
-      {dots.groups.map((g) => (
-        <svg key={g.key} aria-hidden="true" width={g.width} height={8} viewBox={`0 0 ${g.width} 8`} className="block shrink-0">
-          {g.dots.map((d) =>
-            d.kind === "done" ? (
-              <circle key={d.cx} cx={d.cx} cy={4} r={4} fill="var(--text)" />
-            ) : (
-              <circle key={d.cx} cx={d.cx} cy={4} r={3.25} fill="none" stroke="var(--text)" strokeWidth={1.5} />
-            ),
-          )}
-        </svg>
-      ))}
-      <span className="sr-only">{dots.sentence}</span>
-    </div>
-  );
-}
-
-type FeelTap = (kind: "feel" | "reps", ref: SetRef, value: number | null) => void;
-
-/** fokus-pause.md §3 (Variant B): feel, the pause with its recommended rest, the next set. */
-function PauseView({
-  since,
-  done,
-  next,
-  week,
-  logged,
-  primary,
-  onNext,
-  onTap,
-  onAnnounce,
-}: {
-  readonly since: string;
-  readonly done: SetInContext | null;
-  readonly next: SetInContext | null;
-  readonly week: number;
-  readonly logged: LoggedSet | undefined;
-  readonly primary: PrimaryRef;
-  readonly onNext: (since: string, next: SetInContext | null) => void;
-  readonly onTap: FeelTap;
-  readonly onAnnounce: (s: string) => void;
-}) {
-  return (
-    <div className={`flex flex-1 flex-col ${FADE_IN}`}>
-      {done !== null && <FeelBlock set={done} logged={logged} named={false} onTap={onTap} />}
-      {done !== null && <PauseCard since={since} exercise={done.exercise} onAnnounce={onAnnounce} />}
-      {next !== null && <NextSetCard next={next} week={week} inWarmup={false} afterTimer />}
-      <PrimaryButton primary={primary} onClick={() => onNext(since, next)}>
-        Til næste sæt
-      </PrimaryButton>
+      {feel !== null && (
+        <div className="mt-1">
+          <FeelBlock set={feel} logged={logged} named={displayName(feel.exercise) !== displayName(e)} onTap={onTap} />
+        </div>
+      )}
+      <DoneButton primary={primary} onClick={() => onDone(next)} visible={label.visible} spoken={label.spoken} />
     </div>
   );
 }
@@ -511,14 +441,21 @@ function WarmupView({
   const mainLift = isMainLift(setOne.exercise, mainLifts);
   return (
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
-      {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
+      {feel !== null && (
+        <div className="mt-2">
+          <FeelBlock set={feel} logged={logged} named onTap={onTap} />
+        </div>
+      )}
       <div className={feel !== null ? "mt-10" : "mt-4"}>
         <WarmupCard since={since} exercise={setOne.exercise} mainLift={mainLift} />
       </div>
       <NextSetCard next={setOne} week={week} inWarmup afterTimer={rampState(setOne.exercise, mainLift) === "hidden"} />
-      <PrimaryButton light primary={primary} onClick={() => onWarmupEnd(warmup)}>
-        Til sæt 1
-      </PrimaryButton>
+      <DoneButton
+        primary={primary}
+        onClick={() => onWarmupEnd(warmup)}
+        visible="Opvarmning udført"
+        spoken={`Opvarmning udført, ${spokenName(setOne.exercise)}`}
+      />
     </div>
   );
 }
@@ -548,7 +485,11 @@ function FinishedView({
 }) {
   return (
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
-      {feel !== null && <FeelBlock set={feel} logged={logged} named onTap={onTap} />}
+      {feel !== null && (
+        <div className="mt-2">
+          <FeelBlock set={feel} logged={logged} named onTap={onTap} />
+        </div>
+      )}
       <section aria-labelledby={`fokus-finished-${session}`} className={`${feel !== null ? "mt-10" : "mt-4"} flex flex-col`}>
         <h2 id={`fokus-finished-${session}`} className="font-sans text-28 font-semibold tracking-[-0.01em]">
           {card.title}
