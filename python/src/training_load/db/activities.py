@@ -134,3 +134,9 @@ def delete_ids(db: Postgrest, ids: Collection[str], *, table: str = TABLE) -> No
 def all_activities(db: Postgrest) -> list[CyclingActivity]:
     """Every stored activity, paginated, ordered by id."""
     return [from_row(row) for row in db.select(TABLE, columns=COLUMNS, order="id")]
+
+
+def ride_ftps(db: Postgrest) -> list[tuple[date, int | None]]:
+    """(local date, the FTP in force on that ride) for every ride: the FTP check's "sat senest"."""
+    rows = db.select(TABLE, columns="id,start_date_local,ftp", order="id")
+    return [(req_naive_datetime(r, "start_date_local").date(), opt_int(r, "ftp")) for r in rows]

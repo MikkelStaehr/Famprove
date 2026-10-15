@@ -123,7 +123,7 @@ function selectParams(query: SelectQuery): URLSearchParams {
 }
 
 /**
- * One write (the app's only write path is public.exercise_set_log, see lib/db/set-log.ts):
+ * One write (the app's write paths: public.exercise_set_log, lib/db/set-log.ts; public.ftp_ack, lib/db/ftp-ack.ts):
  * POST / PATCH / DELETE `table` with `params` (filters, on_conflict), `Prefer: return=minimal` plus
  * `prefer`, no-store, REQUEST_TIMEOUT_MS. PostgrestError on network failure or non-2xx; the
  * message names the table and status, never the body.
@@ -160,6 +160,40 @@ export async function write(
   if (!response.ok) {
     throw new PostgrestError(table, response.status, `${table}: ${method} HTTP ${response.status}`);
   }
+}
+
+/**
+ * One POST of `body` that returns the stored row (`Prefer: return=representation`), for an insert
+ * whose server defaults (an identity id, a timestamp) the caller needs back (lib/db/ftp-ack.ts).
+ * Same headers, timeout and errors as `write`; a reply that is not one row is a PostgrestError.
+ */
+export async function insertReturning<T>(
+  client: PostgrestClient,
+  table: string,
+  body: Readonly<Record<string, unknown>>,
+  parseRow: (raw: unknown) => T,
+): Promise<T> {
+  let response: Response;
+  try {
+    response = await client.fetch(`${client.restUrl}/${table}`, {
+      method: "POST",
+      headers: { ...authHeaders(client.key), "Content-Type": "application/json", Accept: "application/json", Prefer: "return=representation" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (cause) {
+    throw new PostgrestError(table, null, `${table}: POST failed`, { cause });
+  }
+  if (!response.ok) throw new PostgrestError(table, response.status, `${table}: POST HTTP ${response.status}`);
+  let rows: unknown;
+  try {
+    rows = await response.json();
+  } catch (cause) {
+    throw new PostgrestError(table, response.status, `${table}: POST reply is not JSON`, { cause });
+  }
+  if (!Array.isArray(rows) || rows.length !== 1) throw new PostgrestError(table, response.status, `${table}: POST reply is not one row`);
+  return parseRow(rows[0]);
 }
 
 /**

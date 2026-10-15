@@ -990,17 +990,68 @@ export type AppNoticeRow = {
   readonly kind: string;
   readonly date: IsoDate;
   readonly message: string; // Danish, shown as is
+  readonly updatedAt: string; // the run that last wrote it (ftp-confirm: an answer after it hides it)
 };
 
 export const APP_NOTICES_SELECT = {
   table: "app_notices",
-  columns: "kind,date,message",
+  columns: "kind,date,message,updated_at",
   order: "kind", // the primary key
 } as const;
 
 export function parseAppNoticeRow(raw: unknown): AppNoticeRow {
   const f = new Fields(APP_NOTICES_SELECT.table, raw);
-  return { kind: f.string("kind"), date: f.date("date"), message: f.string("message") };
+  return { kind: f.string("kind"), date: f.date("date"), message: f.string("message"), updatedAt: f.timestamp("updated_at") };
+}
+
+/** public.ftp_status (slice ftp-confirm; python domain/ftp_check.py). Every null = unknown or none, never 0. */
+export type FtpStatusRow = {
+  readonly ftpW: number | null; // the FTP set in intervals.icu
+  readonly eftpW: number | null;
+  readonly credible: boolean | null; // an 8-min effort at >= 90 % of the FTP in 42 days; null = no FTP
+  readonly lastTestedOn: IsoDate | null; // null = no such effort in the last 52 weeks
+  readonly ftpSince: IsoDate | null; // "sat senest": the first ride with this FTP; null = unknown
+  readonly suppressedUntil: IsoDate | null; // after "230 W er rigtigt": the first day it may show again
+};
+
+export const FTP_STATUS_SELECT = {
+  table: "ftp_status",
+  columns: "singleton,ftp_w,eftp_w,credible,last_tested_on,ftp_since,suppressed_until",
+  order: "singleton", // the primary key (one row)
+} as const;
+
+export function parseFtpStatusRow(raw: unknown): FtpStatusRow {
+  const f = new Fields(FTP_STATUS_SELECT.table, raw);
+  const positive = (column: string) => {
+    const w = f.numberOrNull(column);
+    if (w !== null && w <= 0) throw new RowError(`${FTP_STATUS_SELECT.table}.${column}: must be > 0 or null`);
+    return w;
+  };
+  return {
+    ftpW: positive("ftp_w"),
+    eftpW: positive("eftp_w"),
+    credible: f.booleanOrNull("credible"),
+    lastTestedOn: f.dateOrNull("last_tested_on"),
+    ftpSince: f.dateOrNull("ftp_since"),
+    suppressedUntil: f.dateOrNull("suppressed_until"),
+  };
+}
+
+/** public.ftp_ack: the user's answers to the FTP notice (written by lib/db/ftp-ack.ts), newest id wins. */
+export type FtpAckChoice = "confirmed" | "fixed";
+export type FtpAckRow = { readonly id: number; readonly choice: FtpAckChoice; readonly at: string };
+
+export const FTP_ACK_SELECT = {
+  table: "ftp_ack",
+  columns: "id,choice,at",
+  order: "id.desc", // newest first; selectFirst gives the latest answer
+} as const;
+
+export function parseFtpAckRow(raw: unknown): FtpAckRow {
+  const f = new Fields(FTP_ACK_SELECT.table, raw);
+  const choice = f.string("choice");
+  if (choice !== "confirmed" && choice !== "fixed") throw new RowError(`${FTP_ACK_SELECT.table}.choice: ${choice}`);
+  return { id: f.number("id"), choice, at: f.timestamp("at") };
 }
 
 /** Why a planned set has (or has no) suggested kg (python domain/planned_sets.py). */

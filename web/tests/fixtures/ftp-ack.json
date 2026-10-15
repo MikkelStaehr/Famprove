@@ -1,0 +1,14 @@
+{
+  "insert": {
+    "choice": "confirmed",
+    "ftp_w": 230,
+    "eftp_w": 183
+  },
+  "row": {
+    "id": 1,
+    "choice": "confirmed",
+    "ftp_w": 230,
+    "eftp_w": 183,
+    "at": "2026-10-15T08:00:00.123456+00:00"
+  }
+}

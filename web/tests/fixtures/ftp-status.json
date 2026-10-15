@@ -1,0 +1,38 @@
+{
+  "quiet": {
+    "singleton": true,
+    "ftp_w": 230,
+    "eftp_w": 183,
+    "best_8min_42d_w": 202,
+    "threshold_w": 207,
+    "credible": false,
+    "last_tested_on": "2026-05-17",
+    "ftp_since": "2026-03-21",
+    "suppressed_until": null,
+    "checked_at": "2026-10-15T03:00:00+00:00"
+  },
+  "suppressed": {
+    "singleton": true,
+    "ftp_w": 230,
+    "eftp_w": 183,
+    "best_8min_42d_w": 210,
+    "threshold_w": 207,
+    "credible": true,
+    "last_tested_on": "2026-09-20",
+    "ftp_since": "2026-03-21",
+    "suppressed_until": "2026-12-13",
+    "checked_at": "2026-10-15T03:00:00+00:00"
+  },
+  "none": {
+    "singleton": true,
+    "ftp_w": null,
+    "eftp_w": null,
+    "best_8min_42d_w": null,
+    "threshold_w": null,
+    "credible": null,
+    "last_tested_on": null,
+    "ftp_since": null,
+    "suppressed_until": null,
+    "checked_at": "2026-10-15T03:00:00+00:00"
+  }
+}

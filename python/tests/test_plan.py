@@ -91,7 +91,10 @@ def test_collect_plan_rebuilds_targets_keeps_problems_and_prunes(db: InMemoryPos
         {"date": "2026-10-04", "name": "Broken", "steps": [{"minutes": 10}], "notes": "fix me"},
     ]
     db.tables["planned_targets"] = [{"date": "2026-09-01", "name": "Old"}]
-    send = FakeSend(FakeResponse(body={"sportSettings": [{"types": ["Ride"], "ftp": 250}]}))
+    send = FakeSend(
+        FakeResponse(body={"sportSettings": [{"types": ["Ride"], "ftp": 250}]}),
+        FakeResponse(body={"list": [], "activities": {}}),  # the FTP check's power curves
+    )
     run_at = datetime(2026, 9, 28, 3, 0, tzinfo=UTC)
 
     summary = collect_plan.run(

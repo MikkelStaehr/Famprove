@@ -39,6 +39,8 @@
  *          current week (the latest weekly_load week) given an illustrative remaining value when it
  *          has none (the view not yet applied, or nothing left this week), so "planned" can be
  *          screenshotted. Never a real estimate.
+ *   ftp-warning / ftp-quiet  /load's FTP line (ftp-confirm.md §4): an illustrative ftp_status (and
+ *          notice), credible and mismatched / not tested since 17 May; other screens: real rows.
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
@@ -48,8 +50,10 @@ import { sessionOrderWithWarmups, setKey, type SetRef } from "../set-taps.ts";
 import { PostgrestError } from "./postgrest.ts";
 import type {
   AnalysisSummaryRow,
+  AppNoticeRow,
   DailyProjectionRow,
   ExerciseFeelRow,
+  FtpStatusRow,
   IsoDate,
   PlannedSetRow,
   PrescribedSetRow,
@@ -76,7 +80,9 @@ export type DevFixture =
   | "pause-rated"
   | "finished"
   | "feel"
-  | "calendar";
+  | "calendar"
+  | "ftp-warning"
+  | "ftp-quiet";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -93,6 +99,8 @@ const FIXTURES: readonly DevFixture[] = [
   "finished",
   "feel",
   "calendar",
+  "ftp-warning",
+  "ftp-quiet",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
@@ -396,6 +404,30 @@ export function fixtureError(table: string): PostgrestError {
 }
 
 /** computed_at for DEV_FIXTURE=stale: STALE_AGE_MS before `now`. */
+/**
+ * DEV_FIXTURE=ftp-warning / ftp-quiet (ftp-confirm.md §4): /load's FTP line without the real
+ * ftp_status (illustrative, never written; a tap under a fixture writes nothing).
+ * ftp-warning: credible, FTP 230 W vs eFTP 183 W, not suppressed; ftp-quiet: not tested since 17 May.
+ */
+export function illustrativeFtp(
+  fixture: "ftp-warning" | "ftp-quiet",
+  now: Date,
+): { readonly status: FtpStatusRow; readonly notice: AppNoticeRow | null } {
+  const status: FtpStatusRow = {
+    ftpW: 230,
+    eftpW: 183,
+    credible: fixture === "ftp-warning",
+    lastTestedOn: fixture === "ftp-warning" ? "2026-10-04" : "2026-05-17",
+    ftpSince: "2026-03-21",
+    suppressedUntil: null,
+  };
+  const notice: AppNoticeRow | null =
+    fixture === "ftp-warning"
+      ? { kind: "ftp_mismatch", date: "2026-10-15", message: "FTP er sat til 230 W, men dine ture peger på 183 W", updatedAt: now.toISOString() }
+      : null;
+  return { status, notice };
+}
+
 export function staleComputedAt(now: Date): string {
   return new Date(now.getTime() - STALE_AGE_MS).toISOString();
 }

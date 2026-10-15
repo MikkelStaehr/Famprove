@@ -31,7 +31,9 @@ GitHub Actions daily.yml at 05, 12, 20 Copenhagen: the droplet's workflow_dispat
                                                           strength_set_kg (planned/lifted kg history; updated, never rebuilt),
                                                           planned_sets (suggested kg per set, this ISO week on)
   collect-plan       planned_sessions (hand-filled) + FTP from intervals.icu → planned_targets;
-                     FTP vs eFTP → app_notices (ftp_mismatch)
+                     FTP vs eFTP + the ride power curve (one GET) + activities.ftp + ftp_ack
+                       → ftp_status, app_notices (ftp_mismatch, only while the eFTP is credible
+                         and not confirmed; domain/ftp_check.py)
 
 Next.js (web/), server components only
   /       Træning ← daily_load (TSB flag), strength_sessions + strength_sets (this ISO week, last week), planned_targets
@@ -56,7 +58,7 @@ Next.js (web/), server components only
 | `python/tests/` | pytest with synthetic fixtures (`conftest.py` builds a fake workbook and an in-memory PostgREST) and an anonymised real-data slice (`fixtures/blok12_slice.json`: refresh it when a new block starts); `test_contract_*.py` write the web's JSON fixtures (`REGENERATE_CONTRACT=1`) |
 | `supabase/migrations/` | Schema, RLS, grants; applied with `supabase db push` |
 | `web/src/lib/db/` | Server-only data layer (`server-only`): `queries.ts` entry points, `postgrest.ts` client (reads + `write`), `set-log.ts` (the one write path: exercise_set_log taps per set, input checks, undo), `rows.ts` typed parsers, `dev-fixture.ts` (DEV_FIXTURE, dev only: empty, stale, error, band, ef-few, lsrpe, answers, feel; Træning/Fokus: midsession, warmup, pause, exercise-end, pause-rated, finished) |
-| `web/src/app/actions.ts` | The only server action: `logExerciseTap` (per-set shape check, then `lib/db/set-log.ts`) |
+| `web/src/app/actions.ts` | The server actions: `logExerciseTap` (per-set shape check, then `lib/db/set-log.ts`); `chooseFtpAnswer` / `undoFtpAnswer` (the FTP notice's answer, `lib/db/ftp-ack.ts`; states and texts in `lib/ftp-line.ts`) |
 | `web/src/app/api/refresh/route.ts` | "Hent data nu": POST dispatches daily.yml (one run at a time, 5 min apart), GET ?since= says when it has finished; rules in `lib/refresh.ts`, the token only in `lib/github/workflow.ts` (server-only); the ↻ and status line are `components/Refresh.tsx` |
 | `web/src/lib/*.ts` | Pure view models and formatting: `set-taps.ts` (per-set tap rules: input shape, sheet order, progress, rest-timer start, optimistic mirror), `dashboard-view.ts` (/load), `load-days.ts` (/load drawing scales: curve ranges 4U/12U/Sæson, gridlines and the curve's weekly anchors, day-grid shade buckets, bar windows, the before-the-strength-log rule), `load-grid.ts` (/load desktop placement), `training-view.ts` (/ and /fokus: the plan, sets per row, run numbering, TSB hint), `fokus-view.ts` (/fokus: which view, labels, timer, announcements), `zone-scale.ts` (zone-bar drawing scale, zone swatches and range texts, sr sentence, /load zone reading), `analyse-view.ts` (/analyse), `analyse-styrke-view.ts` (/analyse/styrke: lift board, e1RM panels, block ruler, tonnage weeks), `analyse-marks.ts` (Analyse mark constants, deload weeks, x labels kept clear of I DAG), `analyse-grid.ts` (Analyse desktop grid), `format.ts` (locale da-DK), `dates.ts` |
 | `web/src/app/` | Routes: `page.tsx` (Træning), `fokus/page.tsx` (Fokus), `load/page.tsx`, `analyse/layout.tsx` (h1) + `analyse/page.tsx` (Cykel) + `analyse/styrke/page.tsx`, `layout.tsx` (TabBar, Geist fonts), `actions.ts` (the one server action) |
@@ -81,7 +83,7 @@ Next.js (web/), server components only
 `planned_events` (the intervals.icu calendar mirrored raw by collect-intervals; WORKOUT Ride/VirtualRide events drive the prognose's cycling in their ISO weeks) ·
 `strength_set_kg` (persistent: planned and lifted kg per set with timestamps; like forecast_log it can't be rebuilt) ·
 `exercise_set_log` (persistent: start/end/skip of each set and each exercise's warm-up (set 0), felt RPE and reps done, from the Træning screens' taps; can't be rebuilt; written only by the web; read back on reload; Python reads felt RPE and reps done) · `exercise_feel` (derived: one Styrke line per exercise with 4+ rated sets) ·
-`app_notices` (one current notice per kind, e.g. ftp_mismatch from collect-plan; shown on /load) ·
+`app_notices` (one current notice per kind, e.g. ftp_mismatch from collect-plan; shown on /load) · `ftp_status` (one row: FTP, eFTP, credible, last tested, "sat senest", suppressed until; collect-plan) · `ftp_ack` (persistent: the user's answers to the FTP notice, written by the web's second write path, lib/db/ftp-ack.ts; can't be rebuilt) ·
 `planned_sets` (derived by compute: suggested kg per set of this ISO week and later, rolling e1RM of the parent lift x the RPE relation, rounded to 2.5). `activities.raw` / `strength_activities.raw` hold the intervals.icu object as delivered.
 
 ## Plan

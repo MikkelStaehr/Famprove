@@ -309,8 +309,8 @@ test("a ride without ride_metrics (before 2024-12-30) has no VI and no warning",
 });
 
 test("app_notices rows parse; a notice without a message is rejected", () => {
-  const row = { kind: "ftp_mismatch", date: "2026-10-13", message: "FTP er sat til 230 W, men dine ture peger på 183 W" };
-  assert.deepEqual(parseAppNoticeRow(row), row);
+  const row = { kind: "ftp_mismatch", date: "2026-10-13", message: "FTP er sat til 230 W, men dine ture peger på 183 W", updated_at: "2026-10-13T06:00:00+00:00" };
+  assert.deepEqual(parseAppNoticeRow(row), { kind: row.kind, date: row.date, message: row.message, updatedAt: row.updated_at });
   assert.throws(() => parseAppNoticeRow({ ...row, message: null }), RowError);
 });
 
@@ -325,6 +325,7 @@ test("contract: the power-check rows Python writes parse (fixtures/power_checks.
     kind: "ftp_mismatch",
     date: "2026-10-13",
     message: "FTP er sat til 230 W, men dine ture peger på 183 W",
+    updatedAt: "2026-10-13T06:00:00+00:00",
   });
 });
 

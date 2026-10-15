@@ -6,6 +6,7 @@ import { DailyTssBars, TrainingDaysGrid } from "@/components/DayCharts";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { FitnessCurve } from "@/components/FitnessCurve";
+import { FtpLine } from "@/components/FtpLine";
 import { LoadExplainer } from "@/components/LoadExplainer";
 import { MonoCaption } from "@/components/MonoCaption";
 import { RefreshProvider, RefreshStatus } from "@/components/Refresh";
@@ -26,8 +27,9 @@ import {
   type WeekNav,
 } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
-import { loadAppNotices, loadDashboardData, loadTrainingPlan, loadWeekDetail } from "@/lib/db/queries";
+import { loadAppNotices, loadDashboardData, loadFtpCheck, loadTrainingPlan, loadWeekDetail } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
+import { FTP_NOTICE_KIND, ftpLine } from "@/lib/ftp-line";
 import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
 import { noticeText } from "@/lib/notices";
 import {
@@ -95,10 +97,16 @@ async function loadWeekState(nav: WeekNav): Promise<WeekState> {
 
 export default async function Page({ searchParams }: PageProps<"/load">) {
   const { week } = await searchParams;
-  const [state, notices] = await Promise.all([
+  const [state, notices, ftpCheck] = await Promise.all([
     loadPageState(typeof week === "string" ? week : undefined),
     loadAppNotices(),
+    loadFtpCheck(),
   ]);
+  // ftp-confirm.md §1: Python's ftp_mismatch notice becomes the FTP line, never a plain notice.
+  const ftpNotice =
+    ftpCheck.fixtureNotice !== undefined ? ftpCheck.fixtureNotice : (notices.find((n) => n.kind === FTP_NOTICE_KIND) ?? null);
+  const ftp = ftpLine(ftpCheck.status, ftpNotice, ftpCheck.latestAck, resolveToday(new Date(), process.env));
+  const otherNotices = notices.filter((n) => n.kind !== FTP_NOTICE_KIND);
   return (
     <>
       <RefreshProvider>
@@ -121,10 +129,13 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
             <RefreshStatus />
           </div>
         )}
-        {/* Python's notices (app_notices), e.g. the FTP sanity check: one line each, 8px apart. */}
-        {notices.map((n) => (
+        {/* ftp-confirm.md §1: the quiet FTP line first under the updated line (fresh or stale), 8px (plain text, refresh R2). */}
+        {ftp.kind === "quiet" && <FtpLine line={ftp} />}
+        {/* Python's other notices (app_notices): one line each, 8px apart; the FTP warning last, as a disclosure. */}
+        {otherNotices.map((n) => (
           <WarningLine key={n.kind}>{noticeText(n.kind, n.message)}</WarningLine>
         ))}
+        {ftp.kind === "warning" && <FtpLine line={ftp} />}
       </ScreenHeader>
       </RefreshProvider>
       {/* States replace the whole grid: one full-width card, text capped at 60ch. */}

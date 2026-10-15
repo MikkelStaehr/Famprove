@@ -11,6 +11,7 @@ import {
   illustrativeAnswers,
   illustrativeBands,
   illustrativeCalendar,
+  illustrativeFtp,
   illustrativeLogged,
   illustrativeWeeklyPlan,
   ILLUSTRATIVE_FEEL,
@@ -30,6 +31,10 @@ import {
   ACTIVITIES_SELECT,
   APP_NOTICES_SELECT,
   parseAppNoticeRow,
+  FTP_ACK_SELECT,
+  FTP_STATUS_SELECT,
+  parseFtpAckRow,
+  parseFtpStatusRow,
   BLOCKS_SELECT,
   CYCLING_WEEKS_SELECT,
   DAILY_LOAD_SELECT,
@@ -74,6 +79,8 @@ import {
 import type {
   AppNoticeRow,
   CyclingAnalysisData,
+  FtpAckRow,
+  FtpStatusRow,
   StrengthAnalysisData,
   DashboardData,
   DailyLoadRow,
@@ -166,6 +173,37 @@ export async function loadAppNotices(): Promise<readonly AppNoticeRow[]> {
     if (!isDataError(error)) throw error;
     console.error("load: reading app_notices failed", error);
     return [];
+  }
+}
+
+/**
+ * The FTP line's inputs (slice ftp-confirm): Python's ftp_status and the user's newest answer (the
+ * ftp_mismatch notice itself comes with loadAppNotices). Reads only; a failed read shows no line
+ * (never a guessed FTP). DEV_FIXTURE ftp-warning / ftp-quiet give an illustrative status and notice.
+ */
+export async function loadFtpCheck(): Promise<{
+  readonly status: FtpStatusRow | null;
+  readonly latestAck: FtpAckRow | null;
+  readonly fixtureNotice: AppNoticeRow | null | undefined; // undefined = use the real notices
+}> {
+  await connection();
+  const fixture = devFixture();
+  if (fixture === "empty" || fixture === "error") return { status: null, latestAck: null, fixtureNotice: undefined };
+  if (fixture === "ftp-warning" || fixture === "ftp-quiet") {
+    const { status, notice } = illustrativeFtp(fixture, new Date());
+    return { status, latestAck: null, fixtureNotice: notice };
+  }
+  try {
+    const c = client();
+    const [status, latestAck] = await Promise.all([
+      selectFirst(c, FTP_STATUS_SELECT.table, FTP_STATUS_SELECT, parseFtpStatusRow),
+      selectFirst(c, FTP_ACK_SELECT.table, FTP_ACK_SELECT, parseFtpAckRow),
+    ]);
+    return { status, latestAck, fixtureNotice: undefined };
+  } catch (error) {
+    if (!isDataError(error)) throw error;
+    console.error("load: reading ftp_status / ftp_ack failed", error);
+    return { status: null, latestAck: null, fixtureNotice: undefined };
   }
 }
 
