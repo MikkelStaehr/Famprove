@@ -8,9 +8,9 @@ import { TABS as SHELL_TABS } from "@/lib/tab-shell";
 const ICONS: readonly IconName[] = ["barbell", "trend", "bars"];
 
 /**
- * DESIGN.md TabBar (Part A "Navigation", Part B Ember). One <header><nav> before <main> at every
- * width; only its position changes.
- * - Below lg: a fixed bottom bar (--bg, 1px --border top), three equal tabs, each a 22px icon over
+ * DESIGN.md TabBar (Part A "Navigation", Part B Ember). One <header><nav> before the pages in the
+ * DOM at every width; only its position changes.
+ * - Below lg: the bottom bar of the shell's column (--bg, 1px --border top), three equal tabs, each a 22px icon over
  *   a text-11 Geist label, gap 4px, min-w-16, padding 6px; the bar 10px top padding and
  *   max(24px, safe-area) bottom. Each tab is ≥ 44 × 44.
  * - When the labels would wrap (@max-[20.5rem] on the nav, 200% text) the bar falls back to a
@@ -51,8 +51,9 @@ export function TabBar({
   return (
     <header
       className={`@container/nav mx-auto w-full max-w-content lg:order-first lg:max-w-wide lg:px-8 lg:pt-4 lg:pb-6 ${
-        placement === "bar" ? "@max-[20.5rem]/shell:hidden" : "hidden @max-[20.5rem]/shell:block"
+        placement === "bar" ? "order-last @max-[20.5rem]/shell:hidden" : "hidden @max-[20.5rem]/shell:block"
       }`}
+      data-tab-strip={placement === "strip" ? "" : undefined}
     >
       <nav
         aria-label="Hovedmenu"

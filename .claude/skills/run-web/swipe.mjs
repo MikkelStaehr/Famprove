@@ -143,7 +143,7 @@ try {
   const state = () =>
     evaluate(`(() => { const pages = [...document.querySelectorAll('[data-tab-page]')];
       const act = document.querySelector('[data-tab-page][data-active]');
-      return { url: location.pathname, active: act?.dataset.tabPage ?? null,
+      return { url: location.pathname + location.search, active: act?.dataset.tabPage ?? null,
         inactiveInert: pages.filter((e) => e !== act).every((e) => e.inert && getComputedStyle(e).visibility === 'hidden'),
         notInert: pages.filter((e) => e !== act && !(e.inert && getComputedStyle(e).visibility === 'hidden'))
           .map((e) => [e.dataset.tabPage, e.inert, getComputedStyle(e).visibility, e.style.transform]),

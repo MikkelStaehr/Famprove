@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { dragLock, dragPosition, edgeStart, pageStyle, releaseTarget, STACK, tabIndex } from "../src/lib/tab-shell.ts";
+import { dragLock, dragPosition, edgeStart, pageStyle, releaseTarget, STACK, tabIndex, tabTitle } from "../src/lib/tab-shell.ts";
 
 test("a path belongs to its tab; Styrke is Analyse; anything else is Træning", () => {
   assert.deepEqual(["/train", "/load", "/analyse", "/analyse/styrke", "/load?x", "/"].map(tabIndex), [0, 1, 2, 2, 0, 0]);
@@ -52,4 +52,8 @@ test("release: 22 % of the width or 0.45 px/ms changes page, else back; never pa
   assert.equal(releaseTarget(1, 0.3 * 390, 400, 390), 0);
   assert.equal(releaseTarget(2, -300, 100, 390), 2);
   assert.equal(releaseTarget(0, 300, 100, 390), 0);
+});
+
+test("titles: the tab's label, Analyse · Styrke on its section", () => {
+  assert.deepEqual(["/train", "/load", "/analyse", "/analyse/styrke"].map(tabTitle), ["Træning", "Belastning", "Analyse", "Analyse · Styrke"]);
 });

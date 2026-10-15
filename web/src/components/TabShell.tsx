@@ -1,12 +1,12 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { type PointerEvent, type MouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { useMedia } from "./chart-hooks";
 import { TabBar } from "./TabBar";
 import { DUR, easeOutQuart } from "@/lib/motion";
-import { dragLock, dragPosition, edgeStart, pageStyle, releaseTarget, TAB_COUNT, TABS, tabIndex } from "@/lib/tab-shell";
+import { dragLock, dragPosition, edgeStart, pageStyle, releaseTarget, TAB_COUNT, TABS, tabIndex, tabTitle } from "@/lib/tab-shell";
 
 type Drag = { x: number; y: number; t: number; id: number; lock: "x" | null; dx: number };
 
@@ -22,6 +22,7 @@ const REDUCE = "(prefers-reduced-motion: reduce)";
  */
 export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
   const pathname = usePathname();
+  const router = useRouter();
   const index = tabIndex(pathname);
   // The first paint (server render = hydration) is the settled state; React never rewrites these styles.
   const [first] = useState(index);
@@ -39,11 +40,18 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
   const drag = useRef<Drag | null>(null);
   const swallowClick = useRef(false);
 
-  // The last path seen per tab, so returning to Analyse lands on the section it was left on.
+  // The last URL seen per tab (path and search: Belastning's ?week=), so returning to a tab lands
+  // where it was left: Analyse on its section, Belastning on its week. goTo stores the URL it leaves.
   const lastPath = useRef<string[]>(TABS.map((t) => t.path));
+  // A tab activated from a page's strip (200 % text): its link in the new page's strip takes the focus.
+  const focusTab = useRef<string | null>(null);
   useEffect(() => {
-    lastPath.current[index] = pathname;
-    document.title = TABS[index].label;
+    document.title = tabTitle(pathname);
+    const path = focusTab.current;
+    focusTab.current = null;
+    if (path !== null) {
+      document.querySelector<HTMLElement>(`[data-tab-page][data-active] [data-tab-strip] a[href="${path}"]`)?.focus();
+    }
   }, [index, pathname]);
 
   const render = useCallback((pos: number) => {
@@ -96,10 +104,17 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
   const goTo = useCallback(
     (i: number) => {
       const to = Math.max(0, Math.min(TAB_COUNT - 1, i));
-      if (to !== index) window.history.pushState(null, "", lastPath.current[to]);
+      if (to === index) {
+        // The current tab's own link from a section (Styrke): back to its first section, as a Link was.
+        if (window.location.pathname !== TABS[to].path) router.push(TABS[to].path);
+        return;
+      }
+      lastPath.current[index] = window.location.pathname + window.location.search;
+      if (document.activeElement?.closest("[data-tab-strip]") != null) focusTab.current = TABS[to].path;
+      window.history.pushState(null, "", lastPath.current[to]);
       animateTo(to);
     },
-    [index, animateTo],
+    [index, animateTo, router],
   );
 
   // Back/forward (or any URL change to another tab not started here): animate to the URL's tab.
@@ -177,9 +192,11 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
 
   return (
     <div className="@container/shell flex h-dvh flex-col bg-bg">
+      {/* First in the DOM (focus order: the nav before the pages, WCAG 2.4.3); shown last below lg. */}
+      <TabBar index={index} onSelect={goTo} indicatorRef={indicator} />
       <div
         ref={viewport}
-        className="relative min-h-0 flex-1 overflow-hidden lg:order-last"
+        className="relative min-h-0 flex-1 overflow-hidden"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -221,7 +238,6 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
           );
         })}
       </div>
-      <TabBar index={index} onSelect={goTo} indicatorRef={indicator} />
     </div>
   );
 }

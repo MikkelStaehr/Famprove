@@ -1,4 +1,3 @@
-
 import { MarkChart, WeekStrips } from "@/components/AnalyseCharts";
 import { BarSwatch, CrossSwatch, DotSizesSwatch, Legend, LevelSwatch, LineSwatch, RideDotSwatch, TodaySwatch } from "@/components/AnalyseLegend";
 import { AnalyseHeader } from "@/components/AnalyseTabs";

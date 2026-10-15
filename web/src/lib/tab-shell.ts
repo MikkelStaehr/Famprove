@@ -31,6 +31,12 @@ export const STACK = {
   shadow: "var(--shadow-stack)",
 } as const;
 
+/** The document title for a path: the tab's label, "Analyse · Styrke" on the Styrke section. */
+export function tabTitle(pathname: string): string {
+  if (pathname === "/analyse/styrke" || pathname.startsWith("/analyse/styrke/")) return "Analyse · Styrke";
+  return TABS[tabIndex(pathname)].label;
+}
+
 /** The tab a path belongs to; any other path (never reached inside the shell) is Træning. */
 export function tabIndex(pathname: string): number {
   const i = TABS.findIndex((t) => pathname === t.path || pathname.startsWith(`${t.path}/`));
