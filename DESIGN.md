@@ -291,13 +291,10 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 Compact cards, generous radius. Phone: page padding 20px top / 16px sides, 12px between cards. Card padding: section card 18px (header row 18 18 14 when a chart follows), form card 20px, hero card 22px 20px 16px, half card 16px, tile 14px. Inside a card: 14–18px between groups, 6–10px inside a group, 4px between a caption and its value. `ListRow` padding 10px 0, gap 12px. Desktop: same paddings, 24px grid gap.
 
 ## Icons
-Line icons, 24 viewBox, `fill="none"`, `stroke="currentColor"`, **stroke-width 1.5**, round-free (butt caps, as drawn). Sizes: 22 (phone tab bar), 20 (desktop tabs, card corners, icon buttons), 18 (`ListRow`, button trailing arrow), 16 (`WarningLine`, chevrons). Always `aria-hidden` next to text; an icon-only button has `aria-label`. One file of paths, `web/src/components/icons.tsx`:
-- **barbell** (strength, Træning tab): `M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12`
-- **bike** (cycling): `circle 6,16 r4` · `circle 18,16 r4` · `M6 16l4-8h5l3 8M10 8l3 8`
-- **trend** (Belastning tab): `M3 17l5-6 4 3 4-7 5 5`
-- **bars** (Analyse tab): `M4 20V10M10 20V4M16 20v-7M22 20H2`
-- **arrow-right** (Begynd træning): `M5 12h14M13 6l6 6-6 6`
-- New, same style: **chevron-left/right** (`M15 6l-6 6 6 6` / `M9 6l6 6-6 6`), **chevron-down** (`M6 9l6 6 6-6`), **warning** (`M12 4l9 16H3z` + `M12 10v4` + `M12 17v.5`), **check** (`M5 12l5 5 9-10`), **arrow-up/down/flat** for deltas (`M12 19V5M6 11l6-6 6 6` / mirrored / `M5 12h14M13 6l6 6-6 6`), **refresh** (Hent data nu, 16px after the "opdateret" time; `design/specs/refresh.md`: `M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4`).
+(Rewritten 2026-10-15, slice `motion-icons`; spec `design/specs/motion-numbers-icons.md`.) **One library: `lucide-react`.** Line icons, 24 viewBox, `fill="none"`, `stroke="currentColor"`, **stroke-width 1.5** (scaled with size, not `absoluteStrokeWidth`), **round caps and joins** (Lucide's; replaces the earlier butt caps). Sizes: 22 (phone tab bar), 20 (desktop tabs, card corners, icon buttons), 18 (`ListRow`, button trailing arrow), 16 (`WarningLine`, chevrons). Always `aria-hidden` next to text; an icon-only button has `aria-label`. `web/src/components/icons.tsx` is the only file that imports Lucide: a name → component map, so call sites use `<Icon name=…>` unchanged.
+- **Lucide map:** bike → `Bike` · arrow-right (Begynd træning) → `ArrowRight` · chevron-left/right/down → `ChevronLeft` / `ChevronRight` / `ChevronDown` · warning → `TriangleAlert` · check → `Check` · arrow-up / arrow-down / arrow-flat (deltas) → `ArrowUp` / `ArrowDown` / `ArrowRight` · x → `X` · minus → `Minus` · plus → `Plus` · refresh (Hent data nu, 16px after the "opdateret" time; spins while fetching) → `RotateCw`.
+- **Own paths (the three tab icons, everywhere their name is used; animatable parts, same stroke and round caps):** **barbell** (strength, Træning tab) `M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12` in one group; **trend** (Belastning tab) `M3 17l5-6 4 3 4-7 5 5` with `pathLength="1"`; **bars** (Analyse tab) three paths `M5 20V11` · `M11 20V5` · `M17 20v-7` + baseline `M2.5 20.5h19`. Only the newly chosen tab's icon animates, once (Motion table); never on first paint or under reduced motion.
+- No other icon source (no inline SVG icons in components, no second library).
 
 ## Components (look)
 - **Card:** `--card`, 1px `--border`, `--radius-card`, padding 18px, column gap 14px. Header row: `SectionTitle` left, `MonoCaption` text-12 or a control right, `justify-between`, `items-center`.
