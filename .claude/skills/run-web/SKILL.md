@@ -85,8 +85,8 @@ focus landing in an inactive page), `key:<path>` (focus that tab's visible link,
 `report`, or written to `--report-out <file.json>`). Don't run `pnpm lint/typecheck/test` alongside: load average went to 50.
 Frame numbers are only meaningful on an idle machine: check `uptime` and report the load average with them. `--mid` shoots
 the card stack half-way through the first swipe. Prints the URL and active page after each step; exits 1 on
-a long frame over 50 ms, a console error or a horizontal overflow. Safari has no long-animation-frame API:
-the user's own phone stays a manual check.
+a long frame over 50 ms, a console error or a horizontal overflow. The user's phone is Android Chrome (it has
+both the long-animation-frame API and vibrate): this Chrome with touch emulation and `--cpu 4` stands in for it, the phone stays the final check.
 Each step's `loaf` says where a long frame's time went (LoAF attribution: `script` ms, `render` ms and its
 `styleLayout` part, scripts of 5 ms or more as [type, invoker, function@file, ms, forced layout ms]);
 `--trace <file.json>` also records a DevTools trace of the steps (open it in DevTools' Performance panel) and

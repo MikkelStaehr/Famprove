@@ -98,6 +98,8 @@ type Motion = { raf: number; readonly timers: number[]; readonly finish: () => v
 type Drawn = { readonly measured: readonly Segment[]; readonly prognose: readonly Segment[]; readonly ring: readonly [number, number] | null };
 
 const reduced = () => window.matchMedia(REDUCED_MOTION).matches;
+/** sessionStorage key: the curve has drawn itself on this session's first paint (once per session). */
+const DRAWN_KEY = "famprove:curve-drawn";
 
 function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
   const sm = useMedia("(min-width: 640px)");
@@ -240,15 +242,14 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
     drawn.current = { measured: measuredSegs, prognose: prognoseSegs, ring };
   });
 
-  // Draw-in on entering Belastning (never on first paint or reload): 180 ms after the entry, the
-  // measured line draws over 900 ms, the ring fades in at 750 ms, the prognose and band at 850 ms.
-  // Left mid-way (another tab entered) or a range change: it lands at once.
+  // Draw-in: 180 ms after entering Belastning, and once per browser session when the app opens on
+  // Belastning (the user, 2026-10-15: as the reference's boot; a reload in the same session stays
+  // still). The measured line draws over 900 ms, the ring fades in at 750 ms, the prognose and band
+  // at 850 ms. Left mid-way (another tab entered) or a range change: it lands at once.
   const entry = useTabEntry(1);
   const away = useTabEntry(0) + useTabEntry(2);
   const seenEntry = useRef(entry);
-  useEffect(() => {
-    if (seenEntry.current === entry) return;
-    seenEntry.current = entry;
+  const playDraw = useCallback(() => {
     if (reduced()) return;
     stopMotion();
     const later = [fcastRef, bandRef, ringRef];
@@ -298,11 +299,31 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
       });
       at(DUR.prognoseAt + 500, stopMotion);
     });
-  }, [entry, stopMotion]);
+  }, [stopMotion]);
+  useEffect(() => {
+    if (seenEntry.current === entry) return;
+    seenEntry.current = entry;
+    playDraw();
+  }, [entry, playDraw]);
+  // First paint on Belastning: once per session (sessionStorage; unreadable storage = no draw). The
+  // path exists only once the plot has measured its width, so this waits for it.
+  const measured = width !== null;
+  useEffect(() => {
+    if (!measured) return;
+    if (solidRef.current?.closest("[data-tab-page]")?.hasAttribute("data-active") !== true) return;
+    try {
+      if (window.sessionStorage.getItem(DRAWN_KEY) !== null) return;
+      window.sessionStorage.setItem(DRAWN_KEY, "1");
+    } catch {
+      return;
+    }
+    playDraw();
+  }, [measured, playDraw]);
   useEffect(() => stopMotion(), [away, stopMotion]);
 
   // Scrub haptics (reference scrubAt()/buzz()): a 4 ms tick each time the picked day changes during
-  // a drag. Not motion, so kept under reduced motion; no vibrate (iOS) is a no-op.
+  // a drag. Not motion, so kept under reduced motion; the user's phone is Android Chrome (vibrate
+  // exists); a browser without it is a no-op.
   const dragging = useRef(false);
   const lastKey = useRef<number | null>(null);
   const pickIndex = pick?.mode === "touch" ? pick.index : null;

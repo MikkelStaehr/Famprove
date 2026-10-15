@@ -342,5 +342,5 @@ Calm and quick; motion confirms where you are and what changed, never decorates.
 | Rest timer | steps once a second, no transition | | |
 
 - **Sinking page:** darkened by a black scrim at opacity 0.55 × t over the page, never `filter: brightness` (same pixels on a dark page; opacity is cheaper).
-- **Nothing animates on first paint.** A hard load, reload or `router.refresh()` shows the final state at once: curves drawn, bars full, numbers set, current tab icon still. Motion plays only on a change the user caused (a tab change, a range change, a tap, a new value after ↻).
+- **Nothing animates on first paint**, with one exception (user, 2026-10-15): the fitness curve draws itself when the app opens on Belastning, once per browser session (a reload in the same session stays still), as the reference does at boot. A hard load, reload or `router.refresh()` shows the final state at once: curves drawn, bars full, numbers set, current tab icon still. Motion plays only on a change the user caused (a tab change, a range change, a tap, a new value after ↻).
 - **`prefers-reduced-motion: reduce`:** everything is off: every duration and delay is 0, the card stack snaps, the curve and bars appear complete, digits change in place, the skeleton is static.
