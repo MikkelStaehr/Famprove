@@ -26,7 +26,7 @@ import { dotField, FIELD_WIDTH } from "@/lib/fokus-marks";
 
 import { Icon } from "@/components/icons";
 
-import { ArrowIcon, CAPTION, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { ArrowIcon, CAPTION, DARK_BOX, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
@@ -34,13 +34,24 @@ type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 /** reset-fokus.md §3: the pause and warm-up surfaces are Cards (radius 22, padding 20). */
 const CARD = "flex flex-col rounded-card border border-border bg-card p-5";
 
-export function PrimaryButton({ primary, onClick, children }: { readonly primary: PrimaryRef; readonly onClick: () => void; readonly children: string }) {
+/** The view's action in the primary's place: light only when it is a done (Til sæt 1 ends the warm-up), else dark (Part B Buttons). */
+export function PrimaryButton({
+  primary,
+  onClick,
+  children,
+  light = false,
+}: {
+  readonly primary: PrimaryRef;
+  readonly onClick: () => void;
+  readonly children: string;
+  readonly light?: boolean;
+}) {
   return (
     <>
       {/* Takes the free height of a short view, so the button sits at the bottom edge (user, 2026-10-13). */}
       <div aria-hidden="true" className="flex-1" />
       <div className={`mt-10 ${PRIMARY_DOCK}`}>
-        <button ref={primary} type="button" onClick={onClick} className={PRIMARY_BOX}>
+        <button ref={primary} type="button" onClick={onClick} className={light ? PRIMARY_BOX : DARK_BOX}>
           {children}
           <ArrowIcon />
         </button>
@@ -74,13 +85,9 @@ export function FeelBlock({
       <h2 id={`${id}-q`} className="font-sans text-20 font-medium">
         {feelQuestion(set, named)}
       </h2>
-      {/* reset-fokus.md §4: the SegmentedControl look with 56px segments; the chosen one has the
+      {/* button-type.md B5: three separate dark buttons, 56px, gap 8px; the chosen one has the
           --raised fill and a check icon, so the choice is never carried by fill alone. */}
-      <div
-        role="group"
-        aria-labelledby={`${id}-q`}
-        className="mt-3 grid grid-cols-3 gap-0.5 rounded-control border border-text-muted bg-bg p-0.75"
-      >
+      <div role="group" aria-labelledby={`${id}-q`} className="mt-3 grid grid-cols-3 gap-2">
         {FEEL_OPTIONS.map((o) => {
           const on = felt === o.value;
           return (
@@ -90,8 +97,8 @@ export function FeelBlock({
               aria-pressed={on}
               aria-label={o.label}
               onClick={() => onTap("feel", set.ref, nextFeel(felt, o.value))}
-              className={`relative flex min-h-14 items-center justify-center gap-1 rounded-segment px-1 font-sans text-15 leading-tight font-medium text-text transition-colors duration-[120ms] ease-out focus-visible:z-10 ${
-                on ? "bg-raised" : "bg-transparent"
+              className={`relative flex min-h-14 items-center justify-center gap-1 rounded-button border border-text-muted px-1 text-center text-button text-text transition-colors duration-[120ms] ease-out active:opacity-85 ${
+                on ? "bg-raised" : "bg-card"
               }`}
             >
               {on && <Icon name="check" size={16} />}

@@ -5,7 +5,7 @@ import { formatUpdatedAt } from "@/lib/format";
 
 import { Icon } from "@/components/icons";
 
-import { COMPACT_SECONDARY, Hairline, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { COMPACT_SECONDARY, DARK_BOX, Hairline, OUTLINED, PRIMARY_DOCK } from "./Instrument";
 
 /** reset-fokus.md §7: the no-session and error states sit in a Card (radius 22, padding 20). */
 const CARD = "flex flex-col rounded-card border border-border bg-card p-5";
@@ -25,7 +25,7 @@ export function NoSessionNote({ sentence, devSwitches }: { readonly sentence: st
           <p className="text-16">{sentence}</p>
         </div>
         <div className={`mt-4 ${PRIMARY_DOCK}`}>
-          <Link href="/train" className={PRIMARY_BOX}>
+          <Link href="/train" className={DARK_BOX}>
             Til Træning
           </Link>
         </div>

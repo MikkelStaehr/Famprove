@@ -190,6 +190,18 @@ summary::-webkit-details-marker {
   color: var(--text-muted);
 }
 
+/* text-button (Part B Type, user 2026-10-15, design/specs/button-type.md): every button label on
+   Træning and Fokus. Geist Mono 15/500, uppercase via CSS (the source text stays sentence case, so
+   screen readers read words), letter-spacing 0.04em, line-height 1.2. */
+@utility text-button {
+  font-family: --theme(--font-mono);
+  font-weight: 500;
+  font-size: 0.9375rem; /* text-15 */
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* SegmentedControl segment: a transparent ::before extends the hit area to ≥ 44 × 44 without
    overlapping a neighbour (Part B "SegmentedControl": inset -8px -2px around a 28px segment). */
 @utility hit-44 {

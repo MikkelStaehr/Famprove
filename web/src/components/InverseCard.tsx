@@ -42,9 +42,9 @@ export function InverseCard({ id, caption, icon, title, line, children, classNam
   );
 }
 
-/** The InverseCard's dark 48px button: full width, --radius-button, --inverse-text fill, --text Geist 15/500 label, trailing 18px arrow. */
+/** The InverseCard's dark 48px button (Part B Buttons): full width, --radius-button, --inverse-text fill, 1px --text-muted border, --text `text-button` label, trailing 18px arrow. */
 export const INVERSE_BUTTON =
-  "mt-1 flex min-h-12 w-full items-center justify-center gap-2 rounded-button bg-inverse-text px-4 font-sans text-15 font-medium text-text active:opacity-85";
+  "mt-1 flex min-h-12 w-full items-center justify-center gap-2 rounded-button border border-text-muted bg-inverse-text px-4 text-button text-text active:opacity-85";
 
 export function InverseButton({ href, label }: { readonly href: string; readonly label: string }) {
   return (

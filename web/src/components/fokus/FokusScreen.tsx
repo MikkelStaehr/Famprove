@@ -51,7 +51,7 @@ import {
 
 import { FokusProgress } from "./FokusProgress";
 import { Icon } from "@/components/icons";
-import { CAPTION, CheckIcon, COMPACT_SECONDARY, FokusWarning as WarningLine, MUTED_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { CAPTION, CheckIcon, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTLINED, PRIMARY_BOX, SKIP_BUTTON, PRIMARY_DOCK } from "./Instrument";
 import { SessionSignature } from "./SessionSignature";
 import { FeelBlock, Footer, NextSetCard, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
@@ -411,13 +411,13 @@ function SetView({
 
         {/* Secondary action above the primary: nothing sits below Udført (round 2). mt-auto takes the
             free height, so on a short set Udført sits at the bottom edge like the pause's button. */}
-        <button type="button" onClick={() => onSkip(current)} className={`mt-auto self-center ${MUTED_LINK}`}>
+        <button type="button" onClick={() => onSkip(current)} className={`mt-auto self-center ${SKIP_BUTTON}`}>
           Spring over
         </button>
 
         <div className={`mt-6 ${PRIMARY_DOCK}`}>
           <button ref={primary} type="button" onClick={() => onDone(current)} className={PRIMARY_BOX}>
-            <CheckIcon className="size-5" />
+            <CheckIcon className="size-4.5" />
             Udført
           </button>
         </div>
@@ -516,7 +516,7 @@ function WarmupView({
         <WarmupCard since={since} exercise={setOne.exercise} mainLift={mainLift} />
       </div>
       <NextSetCard next={setOne} week={week} inWarmup afterTimer={rampState(setOne.exercise, mainLift) === "hidden"} />
-      <PrimaryButton primary={primary} onClick={() => onWarmupEnd(warmup)}>
+      <PrimaryButton light primary={primary} onClick={() => onWarmupEnd(warmup)}>
         Til sæt 1
       </PrimaryButton>
     </div>
@@ -563,7 +563,7 @@ function FinishedView({
       </section>
       <div aria-hidden="true" className="flex-1" />
       <div className={`mt-10 ${PRIMARY_DOCK}`}>
-        <HomeLink ref={primary} flush={flush} className={PRIMARY_BOX}>
+        <HomeLink ref={primary} flush={flush} className={DARK_BOX}>
           Tilbage til Træning
         </HomeLink>
       </div>
