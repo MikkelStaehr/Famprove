@@ -43,7 +43,7 @@ create table public.superset_pairs (
 create index superset_pairs_by_exercises on public.superset_pairs (exercise_a, variant_a, exercise_b, variant_b, date desc);
 
 comment on table public.superset_pairs is
-  'Supersets chosen in the app (user, 2026-10-15): two consecutive exercise runs of a session (rows = the runs'' first sheet rows) done as A1, B1, rest, A2, B2 ... paired = false records an explicit "no" (the suggestion from an earlier day switched off). Written only by the web''s server action; Python never reads it (no TSS change). Cannot be rebuilt.';
+  'Supersets chosen in the app (user, 2026-10-15): two consecutive exercise runs of a session (rows = the runs'' first sheet rows) done as A1, B1, rest, A2, B2 ... paired = false records an explicit "no" (the suggestion from an earlier day switched off). Written only by the web''s server action; Python never reads it (no TSS change). Cannot be rebuilt, so its foreign keys restrict: an exercise or variant that has been paired cannot be deleted (correct a mistyped one in place, or delete its pairs first).';
 comment on column public.superset_pairs.paired is
   'true = done as a superset that day; false = the suggestion was switched off.';
 

@@ -73,3 +73,18 @@ def test_bodyweight_zero_is_a_kg_and_helpers() -> None:
     assert round_step(126.875) == 127.5 and round_step(141.08) == 140.0
     assert percent("-12.5%") == -0.125 and percent("-10 %") == -0.10
     assert percent("75%") is None and percent("RPE 7") is None
+
+
+def test_same_as_last_needs_the_same_exercise_variant_and_reps() -> None:
+    sets = _rows((None, None, None))
+    sets[4] = replace(sets[4], variant_id=7)  # row 77 is a named variant this week
+    sets[5] = replace(sets[5], reps=5)  # row 78 has other reps than last week's
+    got = today_kgs(sets, {}, run_week=W3)
+    assert ref(sets[4]) not in got  # last week's plain deadlift is no anchor for a variant
+    assert ref(sets[5]) not in got  # nor last week's 3 reps for 5
+    assert got[ref(sets[6])] == TodayKg(130, "last")  # the back-off row still matches
+
+
+def test_percent_rejects_what_is_no_backoff() -> None:
+    for text in ("-nan%", "-inf%", "-100%", "-150%", "-0%", "10%", "75%", "abc"):
+        assert percent(text) is None, text

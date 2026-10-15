@@ -15,6 +15,7 @@ fokus-kg). Pure: no I/O. The first rule that applies, per set:
 Otherwise None: Fokus shows no kg block. Never 0 where the sheet has no 0.
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -27,6 +28,7 @@ from training_load.domain.strength_analysis import E1RM_FACTOR
 type TodayBasis = Literal["sheet", "derived", "e1rm", "last"]
 TODAY_BASES: Final = ("sheet", "derived", "e1rm", "last")
 STEP_KG: Final = 2.5
+_BACKOFF: Final = re.compile(r"^\s*-\s*(\d+(?:[.,]\d+)?)\s*%\s*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,14 +50,13 @@ def round_step(kg: float) -> float:
 
 
 def percent(prescribed: str | None) -> float | None:
-    """ "-12.5%" -> -0.125, "-10%" -> -0.10; anything else None (an RPE row, a %1RM row "75%")."""
-    text = (prescribed or "").strip().replace(",", ".").replace(" ", "")
-    if not text.endswith("%") or not text.startswith("-"):
+    """ "-12.5%" -> -0.125, "-10 %" -> -0.10; anything else None (an RPE row, a %1RM row "75%", a
+    share outside (-100 %, 0), nan or inf)."""
+    m = _BACKOFF.match(prescribed or "")
+    if m is None:
         return None
-    try:
-        return float(text[:-1]) / 100
-    except ValueError:
-        return None
+    share = -float(m.group(1).replace(",", ".")) / 100
+    return share if -1 < share < 0 else None
 
 
 def _e1rm_ratio(reps: float, rpe: float) -> float:
@@ -122,8 +123,11 @@ def today_kgs(
             before = by_ref.get(
                 (s.sheet_id, s.block, s.sheet_row, s.set_no, s.week_start - timedelta(days=7))
             )
+            # The same exercise, variant (null only matches null) and reps, as planned_sets' anchor.
             if (
                 before is not None
+                and _same_exercise(before, s)
+                and before.reps == s.reps
                 and before.logged_kg is not None
                 and (before.logged_kg > 0 or before.bodyweight)
             ):
