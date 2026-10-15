@@ -15,6 +15,7 @@ import {
   startFromAnotherTap,
   stateOf,
 } from "../set-taps.ts";
+import { effectivePairs, exerciseIdMap, type SessionRun, sessionRuns } from "../supersets.ts";
 import { localToday } from "../training-view.ts";
 import { devSwitchOn } from "./dev-fixture.ts";
 import { EnvError, readSupabaseEnv } from "./env.ts";
@@ -26,7 +27,14 @@ import {
   selectAll,
   write,
 } from "./postgrest.ts";
-import { parseSetLogRow, RowError, SET_LOG_SELECT } from "./rows.ts";
+import {
+  parseSetLogRow,
+  parseSupersetPairRow,
+  RowError,
+  SET_LOG_SELECT,
+  SUPERSET_PAIRS_SELECT,
+  type SupersetPairRow,
+} from "./rows.ts";
 
 /**
  * The app's only write path: public.exercise_set_log, from the Træning screens' taps via the
@@ -76,13 +84,13 @@ export function rangeTop(repsText: string | null): number | null {
   return Math.max(end(m[1]), end(m[2]));
 }
 
-/** The session's sets in the sheet (row, set, exercise name, reps as written). */
-async function sessionSets(c: PostgrestClient, weekStart: string, session: number) {
+/** The session's sets in the sheet (row, set, exercise name, variant, reps as written). */
+export async function sessionSets(c: PostgrestClient, weekStart: string, session: number) {
   return selectAll(
     c,
     "strength_sets",
     {
-      columns: "sheet_row,set_no,name,reps_text",
+      columns: "sheet_row,set_no,name,reps_text,variant_id",
       order: "sheet_id,block,sheet_row,week,set_no",
       filters: [
         ["week_start", `eq.${weekStart}`],
@@ -95,13 +103,17 @@ async function sessionSets(c: PostgrestClient, weekStart: string, session: numbe
         throw new RowError("strength_sets row must have sheet_row, set_no and name");
       }
       const repsText = typeof r.reps_text === "string" ? r.reps_text : null;
-      return { ref: { row: r.sheet_row, set: r.set_no }, name: r.name, repsText };
+      if (r.variant_id !== null && r.variant_id !== undefined && typeof r.variant_id !== "number") {
+        throw new RowError("strength_sets.variant_id must be a number or null");
+      }
+      const variantId = typeof r.variant_id === "number" ? r.variant_id : null; // null = ukendt
+      return { ref: { row: r.sheet_row, set: r.set_no }, name: r.name, repsText, variantId };
     },
   );
 }
 
 /** public.exercises id per name and alias key; a canonical name wins over another's alias. */
-async function exerciseIds(c: PostgrestClient): Promise<Map<string, number>> {
+export async function exerciseIds(c: PostgrestClient): Promise<Map<string, number>> {
   const rows = await selectAll(c, "exercises", { columns: "id,name,aliases", order: "id" }, (raw) => {
     const r = record(raw, "exercises");
     if (typeof r.id !== "number" || typeof r.name !== "string" || !Array.isArray(r.aliases)) {
@@ -109,10 +121,33 @@ async function exerciseIds(c: PostgrestClient): Promise<Map<string, number>> {
     }
     return { id: r.id, name: r.name, aliases: r.aliases.filter((a) => typeof a === "string") };
   });
-  const ids = new Map<string, number>();
-  for (const e of rows) if (!ids.has(nameKey(e.name))) ids.set(nameKey(e.name), e.id);
-  for (const e of rows) for (const a of e.aliases) if (!ids.has(nameKey(a))) ids.set(nameKey(a), e.id);
-  return ids;
+  return exerciseIdMap(rows);
+}
+
+/**
+ * The superset rows that decide a session's pairs: today's rows of the session, and earlier days'
+ * rows whose exercises are both in the session (one query; effectivePairs takes the latest per
+ * ordered pair).
+ */
+export async function sessionPairRows(
+  c: PostgrestClient,
+  date: string,
+  session: number,
+  runs: readonly SessionRun[],
+): Promise<{ readonly today: SupersetPairRow[]; readonly history: SupersetPairRow[] }> {
+  const ids = [...new Set(runs.flatMap((r) => (r.exerciseId === null ? [] : [r.exerciseId])))].toSorted((a, b) => a - b);
+  if (ids.length === 0) return { today: [], history: [] };
+  const list = `in.(${ids.join(",")})`;
+  const rows = await selectAll(
+    c,
+    SUPERSET_PAIRS_SELECT.table,
+    { ...SUPERSET_PAIRS_SELECT, filters: [["date", `lte.${date}`], ["exercise_a", list], ["exercise_b", list]] },
+    parseSupersetPairRow,
+  );
+  return {
+    today: rows.filter((r) => r.date === date && r.session === session),
+    history: rows.filter((r) => r.date < date),
+  };
 }
 
 function keyParams(k: Key): Filter[] {
@@ -208,7 +243,10 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
       sessionSets(c, isoWeekStart(input.date), input.session),
       exerciseIds(c),
     ]);
-    const order = sessionOrderWithWarmups(sets);
+    // Supersets: the pairs in force reorder the session (A1, B1, A2 ...), as on the screens.
+    const runs = sessionRuns(sets, ids);
+    const pairRows = await sessionPairRows(c, input.date, input.session, runs);
+    const order = sessionOrderWithWarmups(sets, effectivePairs(runs, pairRows.today, pairRows.history));
     const inOrder = new Set(order.map(setKey)); // the sheet's sets and their exercises' warm-ups
     const names = new Map(sets.map((s) => [setKey(s.ref), s.name]));
     const tops = new Map(sets.map((s) => [setKey(s.ref), rangeTop(s.repsText)]));

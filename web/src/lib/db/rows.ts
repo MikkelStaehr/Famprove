@@ -1408,3 +1408,59 @@ export function parseExerciseCategoryRow(raw: unknown): ExerciseCategoryRow {
   if (category === null) throw new RowError("exercises.category: expected a category");
   return { name: f.string("name"), aliases, category };
 }
+
+/**
+ * public.superset_pairs (slice supersets): a pair of two consecutive runs chosen in the app,
+ * written only by lib/db/superset-pairs.ts. paired false is an explicit "no" (a suggestion
+ * switched off), never a missing value. Variants: null = ukendt (matches only null).
+ */
+export type SupersetPairRow = {
+  readonly date: IsoDate;
+  readonly session: number;
+  readonly rowA: number;
+  readonly rowB: number;
+  readonly exerciseA: number;
+  readonly variantA: number | null;
+  readonly exerciseB: number;
+  readonly variantB: number | null;
+  readonly paired: boolean;
+  readonly updatedAt: string;
+};
+
+export const SUPERSET_PAIRS_SELECT = {
+  table: "superset_pairs",
+  columns: "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at",
+  order: "date.desc,session_no,row_a", // newest day first, then the primary key
+} as const;
+
+export function parseSupersetPairRow(raw: unknown): SupersetPairRow {
+  const f = new Fields(SUPERSET_PAIRS_SELECT.table, raw);
+  const row: SupersetPairRow = {
+    date: f.date("date"),
+    session: f.number("session_no"),
+    rowA: f.number("row_a"),
+    rowB: f.number("row_b"),
+    exerciseA: f.number("exercise_a"),
+    variantA: f.numberOrNull("variant_a"),
+    exerciseB: f.number("exercise_b"),
+    variantB: f.numberOrNull("variant_b"),
+    paired: f.boolean("paired"),
+    updatedAt: f.timestamp("updated_at"),
+  };
+  if (row.rowB <= row.rowA) throw new RowError("superset_pairs: row_b must be after row_a");
+  return row;
+}
+
+/** public.exercises ids by name and alias (superset runs are keyed by exercise id). */
+export type ExerciseIdRow = { readonly id: number; readonly name: string; readonly aliases: readonly string[] };
+
+export const EXERCISE_IDS_SELECT = { table: "exercises", columns: "id,name,aliases", order: "id" } as const;
+
+export function parseExerciseIdRow(raw: unknown): ExerciseIdRow {
+  const f = new Fields(EXERCISE_IDS_SELECT.table, raw);
+  const aliases = f.array("aliases").map((a) => {
+    if (typeof a !== "string") throw new RowError("exercises.aliases: expected text values");
+    return a;
+  });
+  return { id: f.number("id"), name: f.string("name"), aliases };
+}
