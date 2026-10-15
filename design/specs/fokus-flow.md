@@ -24,7 +24,7 @@ Once per rest, when the shown timer crosses `rest_min_s` while the page is visib
 Requested on Fokus when the log shows the session begun (any row today) and not finished; re-requested on `visibilitychange` → visible; released on the finished view and on leaving (Afslut, unmount). Unsupported or refused: silent, no UI.
 
 ## 5. Screen reader
-- Primary: accessible name `Sæt 2 af 4 udført, Squat` (contains the visible words). Warm-up: `Opvarmning udført, Squat`.
+- Primary: accessible name `Sæt 2 udført, 2 af 4, Squat` (starts with the visible words, WCAG 2.5.3; reviewer 2026-10-15). Warm-up: `Opvarmning udført, Squat`.
 - After a done, one polite status: `Squat, sæt 1 udført. Næste: sæt 2 af 4, 5 reps, i dag 142,5 kg. Pause, anbefalet 3 til 5 minutter.` (kg sentence per `fokus-kg.md` §4). Focus moves to the primary.
 - Feel group: `role="group"`, name `Hvordan var sæt 1? Valgfrit.`
 - At the minimum: `Anbefalet pause nået: 3 minutter. Klar til næste sæt.` once (with the vibration). The timer is never announced.
