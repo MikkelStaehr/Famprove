@@ -16,7 +16,7 @@ const REDUCE = "(prefers-reduced-motion: reduce)";
  * The tab shell (slice motion-shell; docs/decisions/tab-shell.md, design/specs/motion-shell.md):
  * all three tabs mounted, stacked as cards at position p. The URL owns the settled tab: a tap
  * pushes its path (history.pushState: no request, no remount), back/forward and deep links set it.
- * Each page is its own scroll container; the inactive ones are inert and hidden at rest.
+ * Each page is its own scroll container; the inactive ones are inert and hidden at rest (render() switches both).
  * p lives in a ref and every frame writes the styles straight to the frames, scrims and the bar's
  * indicator; React renders them once, at the first paint's index, and never touches them again.
  */
@@ -63,7 +63,17 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
       el.style.transform = s.transform;
       el.style.borderRadius = s.borderRadius;
       el.style.boxShadow = s.boxShadow;
-      el.style.visibility = s.visibility;
+      // Hidden and inert switch together, and only here: each switch makes the browser restyle the whole
+      // page (~300-700 elements, 30-60 ms at 4x CPU), so one pass per page per move, never a second one
+      // from React's commit at the release. The target page shows from the move's first frame (off-screen
+      // or under the current page), so a tap's focus can land in it before the commit.
+      const hidden = s.visibility === "hidden" && i !== target.current;
+      if (el.inert !== hidden) {
+        el.style.visibility = hidden ? "hidden" : "visible";
+        el.inert = hidden;
+        if (hidden) el.setAttribute("aria-hidden", "true");
+        else el.removeAttribute("aria-hidden");
+      }
       el.style.willChange = moving.current ? "transform" : "";
       const scrim = scrims.current[i];
       if (scrim != null) scrim.style.opacity = String(s.scrim);
@@ -216,8 +226,9 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
               data-active={active ? "" : undefined}
               className="absolute inset-0 origin-[50%_40%] touch-pan-y overflow-hidden bg-bg"
               style={{ transform: s.transform, borderRadius: s.borderRadius, boxShadow: s.boxShadow, visibility: s.visibility, zIndex: s.zIndex }}
-              inert={!active}
-              aria-hidden={!active}
+              // At the first paint's index only, like the styles: render() switches them (with visibility) after.
+              inert={i !== first}
+              aria-hidden={i !== first}
             >
               <main className="h-full touch-pan-y overflow-y-auto overscroll-y-contain">
                 {/* 200 % text: the tab strip at the top of the page, scrolling away with it (TabBar). */}
