@@ -3,6 +3,7 @@ import { BAND_LABEL, BAND_TEXT, PROGNOSE_TEXT } from "@/lib/prognose-text";
 import { BANDS, ZONE_RANGE, type ZoneKey } from "@/lib/zone-scale";
 
 import { BandSwatch, LineSample, PROGNOSE_LABEL, PrognoseSwatch, SERIES, type SeriesKey } from "./ChartSeries";
+import { Icon } from "./icons";
 
 /**
  * "Hvad betyder det?" (design/specs/load.md §8b): a native <details> in the chart card, under
@@ -44,18 +45,11 @@ export function LoadExplainer() {
         <span>
           Hvad betyder det?<span className="sr-only"> Forklaring af fitness, træthed, form og formzoner</span>
         </span>
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          className="size-5 shrink-0 text-text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-180 motion-safe:ease-out"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="m5 7.5 5 5 5-5" />
-        </svg>
+        <Icon
+          name="chevron-down"
+          size={20}
+          className="text-text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-180 motion-safe:ease-out"
+        />
       </summary>
       <div className="mt-2 flex max-w-[65ch] flex-col gap-4 pb-4">
         <div className="flex flex-col gap-3">

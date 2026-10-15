@@ -6,6 +6,7 @@
   color-scheme: dark;
 
   --bg: #111110;
+  --ease-ember: cubic-bezier(0.2, 0.8, 0.2, 1); /* DESIGN.md Motion; lib/motion.ts EASE_EMBER (motion.test) */
   --card: #1a1a19;
   --border: #262624;
   --raised: #2a2a28;
@@ -228,5 +229,68 @@ main:has(> [data-screen="fokus"]) {
 @keyframes fade-in {
   from {
     opacity: 0;
+  }
+}
+
+/* Tab icon on becoming current (Part B "Motion": barbell lift 600 ms / trend draw 650 ms / bars
+   grow 500 ms, 70 ms apart; the ember ease). TabBar adds .icon-play to the newly current tab once
+   per change, never on first paint; the parts' classes come from icons.tsx. Only under
+   no-preference (motion-safe), and the reduced-motion rule above zeroes durations as well. */
+.i-dumb,
+.i-b {
+  transform-box: fill-box;
+}
+.i-dumb {
+  transform-origin: center;
+}
+.i-b {
+  transform-origin: bottom;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .icon-play .i-dumb {
+    animation: icon-lift 600ms var(--ease-ember);
+  }
+  .icon-play .i-line {
+    stroke-dasharray: 1;
+    animation: icon-draw 650ms var(--ease-ember) both;
+  }
+  .icon-play .i-b {
+    animation: icon-grow 500ms var(--ease-ember) both;
+  }
+  .icon-play .i-b:nth-child(2) {
+    animation-delay: 70ms;
+  }
+  .icon-play .i-b:nth-child(3) {
+    animation-delay: 140ms;
+  }
+}
+@keyframes icon-lift {
+  0% {
+    transform: none;
+  }
+  35% {
+    transform: translateY(-3px) rotate(-10deg);
+  }
+  70% {
+    transform: translateY(0.5px) rotate(4deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes icon-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes icon-grow {
+  from {
+    transform: scaleY(0.1);
+  }
+  to {
+    transform: scaleY(1);
   }
 }

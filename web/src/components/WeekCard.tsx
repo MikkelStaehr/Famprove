@@ -345,18 +345,7 @@ function DataWarning({ warning }: { readonly warning: string }) {
         <DiamondIcon />
         Tjek effektdata
         {/* The day rows' 16px chevron, pointing down; it flips without transition when open. */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          className="size-4 shrink-0 text-text-muted group-open/data:rotate-180"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="m3 6 5 5 5-5" />
-        </svg>
+        <Icon name="chevron-down" size={16} className="text-text-muted group-open/data:rotate-180" />
       </summary>
       <p className="mt-1 max-w-[60ch] text-text-muted">{warning}</p>
     </details>

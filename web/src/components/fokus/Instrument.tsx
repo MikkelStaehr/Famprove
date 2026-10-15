@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { Icon } from "../icons";
+
 /** Parts shared by the Fokus views (DESIGN.md Part B Ember, design/specs/reset-fokus.md). */
 
 /**
@@ -32,20 +34,12 @@ export function Hairline({ className = "" }: { readonly className?: string }) {
 
 /** The check icon (icons.tsx path), 1.5px line; the caller sizes it (20px on the primary). */
 export function CheckIcon({ className }: { readonly className: string }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className={`shrink-0 ${className}`} fill="none" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M5 12l5 5 9-10" />
-    </svg>
-  );
+  return <Icon name="check" className={className} />;
 }
 
-/** The arrow-right icon (icons.tsx path), 20px, 1.5px line. */
+/** The arrow-right icon, 20px, 1.5px line. */
 export function ArrowIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M5 12h14M13 6l6 6-6 6" />
-    </svg>
-  );
+  return <Icon name="arrow-right" size={20} />;
 }
 
 /** Stale / save-failed line (§6): an ink ◆ (SVG) and the words, never red. */

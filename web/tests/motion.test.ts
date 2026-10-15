@@ -30,3 +30,11 @@ test("DESIGN.md Part B Motion and the code agree (the timing table is the contra
   }
   assert.ok(design.replace(/\s/g, "").includes(EASE_EMBER.replace(/\s/g, "")), "DESIGN.md names the ember curve");
 });
+
+test("globals.css carries the same ember curve as lib/motion.ts", () => {
+  const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf-8");
+  const m = /--ease-ember:\s*([^;]+);/.exec(css);
+  assert.ok(m !== null, "--ease-ember is defined");
+  const norm = (v: string) => v.replace(/\s/g, "").replace(/(^|[(,])0\./g, "$1.");
+  assert.equal(norm(m[1]), norm(EASE_EMBER));
+});

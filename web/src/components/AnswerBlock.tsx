@@ -3,6 +3,7 @@ import { describeDataError } from "@/lib/data-error";
 import type { SummaryDirection } from "@/lib/db/rows";
 
 import { ErrorState } from "./ErrorState";
+import { Icon } from "./icons";
 
 /** Card look shared by the answers (reset-analyse-cykel.md §3): --card, 1px --border, radius 22, padding 20. */
 export const ANSWER_CARD = "relative flex min-w-0 flex-col gap-2 rounded-card border border-border bg-card p-5 lg:self-stretch";
@@ -78,12 +79,8 @@ export function AnswerBlock({ block }: { readonly block: AnswerBlockView }) {
   );
 }
 
-/** 20px neutral arrow, 1.5px stroke, --text (never coloured: the sentence carries the meaning). */
+/** 20px neutral arrow (↗ ↘ →), 1.5px stroke, --text (never coloured: the sentence carries the meaning). */
 function Arrow({ direction }: { readonly direction: SummaryDirection }) {
-  const d = direction === "up" ? "M6 18 18 6M9 6h9v9" : direction === "down" ? "M6 6l12 12M18 9v9H9" : "M4 12h16M14 6l6 6-6 6";
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 shrink-0 self-center text-text" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d={d} />
-    </svg>
-  );
+  const name = direction === "up" ? "arrow-up-right" : direction === "down" ? "arrow-down-right" : "arrow-flat";
+  return <Icon name={name} size={20} className="self-center text-text" />;
 }

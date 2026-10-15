@@ -1,11 +1,13 @@
 "use client";
 
-import { type MouseEvent, type Ref, useState } from "react";
+import { type MouseEvent, type Ref, useEffect, useRef, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
 import { TABS as SHELL_TABS } from "@/lib/tab-shell";
 
 const ICONS: readonly IconName[] = ["barbell", "trend", "bars"];
+/** globals.css: the chosen tab's icon animation hook. */
+const PLAY = "icon-play";
 
 /**
  * DESIGN.md TabBar (Part A "Navigation", Part B Ember). One <header><nav> before the pages in the
@@ -27,6 +29,11 @@ const ICONS: readonly IconName[] = ["barbell", "trend", "bars"];
  * 200 % text (the shell narrower than 20.5rem): the shell's bar hides and each page carries a
  * `placement="strip"` copy at the top of its scroll container, so the strip scrolls away with the
  * page as before the shell (design-lead Must, motion-shell); the inactive pages' copies are inert.
+ * Tab icon motion (motion-icons, Part B Motion): when `index` changes after first paint, the newly
+ * current tab's <li> gets `.icon-play` (removed, reflowed, re-added, like the reference's
+ * playIcon), so its icon plays once: barbell lift 600 ms, trend draw 650 ms, bars grow 500 ms. The
+ * <li>'s className is static, so React never strips the class. Nothing on first paint or a re-tap;
+ * nothing under reduced motion (skipped here, and the keyframes sit in a no-preference query).
  */
 export function TabBar({
   index,
@@ -43,6 +50,18 @@ export function TabBar({
 }) {
   // The indicator's first paint only: React never rewrites its transform, TabShell owns it after mount.
   const [firstIndex] = useState(index);
+  const items = useRef<(HTMLLIElement | null)[]>([]);
+  const shownIndex = useRef(index);
+  useEffect(() => {
+    if (shownIndex.current === index) return; // first paint, or the same tab again
+    shownIndex.current = index;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const li = items.current[index];
+    if (li === null || li === undefined) return;
+    li.classList.remove(PLAY);
+    void li.offsetWidth; // restart the animation on A → B → A
+    li.classList.add(PLAY);
+  }, [index]);
   const select = (i: number) => (e: MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // a new tab/window
     e.preventDefault();
@@ -71,7 +90,13 @@ export function TabBar({
           {SHELL_TABS.map((tab, i) => {
             const current = i === index;
             return (
-              <li key={tab.path} className="flex">
+              <li
+                key={tab.path}
+                ref={(el) => {
+                  items.current[i] = el;
+                }}
+                className="flex"
+              >
                 <a
                   href={tab.path}
                   onClick={select(i)}
