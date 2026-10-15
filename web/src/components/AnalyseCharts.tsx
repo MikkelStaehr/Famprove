@@ -1,6 +1,6 @@
 "use client";
 
-import { CartesianGrid, ComposedChart, Line, ReferenceDot, XAxis, YAxis } from "recharts";
+import { CartesianGrid, ComposedChart, Line, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts";
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
 import { type AxisTick, type ChartRow, chartRows, eftpDots, formatEf, type LineChartView, type Mark, type Seam, seamReadout, slotCentre, type WeekBar } from "@/lib/analyse-view";
@@ -273,6 +273,27 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
           tickLine={false}
           axisLine={false}
         />
+        {/* §A: the FTP set as a level line from ftp_since (clamped to the plot start) to today, under the dots. */}
+        {variant === "eftp" && chart.level != null && (
+          <ReferenceLine
+            segment={[
+              { x: Math.max(axis.lo, chart.level.x0 ?? axis.lo), y: chart.level.y },
+              { x: todayX, y: chart.level.y },
+            ]}
+            stroke={AMARKS.level.color}
+            strokeWidth={AMARKS.level.width}
+            ifOverflow="hidden"
+            label={(p: { readonly viewBox?: { readonly x?: number; readonly y?: number } }) => (
+              <text
+                x={(p.viewBox?.x ?? 0) + AMARKS.level.labelGap}
+                y={(p.viewBox?.y ?? 0) - AMARKS.level.labelGap}
+                {...TICK}
+              >
+                {chart.level?.label}
+              </text>
+            )}
+          />
+        )}
         {variant === "ef" && (
           <Line dataKey="dots" stroke="none" dot={efDot} activeDot={false} isAnimationActive={false} legendType="none" />
         )}

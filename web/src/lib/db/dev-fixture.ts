@@ -40,7 +40,8 @@
  *          has none (the view not yet applied, or nothing left this week), so "planned" can be
  *          screenshotted. Never a real estimate.
  *   ftp-warning / ftp-quiet  /load's FTP line (ftp-confirm.md §4): an illustrative ftp_status (and
- *          notice), credible and mismatched / not tested since 17 May; other screens: real rows.
+ *          notice), credible and mismatched / not tested since 17 May; /analyse gets the same FTP
+ *          (its FTP line, ftp-confirm.md §A); other screens: real rows.
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { MarkChart, WeekStrips } from "@/components/AnalyseCharts";
-import { BarSwatch, CrossSwatch, DotSizesSwatch, Legend, LineSwatch, RideDotSwatch, TodaySwatch } from "@/components/AnalyseLegend";
+import { BarSwatch, CrossSwatch, DotSizesSwatch, Legend, LevelSwatch, LineSwatch, RideDotSwatch, TodaySwatch } from "@/components/AnalyseLegend";
 import { AnalyseHeader } from "@/components/AnalyseTabs";
 import { ANSWER_CARD, AnswerBlocks } from "@/components/AnswerBlock";
 import { Card } from "@/components/Card";
@@ -116,6 +116,7 @@ function Cards({ view }: { readonly view: Ready }) {
             {/* The eFTP line's legend item lives in the readout row's cell (DESIGN.md Charts: interaction). */}
             <Legend
               items={[
+                ...(view.ftpCaption === null ? [] : [{ swatch: <LevelSwatch />, label: view.ftpCaption }]),
                 { swatch: <DotSizesSwatch />, label: "eFTP · størrelse = TSS" },
                 { swatch: <CrossSwatch />, label: "Udeladt tur" },
               ]}

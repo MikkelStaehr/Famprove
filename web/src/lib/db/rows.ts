@@ -336,6 +336,8 @@ export type CyclingAnalysisData = {
   readonly summary?: readonly AnalysisSummaryRow[] | null;
   /** Why summary is null (set by loadCyclingAnalysis). */
   readonly summaryError?: DataError | null;
+  /** ftp_status for the eFTP chart's FTP line (slice ftp-analyse); null = unknown or unreadable, absent = not read. */
+  readonly ftp?: FtpStatusRow | null;
 };
 
 /** The three questions on top of Cykel (python domain/cycling_answers.py). */

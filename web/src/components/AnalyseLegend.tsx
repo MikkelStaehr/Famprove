@@ -48,6 +48,15 @@ export function LineSwatch() {
   );
 }
 
+/** The FTP level line on the eFTP chart (ftp-confirm.md §A): 1px --text-muted, 12px. */
+export function LevelSwatch() {
+  return (
+    <Swatch width={12}>
+      <line x1="0" x2="12" y1="7" y2="7" stroke={AMARKS.level.color} strokeWidth={AMARKS.level.width} />
+    </Swatch>
+  );
+}
+
 /** An EF ride: the small --shade-2 dot. */
 export function RideDotSwatch() {
   return (

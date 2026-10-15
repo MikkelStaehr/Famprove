@@ -13,6 +13,8 @@ export const AMARKS = {
   baseline: { color: "var(--axis)" },
   /** Main line: eFTP through its points, the EF trend. */
   line: { width: 2, color: "var(--text)" },
+  /** The FTP set (ftp-confirm.md §A): 1px solid --text-muted under the dots; label Mono 11, 4px in and up. */
+  level: { width: 1, color: "var(--text-muted)", labelGap: 4 },
   /** The latest eFTP ride: C's "you are here" ring. */
   latest: { r: 5, fill: "var(--card)", stroke: 2, color: "var(--text)" },
   /** EF per ride: a small filled secondary dot. */

@@ -437,11 +437,22 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
       throw error;
     },
   );
+  // The FTP line (slice ftp-analyse) is decoration: unreadable = no line, never a guessed FTP.
+  // Under DEV_FIXTURE ftp-warning / ftp-quiet the illustrative FTP replaces the read.
+  const ftpRead =
+    fixture === "ftp-warning" || fixture === "ftp-quiet"
+      ? Promise.resolve(illustrativeFtp(fixture, new Date()).status)
+      : selectFirst(db, FTP_STATUS_SELECT.table, FTP_STATUS_SELECT, parseFtpStatusRow).catch((error: unknown) => {
+          console.error("analyse: loading ftp_status failed", error);
+          if (isDataError(error)) return null;
+          throw error;
+        });
   // Promise.all also awaits the secondary reads when the rides read fails first (no unhandled rejection).
-  const [rides, weeksResult, summaryResult] = await Promise.all([
+  const [rides, weeksResult, summaryResult, ftp] = await Promise.all([
     selectAll(db, RIDE_METRICS_SELECT.table, RIDE_METRICS_SELECT, parseRideMetricsRow),
     weeksRead,
     summaryRead,
+    ftpRead,
   ]);
   const weeks = weeksResult instanceof Error ? null : weeksResult;
   const weeksError = weeksResult instanceof Error ? weeksResult : null;
@@ -455,6 +466,7 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
       weeksError,
       summary: summary === null ? null : summary.map((a) => ({ ...a, computedAt })),
       summaryError,
+      ftp,
     };
   }
   return {
@@ -463,6 +475,7 @@ export async function loadCyclingAnalysis(): Promise<CyclingAnalysisData> {
     weeksError,
     summary: fixture === "answers" && summary !== null ? illustrativeAnswers(summary) : summary,
     summaryError,
+    ftp,
   };
 }
 

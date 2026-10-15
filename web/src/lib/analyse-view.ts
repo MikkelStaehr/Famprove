@@ -8,7 +8,7 @@ import { MISSING, type Readout, viCell } from "./chart-readout.ts";
 import { addDays, dayNumber, isoWeek, isoWeekStart } from "./dates.ts";
 import { type Freshness, freshness } from "./dashboard-view.ts";
 import type { DataError } from "./data-error.ts";
-import type { CyclingAnalysisData, CyclingWeekRow, IsoDate, RideExclusion, RideMetricsRow } from "./db/rows.ts";
+import type { CyclingAnalysisData, CyclingWeekRow, FtpStatusRow, IsoDate, RideExclusion, RideMetricsRow } from "./db/rows.ts";
 import { formatDate, formatDateRange, formatDay, formatDuration, formatLoad, formatWatts, LOCALE } from "./format.ts";
 
 /** The analysis window starts here (spec §4); weeks from 2024-12-30 are clipped to it. */
@@ -132,7 +132,18 @@ export type LineChartView = {
   readonly domain: readonly [number, number];
   readonly ticks: readonly number[];
   readonly sr: string;
+  /** The eFTP chart's FTP level line (ftp-confirm.md §A); absent or null = none. */
+  readonly level?: FtpLevel | null;
 };
+
+/** A horizontal line at the FTP set, from `x0` (ftp_since's day; null = the plot start) to today. */
+export type FtpLevel = { readonly y: number; readonly x0: number | null; readonly label: string };
+
+/** §A: the legend's FTP item, "FTP: 230 W · sat senest 21. mar. 2026"; null without an FTP. */
+export function ftpCaption(ftp: FtpStatusRow | null | undefined): string | null {
+  if (ftp === null || ftp === undefined || ftp.ftpW === null) return null;
+  return ftp.ftpSince === null ? `FTP: ${ftp.ftpW} W` : `FTP: ${ftp.ftpW} W · sat senest ${dateWithYear(ftp.ftpSince)}`;
+}
 
 export type WeekBar = {
   readonly x0: number; // slot start (day number, clipped to the axis)
@@ -169,6 +180,7 @@ export type AnalyseView =
       readonly ticksWide: readonly AxisTick[];
       readonly seams: readonly Seam[];
       readonly eftp: LineChartView | null; // null: fewer than 2 points
+      readonly ftpCaption: string | null; // the eFTP legend's FTP item (§A); null = no FTP
       readonly noWattNote: string | null;
       readonly ef: LineChartView | EfFew;
       readonly weeks: readonly WeekBar[] | null; // null: cycling_weeks couldn't be read
@@ -212,7 +224,7 @@ function excludedTip(r: ExcludedRow, year: number): string[] {
   return [dayText(r.date, year), `Udeladt: ${exclusionText(r.exclusion).short}`, ...(facts === "" ? [] : [facts])];
 }
 
-function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCount: number): LineChartView | null {
+function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCount: number, ftp: FtpStatusRow | null = null): LineChartView | null {
   const year = yearOf(today);
   const points = rows.filter(isEftpRow);
   if (points.length < 2) return null;
@@ -263,7 +275,9 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
       },
     });
   }
-  const values = points.map((p) => p.rollingFtpW);
+  const ftpW = ftp?.ftpW ?? null;
+  // §A: the y domain holds the FTP too, so its line is on the plot even above every eFTP point.
+  const values = [...points.map((p) => p.rollingFtpW), ...(ftpW === null ? [] : [ftpW])];
   const { domain, ticks } = niceTicks(Math.min(...values), Math.max(...values), 10);
   const hiRow = points.reduce((a, b) => (b.rollingFtpW > a.rollingFtpW ? b : a));
   const loRow = points.reduce((a, b) => (b.rollingFtpW < a.rollingFtpW ? b : a));
@@ -273,8 +287,12 @@ function eftpChart(rows: readonly RideMetricsRow[], today: IsoDate, excludedCoun
     `Seneste ${formatLoad(last.rollingFtpW)} W den ${dateWithYear(last.date)}, højeste ${formatLoad(hiRow.rollingFtpW)} W den ${dateWithYear(hiRow.date)}, laveste ${formatLoad(loRow.rollingFtpW)} W den ${dateWithYear(loRow.date)}.`,
     ...pauses,
     ...(excludedCount > 0 ? [`${rides(excludedCount)} er udeladt; se listen Udeladte ture.`] : []),
+    ...(ftpW === null
+      ? []
+      : [ftp?.ftpSince == null ? `FTP er sat til ${ftpW} W.` : `FTP er sat til ${ftpW} W, senest sat ${dateWithYear(ftp.ftpSince)}.`]),
   ].join(" ");
-  return { marks, segments: seg + 1, domain, ticks, sr };
+  const level = ftpW === null ? null : { y: ftpW, x0: ftp?.ftpSince == null ? null : dayNumber(ftp.ftpSince), label: `FTP ${ftpW}` };
+  return { marks, segments: seg + 1, domain, ticks, sr, level };
 }
 
 export type EfFew = {
@@ -561,7 +579,8 @@ export function buildAnalyseView(data: CyclingAnalysisData, now: Date, today: Is
     ticksNarrow: axisTicks(today, false),
     ticksWide: axisTicks(today, true),
     seams: data.weeks === null ? [] : seams(data.weeks),
-    eftp: eftpChart(plotted, today, excludedRows.length),
+    eftp: eftpChart(plotted, today, excludedRows.length, data.ftp ?? null),
+    ftpCaption: ftpCaption(data.ftp),
     noWattNote:
       noWatt === 0 ? null : `${rides(noWatt)} uden watt er ikke med her, men tæller i timer og belastning.`,
     ef: efChart(plotted, today),

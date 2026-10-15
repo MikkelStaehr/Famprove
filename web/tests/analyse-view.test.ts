@@ -14,6 +14,7 @@ import {
   buildAnalyseView,
   efTooFew,
   exclusionFacts,
+  ftpCaption,
   exclusionText,
   formatHours,
   formatKm,
@@ -21,6 +22,7 @@ import {
   weekBars,
 } from "../src/lib/analyse-view.ts";
 import { highestAt, nearestIndex, restingReadout, restingWeekIndex } from "../src/lib/chart-readout.ts";
+import { dayNumber } from "../src/lib/dates.ts";
 import type { CyclingWeekRow, RideMetricsRow } from "../src/lib/db/rows.ts";
 import { parseRideMetricsRow } from "../src/lib/db/rows.ts";
 
@@ -278,4 +280,35 @@ test("eFTP dots: radius follows √load within 1.5–6, null load is a hollow ri
 
 test("a week bar and the today tick sit at the slot centre", () => {
   assert.equal(slotCentre({ x0: 10, x1: 17 }), 13.5);
+});
+
+// --- ftp-analyse (ftp-confirm.md §A): the FTP set on the eFTP chart ------------------------------
+
+const FTP_STATUS = { ftpW: 230, eftpW: 183, credible: false, lastTestedOn: "2026-05-17", ftpSince: "2026-03-21", suppressedUntil: null } as const;
+const EFTP_RIDES = [
+  ride("2026-03-21", { rollingFtpW: 193, eftpOk: true }),
+  ride("2026-10-11", { rollingFtpW: 183, eftpOk: true }),
+];
+
+test("§A: the FTP caption, level line and sr sentence; the y domain holds an FTP above every point", () => {
+  const view = buildAnalyseView({ rides: EFTP_RIDES, weeks: [], ftp: FTP_STATUS }, new Date(AT), "2026-10-15");
+  assert.equal(view.kind, "ready");
+  if (view.kind !== "ready" || view.eftp === null) return;
+  assert.equal(view.ftpCaption, "FTP: 230 W · sat senest 21. mar. 2026");
+  assert.deepEqual(view.eftp.level, { y: 230, x0: dayNumber("2026-03-21"), label: "FTP 230" });
+  assert.ok(view.eftp.domain[1] >= 230, `domain ${view.eftp.domain.join("–")} holds 230`);
+  assert.match(view.eftp.sr, /FTP er sat til 230 W, senest sat 21\. mar\. 2026\.$/);
+});
+
+test("§A: FTP without a date reads without it; no FTP draws nothing and leaves the domain to the points", () => {
+  assert.equal(ftpCaption({ ...FTP_STATUS, ftpSince: null }), "FTP: 230 W");
+  assert.equal(ftpCaption({ ...FTP_STATUS, ftpW: null }), null);
+  assert.equal(ftpCaption(null), null);
+  assert.equal(ftpCaption(undefined), null);
+  const without = buildAnalyseView({ rides: EFTP_RIDES, weeks: [] }, new Date(AT), "2026-10-15");
+  assert.ok(without.kind === "ready" && without.eftp !== null);
+  if (without.kind !== "ready" || without.eftp === null) return;
+  assert.equal(without.ftpCaption, null);
+  assert.equal(without.eftp.level, null);
+  assert.ok(without.eftp.domain[1] < 230);
 });
