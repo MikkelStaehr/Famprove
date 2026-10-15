@@ -160,9 +160,11 @@ def test_a_day_not_dated_yet_gives_no_sets_and_stops_nothing() -> None:
     assert {p["name"] for p in parse_all(workbook(rows), plain)} == {"Leg curl"}
 
 
-def test_a_tab_without_a_block_number_never_stops_the_run() -> None:
-    """The caller drops such a tab anyway (counts_issues False), so its layout stops nothing."""
+def test_a_tab_without_a_block_number_never_stops_the_run(caplog: pytest.LogCaptureFixture) -> None:
+    """The caller drops such a tab anyway (counts_issues False), so its layout stops nothing; the
+    log names it."""
     broken = workbook(day(1, exercise("Leg press")))  # a day without an end
     assert parse_all(broken, plain, counts_issues=lambda _tab: False) == []
+    assert f"skipping tab '{TAB}' without a block number" in caplog.text
     with pytest.raises(SheetLayoutError):
         parse_all(broken, plain, counts_issues=lambda _tab: True)

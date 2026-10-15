@@ -9,12 +9,14 @@ STRENGTH_K (tidl. K) ganges på i domain.strength. Muskelfaktor og kropsvægt pr
 public.exercises via ``scoring(type, navn)`` (domain.exercises, 2026-10-12): kropsvægt-kg =
 BODYWEIGHT x bodyweight_fraction; resten af formlen er uændret.
 """
-import io, math, re, datetime as dt
+import io, logging, math, re, datetime as dt
 from collections import Counter
 from typing import TypedDict
 import openpyxl
 
 from training_load.domain.exercises import variant_key
+
+log = logging.getLogger(__name__)
 
 class ParsedSet(TypedDict):
     date: dt.date
@@ -232,9 +234,10 @@ def parse_all(data: bytes, scoring, issues: Counter[str] | None = None,
             counted = counts_issues is None or counts_issues(tab)
             try:
                 sets += parse_tab(wb[tab], tab, scoring, issues if counted else Counter())
-            except SheetLayoutError:
+            except SheetLayoutError as e:
                 if counted: raise
                 # en fane uden bloknummer smides alligevel væk af kalderen: dens layout stopper intet
+                log.warning("skipping tab %r without a block number: %s", tab, e)
     return sets
 
 def row_variants(r, name, notes_cols, issues: Counter[str]):
