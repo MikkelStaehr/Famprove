@@ -1,0 +1,203 @@
+// Touch swipes and tab taps on the tab shell (slice motion-shell), with frame timing, through the same
+// Chromium DevTools protocol as shoot.mjs. Real touch events (Input.dispatchTouchEvent: pointerType
+// "touch"), real time, optional CPU throttling.
+// node .claude/skills/run-web/swipe.mjs --path /load --steps "left,right,tap:/analyse,back"
+//   [--width 390] [--height 844] [--cpu 4] [--share 0.3] [--ms 300] [--mid <file.png>] [--out <file.png>]
+//   [--reduce-motion] [--zoom200] [--base http://localhost:3100] [--timeout 120]
+// Steps: left | right (a swipe of --share x width over --ms, from the middle, never the edge zones),
+//   flick-left | flick-right (15 % of the width in 80 ms), short-left | short-right (15 % over 600 ms),
+//   edge-left | edge-right (starting 10 px from the edge), tap:<path> (a click on that tab), back (history).
+// --mid shoots the screen half-way through the first swipe (the card stack mid-move).
+// Prints one JSON line: per step the URL and active page after it settles; long animation frames
+// (PerformanceObserver "long-animation-frame", > 50 ms) and the largest gap between animation frames
+// while gestures ran. Exits 1 on a long frame over 50 ms, a console error or a page that never got ready.
+import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { parseArgs } from "node:util";
+
+const { values: opt } = parseArgs({
+  options: {
+    path: { type: "string", default: "/load" },
+    steps: { type: "string", default: "left,right" },
+    width: { type: "string", default: "390" },
+    height: { type: "string", default: "844" },
+    cpu: { type: "string", default: "1" },
+    share: { type: "string", default: "0.3" },
+    ms: { type: "string", default: "300" },
+    mid: { type: "string" },
+    out: { type: "string" },
+    base: { type: "string", default: process.env.BASE_URL ?? "http://localhost:3100" },
+    "reduce-motion": { type: "boolean", default: false },
+    zoom200: { type: "boolean", default: false },
+    timeout: { type: "string", default: "120" },
+  },
+});
+const width = Number(opt.width);
+const height = Number(opt.height);
+const DEFAULT_BROWSER = {
+  win32: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  linux: "google-chrome",
+};
+const browserPath = process.env.BROWSER_PATH ?? process.env.EDGE_PATH ?? DEFAULT_BROWSER[process.platform] ?? "google-chrome";
+const profile = mkdtempSync(join(tmpdir(), "run-web-"));
+const port = 9800 + Math.floor(Math.random() * 100);
+const browser = spawn(
+  browserPath,
+  ["--headless=new", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, "about:blank"],
+  { stdio: "ignore" },
+);
+const watchdog = setTimeout(() => {
+  console.error(`swipe did not finish within ${opt.timeout} s; browser killed`);
+  browser.kill("SIGKILL");
+  try {
+    rmSync(profile, { recursive: true, force: true });
+  } catch {}
+  process.exit(1);
+}, Number(opt.timeout) * 1000);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let exitCode = 0;
+
+try {
+  let target;
+  for (let i = 0; i < 75 && !target; i++) {
+    try {
+      target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === "page");
+    } catch {}
+    if (!target) await sleep(200);
+  }
+  if (!target) throw new Error(`the browser did not start (${browserPath}); set BROWSER_PATH`);
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise((r) => ws.addEventListener("open", r, { once: true }));
+  let id = 0;
+  const pending = new Map();
+  const errors = [];
+  ws.addEventListener("message", (m) => {
+    const msg = JSON.parse(m.data);
+    if (msg.id && pending.has(msg.id)) {
+      pending.get(msg.id)(msg.result ?? {});
+      pending.delete(msg.id);
+    } else if (msg.method === "Runtime.exceptionThrown") {
+      errors.push(msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text);
+    } else if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
+      errors.push(msg.params.args.map((a) => a.value ?? a.description).join(" "));
+    }
+  });
+  const send = (method, params = {}) =>
+    new Promise((r) => {
+      const i = ++id;
+      pending.set(i, r);
+      ws.send(JSON.stringify({ id: i, method, params }));
+    });
+  const evaluate = async (expression) =>
+    (await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })).result?.value;
+
+  await send("Runtime.enable");
+  await send("Page.enable");
+  await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 2, mobile: true });
+  await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  if (opt["reduce-motion"]) await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+  await send("Page.navigate", { url: new URL(opt.path, opt.base).href });
+
+  let ready = false;
+  for (let i = 0; i < 150 && !ready; i++) {
+    await sleep(200);
+    // Every tab, not only the active one: the others stream in from their defaults, and a swipe
+    // measured while they hydrate measures the stream, not the swipe.
+    ready = await evaluate(
+      `[...document.querySelectorAll('[data-tab-page]')].length === 3` +
+        ` && [...document.querySelectorAll('[data-tab-page]')].every((p) => p.querySelector('main h1'))` +
+        ` && !document.querySelector('[data-tab-page] [class*="animate-pulse"]')`,
+    );
+  }
+  if (!ready) {
+    console.error("page did not become ready within 30 s");
+    exitCode = 1;
+  }
+  if (opt.zoom200) {
+    await evaluate(`document.head.append(Object.assign(document.createElement('style'), { textContent: 'html { font-size: 200% !important; }' })); true`);
+  }
+  await sleep(1500); // hydration settles before the clock starts
+  // Frame timing from here on: long animation frames and the largest rAF gap while gestures run.
+  await evaluate(`(() => {
+    window.__long = [];
+    try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(Math.round(e.duration)); })
+      .observe({ type: 'long-animation-frame', buffered: false }); } catch { window.__long = null; }
+    window.__longAt = []; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.duration > 50) window.__longAt.push([Math.round(e.startTime), Math.round(e.duration)]); })
+      .observe({ type: 'long-animation-frame', buffered: false }); } catch {}
+    window.__gap = 0; window.__measure = false; let last = 0;
+    const tick = (t) => { if (window.__measure && last) window.__gap = Math.max(window.__gap, t - last); last = t; requestAnimationFrame(tick); };
+    requestAnimationFrame(tick); return true; })()`);
+  const cpu = Number(opt.cpu);
+  if (cpu > 1) await send("Emulation.setCPUThrottlingRate", { rate: cpu });
+
+  const touch = (type, x, y) => send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y }] });
+  const y = Math.round(height * 0.45);
+  let midShot = opt.mid;
+  async function swipe(dir, share, ms, fromEdge = false) {
+    const sign = dir === "left" ? -1 : 1;
+    const x0 = fromEdge ? (sign < 0 ? width - 10 : 10) : sign < 0 ? Math.round(width * 0.75) : Math.round(width * 0.25);
+    const dist = share * width;
+    const n = ms <= 100 ? 4 : 16; // a flick: few moves, so CDP round trips don't slow it below 0.45 px/ms
+    await touch("touchStart", x0, y);
+    for (let k = 1; k <= n; k++) {
+      await sleep(ms / n);
+      await touch("touchMove", Math.round(x0 + (sign * dist * k) / n), y);
+      if (midShot && k === Math.floor(n / 2)) {
+        const shot = await send("Page.captureScreenshot", { format: "png" });
+        writeFileSync(midShot, Buffer.from(shot.data, "base64"));
+        midShot = undefined;
+      }
+    }
+    await touch("touchEnd", 0, 0);
+  }
+  const results = [];
+  await evaluate(`window.__measure = true`);
+  for (const step of opt.steps.split(",").map((s) => s.trim()).filter(Boolean)) {
+    const ms = Number(opt.ms);
+    const t0 = await evaluate(`performance.now()`);
+    if (step === "left" || step === "right") await swipe(step, Number(opt.share), ms);
+    else if (step === "flick-left" || step === "flick-right") await swipe(step.slice(6), 0.18, 40); // < 22 %, > 0.45 px/ms
+    else if (step === "short-left" || step === "short-right") await swipe(step.slice(6), 0.15, 600);
+    else if (step === "edge-left" || step === "edge-right") await swipe(step.slice(5), Number(opt.share), ms, true);
+    // The tab bar's link (a page's own section links, e.g. Analyse's Cykel, share hrefs and are inert when hidden).
+    else if (step.startsWith("tap:")) await evaluate(`document.querySelector('nav[aria-label="Hovedmenu"] a[href="${step.slice(4)}"]')?.click(); true`);
+    else if (step === "back") await evaluate(`history.back(); true`);
+    else throw new Error(`unknown step ${step}`);
+    await sleep(700); // the 440 ms animation and a margin
+    results.push({
+      step,
+      ...(await evaluate(
+        `({ url: location.pathname, active: document.querySelector('[data-tab-page][data-active]')?.dataset.tabPage ?? null,` +
+          ` long: (window.__longAt || []).filter(([t]) => t >= ${t0}).map(([, d]) => d) })`,
+      )),
+    });
+    await evaluate(`window.__longAt = []; true`);
+  }
+  await evaluate(`window.__measure = false`);
+  if (cpu > 1) await send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  const timing = await evaluate(`({ long: window.__long, gap: Math.round(window.__gap) })`);
+  const overflow = await evaluate(
+    `[...document.querySelectorAll('[data-tab-page] main')].some((m) => m.scrollWidth > m.clientWidth) || document.documentElement.scrollWidth > document.documentElement.clientWidth`,
+  );
+  if (opt.out) {
+    const shot = await send("Page.captureScreenshot", { format: "png" });
+    writeFileSync(opt.out, Buffer.from(shot.data, "base64"));
+  }
+  const long = timing.long === null ? null : timing.long.filter((d) => d > 50);
+  console.log(
+    JSON.stringify({ path: opt.path, cpu, steps: results, longFramesOver50ms: long, maxFrameGapMs: timing.gap, horizontalOverflow: overflow, consoleErrors: errors }),
+  );
+  if ((long !== null && long.length > 0) || errors.length > 0 || overflow) exitCode = 1;
+  ws.close();
+} finally {
+  clearTimeout(watchdog);
+  browser.kill();
+  await sleep(300);
+  try {
+    rmSync(profile, { recursive: true, force: true });
+  } catch {}
+}
+process.exit(exitCode);

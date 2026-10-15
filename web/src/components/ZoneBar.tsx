@@ -23,7 +23,7 @@ export function ZoneBar({ tsb, zone }: ZoneBarProps) {
   const end = tsb === null ? null : pinned(tsb);
   return (
     <div aria-hidden="true" className="flex flex-col gap-2">
-      <div className="relative">
+      <div data-noswipe="" className="relative">
         <div className="flex h-2 gap-0.75">
           {BANDS.map((b, i) => (
             <span

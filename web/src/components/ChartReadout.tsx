@@ -103,6 +103,8 @@ export function useChartPick(opts: {
     ref,
     tabIndex: 0,
     role: "group" as const,
+    // The tab shell never starts a swipe on a chart plot (motion-shell §2): the plot's own drag picks.
+    "data-noswipe": "",
     style: { touchAction: "pan-y" } as const,
     onPointerDown: (e: PointerEvent<HTMLDivElement>) => at(e, true),
     onPointerMove: (e: PointerEvent<HTMLDivElement>) => at(e, false),

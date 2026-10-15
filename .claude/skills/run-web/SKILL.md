@@ -60,6 +60,21 @@ PNG** — a screenshot you haven't looked at proves nothing.
 `serve.ps1 -Mode prod` serves the last `pnpm build` with `next start`. Building rewrites `web/.next`,
 which a `next start` on port 3000 may be serving — so prefer dev mode, or ask before building.
 
+## Swipes and frame timing (the tab shell)
+`swipe.mjs` drives the tab shell with real touch events (pointerType "touch") and measures frames: long
+animation frames over 50 ms (PerformanceObserver) and the largest gap between animation frames while the
+gestures run, optionally under CPU throttling. Same browser and port rules as `shoot.mjs`.
+
+```bash
+# Pixel-class phone, 4x CPU throttle: swipe to Analyse, back, tap Træning, browser back
+.claude/skills/run-web/serve.sh -- "node .claude/skills/run-web/swipe.mjs --path /load --cpu 4 --steps left,right,tap:/train,back --mid \$TMPDIR/mid.png"
+```
+Steps: `left` / `right` (a swipe of `--share` x width over `--ms`), `flick-*` (15 % in 80 ms), `short-*`
+(15 % over 600 ms), `edge-*` (from 10 px off the edge: must not move), `tap:<path>`, `back`. `--mid` shoots
+the card stack half-way through the first swipe. Prints the URL and active page after each step; exits 1 on
+a long frame over 50 ms, a console error or a horizontal overflow. Safari has no long-animation-frame API:
+the user's own phone stays a manual check.
+
 ## Rules
 - Port 3100 only. The script refuses to start if 3100 is taken and always stops its server.
 - `web/.env.local` (real Supabase keys) is read by Next itself; never open or print it.

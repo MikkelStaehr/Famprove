@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent } from "react";
+import { type MouseEvent, type Ref, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
 import { TABS as SHELL_TABS } from "@/lib/tab-shell";
@@ -22,8 +22,21 @@ const ICONS: readonly IconName[] = ["barbell", "trend", "bars"];
  * In the tab shell (motion-shell): the bar sits in the shell's column (bottom below lg, top from
  * lg), never over the pages; a tap changes the tab through `onSelect` (history.pushState, no
  * navigation); the href stays for a new tab or window. /fokus has no shell, so no bar.
+ * Indicator (phone bar only): a track one tab wide on the bar's top edge, holding a 28px 2px --text
+ * bar; TabShell translates it by p × 100 % of its own width. None at lg or on the 200 % strip.
  */
-export function TabBar({ index, onSelect }: { readonly index: number; readonly onSelect: (i: number) => void }) {
+export function TabBar({
+  index,
+  onSelect,
+  indicatorRef,
+}: {
+  readonly index: number;
+  readonly onSelect: (i: number) => void;
+  /** The indicator's track: TabShell moves it to p every frame (its first paint sits at `index`). */
+  readonly indicatorRef?: Ref<HTMLSpanElement>;
+}) {
+  // The indicator's first paint only: React never rewrites its transform, TabShell owns it after mount.
+  const [firstIndex] = useState(index);
   const select = (i: number) => (e: MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // a new tab/window
     e.preventDefault();
@@ -35,6 +48,14 @@ export function TabBar({ index, onSelect }: { readonly index: number; readonly o
         aria-label="Hovedmenu"
         className="relative border-t border-border bg-bg pt-2.5 pr-[max(16px,env(safe-area-inset-right))] pb-[max(24px,env(safe-area-inset-bottom))] pl-[max(16px,env(safe-area-inset-left))] @max-[20.5rem]/nav:border-t-0 @max-[20.5rem]/nav:pb-2.5 lg:inline-flex lg:rounded-button lg:border lg:border-border lg:bg-card lg:p-1"
       >
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-px right-[max(16px,env(safe-area-inset-right))] left-[max(16px,env(safe-area-inset-left))] h-0.5 @max-[20.5rem]/nav:hidden lg:hidden"
+        >
+          <span ref={indicatorRef} className="block h-0.5 w-1/3" style={{ transform: `translateX(${firstIndex * 100}%)` }}>
+            <span className="mx-auto block h-0.5 w-7 rounded-[1px] bg-text" />
+          </span>
+        </span>
         <ul className="flex flex-wrap justify-around lg:flex-nowrap lg:gap-1">
           {SHELL_TABS.map((tab, i) => {
             const current = i === index;
