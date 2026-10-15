@@ -223,13 +223,18 @@ def parse_all(data: bytes, scoring, issues: Counter[str] | None = None,
               counts_issues=None) -> list[ParsedSet]:
     """``scoring(type, name)`` -> domain.exercises.Scoring (muscle factor, bodyweight kg) per row.
     ``counts_issues(tab)`` False: the tab is parsed but its unreadable cells aren't counted
-    (the caller drops it anyway, e.g. a template tab without a block number)."""
+    (the caller drops it anyway, e.g. a template tab without a block number), and a layout error
+    in it (SheetLayoutError) stops nothing."""
     wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
     sets = []
     for tab in wb.sheetnames:
         if tab.startswith("Program - blok"):
             counted = counts_issues is None or counts_issues(tab)
-            sets += parse_tab(wb[tab], tab, scoring, issues if counted else Counter())
+            try:
+                sets += parse_tab(wb[tab], tab, scoring, issues if counted else Counter())
+            except SheetLayoutError:
+                if counted: raise
+                # en fane uden bloknummer smides alligevel væk af kalderen: dens layout stopper intet
     return sets
 
 def row_variants(r, name, notes_cols, issues: Counter[str]):
@@ -267,8 +272,9 @@ HEADER_KEYS = {"SETS": "sets", "REPS": "reps", "LOAD": "load", "WEIGHT": "weight
 REQUIRED_KEYS = ("sets", "reps", "load", "weight", "notes")
 
 def is_week_row(r) -> bool:
-    """Dag-sektionens dato-række: en dato i kolonne B og 'WEEK 1' i rækken."""
-    return bool(r) and len(r) > 1 and isinstance(r[1], dt.datetime) and "WEEK 1" in [str(x) for x in r]
+    """Dag-sektionens WEEK/dato-række: 'WEEK 1' i rækken. Dagens dato står i kolonne B; mangler den
+    (en blok, træneren har lagt ind, men ikke dateret endnu), læses dagen uden sæt, som før."""
+    return bool(r) and "WEEK 1" in [str(x) for x in r]
 
 def is_header_row(r) -> bool:
     return bool(r) and any(isinstance(c, str) and c.strip().upper() == "SETS" for c in r)
@@ -277,8 +283,8 @@ def ends_day(r) -> bool:
     """En træningsdag slutter ved næste dags 'Micro Length'- eller 'DAY'-række, eller ved
     skabelonens 'MICROCYCLE ... METRICS'-tabeller under sidste dag."""
     label = str(r[1]).strip().upper() if r and len(r) > 1 and isinstance(r[1], str) else ""
-    return label in ("MICRO LENGTH", "DAY") or any(
-        isinstance(c, str) and c.strip().upper().startswith("MICROCYCLE") for c in r)
+    return label in ("MICRO LENGTH", "DAY") or (not looks_like_exercise(r) and any(
+        isinstance(c, str) and c.strip().upper().startswith("MICROCYCLE") for c in r))  # aldrig en NOTES-celle
 
 def looks_like_exercise(r) -> bool:
     """En række med en øvelse: TYPE og NAME som tekst (eller en Abs-række uden TYPE)."""
@@ -310,6 +316,7 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
     e1rm = read_e1rm(rows, issues)
     sets = []
     week_dates: list[object] = []   # dagens dato pr. uge (fra WEEK-rækken)
+    dated = False     # dagens WEEK-række har en dato i kolonne B
     section = 0
     lsrpe_ok = True   # LSRPE læses, indtil en overskrift mangler kolonnen i en uge (talt én gang); så ikke resten af fanen
     run_head = None   # (sektion, øvelse, variant pr. uge) for den række, der startede en øvelses-run
@@ -329,6 +336,7 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
             # dato-række: dato står 2 kolonner efter 'WEEK n'
             starts = [i for i,c in enumerate(r) if isinstance(c,str) and c.startswith("WEEK")]
             week_dates = [r[i+2] if i+2 < len(r) else None for i in starts]
+            dated = len(r) > 1 and isinstance(r[1], dt.datetime)   # udateret dag: ingen sæt endnu
             week_row = ri
             section += 1
             continue
@@ -351,7 +359,7 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
                 raise SheetLayoutError(f"{tab}, row {ri}: an exercise row ({str(r[1] or '').strip()!r}, "
                                        f"{str(r[2]).strip()!r}) outside a training day")
             continue
-        if not r or not r[2]: continue
+        if not dated or not r or not r[2]: continue
         typ, name = str(r[1] or "").strip(), str(r[2]).strip()
         if typ in ("TYPE","Micro Length","DAY","LIFT","MUSCLE GROUP") or typ.startswith("MICRO") or name=="NAME": continue
         if not typ and name.lower().startswith("abs"): typ = "ABS"

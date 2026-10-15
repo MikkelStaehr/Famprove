@@ -138,3 +138,31 @@ def test_columns_are_found_by_their_header_not_their_position() -> None:
     assert (by_week[1]["logged_kg"], by_week[1]["prescribed"]) == (20.0, "RPE 8")
     assert (by_week[2]["logged_kg"], by_week[2]["prescribed"]) == (30.0, "RPE 7")
     assert by_week[2]["raw"]["weight"] == 30.0 and by_week[2]["raw"]["load"] == "RPE 7"
+
+
+def test_a_note_starting_with_microcycle_never_ends_the_day() -> None:
+    """Only a row that isn't an exercise can be the MICROCYCLE end marker (reviewer, 2026-10-15)."""
+    noted = exercise("Leg curl")
+    noted[4 + 5] = "Microcycle note: go easy"  # week 1's NOTES
+    rows: list[list[object]] = [*day(1, exercise("Leg press"), noted), END]
+    assert sorted({p["name"] for p in parse_all(workbook(rows), plain)}) == [
+        "Leg curl",
+        "Leg press",
+    ]
+
+
+def test_a_day_not_dated_yet_gives_no_sets_and_stops_nothing() -> None:
+    """A block laid out but not dated yet (no date in column B) reads as before: no sets."""
+    undated = week_row(1)
+    undated[1] = None
+    rows: list[list[object]] = [[None, "DAY", 1], undated, header(), exercise("Leg press"),
+                                *day(2, exercise("Leg curl")), END]  # fmt: skip
+    assert {p["name"] for p in parse_all(workbook(rows), plain)} == {"Leg curl"}
+
+
+def test_a_tab_without_a_block_number_never_stops_the_run() -> None:
+    """The caller drops such a tab anyway (counts_issues False), so its layout stops nothing."""
+    broken = workbook(day(1, exercise("Leg press")))  # a day without an end
+    assert parse_all(broken, plain, counts_issues=lambda _tab: False) == []
+    with pytest.raises(SheetLayoutError):
+        parse_all(broken, plain, counts_issues=lambda _tab: True)
