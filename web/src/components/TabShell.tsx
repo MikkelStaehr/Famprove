@@ -13,14 +13,6 @@ type Drag = { x: number; y: number; t: number; id: number; lock: "x" | null; dx:
 const REDUCE = REDUCED_MOTION;
 
 /**
- * The tab shell (slice motion-shell; docs/decisions/tab-shell.md, design/specs/motion-shell.md):
- * all three tabs mounted, stacked as cards at position p. The URL owns the settled tab: a tap
- * pushes its path (history.pushState: no request, no remount), back/forward and deep links set it.
- * Each page is its own scroll container; the inactive ones are inert and hidden at rest (render() switches both).
- * p lives in a ref and every frame writes the styles straight to the frames, scrims and the bar's
- * indicator; React renders them once, at the first paint's index, and never touches them again.
- */
-/**
  * "This tab became active" for entry motion (the curve drawing itself, Analyse's bars): per tab a
  * count of entries after first paint, so a hard load or reload never animates (DESIGN.md Motion).
  */
@@ -31,6 +23,14 @@ export function useTabEntry(i: number): number {
   return useContext(TabEntries)[i] ?? 0;
 }
 
+/**
+ * The tab shell (slice motion-shell; docs/decisions/tab-shell.md, design/specs/motion-shell.md):
+ * all three tabs mounted, stacked as cards at position p. The URL owns the settled tab: a tap
+ * pushes its path (history.pushState: no request, no remount), back/forward and deep links set it.
+ * Each page is its own scroll container; the inactive ones are inert and hidden at rest (render() switches both).
+ * p lives in a ref and every frame writes the styles straight to the frames, scrims and the bar's
+ * indicator; React renders them once, at the first paint's index, and never touches them again.
+ */
 export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
   const pathname = usePathname();
   const router = useRouter();

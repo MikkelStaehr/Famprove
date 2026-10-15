@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buzz, curveShape, curveYAt, MORPH_MEASURED, MORPH_PROGNOSE, morphFrame, sampleSegments } from "../src/lib/curve-motion.ts";
+import { buzz, curveShape, curveYAt, MORPH_MEASURED, MORPH_PROGNOSE, morphFrame, sampleSegments, shapeAt } from "../src/lib/curve-motion.ts";
 import { monotoneSegments } from "../src/lib/monotone-path.ts";
 
 const measured = monotoneSegments([
@@ -70,4 +70,12 @@ test("buzz ticks 4 ms where vibrate exists and never throws", () => {
       throw new Error("blocked");
     },
   });
+});
+
+test("shapeAt: the start at 0, the target at 1, between them the lerped frame (an interrupted morph's start)", () => {
+  const a = { measured: [[0, 0], [10, 10]] as const, prognose: [] as const };
+  const b = { measured: [[0, 10], [10, 0]] as const, prognose: [] as const };
+  assert.deepEqual(shapeAt(a, b, 0).measured, [[0, 0], [10, 10]]);
+  assert.deepEqual(shapeAt(a, b, 1).measured, [[0, 10], [10, 0]]);
+  assert.deepEqual(shapeAt(a, b, 0.5).measured, [[0, 5], [10, 5]]);
 });

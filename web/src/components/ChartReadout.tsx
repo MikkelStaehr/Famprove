@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { type Readout, readoutText, tipLeft } from "@/lib/chart-readout";
 
@@ -114,7 +114,9 @@ export function useChartPick(opts: {
     onKeyDown,
     onBlur: () => setPick((p) => (p?.mode === "key" ? null : p)),
   };
-  return { pick, plotProps };
+  // Drop the selection (e.g. a range change: the index would point into other points).
+  const clear = useCallback(() => setPick(null), []);
+  return { pick, plotProps, clear };
 }
 
 /** The value shown only after `ms` of quiet, at most once per `ms` (the aria-live text while dragging). */

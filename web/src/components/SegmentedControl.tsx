@@ -49,7 +49,13 @@ export function SegmentedControl<T extends string>({ label, segments, value, onC
       }
     };
     place();
-    const observer = new ResizeObserver(place);
+    // A resize, a late font swap or text zoom re-places the pill without sliding; only a value slides.
+    const observer = new ResizeObserver(() => {
+      p.style.transition = "none";
+      place();
+      void p.offsetWidth;
+      p.style.transition = "";
+    });
     observer.observe(g);
     return () => observer.disconnect();
   }, [value]);

@@ -3,7 +3,7 @@
 import { type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { bracketGeometry, monoLabelWidth } from "@/lib/chart-marks";
-import { buzz, curveShape, curveYAt, morphFrame } from "@/lib/curve-motion";
+import { buzz, curveShape, type CurveShape, curveYAt, morphFrame, shapeAt } from "@/lib/curve-motion";
 import { curveReadout, nearestIndex } from "@/lib/chart-readout";
 import { type BlockSpan, type ChartPoint, ctlBandArea } from "@/lib/dashboard-view";
 import { addDays, dayNumber } from "@/lib/dates";
@@ -92,7 +92,8 @@ type PlotProps = {
 };
 
 /** A running draw-in or morph: its frame, its timers, and how it lands on the static render. */
-type Motion = { raf: number; readonly timers: number[]; readonly finish: () => void };
+/** A running motion; `shape` (a morph only): what is on screen now, the next morph's start. */
+type Motion = { raf: number; readonly timers: number[]; readonly finish: () => void; shape?: () => CurveShape };
 /** What the last commit drew: the morph's start, and the static values a motion lands on. */
 type Drawn = { readonly measured: readonly Segment[]; readonly prognose: readonly Segment[]; readonly ring: readonly [number, number] | null };
 
@@ -118,7 +119,7 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
 
   const xs = points.map((p) => x(p.date));
   const latestIndex = points.findLastIndex((p) => p.kind === "actual");
-  const { pick, plotProps: pickProps } = useChartPick({
+  const { pick, plotProps: pickProps, clear: clearPick } = useChartPick({
     count: points.length,
     startIndex: Math.max(0, latestIndex),
     indexAt: (clientX, box) => (points.length === 0 ? null : nearestIndex(xs, clientX - box.left)),
@@ -171,13 +172,18 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
   useLayoutEffect(() => {
     if (prevRange.current === range) return;
     prevRange.current = range;
-    stopMotion();
+    clearPick(); // the picked index would point into another range's points (reference: hideScrub)
     const from = drawn.current;
+    const onScreen = motion.current?.shape?.() ?? null; // a morph cut short: start from its frame
+    // This commit is what React drew: a running motion stopped here lands on it, never on the last one.
+    drawn.current = { measured: measuredSegs, prognose: prognoseSegs, ring };
+    stopMotion();
     const solid = solidRef.current;
     const fcast = fcastRef.current;
     if (from === null || solid === null || fcast === null || reduced()) return;
-    const a = curveShape(from.measured, from.prognose);
+    const a = onScreen ?? curveShape(from.measured, from.prognose);
     const b = curveShape(measuredSegs, prognoseSegs);
+    let current: CurveShape = a;
     const faded = [gridRef.current, bandRef.current, xlabRef.current];
     for (const el of faded) {
       if (el === null) continue;
@@ -185,6 +191,7 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
       el.style.opacity = "0";
     }
     const frame = (t: number) => {
+      current = shapeAt(a, b, t);
       const f = morphFrame(a, b, t);
       solid.setAttribute("d", f.measured);
       fcast.setAttribute("d", f.prognose);
@@ -196,6 +203,7 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
     const m: Motion = {
       raf: 0,
       timers: [],
+      shape: () => current,
       finish: () => {
         const now = drawn.current;
         solid.setAttribute("d", now === null ? "" : segmentsPath(now.measured));
@@ -226,7 +234,7 @@ function Plot({ points, blocks, lastActual, from, to, range }: PlotProps) {
     frame(0);
     m.raf = requestAnimationFrame(step);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs on a range change only; the segments are this commit's
-  }, [range, stopMotion]);
+  }, [range, stopMotion, clearPick]);
   // After the morph check: what this commit drew (the next morph's start and every motion's landing).
   useLayoutEffect(() => {
     drawn.current = { measured: measuredSegs, prognose: prognoseSegs, ring };

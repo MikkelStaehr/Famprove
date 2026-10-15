@@ -70,9 +70,13 @@ export type MorphFrame = {
 };
 
 /** The morph frame at eased `t` in [0, 1]: monotone paths through the lerped points, as the reference. */
+/** The shape on screen at `t`: what an interrupted morph hands the next one as its start. */
+export function shapeAt(from: CurveShape, to: CurveShape, t: number): CurveShape {
+  return { measured: frameList(from.measured, to.measured, t), prognose: frameList(from.prognose, to.prognose, t) };
+}
+
 export function morphFrame(from: CurveShape, to: CurveShape, t: number): MorphFrame {
-  const m = frameList(from.measured, to.measured, t);
-  const p = frameList(from.prognose, to.prognose, t);
+  const { measured: m, prognose: p } = shapeAt(from, to, t);
   const xy = (pts: readonly Point[]) => pts.map(([x, y]) => ({ x, y }));
   return { measured: monotonePath(xy(m)), prognose: monotonePath(xy(p)), ring: m.at(-1) ?? null };
 }
