@@ -103,6 +103,24 @@ def with_reps_done(
     return out, applied
 
 
+def without_skipped(
+    sets: Sequence[StrengthSet], logged: Iterable[LoggedSet]
+) -> tuple[list[StrengthSet], int]:
+    """``sets`` with every set the user skipped in the app (exercise_set_log.skipped, a working
+    set, set_no >= 1) scored 0, so it adds no TSS (user, 2026-10-15, slice skip-tss); and how
+    many. Reps, kg and RPE stay as the sheet has them; only the score is 0."""
+    skipped = {_set_of(e) for e in logged if e.skipped and e.set_no >= 1}
+    out: list[StrengthSet] = []
+    applied = 0
+    for s in sets:
+        if (s.week_start, s.session, s.sheet_row, s.set_no) in skipped and s.score != 0:
+            out.append(replace(s, score=0.0))
+            applied += 1
+        else:
+            out.append(s)
+    return out, applied
+
+
 def rescore(
     s: StrengthSet, reps: float, factor: float, e1rm_kg: float | None = None
 ) -> tuple[float | None, float]:

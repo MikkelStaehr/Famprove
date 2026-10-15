@@ -67,6 +67,7 @@ from training_load.domain.set_feedback import (
     progressions,
     with_reps_done,
     with_rolling_e1rm_rpe,
+    without_skipped,
 )
 from training_load.domain.strength import derive_blocks, iso_week_start
 from training_load.domain.strength_analysis import (
@@ -157,6 +158,11 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
     sets, pct_rescored = with_rolling_e1rm_rpe(sets, analysis.weeks)
     if pct_rescored:
         log.info("%d main-lift sets without an RPE scored from the rolling e1RM", pct_rescored)
+    # Last of the scoring: a set skipped in the app adds no TSS (user, 2026-10-15), whatever
+    # rescored it above.
+    sets, skipped = without_skipped(sets, logged_sets)
+    if skipped:
+        log.info("%d sets skipped in the app scored 0 (exercise_set_log.skipped)", skipped)
     # The week view shows the score that feeds the TSS below (strength_sets.score_final).
     finals = sync_final_scores(db, stored_sets, sets)
     log.info("strength_sets.score_final: %d sets differ from the parser's score", finals)

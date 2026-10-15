@@ -15,6 +15,7 @@ from training_load.domain.set_feedback import (
     rescore,
     with_reps_done,
     with_rolling_e1rm_rpe,
+    without_skipped,
 )
 from training_load.domain.strength import StrengthSet
 from training_load.domain.strength_analysis import StrengthWeek, rolling_e1rm_at
@@ -211,3 +212,15 @@ def test_rescoring_reps_done_counts_both_sides_of_a_per_side_set(make_set: MakeS
     one = make_set(type="QUADS", name="RFE split squat", reps=8.0, kg=113.75, prescribed="RPE 7")
     both = replace(one, sides=2)
     assert rescore(both, 8.0, 0.6)[1] == pytest.approx(2 * rescore(one, 8.0, 0.6)[1])
+
+
+# --- skip-tss (user, 2026-10-15): a set skipped in the app scores 0 ------------------------------
+
+
+def test_a_set_skipped_in_the_app_scores_0_and_nothing_else_changes(make_set: MakeSet) -> None:
+    a = make_set(week_start=MONDAY, session=1, sheet_row=84, set_no=1, score=120.0)
+    b = make_set(week_start=MONDAY, session=1, sheet_row=84, set_no=2, score=110.0)
+    out, n = without_skipped([a, b], [entry(84, 2, skipped=True), entry(84, 0, skipped=True)])
+    assert n == 1  # the warm-up (set 0) is no working set
+    assert [x.score for x in out] == [120.0, 0.0]
+    assert (out[1].reps, out[1].kg, out[1].rpe) == (b.reps, b.kg, b.rpe)
