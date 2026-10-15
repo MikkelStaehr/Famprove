@@ -8,10 +8,10 @@ import { ErrorState } from "@/components/ErrorState";
 import { FitnessCurve } from "@/components/FitnessCurve";
 import { LoadExplainer } from "@/components/LoadExplainer";
 import { MonoCaption } from "@/components/MonoCaption";
-import { RefreshButton, RefreshProvider, RefreshStatus } from "@/components/Refresh";
+import { RefreshProvider, RefreshStatus } from "@/components/Refresh";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Tile } from "@/components/Tile";
-import { UpdatedLine } from "@/components/UpdatedLine";
+import { UpdatedLine, UpdatedTime } from "@/components/UpdatedLine";
 import { WarningLine } from "@/components/WarningLine";
 import { ZoneBar } from "@/components/ZoneBar";
 import { ZonePill } from "@/components/ZonePill";
@@ -36,7 +36,6 @@ import {
   formatLoad,
   formatSigned,
   formatUpdatedAt,
-  updatedText,
   stopAfter,
   TSS_PER_DAY,
 } from "@/lib/format";
@@ -107,13 +106,7 @@ export default async function Page({ searchParams }: PageProps<"/load">) {
         title="Belastning"
         line={
           state.kind === "ready" && state.freshness.kind === "fresh" ? (
-            <>
-              opdateret{" "}
-              <span className="whitespace-nowrap">
-                <time dateTime={state.freshness.computedAt}>{updatedText(state.freshness.computedAt, null).sentence}</time>
-                <RefreshButton attention={false} />
-              </span>
-            </>
+            <UpdatedTime computedAt={state.freshness.computedAt} />
           ) : undefined
         }
         status={<RefreshStatus />}

@@ -150,7 +150,6 @@ export default async function TrainingPage() {
   // Phone: one column (max 640 from sm). Desktop (lg): 7fr | 5fr, DOM order = phone order (reset-traening.md §4).
   const page = (
     <div className="mx-auto flex w-full max-w-160 flex-col gap-3 lg:max-w-none lg:gap-4">
-      <RefreshProvider>
       <header className="flex flex-col gap-2 px-1 pt-1 pb-2">
         <div className="flex flex-col gap-0.5">
           <h1 className="font-sans text-22 font-semibold text-text">Træning</h1>
@@ -175,7 +174,6 @@ export default async function TrainingPage() {
           </WarningLine>
         )}
       </header>
-      </RefreshProvider>
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[7fr_5fr] lg:grid-rows-[auto_auto_auto_1fr] lg:items-start lg:gap-4">
         {weekCard}
         {plan.kind === "error" ? (
@@ -189,12 +187,18 @@ export default async function TrainingPage() {
       </div>
     </div>
   );
-  return session === null ? (
-    page
-  ) : (
-    <SetLogProvider session={session} date={today} devSwitches={devSwitchesOn()}>
-      {page}
-    </SetLogProvider>
+  // Outside the conditional SetLogProvider: a refetch that adds or drops the session must not
+  // remount it (its "data hentet" and the ↻'s focus would be lost).
+  return (
+    <RefreshProvider>
+      {session === null ? (
+        page
+      ) : (
+        <SetLogProvider session={session} date={today} devSwitches={devSwitchesOn()}>
+          {page}
+        </SetLogProvider>
+      )}
+    </RefreshProvider>
   );
 }
 

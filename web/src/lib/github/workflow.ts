@@ -37,7 +37,7 @@ function headers(token: string): HeadersInit {
   };
 }
 
-/** The workflow's latest runs, newest first (GitHub's order). */
+/** The workflow's latest runs, newest first (GitHub's order); unreadable ones are logged by count. */
 export async function listRuns(token: string, fetchFn: FetchLike = fetch): Promise<WorkflowRun[]> {
   const res = await fetchFn(`${API}/runs?per_page=${RUNS_PAGE}`, {
     method: "GET",
@@ -46,7 +46,9 @@ export async function listRuns(token: string, fetchFn: FetchLike = fetch): Promi
     signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
   });
   if (!res.ok) throw new GithubError(`GitHub runs: HTTP ${res.status}`);
-  return parseRuns(await res.json());
+  const { runs, dropped } = parseRuns(await res.json());
+  if (dropped > 0) console.warn("GitHub runs: %d unreadable runs left out", dropped);
+  return runs;
 }
 
 /** Starts the workflow on main without inputs: a manual run, which the gate always runs. */

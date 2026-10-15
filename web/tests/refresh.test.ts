@@ -28,7 +28,7 @@ const run = (minutesAgo: number, status = "completed", conclusion: string | null
 });
 
 test("parseRuns keeps well-typed runs and drops the rest; no workflow_runs is an error", () => {
-  const runs = parseRuns({
+  const { runs, dropped } = parseRuns({
     workflow_runs: [
       { event: "schedule", status: "completed", conclusion: "success", created_at: "2026-10-15T07:00:00Z" },
       { event: "workflow_dispatch", status: "queued", conclusion: null, created_at: "2026-10-15T07:59:00Z" },
@@ -39,6 +39,7 @@ test("parseRuns keeps well-typed runs and drops the rest; no workflow_runs is an
     ],
   });
   assert.deepEqual(runs.map((r) => [r.event, r.status]), [["schedule", "completed"], ["workflow_dispatch", "queued"]]);
+  assert.equal(dropped, 4); // counted, so the route logs them
   assert.throws(() => parseRuns({ message: "Bad credentials" }));
   assert.throws(() => parseRuns(null));
 });

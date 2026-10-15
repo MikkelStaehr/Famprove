@@ -6,6 +6,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useL
 import { formatTimeOfDay } from "@/lib/format";
 import {
   isPending,
+  waitShownUntil,
   parseRefreshAnswer,
   parseRefreshStatus,
   phaseAfter,
@@ -72,7 +73,8 @@ export function RefreshProvider({ children }: { readonly children: ReactNode }) 
       };
     }
     // "data hentet" for 5 s; the wait line until its time.
-    const clearAfter = phase.kind === "done" ? DONE_SHOWN_MS : phase.kind === "wait" ? phase.until - Date.now() : null;
+    const clearAfter =
+      phase.kind === "done" ? DONE_SHOWN_MS : phase.kind === "wait" ? waitShownUntil(phase.until) - Date.now() : null;
     if (clearAfter === null) return;
     const timer = window.setTimeout(() => setPhase({ kind: "idle" }), Math.max(0, clearAfter));
     return () => window.clearTimeout(timer);
@@ -116,8 +118,14 @@ export function RefreshButton({ attention }: { readonly attention: boolean }) {
       el.focus();
     }
     // Still in the document during a layout cleanup: was it focused when it went?
+    // A replacement mounts in the same commit; if none does, the flag must not reach a later one.
     return () => {
-      if (el !== null && document.activeElement === el) focusNextRef.current = true;
+      if (el !== null && document.activeElement === el) {
+        focusNextRef.current = true;
+        window.setTimeout(() => {
+          focusNextRef.current = false;
+        }, 0);
+      }
     };
   }, [focusNextRef]);
   return (

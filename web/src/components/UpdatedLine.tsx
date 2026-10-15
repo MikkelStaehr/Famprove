@@ -13,6 +13,19 @@ type UpdatedLineProps = {
   readonly unknownNote: string;
 };
 
+/** "opdateret <time>↻" (refresh.md §1: the time and the ↻ never wrap apart); the caller's line styles it. */
+export function UpdatedTime({ computedAt }: { readonly computedAt: string }) {
+  return (
+    <>
+      opdateret{" "}
+      <span className="whitespace-nowrap">
+        <time dateTime={computedAt}>{updatedText(computedAt, null).sentence}</time>
+        <RefreshButton attention={false} />
+      </span>
+    </>
+  );
+}
+
 /**
  * "opdateret <time>" in Geist Mono 12 muted; stale or unknown = ◆ + words in --text (WarningLine),
  * never colour alone. Each ends with the ↻ (refresh.md §1), so it needs a RefreshProvider above it.
@@ -21,11 +34,7 @@ export function UpdatedLine({ freshness, staleNote, unknownNote }: UpdatedLinePr
   if (freshness.kind === "fresh") {
     return (
       <p className="font-mono text-12 text-text-muted">
-        opdateret{" "}
-        <span className="whitespace-nowrap">
-          <time dateTime={freshness.computedAt}>{updatedText(freshness.computedAt, null).sentence}</time>
-          <RefreshButton attention={false} />
-        </span>
+        <UpdatedTime computedAt={freshness.computedAt} />
       </p>
     );
   }

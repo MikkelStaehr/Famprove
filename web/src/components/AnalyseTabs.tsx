@@ -1,9 +1,8 @@
 import Link from "next/link";
 
 import type { Freshness } from "@/lib/dashboard-view";
-import { updatedText } from "@/lib/format";
 
-import { RefreshButton, RefreshProvider, RefreshStatus } from "./Refresh";
+import { RefreshProvider, RefreshStatus } from "./Refresh";
 import { UpdatedLine } from "./UpdatedLine";
 
 const SECTIONS = [
@@ -63,21 +62,11 @@ export function AnalyseHeader({
         // refresh.md §1: 16px from the line to the tabs, so no target sits within 14px of the ↻.
         <div className="mb-1 px-1">
           <RefreshProvider>
-            {freshness.kind === "fresh" ? (
-              <p className="font-mono text-12 text-text-muted">
-                opdateret{" "}
-                <span className="whitespace-nowrap">
-                  <time dateTime={freshness.computedAt}>{updatedText(freshness.computedAt, null).sentence}</time>
-                  <RefreshButton attention={false} />
-                </span>
-              </p>
-            ) : (
-              <UpdatedLine
-                freshness={freshness}
-                staleNote="Jobbet skal køre dagligt omkring kl. 05.00."
-                unknownNote="Opdateringstidspunkt ukendt, så data kan være forældet."
-              />
-            )}
+            <UpdatedLine
+              freshness={freshness}
+              staleNote="Jobbet skal køre dagligt omkring kl. 05.00."
+              unknownNote="Opdateringstidspunkt ukendt, så data kan være forældet."
+            />
             <RefreshStatus />
           </RefreshProvider>
         </div>

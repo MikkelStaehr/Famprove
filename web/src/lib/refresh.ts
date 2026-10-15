@@ -28,15 +28,17 @@ export type WorkflowRun = {
 };
 
 /**
- * Narrows GitHub's JSON to runs. A run with a field of the wrong type is dropped (never guessed);
- * a body without a `workflow_runs` array is an error (the route answers `error`).
+ * Narrows GitHub's JSON to runs. A run with a field of the wrong type is left out (never guessed)
+ * and counted in `dropped`, which the caller logs; a body without a `workflow_runs` array is an
+ * error (the route answers `error`).
  */
-export function parseRuns(json: unknown): WorkflowRun[] {
+export function parseRuns(json: unknown): { readonly runs: WorkflowRun[]; readonly dropped: number } {
   if (typeof json !== "object" || json === null || !("workflow_runs" in json) || !Array.isArray(json.workflow_runs)) {
     throw new Error("GitHub runs: no workflow_runs array");
   }
+  const all = json.workflow_runs as unknown[];
   const runs: WorkflowRun[] = [];
-  for (const r of json.workflow_runs as unknown[]) {
+  for (const r of all) {
     if (typeof r !== "object" || r === null) continue;
     const { event, status, conclusion, created_at: created } = r as Record<string, unknown>;
     if (typeof event !== "string" || typeof status !== "string" || typeof created !== "string") continue;
@@ -45,7 +47,7 @@ export function parseRuns(json: unknown): WorkflowRun[] {
     if (Number.isNaN(createdAt)) continue;
     runs.push({ event, status, conclusion, createdAt });
   }
-  return runs;
+  return { runs, dropped: all.length - runs.length };
 }
 
 export type RefreshDecision =
@@ -148,6 +150,11 @@ export function phaseAfter(answer: RefreshAnswer, now: number): RefreshPhase {
 
 export type RefreshMessage = { readonly text: string; readonly warning: boolean };
 
+/** The wait line names this minute (`until` rounded up), and stays until it. */
+export function waitShownUntil(until: number): number {
+  return Math.ceil(until / 60_000) * 60_000;
+}
+
 /**
  * The status line's words (design/specs/refresh.md §3). `clock` formats epoch ms as a local
  * "05.17" (injected, so this stays pure); the wait time is rounded up to the minute.
@@ -164,7 +171,7 @@ export function refreshMessage(phase: RefreshPhase, clock: (ms: number) => strin
     case "done":
       return neutral("data hentet");
     case "wait":
-      return neutral(`hentet for nylig · kan hentes igen kl. ${clock(Math.ceil(phase.until / 60_000) * 60_000)}`);
+      return neutral(`hentet for nylig · kan hentes igen kl. ${clock(waitShownUntil(phase.until))}`);
     case "unavailable":
       return neutral("hentning er ikke slået til her · data hentes kl. 05, 12 og 20");
     case "error":
