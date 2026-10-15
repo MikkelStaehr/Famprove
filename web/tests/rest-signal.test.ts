@@ -49,9 +49,29 @@ test("rest signal: no Min (rest_min_s null) never vibrates; hidden at the crossi
 
 test("rest signal: unsupported vibrate (no method, no navigator) is a silent no-op but still marks the moment", () => {
   const s = restSignal(SINCE, 180, {});
-  s.tick(at(0), true);
+  s.tick(at(179), true);
   assert.equal(s.tick(at(180), true), true);
   const n = restSignal(SINCE, 180, undefined);
-  n.tick(at(0), true);
+  n.tick(at(179), true);
   assert.equal(n.tick(at(180), true), true);
+});
+
+test("rest signal: a frozen page (no tick for a while) that wakes past Min never buzzes late", () => {
+  const { nav, calls } = fakeNav();
+  const s = restSignal(SINCE, 180, nav);
+  assert.equal(s.tick(at(10), true), false);
+  assert.equal(s.tick(at(11), true), false);
+  assert.equal(s.tick(at(190), true), false); // screen locked from 11 s to 190 s: no ticks ran
+  assert.equal(s.tick(at(191), true), false);
+  assert.deepEqual(calls, []);
+});
+
+test("rest signal: a freeze that ends before Min stays armed", () => {
+  const { nav, calls } = fakeNav();
+  const s = restSignal(SINCE, 180, nav);
+  assert.equal(s.tick(at(10), true), false);
+  assert.equal(s.tick(at(100), true), false); // frozen 10 s to 100 s, still under Min
+  assert.equal(s.tick(at(179), true), false);
+  assert.equal(s.tick(at(180), true), true);
+  assert.deepEqual(calls, [200]);
 });

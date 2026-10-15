@@ -19,6 +19,7 @@ export function wakeLockController(api: WakeLockApi | undefined, visible: () => 
   let held: WakeLockHandle | null = null;
   let wanted = false;
   let requesting = false;
+  let again = false; // asked again while a request was pending (hidden and shown meanwhile)
 
   const drop = () => {
     const h = held;
@@ -26,7 +27,11 @@ export function wakeLockController(api: WakeLockApi | undefined, visible: () => 
     h?.release().catch(() => undefined); // already released by the browser: fine
   };
   const request = async () => {
-    if (api === undefined || !wanted || requesting || !visible()) return;
+    if (api === undefined || !wanted || !visible()) return;
+    if (requesting) {
+      again = true;
+      return;
+    }
     if (held !== null && !held.released) return;
     requesting = true;
     try {
@@ -37,6 +42,12 @@ export function wakeLockController(api: WakeLockApi | undefined, visible: () => 
       // refused (battery saver, no user activation): an enhancement only
     } finally {
       requesting = false;
+    }
+    if (again) {
+      // the page was hidden and shown while the first request was pending: the browser may have
+      // dropped (or refused) that lock, so ask once more; a held, live lock makes this a no-op
+      again = false;
+      await request();
     }
   };
 
