@@ -61,10 +61,18 @@ def _row(name: str, notes: dict[int, str]) -> list[object]:
     return row
 
 
+def notes(weeks: int) -> list[int]:
+    """Each week's NOTES column in the template (the parser takes them from the header row)."""
+    return [4 + 8 * w + 5 for w in range(weeks)]
+
+
 def test_a_variant_holds_from_its_week_until_the_next_and_the_own_name_resets() -> None:
     issues: Counter[str] = Counter()
     states, named = row_variants(
-        _row("Bicep of choice", {2: "V: Kabel curl", 4: "V: DB curl"}), "Bicep of choice", 6, issues
+        _row("Bicep of choice", {2: "V: Kabel curl", 4: "V: DB curl"}),
+        "Bicep of choice",
+        notes(6),
+        issues,
     )
     assert [s[0] if s else None for s in states] == [
         None,
@@ -78,14 +86,14 @@ def test_a_variant_holds_from_its_week_until_the_next_and_the_own_name_resets() 
     states, _ = row_variants(
         _row("Bicep of choice", {0: "V: Kabel curl", 2: "V: bicep of choice"}),
         "Bicep of choice",
-        4,
+        notes(4),
         issues,
     )
     assert [s[0] if s else None for s in states] == ["kabel curl", "kabel curl", None, None]
     states, _ = row_variants(
         _row("Bicep of choice", {0: "V: Kabel curl", 1: "V:", 2: "V: A\nV: B"}),
         "Bicep of choice",
-        3,
+        notes(3),
         issues,
     )
     assert [s[0] if s else None for s in states] == ["kabel curl", "kabel curl", "a"]
@@ -115,6 +123,7 @@ def _workbook(tabs: dict[str, list[list[object]]]) -> bytes:
         ws.append(header)
         for r in rows:
             ws.append(r)
+        ws.append([None, None, None, None, "MICROCYCLE SBD METRICS"])  # the last day's end
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()

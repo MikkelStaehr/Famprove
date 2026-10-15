@@ -13,7 +13,9 @@ columns are 0-based tuple indices of ``ws.iter_rows(values_only=True)``):
       col 6 + 8w = that week's session datetime. "WEEK 1" must be an exact cell value.
 
   Header rows to be skipped: col 1 in ("TYPE", "DAY", "LIFT", "MUSCLE GROUP", "Micro Length")
-      or starting with "MICRO", or col 2 == "NAME".
+      or starting with "MICRO", or col 2 == "NAME". A training day runs from the header row
+      directly under a date row to the next DAY / Micro Length row, or the "MICROCYCLE SBD
+      METRICS" row each tab ends with (strength_sheet.ends_day; without it the parser stops).
 
   Exercise row: col 1 = type ("SQUAT", "BENCH", "BACK", "QUADS", ...), col 2 = name,
       per week w: col 4 + 8w = sets, 5 + 8w = reps (5 or "8 - 12"),
@@ -127,6 +129,8 @@ def _write_tab(
             for cell in weeks:
                 row.extend([*(cell or (None, None, None, None)), None, None, None, None])
             ws.append(row)
+    # The template's metrics table under the last day marks its end (strength_sheet.ends_day).
+    ws.append([None, None, None, None, "MICROCYCLE SBD METRICS"])
 
 
 def build_workbook(blok_11_sections: Sequence[Section] = BLOK_11_SECTIONS) -> bytes:
@@ -167,6 +171,8 @@ def slice_workbook(edits: Mapping[tuple[int, int], object] | None = None) -> byt
     values: dict[tuple[int, int], object] = {}
     for row, col, kind, value in SLICE["cells"]:
         values[(row, col)] = dt.datetime.fromisoformat(value) if kind == "d" else value
+    # The real tab's metrics table under its last day, so the day has its end (ends_day).
+    values[(max(row for row, _col in values) + 2, 4)] = "MICROCYCLE SBD METRICS"
     values.update(edits or {})
     for (row, col), value in values.items():
         ws.cell(row=row, column=col + 1, value=value)  # type: ignore[call-overload]  # slice cells are str/float/datetime

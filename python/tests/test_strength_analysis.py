@@ -30,8 +30,8 @@ from training_load.domain.strength_analysis import (
     strength_weeks,
 )
 from training_load.sources.strength_sheet import (
-    LSRPE_COLUMN_MISSING,
     LSRPE_NOT_HALF,
+    SheetLayoutError,
     logged_rpe,
     parse_tab,
 )
@@ -410,7 +410,8 @@ def test_empty_kg_records_nothing(make_set: MakeSet) -> None:
     assert replace(done) == done
 
 
-def test_a_tab_without_any_header_row_counts_the_missing_lsrpe_column() -> None:
+def test_a_tab_without_a_header_row_stops_instead_of_reading_by_position() -> None:
+    """user, 2026-10-15: columns come from the header row; a WEEK row without one is an error."""
     wb = openpyxl.Workbook()
     ws = wb.active
     assert ws is not None
@@ -427,6 +428,5 @@ def test_a_tab_without_any_header_row_counts_the_missing_lsrpe_column() -> None:
     ws.append(
         [None, "SQUAT", "Squat", None, 1, 5, "RPE 6", 140, 7]
     )  # an LSRPE-like cell, no header
-    issues: Counter[str] = Counter()
-    [parsed] = parse_tab(ws, "Program - blok 12", legacy_scoring(80.0), issues)
-    assert parsed["logged_rpe"] is None and issues[LSRPE_COLUMN_MISSING] == 1
+    with pytest.raises(SheetLayoutError, match=r"row 1: no header row"):
+        parse_tab(ws, "Program - blok 12", legacy_scoring(80.0), Counter())

@@ -232,15 +232,16 @@ def parse_all(data: bytes, scoring, issues: Counter[str] | None = None,
             sets += parse_tab(wb[tab], tab, scoring, issues if counted else Counter())
     return sets
 
-def row_variants(r, name, weeks, issues: Counter[str]):
+def row_variants(r, name, notes_cols, issues: Counter[str]):
     """(the variant in force per week, whether the week's own NOTES named one) for one sheet row
     (user, 2026-10-14): "V: <variant>" in a week's NOTES holds from that week to the end of the
     block or the next "V:"; weeks before the first are None (ukendt). "V: <the row's own name>"
-    ends the variant. An empty "V:" keeps the current one (counted)."""
+    ends the variant. An empty "V:" keeps the current one (counted). ``notes_cols``: each week's
+    NOTES column from the header row."""
     own = variant_key(name)
     current, states, named = None, [], []
-    for w in range(weeks):
-        cell = r[4 + w*8 + 5] if 4 + w*8 + 5 < len(r) else None   # ugens NOTES (RAW_KEYS[5])
+    for col in notes_cols:
+        cell = r[col] if col < len(r) else None   # ugens NOTES
         written, _note, extra = split_notes(cell)
         if extra: issues[VARIANT_TWICE] += 1
         if written is not None and not written.strip():
@@ -252,33 +253,113 @@ def row_variants(r, name, weeks, issues: Counter[str]):
         named.append(written is not None)
     return states, named
 
+class SheetLayoutError(ValueError):
+    """The tab can't be read safely (user, 2026-10-15), so collect-strength stops instead of
+    guessing: a header row not directly under a WEEK/date row, a week without one of its columns,
+    a training day whose end the sheet doesn't mark, or an exercise row outside a training day
+    (e.g. the coach's exercise library pasted below the last day)."""
+
+# Overskrift -> nøgle (RAW_KEYS). En uges kolonner findes ud fra overskriftsrækken, ikke faste
+# positioner (user, 2026-10-15). SETS, REPS, LOAD, WEIGHT og NOTES skal findes; LSRPE og Mean Weight
+# må mangle (LSRPE tælles som LSRPE_COLUMN_MISSING, som før).
+HEADER_KEYS = {"SETS": "sets", "REPS": "reps", "LOAD": "load", "WEIGHT": "weight", "LSRPE": "lsrpe",
+               "NOTES": "notes", "MEAN WEIGHT": "mean_weight"}
+REQUIRED_KEYS = ("sets", "reps", "load", "weight", "notes")
+
+def is_week_row(r) -> bool:
+    """Dag-sektionens dato-række: en dato i kolonne B og 'WEEK 1' i rækken."""
+    return bool(r) and len(r) > 1 and isinstance(r[1], dt.datetime) and "WEEK 1" in [str(x) for x in r]
+
+def is_header_row(r) -> bool:
+    return bool(r) and any(isinstance(c, str) and c.strip().upper() == "SETS" for c in r)
+
+def ends_day(r) -> bool:
+    """En træningsdag slutter ved næste dags 'Micro Length'- eller 'DAY'-række, eller ved
+    skabelonens 'MICROCYCLE ... METRICS'-tabeller under sidste dag."""
+    label = str(r[1]).strip().upper() if r and len(r) > 1 and isinstance(r[1], str) else ""
+    return label in ("MICRO LENGTH", "DAY") or any(
+        isinstance(c, str) and c.strip().upper().startswith("MICROCYCLE") for c in r)
+
+def looks_like_exercise(r) -> bool:
+    """En række med en øvelse: TYPE og NAME som tekst (eller en Abs-række uden TYPE)."""
+    if not r or len(r) < 3 or not isinstance(r[2], str) or not r[2].strip():
+        return False
+    typ = str(r[1] or "").strip()
+    return bool(typ) or r[2].strip().lower().startswith("abs")
+
+def week_columns(tab, ri, header, starts):
+    """Hver uges kolonne pr. overskrift (user, 2026-10-15): ugens gruppe går fra dens 'WEEK n'-
+    kolonne til næste uges. Mangler SETS, REPS, LOAD, WEIGHT eller NOTES, stopper læsningen."""
+    weeks = []
+    for w, start in enumerate(starts):
+        end = starts[w+1] if w+1 < len(starts) else len(header)
+        cols = {}
+        for i in range(start, min(end, len(header))):
+            key = HEADER_KEYS.get(" ".join(str(header[i] or "").split()).upper())
+            if key is not None and key not in cols: cols[key] = i
+        missing = [k.upper() for k in REQUIRED_KEYS if k not in cols]
+        if missing:
+            raise SheetLayoutError(f"{tab}, row {ri}: week {w+1} has no {', '.join(missing)} "
+                                   f"column under its WEEK {w+1} label")
+        weeks.append(cols)
+    return weeks
+
 def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
     issues = Counter() if issues is None else issues
     rows = list(ws.iter_rows(values_only=True))
     e1rm = read_e1rm(rows, issues)
     sets = []
-    week_dates = None
+    week_dates: list[object] = []   # dagens dato pr. uge (fra WEEK-rækken)
     section = 0
-    lsrpe_ok = None   # afgøres af den første header-række (SETS i kolonne E): LSRPE 4 kolonner til højre
+    lsrpe_ok = True   # LSRPE læses, indtil en overskrift mangler kolonnen i en uge (talt én gang); så ikke resten af fanen
     run_head = None   # (sektion, øvelse, variant pr. uge) for den række, der startede en øvelses-run
+    # En træningsdag (user, 2026-10-15): overskriftsrækken lige under en WEEK/dato-række, til næste
+    # Micro Length-, DAY- eller MICROCYCLE-række. Kan grænsen ikke afgøres, stopper læsningen.
+    week_row = None   # rækken med WEEK/datoer, der venter på sin overskrift
+    day_start = None  # overskriftsrækken for den dag, der læses nu (None: ingen dag åben)
+    started = False   # første dag er begyndt: øvelsesrækker udenfor en dag er en fejl herfra
+    cols = []         # pr. uge: overskrift -> kolonne
     for ri, r in enumerate(rows, start=1):
-        if lsrpe_ok is None and r and len(r) > 4 and str(r[4] or "").strip().upper() == "SETS":
-            lsrpe_ok = len(r) > 8 and str(r[8] or "").strip().upper() == "LSRPE"
-            if not lsrpe_ok: issues[LSRPE_COLUMN_MISSING] += 1
-        if r and isinstance(r[1],dt.datetime) and "WEEK 1" in [str(x) for x in r]:
+        if is_week_row(r):
+            if day_start is not None:
+                raise SheetLayoutError(f"{tab}, row {ri}: a new WEEK row, but the training day from "
+                                       f"row {day_start} has no end (Micro Length, DAY or MICROCYCLE row)")
+            if week_row is not None:
+                raise SheetLayoutError(f"{tab}, row {week_row}: no header row directly under the WEEK row")
             # dato-række: dato står 2 kolonner efter 'WEEK n'
-            week_dates = [r[i+2] for i,c in enumerate(r) if isinstance(c,str) and c.startswith("WEEK")]
+            starts = [i for i,c in enumerate(r) if isinstance(c,str) and c.startswith("WEEK")]
+            week_dates = [r[i+2] if i+2 < len(r) else None for i in starts]
+            week_row = ri
             section += 1
             continue
-        if not week_dates or not r or not r[2]: continue
+        if week_row is not None:
+            if not is_header_row(r):
+                raise SheetLayoutError(f"{tab}, row {week_row}: no header row (TYPE, NAME, SETS ...) "
+                                       f"directly under the WEEK row")
+            cols = week_columns(tab, ri, r, starts)
+            if lsrpe_ok and any("lsrpe" not in c for c in cols):
+                lsrpe_ok = False; issues[LSRPE_COLUMN_MISSING] += 1
+            week_row, day_start, started = None, ri, True
+            continue
+        if is_header_row(r):
+            raise SheetLayoutError(f"{tab}, row {ri}: a header row that isn't directly under a WEEK row")
+        if day_start is not None and ends_day(r):
+            day_start = None
+            continue
+        if day_start is None:
+            if started and looks_like_exercise(r):
+                raise SheetLayoutError(f"{tab}, row {ri}: an exercise row ({str(r[1] or '').strip()!r}, "
+                                       f"{str(r[2]).strip()!r}) outside a training day")
+            continue
+        if not r or not r[2]: continue
         typ, name = str(r[1] or "").strip(), str(r[2]).strip()
         if typ in ("TYPE","Micro Length","DAY","LIFT","MUSCLE GROUP") or typ.startswith("MICRO") or name=="NAME": continue
         if not typ and name.lower().startswith("abs"): typ = "ABS"
         if not typ:
-            if any(4+w*8 < len(r) and r[4+w*8] not in (None,0,"") for w in range(len(week_dates))):
+            if any(c["sets"] < len(r) and r[c["sets"]] not in (None,0,"") for c in cols):
                 issues[ROW_WITHOUT_TYPE] += 1   # foreskrevet, men uden TYPE: ville ellers forsvinde stille
             continue
-        states = row_variants(r, name, len(week_dates), issues)
+        states = row_variants(r, name, [c["notes"] for c in cols], issues)
         if run_head is not None and run_head[0] == (section, variant_key(name)):
             # En række i samme øvelses-run uden egen "V:" følger run'ens første række uge for uge.
             first_own = next((w for w, st in enumerate(states[1]) if st), len(week_dates))
@@ -288,9 +369,12 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
         for w,date in enumerate(week_dates):
             variant = states[0][w]
             exercise = scoring(typ, name) if variant is None else scoring(typ, name, variant[0])
-            base = 4 + w*8          # SETS-kolonne for uge w
-            nsets, reps, load, kg = r[base], r[base+1], r[base+2], r[base+3]
-            cells = [r[base+k] if base+k < len(r) else None for k in range(len(RAW_KEYS))]
+            c = cols[w]             # uge w's kolonner fra overskriften
+            def at(i): return r[i] if i < len(r) else None
+            nsets, reps, load, kg = at(c["sets"]), at(c["reps"]), at(c["load"]), at(c["weight"])
+            # raw: cellen under hver overskrift; mangler LSRPE/Mean Weight, cellen på skabelonens
+            # plads (SETS + 4 / + 6), som skrevet
+            cells = [at(c[k]) if k in c else at(c["sets"] + i) for i, k in enumerate(RAW_KEYS)]
             kg = text_number(kg)
             sets_text, reps_text = cell_text(nsets), cell_text(reps)
             if nsets in (None,0,"") or reps in (None,"") : continue
@@ -323,5 +407,9 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
                                       e1rm=e1rm.get(typ), raw=raw, logged_rpe=lsrpe,
                                       variant=variant[0] if variant else None,
                                       variant_display=variant[1] if variant else None))
-    if lsrpe_ok is None and sets: issues[LSRPE_COLUMN_MISSING] += 1   # ingen header-række: LSRPE ulæst
+    if day_start is not None:
+        raise SheetLayoutError(f"{tab}: the training day from row {day_start} has no end (no Micro "
+                               f"Length, DAY or MICROCYCLE row after it)")
+    if week_row is not None:
+        raise SheetLayoutError(f"{tab}, row {week_row}: no header row directly under the WEEK row")
     return sets
