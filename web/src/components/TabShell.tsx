@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { type PointerEvent, type MouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { createContext, type PointerEvent, type MouseEvent, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { useMedia } from "./chart-hooks";
 import { TabBar } from "./TabBar";
@@ -20,10 +20,29 @@ const REDUCE = REDUCED_MOTION;
  * p lives in a ref and every frame writes the styles straight to the frames, scrims and the bar's
  * indicator; React renders them once, at the first paint's index, and never touches them again.
  */
+/**
+ * "This tab became active" for entry motion (the curve drawing itself, Analyse's bars): per tab a
+ * count of entries after first paint, so a hard load or reload never animates (DESIGN.md Motion).
+ */
+const TabEntries = createContext<readonly number[]>([0, 0, 0]);
+
+/** How often tab `i` has been entered since first paint; an effect keyed on it plays the entry. */
+export function useTabEntry(i: number): number {
+  return useContext(TabEntries)[i] ?? 0;
+}
+
 export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
   const pathname = usePathname();
   const router = useRouter();
   const index = tabIndex(pathname);
+  // Entries after first paint, per tab (useTabEntry): the settled index changing is an entry.
+  const [entries, setEntries] = useState<readonly number[]>([0, 0, 0]);
+  const enteredIndex = useRef(index);
+  useEffect(() => {
+    if (enteredIndex.current === index) return;
+    enteredIndex.current = index;
+    setEntries((e) => e.map((n, i) => (i === index ? n + 1 : n)));
+  }, [index]);
   // The first paint (server render = hydration) is the settled state; React never rewrites these styles.
   const [first] = useState(index);
   const lg = useMedia("(min-width: 1024px)");
@@ -201,6 +220,7 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
   };
 
   return (
+    <TabEntries value={entries}>
     <div className="@container/shell flex h-dvh flex-col bg-bg">
       {/* First in the DOM (focus order: the nav before the pages, WCAG 2.4.3); shown last below lg. */}
       <TabBar index={index} onSelect={goTo} indicatorRef={indicator} />
@@ -250,5 +270,6 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
         })}
       </div>
     </div>
+    </TabEntries>
   );
 }
