@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 
 import { E1rmPanels, TonnageStrips } from "@/components/AnalyseCharts";
 import {
@@ -25,8 +24,6 @@ import { loadExerciseFeel, loadStrengthAnalysis } from "@/lib/db/queries";
 import { formatUpdatedAt } from "@/lib/format";
 import { resolveToday } from "@/lib/training-view";
 
-export const metadata: Metadata = { title: "Analyse · Styrke" };
-
 type Ready = Extract<StyrkeView, { kind: "ready" }>;
 type PageState = StyrkeView | { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 
@@ -46,7 +43,7 @@ async function loadPageState(): Promise<PageState> {
   }
 }
 
-export default async function Page() {
+export async function AnalyseStyrke() {
   const state = await loadPageState();
   return (
     <>

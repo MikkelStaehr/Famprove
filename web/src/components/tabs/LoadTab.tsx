@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { type ReactNode, Suspense } from "react";
 
 import { Card } from "@/components/Card";
@@ -54,10 +53,6 @@ import { resolveToday, strengthWeek } from "@/lib/training-view";
 import { type DatedPlan, datedPlan } from "@/lib/week-plan";
 import { isZoneKey, ZONE_CLASS, zoneReading, zoneSentence } from "@/lib/zone-scale";
 
-export const metadata: Metadata = {
-  title: "Belastning",
-};
-
 type ReadyView = Extract<DashboardView, { kind: "ready" }>;
 type Failed = { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 type PageState = DashboardView | Failed;
@@ -95,8 +90,8 @@ async function loadWeekState(nav: WeekNav): Promise<WeekState> {
   }
 }
 
-export default async function Page({ searchParams }: PageProps<"/load">) {
-  const { week } = await searchParams;
+/** Belastning (/load); `week` is the `?week=` search param (the slot page passes it, the default none). */
+export async function LoadTab({ week }: { readonly week: string | string[] | undefined }) {
   const [state, notices, ftpCheck] = await Promise.all([
     loadPageState(typeof week === "string" ? week : undefined),
     loadAppNotices(),

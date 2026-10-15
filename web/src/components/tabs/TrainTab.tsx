@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { connection } from "next/server";
 import { type ReactNode, Suspense } from "react";
 
@@ -30,10 +29,6 @@ import {
   weekSentence,
 } from "@/lib/training-view";
 import { datedPlan } from "@/lib/week-plan";
-
-export const metadata: Metadata = {
-  title: "Træning",
-};
 
 type Failed = { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 type FormState = { readonly kind: "ready"; readonly header: TrainingHeader | null } | Failed;
@@ -94,7 +89,7 @@ async function loadWeekBody(today: IsoDate, strength: StrengthWeek | null): Prom
             what={describeDataError(error)}
             detail={error.message}
             at={{ iso: at, text: formatUpdatedAt(at) }}
-            retry={{ href: "/" }}
+            retry={{ href: "/train" }}
           />
         ),
       };
@@ -118,8 +113,8 @@ function devSwitchesOn(): boolean {
   return process.env.NODE_ENV === "development" && (Boolean(process.env.DEV_TODAY) || devFixture() !== null);
 }
 
-/** `/`: "What is my session, and how fresh am I for it?" (design/specs/traening.md §3). */
-export default async function TrainingPage() {
+/** Træning (/train): "What is my session, and how fresh am I for it?" (design/specs/traening.md §3). */
+export async function TrainTab() {
   await connection(); // request time: "today" is the Copenhagen date now, never the build's
   const now = new Date();
   const today = resolveToday(now, process.env);
@@ -254,7 +249,7 @@ function PlanError({ error, at }: { readonly error: DataError; readonly at: Date
         what={describeDataError(error)}
         detail={error.message}
         at={{ iso: at.toISOString(), text: formatUpdatedAt(at.toISOString()) }}
-        retry={{ href: "/" }}
+        retry={{ href: "/train" }}
       />
     </section>
   );

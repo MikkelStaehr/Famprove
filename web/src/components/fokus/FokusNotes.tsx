@@ -25,7 +25,7 @@ export function NoSessionNote({ sentence, devSwitches }: { readonly sentence: st
           <p className="text-16">{sentence}</p>
         </div>
         <div className={`mt-4 ${PRIMARY_DOCK}`}>
-          <Link href="/" className={PRIMARY_BOX}>
+          <Link href="/train" className={PRIMARY_BOX}>
             Til Træning
           </Link>
         </div>
@@ -43,7 +43,7 @@ export function FokusError({ error, at }: { readonly error: DataError; readonly 
     <div className="flex flex-col gap-4">
       <h1 className="sr-only">Fokus</h1>
       <div>
-        <Link href="/" className={COMPACT_SECONDARY}>
+        <Link href="/train" className={COMPACT_SECONDARY}>
           <Icon name="x" size={18} />
           Afslut
         </Link>

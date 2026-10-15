@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { TabBar } from "@/components/TabBar";
-
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,18 +23,15 @@ const geist = Geist({ subsets: ["latin"], weight: ["400", "500", "600"], variabl
 const geistMono = Geist_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-geist-mono", display: "swap" });
 
 /**
- * The nav sits outside the pages, so it also shows while a page loads or fails; absent on /fokus
- * (TabBar renders nothing there). DESIGN.md Part A "Layout: phone and desktop": below lg the nav is
- * a fixed bottom bar, so main has 20px (or the safe-area inset) on top, 16px gutters, 12px between
- * cards and ends with the bar's height + 24px; from lg it is a static top bar and main is the
- * 1200px frame (32px gutters, 24px gap). Screens set their own grid inside it.
+ * html, body and the fonts only. The three tabs live in the (tabs) shell (components/TabShell: its
+ * own tab bar and one scroll container per page, docs/decisions/tab-shell.md); /fokus has its own
+ * main (app/fokus/layout.tsx) and no tab bar.
  */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="da" className={`${geist.variable} ${geistMono.variable}`}>
       <body className="bg-bg font-sans text-16 font-normal text-text antialiased">
-        <TabBar />
-        <main className="mx-auto flex w-full max-w-content flex-col gap-3 pt-[max(20px,env(safe-area-inset-top))] pr-[max(16px,env(safe-area-inset-right))] pb-[calc(var(--bottom-bar)+24px)] pl-[max(16px,env(safe-area-inset-left))] lg:max-w-wide lg:gap-6 lg:px-8 lg:pt-0 lg:pb-12">{children}</main>
+        {children}
       </body>
     </html>
   );

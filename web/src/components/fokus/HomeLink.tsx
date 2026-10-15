@@ -26,12 +26,12 @@ export function HomeLink({
   return (
     <Link
       ref={ref}
-      href="/"
+      href="/train"
       className={className}
       onClick={(event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
         event.preventDefault();
-        void settle(flush).then(() => router.push("/"));
+        void settle(flush).then(() => router.push("/train"));
       }}
     >
       {children}

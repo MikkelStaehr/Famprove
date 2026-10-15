@@ -47,7 +47,7 @@ const THEME_STATIC = vars(block(CSS, CSS.indexOf("@theme static")));
 
 test("DESIGN.md Part B lists the Ember tokens this test checks", () => {
   assert.equal(expected.length, 21, `parsed ${expected.length} hex colour tokens`);
-  assert.equal(radii.length, 8, `parsed ${radii.length} radius tokens`);
+  assert.equal(radii.length, 10, `parsed ${radii.length} radius tokens`); // + stack and sink (motion-shell)
   assert.deepEqual(
     sizes.map((s) => s.px),
     [56, 48, 44, 40, 32, 28, 24, 22, 20, 16, 15, 14, 13, 12, 11, 10],

@@ -55,7 +55,8 @@ server=$!
 
 ok=""
 for _ in $(seq 1 120); do
-  if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "http://localhost:$PORT/")" = 200 ]; then ok=1; break; fi
+  # -L: / redirects to /train since the tab shell (motion-shell); the page behind it must answer 200.
+  if [ "$(curl -s -L -o /dev/null -w '%{http_code}' --max-time 60 "http://localhost:$PORT/")" = 200 ]; then ok=1; break; fi
   sleep 0.5
 done
 [ -n "$ok" ] || { echo "server on $PORT did not answer 200 within about a minute (log: ${TMPDIR:-/tmp}/run-web-$PORT.log)" >&2; exit 1; }

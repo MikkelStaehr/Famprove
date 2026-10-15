@@ -17,7 +17,7 @@ export default function Loading() {
         Henter sættet …
       </p>
       <div className="flex items-center justify-between gap-3">
-        <Link href="/" className={COMPACT_SECONDARY}>
+        <Link href="/train" className={COMPACT_SECONDARY}>
           <Icon name="x" size={18} />
           Afslut
         </Link>

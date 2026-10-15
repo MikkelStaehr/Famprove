@@ -74,6 +74,9 @@
   --radius-control: 10px;
   --radius-segment: 7px;
   --radius-cell: 4px;
+  --radius-stack: 24px; /* tab shell: the page sliding in on top (left corners) */
+  --radius-sink: 26px; /* tab shell: the page sinking back, x t */
+  --shadow-stack: -18px 0 36px rgba(0, 0, 0, 0.55); /* the one shadow: the tab-shell page moving in (DESIGN.md Shape) */
   --radius-pill: 999px;
 }
 

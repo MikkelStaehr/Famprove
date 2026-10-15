@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 
 import { MarkChart, WeekStrips } from "@/components/AnalyseCharts";
 import { BarSwatch, CrossSwatch, DotSizesSwatch, Legend, LevelSwatch, LineSwatch, RideDotSwatch, TodaySwatch } from "@/components/AnalyseLegend";
@@ -20,8 +19,6 @@ import {
 import { loadCyclingAnalysis } from "@/lib/db/queries";
 import { formatUpdatedAt } from "@/lib/format";
 import { resolveToday } from "@/lib/training-view";
-
-export const metadata: Metadata = { title: "Analyse" };
 
 type Ready = Extract<AnalyseView, { kind: "ready" }>;
 type PageState =
@@ -46,7 +43,7 @@ async function loadPageState(): Promise<PageState> {
   }
 }
 
-export default async function Page() {
+export async function AnalyseCykel() {
   const state = await loadPageState();
   return (
     <>

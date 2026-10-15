@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
+  // The tab shell (docs/decisions/tab-shell.md §2): Træning is /train; the home-screen bookmark on /
+  // keeps working through a temporary redirect (308 would be cached for good).
+  async redirects() {
+    return [{ source: "/", destination: "/train", permanent: false }];
+  },
 };
 
 export default nextConfig;

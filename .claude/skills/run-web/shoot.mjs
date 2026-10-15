@@ -135,16 +135,22 @@ try {
   }
   await sleep(200);
 
+  // The tab shell (motion-shell) scrolls each page in its own container, not the document: the
+  // full-page height adds what the active page's container hides, and a horizontal overflow inside
+  // it counts like one of the document's.
   const page = await evaluate(
-    `({ height: Math.ceil(document.documentElement.scrollHeight),` +
-      ` scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth })`,
+    `(() => { const doc = document.documentElement;` +
+      ` const m = document.querySelector('[data-tab-page][data-active] main');` +
+      ` const extra = m ? Math.max(0, m.scrollHeight - m.clientHeight) : 0;` +
+      ` return { height: Math.ceil(doc.scrollHeight + extra), scrollWidth: doc.scrollWidth, clientWidth: doc.clientWidth,` +
+      ` innerOverflow: m ? m.scrollWidth > m.clientWidth : false }; })()`,
   );
   await metrics(page.height); // full page in one shot
   await sleep(300);
   const shot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(opt.out, Buffer.from(shot.data, "base64"));
 
-  const horizontalOverflow = page.scrollWidth > page.clientWidth;
+  const horizontalOverflow = page.scrollWidth > page.clientWidth || page.innerOverflow;
   console.log(JSON.stringify({ out: opt.out, width, height: page.height, horizontalOverflow, consoleErrors: errors }));
   if (horizontalOverflow || errors.length > 0) exitCode = 1;
   ws.close();

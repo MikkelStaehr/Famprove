@@ -93,7 +93,7 @@ export function ZoneBarError({ retry }: ZoneBarErrorProps) {
       <span>Kunne ikke hente form (TSB).</span>
       {retry && (
         <Link
-          href="/"
+          href="/train"
           prefetch={false}
           className="inline-flex min-h-11 items-center font-medium text-text underline underline-offset-3"
         >
