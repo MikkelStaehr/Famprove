@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { DUR, EASE_EMBER } from "@/lib/motion";
+import { DUR, EASE_EMBER, REDUCED_MOTION } from "@/lib/motion";
 import { type RollPlan, rollPlan, shapeKey } from "@/lib/roll";
 
 const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
@@ -31,7 +31,7 @@ export function RollingNumber({ text }: { readonly text: string }) {
   useLayoutEffect(() => {
     const { plan } = shown;
     if (plan === null) return;
-    const animate = plan.rolls && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const animate = plan.rolls && !window.matchMedia(REDUCED_MOTION).matches;
     plan.cells.forEach((cell, i) => {
       const el = columns.current[i];
       if (cell.kind !== "digit" || el === null || el === undefined) return;
@@ -49,6 +49,8 @@ export function RollingNumber({ text }: { readonly text: string }) {
         el.style.transform = at(cell.from);
         void el.offsetWidth;
       }
+      el.style.willChange = "transform"; // only while it rolls
+      el.addEventListener("transitionend", () => (el.style.willChange = ""), { once: true });
       el.style.transition = `transform ${DUR.roll}ms ${EASE_EMBER} ${cell.delayMs}ms`;
       el.style.transform = target;
     });
@@ -72,7 +74,7 @@ export function RollingNumber({ text }: { readonly text: string }) {
                 ref={(el) => {
                   columns.current[i] = el;
                 }}
-                className="block will-change-transform"
+                className="block"
               >
                 {DIGITS.map((d) => (
                   <span key={d} className={CELL}>

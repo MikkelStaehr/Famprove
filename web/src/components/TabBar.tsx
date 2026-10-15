@@ -3,6 +3,7 @@
 import { type MouseEvent, type Ref, useEffect, useRef, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
+import { REDUCED_MOTION } from "@/lib/motion";
 import { TABS as SHELL_TABS } from "@/lib/tab-shell";
 
 const ICONS: readonly IconName[] = ["barbell", "trend", "bars"];
@@ -55,7 +56,7 @@ export function TabBar({
   useEffect(() => {
     if (shownIndex.current === index) return; // first paint, or the same tab again
     shownIndex.current = index;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia(REDUCED_MOTION).matches) return;
     const li = items.current[index];
     if (li === null || li === undefined) return;
     li.classList.remove(PLAY);

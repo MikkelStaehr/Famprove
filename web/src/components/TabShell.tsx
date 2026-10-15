@@ -5,12 +5,12 @@ import { type PointerEvent, type MouseEvent, type ReactNode, useCallback, useEff
 
 import { useMedia } from "./chart-hooks";
 import { TabBar } from "./TabBar";
-import { DUR, easeOutQuart } from "@/lib/motion";
+import { DUR, easeOutQuart, REDUCED_MOTION } from "@/lib/motion";
 import { dragLock, dragPosition, edgeStart, pageStyle, releaseTarget, TAB_COUNT, TABS, tabIndex, tabTitle } from "@/lib/tab-shell";
 
 type Drag = { x: number; y: number; t: number; id: number; lock: "x" | null; dx: number };
 
-const REDUCE = "(prefers-reduced-motion: reduce)";
+const REDUCE = REDUCED_MOTION;
 
 /**
  * The tab shell (slice motion-shell; docs/decisions/tab-shell.md, design/specs/motion-shell.md):

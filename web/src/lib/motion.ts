@@ -5,6 +5,9 @@
  * motion test holds the two equal). Under prefers-reduced-motion nothing animates (callers check).
  */
 
+/** The one reduced-motion query every animation checks before it starts (DESIGN.md Motion: off). */
+export const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
 /** The reference's one CSS curve, cubic-bezier(.2,.8,.2,1): unfolds, rolls, draws, pills. */
 export const EASE_EMBER = "cubic-bezier(.2,.8,.2,1)";
 
