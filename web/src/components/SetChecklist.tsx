@@ -1,11 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 
 import { RollingNumber } from "@/components/motion/RollingNumber";
 
 import { type FreshTicks, tickAnimates } from "@/lib/fresh-ticks";
 import { setKey, type SetState } from "@/lib/set-taps";
+import { refusedText, type SeamSave, type SeamState, type SeamView, slotKey } from "@/lib/superset-view";
 import {
   adjustmentBrackets,
   compactPrescription,
@@ -21,6 +22,7 @@ import {
   todayKgView,
 } from "@/lib/training-view";
 
+import { OUTLINED } from "./fokus/Instrument";
 import { Icon } from "./icons";
 import { SECONDARY } from "./instrument";
 import { useSession } from "./SetLogProvider";
@@ -58,28 +60,137 @@ export function SetCount() {
  * user's toggle only, so nothing opens or collapses on its own and focus stays where the user put it.
  */
 export function SetChecklist() {
-  const { session, view } = useSession();
+  const { session, view, seams } = useSession();
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const runs = exerciseRuns(view.groups);
+  const rowOf = (run: ExerciseRunView) => run.groups[0].exercise.row;
+  const seamAfter = new Map(seams.views.map((v) => [v.rowA, v]));
+
+  const item = (run: ExerciseRunView, grouped: boolean) => {
+    const expanded = toggled.get(run.key) ?? false;
+    return (
+      <div className="relative">
+        {/* The NÆSTE exercise: a 2px --text bar at the list's x −12px, full height (§2.5); in a superset group the rail sits there, so it moves out with the indent. */}
+        {run.isNext && (
+          <span aria-hidden="true" data-next-edge="true" className={`absolute inset-y-0 w-0.5 bg-text ${grouped ? "-left-6" : "-left-3"}`} />
+        )}
+        <ExerciseRun
+          run={run}
+          week={session.week}
+          expanded={expanded}
+          onToggle={() => setToggled((m) => new Map(m).set(run.key, !expanded))}
+        />
+      </div>
+    );
+  };
+
+  const items: ReactNode[] = [];
+  for (let i = 0; i < runs.length; i += 1) {
+    const run = runs[i];
+    const seam = seamAfter.get(rowOf(run));
+    const partner = runs[i + 1];
+    const before = i === 0 ? null : seamAfter.get(rowOf(runs[i - 1]));
+    const grouped = seam !== undefined && partner !== undefined && seam.rowB === rowOf(partner) && seamPaired(seam.state);
+    if (grouped) {
+      // S4: the pair as one block, a 2px --text rail from A's top to B's bottom, rows indented 12px.
+      items.push(
+        <li
+          key={run.key}
+          role="group"
+          aria-label={`Superset: ${seam.both}`}
+          className={`relative pl-3${i === 0 ? "" : " border-t border-border"}`}
+        >
+          <span
+            aria-hidden="true"
+            data-superset-rail="true"
+            className={`absolute inset-y-0 left-0 w-0.5 bg-text${seams.drawn.has(slotKey(seam)) ? " seam-rail-draw" : ""}`}
+          />
+          {item(run, true)}
+          <Seam v={seam} />
+          {item(partner, true)}
+        </li>,
+      );
+      i += 1;
+      continue;
+    }
+    // R1: an unpaired seam sits on the boundary above B, in place of the row divider.
+    const seamAbove = before !== undefined && before !== null && before.rowB === rowOf(run) && hasSeam(before, seams.saves) ? before : null;
+    items.push(
+      <li key={run.key} className={`relative${i === 0 || seamAbove !== null ? "" : " border-t border-border"}`}>
+        {seamAbove !== null && <Seam v={seamAbove} />}
+        {item(run, false)}
+      </li>,
+    );
+  }
 
   return (
-    <ol aria-label="Øvelser" className="flex flex-col">
-      {runs.map((run, i) => {
-        const expanded = toggled.get(run.key) ?? false;
-        return (
-          <li key={run.key} className={`relative${i === 0 ? "" : " border-t border-border"}`}>
-            {/* The NÆSTE exercise: a 2px --text bar on its left edge at x −12px, full height (§2.5). */}
-            {run.isNext && <span aria-hidden="true" data-next-edge="true" className="absolute inset-y-0 -left-3 w-0.5 bg-text" />}
-            <ExerciseRun
-              run={run}
-              week={session.week}
-              expanded={expanded}
-              onToggle={() => setToggled((m) => new Map(m).set(run.key, !expanded))}
-            />
-          </li>
-        );
-      })}
-    </ol>
+    <>
+      <p role="status" className="sr-only">
+        {seams.status}
+      </p>
+      <ol aria-label="Øvelser" className="flex flex-col">
+        {items}
+      </ol>
+    </>
+  );
+}
+
+function seamPaired(state: SeamState): boolean {
+  return state === "paired" || state === "suggested" || state === "locked";
+}
+
+function hasSeam(v: SeamView, saves: ReadonlyMap<string, SeamSave>): boolean {
+  const status = saves.get(slotKey(v))?.status;
+  return v.state !== "none" || status === "failed" || status === "refused";
+}
+
+/**
+ * The seam between two runs (supersets.md S1–S3, S7–S9): hairlines left and right, the control
+ * centred. A dark compact toggle (32px visible, 44px hit via ::before), or the static locked text.
+ */
+function Seam({ v }: { readonly v: SeamView }) {
+  const { seams } = useSession();
+  const save = seams.saves.get(slotKey(v));
+  const on = seamPaired(v.state);
+  return (
+    <div className="flex flex-col pb-1">
+      {v.state !== "none" && (
+        <div data-seam={v.state} className="flex min-h-11 items-center gap-3">
+          <span aria-hidden="true" className="h-px flex-1 bg-border" />
+          {v.state === "locked" ? (
+            <p className="flex items-center gap-2 font-mono text-13 text-text-muted uppercase">
+              <Icon name="arrow-left-right" size={18} />
+              <span aria-hidden="true">Superset · låst</span>
+              <span className="sr-only">Superset, låst, fordi {v.started} er gået i gang.</span>
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                aria-pressed={on}
+                aria-label={`Superset: ${v.both}`}
+                onClick={() => seams.toggle(v, !on)}
+                className={`relative inline-flex h-8 shrink-0 items-center gap-2 px-3 before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${OUTLINED.replace("bg-card", on ? "bg-raised" : "bg-card")}`}
+              >
+                <Icon name={on ? "check" : "arrow-left-right"} size={18} />
+                Superset
+              </button>
+              {v.state === "suggested" && <span className="shrink-0 font-sans text-13 text-text-muted">Som sidst</span>}
+            </>
+          )}
+          <span aria-hidden="true" className="h-px flex-1 bg-border" />
+        </div>
+      )}
+      {save?.status === "failed" && (
+        <WarningLine>
+          Superset-valget er ikke gemt. Det står her, men forsvinder, hvis siden genindlæses.{" "}
+          <button type="button" onClick={() => seams.toggle(v, save.override ?? on)} className={`mt-2 flex ${SECONDARY}`}>
+            Gem igen
+          </button>
+        </WarningLine>
+      )}
+      {save?.status === "refused" && <WarningLine>{refusedText(v)}</WarningLine>}
+    </div>
   );
 }
 

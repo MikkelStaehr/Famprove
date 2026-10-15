@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   ArrowDown,
   ArrowDownRight,
+  ArrowLeftRight,
   ArrowRight,
   ArrowUp,
   ArrowUpRight,
@@ -35,6 +36,7 @@ export type IconName =
   | "trend"
   | "bars"
   | "arrow-right"
+  | "arrow-left-right"
   | "arrow-up-right"
   | "arrow-down-right"
   | "chevron-left"
@@ -79,6 +81,7 @@ const OWN: Readonly<Record<OwnName, ReactNode>> = {
 const LUCIDE: Readonly<Record<Exclude<IconName, OwnName>, LucideIcon>> = {
   bike: Bike,
   "arrow-right": ArrowRight,
+  "arrow-left-right": ArrowLeftRight,
   "arrow-up-right": ArrowUpRight,
   "arrow-down-right": ArrowDownRight,
   "chevron-left": ChevronLeft,
