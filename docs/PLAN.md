@@ -122,3 +122,10 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | motion-traening | Træning: exercises unfold with grid-rows (380 ms), the check draws, the dot pops, the set counter rolls | M |
 | motion-analyse | Analyse: bars grow with a 40 ms stagger, the eFTP / EF / e1RM lines draw in | M |
 | board-sparkline | Styrke board sparklines per lift, once every lift has >= 4 qualifying e1RM weeks (queued) | M |
+| skip-tss | A set the user skips in the app (exercise_set_log.skipped) scores 0 TSS (user, 2026-10-15) | S |
+| log-fix-1015 | Today's log: tricep reps 22/18 per arm, set 3 skipped; lateral raise and tricep timing marked unusable; today's superset pairs; compute and today's TSS | S |
+| fokus-kg | Fokus shows today's sheet kg as "I DAG" (else derived from a sibling set, ~e1RM, or same as last week; Python's today_kg), last week smaller under it | L |
+| rest-by-type | Rest window by exercise category: main 3-5 min, accessory/bodyweight 1.5-3, isolation and abs 1-2 | S |
+| button-type | Buttons on Fokus and Træning: Geist Mono 15/500, uppercase, .04em; only Udført light, the rest dark with a border | S |
+| fokus-flow | Fokus: the rest screen is the next set (timer, kg, "✓ SÆT n UDFØRT"), vibrate once at Min, wake lock for the session, no "Til næste sæt" | M |
+| supersets | Supersets chosen in the app: pair two consecutive exercises (superset_pairs, a third write path), A1 -> B1 -> rest, suggested next time, TSS unchanged | L |
