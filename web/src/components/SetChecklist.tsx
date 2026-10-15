@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 
+import { RollingNumber } from "@/components/motion/RollingNumber";
+
 import type { SetState } from "@/lib/set-taps";
 import {
   adjustmentBrackets,
@@ -43,7 +45,7 @@ export function SetCount() {
           {done} af {total} sæt udført
         </span>
         <span aria-hidden="true">
-          <span className="font-medium text-text">{done}</span> / {total}
+          <span className="font-medium text-text"><RollingNumber text={String(done)} /></span> / {total}
         </span>
       </p>
       {skipped > 0 && <p className="font-mono text-12 text-text-muted tabular-nums">{skipped} sprunget over</p>}

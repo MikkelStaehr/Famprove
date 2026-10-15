@@ -7,6 +7,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { FitnessCurve } from "@/components/FitnessCurve";
 import { FtpLine } from "@/components/FtpLine";
 import { LoadExplainer } from "@/components/LoadExplainer";
+import { RollingNumber } from "@/components/motion/RollingNumber";
 import { MonoCaption } from "@/components/MonoCaption";
 import { RefreshProvider, RefreshStatus } from "@/components/Refresh";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -178,7 +179,7 @@ function FormCard({ view }: { readonly view: ReadyView }) {
       </div>
       <div className="flex flex-wrap items-baseline gap-2.5">
         <span aria-hidden="true" className={`font-mono text-56 font-medium tabular-nums ${zone === null ? "text-text" : ZONE_CLASS[zone].text}`}>
-          {formatSigned(hero.tsb)}
+          <RollingNumber text={formatSigned(hero.tsb)} />
         </span>
         <p className="min-w-0 font-sans text-15 text-text-muted" style={{ flex: "1 1 12rem" }}>
           {zoneReading(zone)}
@@ -197,10 +198,10 @@ function Tiles({ view }: { readonly view: ReadyView }) {
   const weekNo = thisWeek?.isoWeek ?? isoWeek(hero.date).week;
   return (
     <dl className={`grid grid-cols-2 gap-3 ${LOAD_PLACE.tiles}`}>
-      <Tile label={<dt>Træthed</dt>} value={<dd>{formatLoad(hero.atl)}</dd>} support={<dd>TSS/DAG</dd>} />
+      <Tile label={<dt>Træthed</dt>} value={<dd><RollingNumber text={formatLoad(hero.atl)} /></dd>} support={<dd>TSS/DAG</dd>} />
       <Tile
         label={<dt>Uge {weekNo}</dt>}
-        value={<dd>{thisWeek === null ? "–" : formatLoad(thisWeek.totalTss)}</dd>}
+        value={<dd><RollingNumber text={thisWeek === null ? "–" : formatLoad(thisWeek.totalTss)} /></dd>}
         support={<dd>TSS · {thisWeek === null ? "–" : thisWeek.dayCount}/7 d</dd>}
       />
     </dl>
@@ -227,7 +228,7 @@ function FitnessHeader({ view }: { readonly view: ReadyView }) {
         {stale ? ` den ${formatDay(hero.date)}` : ""}. {ramp.sr}
       </p>
       <div aria-hidden="true" className="mt-1 flex flex-wrap items-baseline gap-x-2.5">
-        <span className="font-mono text-48 font-medium text-text tabular-nums">{formatOneDecimal(hero.ctl)}</span>
+        <span className="font-mono text-48 font-medium text-text tabular-nums"><RollingNumber text={formatOneDecimal(hero.ctl)} /></span>
         <span className={`font-mono text-14 font-medium tabular-nums ${hero.ctlRamp7d === null ? "text-text-muted" : "text-text"}`}>{ramp.text}</span>
       </div>
       {verdict !== null && (
