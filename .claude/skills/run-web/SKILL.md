@@ -81,6 +81,10 @@ Frame numbers are only meaningful on an idle machine: check `uptime` and report 
 the card stack half-way through the first swipe. Prints the URL and active page after each step; exits 1 on
 a long frame over 50 ms, a console error or a horizontal overflow. Safari has no long-animation-frame API:
 the user's own phone stays a manual check.
+Each step's `loaf` says where a long frame's time went (LoAF attribution: `script` ms, `render` ms and its
+`styleLayout` part, scripts of 5 ms or more as [type, invoker, function@file, ms, forced layout ms]);
+`--trace <file.json>` also records a DevTools trace of the steps (open it in DevTools' Performance panel) and
+puts its main-thread rendering work of 8 ms or more in `trace` ([event, ms, elementCount for UpdateLayoutTree]).
 
 ## Rules
 - Port 3100 only. The script refuses to start if 3100 is taken and always stops its server.

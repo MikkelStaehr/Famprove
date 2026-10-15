@@ -38,6 +38,7 @@ const { values: opt } = parseArgs({
     "reduce-motion": { type: "boolean", default: false },
     zoom200: { type: "boolean", default: false },
     timeout: { type: "string", default: "120" },
+    trace: { type: "string" }, // a CDP trace of the steps (devtools.timeline) to this file; its summary goes in the JSON
   },
 });
 const width = Number(opt.width);
@@ -80,11 +81,17 @@ try {
   let id = 0;
   const pending = new Map();
   const errors = [];
+  const traceEvents = [];
+  let traceDone;
   ws.addEventListener("message", (m) => {
     const msg = JSON.parse(m.data);
     if (msg.id && pending.has(msg.id)) {
       pending.get(msg.id)(msg.result ?? {});
       pending.delete(msg.id);
+    } else if (msg.method === "Tracing.dataCollected") {
+      traceEvents.push(...msg.params.value);
+    } else if (msg.method === "Tracing.tracingComplete") {
+      traceDone?.();
     } else if (msg.method === "Runtime.exceptionThrown") {
       errors.push(msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text);
     } else if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
@@ -131,7 +138,13 @@ try {
     window.__long = [];
     try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(Math.round(e.duration)); })
       .observe({ type: 'long-animation-frame', buffered: false }); } catch { window.__long = null; }
-    window.__longAt = []; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.duration > 50) window.__longAt.push([Math.round(e.startTime), Math.round(e.duration)]); })
+    // Per long frame also where its time went (LoAF attribution): script ms, the render phase (rAF, style,
+    // layout, paint) and its style+layout part, and the top scripts (invoker, source, ms, forced layout ms).
+    window.__longAt = []; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.duration > 50) {
+      const end = e.startTime + e.duration, r = (v) => Math.round(v);
+      window.__longAt.push([r(e.startTime), r(e.duration), { script: r(e.scripts.reduce((a, s) => a + s.duration, 0)),
+        render: e.renderStart ? r(end - e.renderStart) : 0, styleLayout: e.styleAndLayoutStart ? r(end - e.styleAndLayoutStart) : 0,
+        scripts: e.scripts.filter((s) => s.duration >= 5).map((s) => [s.invokerType, s.invoker.slice(0, 60), (s.sourceFunctionName || '') + '@' + (s.sourceURL || '').split('/').pop(), r(s.duration), r(s.forcedStyleAndLayoutDuration)]) }]); } })
       .observe({ type: 'long-animation-frame', buffered: false }); } catch {}
     window.__gap = 0; window.__measure = false; let last = 0;
     const tick = (t) => { if (window.__measure && last) window.__gap = Math.max(window.__gap, t - last); last = t; requestAnimationFrame(tick); };
@@ -188,6 +201,7 @@ try {
     await touch("touchEnd", 0, 0);
   }
   const results = [];
+  if (opt.trace) await send("Tracing.start", { categories: "devtools.timeline,disabled-by-default-devtools.timeline,blink", transferMode: "ReportEvents" });
   await evaluate(`window.__measure = true`);
   for (const step of opt.steps.split(",").map((s) => s.trim()).filter(Boolean)) {
     const ms = Number(opt.ms);
@@ -225,11 +239,25 @@ try {
       step,
       ...(await state()),
       settle: { changes: after.length, spanMs: after.length ? Math.round(after[after.length - 1] - after[0]) : 0 },
-      ...(await evaluate(`({ long: (window.__longAt || []).filter(([t]) => t >= ${t0}).map(([, d]) => d) })`)),
+      ...(await evaluate(`(() => { const l = (window.__longAt || []).filter(([t]) => t >= ${t0});
+        return { long: l.map(([, d]) => d), loaf: l.map(([, d, a]) => ({ ms: d, ...a })) }; })()`)),
     });
     await evaluate(`window.__longAt = []; true`);
   }
   await evaluate(`window.__measure = false`);
+  let traceSummary;
+  if (opt.trace) {
+    const done = new Promise((r) => (traceDone = r));
+    await send("Tracing.end");
+    await done;
+    writeFileSync(opt.trace, JSON.stringify({ traceEvents }));
+    // The renderer main thread's rendering work of 8 ms or more: style (elementCount), layout, pre-paint, paint.
+    const main = traceEvents.find((e) => e.name === "thread_name" && e.args?.name === "CrRendererMain");
+    traceSummary = traceEvents
+      .filter((e) => e.ph === "X" && e.dur >= 8000 && (!main || (e.pid === main.pid && e.tid === main.tid)) &&
+        ["UpdateLayoutTree", "Layout", "PrePaint", "Paint", "Layerize", "UpdateLayer", "FunctionCall", "EventDispatch", "RunMicrotasks", "HitTest", "ParseHTML", "IntersectionObserverController::computeIntersections"].includes(e.name))
+      .map((e) => [e.name, Math.round(e.dur / 1000), e.args?.elementCount ?? e.args?.beginData?.dirtyObjects ?? e.args?.data?.type ?? e.args?.data?.functionName ?? ""]);
+  }
   if (cpu > 1) await send("Emulation.setCPUThrottlingRate", { rate: 1 });
   const timing = await evaluate(`({ long: window.__long, gap: Math.round(window.__gap) })`);
   const overflow = await evaluate(
@@ -241,7 +269,7 @@ try {
   }
   const long = timing.long === null ? null : timing.long.filter((d) => d > 50);
   console.log(
-    JSON.stringify({ path: opt.path, cpu, initial, mid: midState, steps: results, longFramesOver50ms: long, maxFrameGapMs: timing.gap, horizontalOverflow: overflow, consoleErrors: errors }),
+    JSON.stringify({ path: opt.path, cpu, initial, mid: midState, steps: results, longFramesOver50ms: long, maxFrameGapMs: timing.gap, trace: traceSummary, horizontalOverflow: overflow, consoleErrors: errors }),
   );
   if ((long !== null && long.length > 0) || errors.length > 0 || overflow) exitCode = 1;
   ws.close();
