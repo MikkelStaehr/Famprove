@@ -33,13 +33,13 @@ One `role="status"` (polite) region, always in the DOM, empty when idle. Neutral
 `wait`: the time is now + seconds, rounded up to the minute, Copenhagen time, "05.17" style; it never counts down. *If GET status cannot follow a run it did not start, `running` shows "en hentning kører allerede · prøv igen om 1 min" and does not poll. All texts come from one pure function, so `node --test` can check them.
 
 ## 4. States
-Loading: Pending above. Empty: no `daily_load` row ("opdatering ukendt") still shows the ↻. Error: rows `error`, run failed and 5 min. Stale: §1. Under `DEV_TODAY` / `DEV_FIXTURE` the server answers `unavailable`.
+Loading: Pending above. Empty: where a screen shows no "opdateret" line (Belastning and Analyse without data), there is no ↻ (user, 2026-10-15); an "opdatering ukendt" line still has one. Error: rows `error` and run failed (warning); the 5-min row is neutral (user, 2026-10-15). Stale: §1. Under `DEV_TODAY` / `DEV_FIXTURE` the server answers `unavailable`.
 
 ## Acceptance criteria
-1. R1 Træning, Belastning and both Analyse tabs show the 16px `refresh` glyph right after the updated time, at 390 and 1280px, fresh, `stale` and `empty`; the ↻ never sits alone on a wrapped line.
+1. R1 Træning, Belastning and both Analyse tabs show the 16px `refresh` glyph right after the updated time, at 390 and 1280px, fresh and `stale`; a screen without an updated line (`empty`) has no ↻; the ↻ never sits alone on a wrapped line.
 2. R2 The button is 44 × 44, named "Hent data nu", reachable by Tab, with a visible 2px focus ring; the updated line is no taller than without it, and no other target is within 14px of the line.
 3. R3 Within 100ms of a tap the glyph spins and the status region reads "henter data …"; while pending a second tap sends no request.
 4. R4 With `prefers-reduced-motion: reduce` nothing rotates and the status text still shows.
-5. R5 Each outcome shows exactly the §3 text in the §3 style, inside one `role="status"` region; `error`, run failed and the 5-min case render as WarningLine, the rest in muted mono.
+5. R5 Each outcome shows exactly the §3 text in the §3 style, inside one `role="status"` region; `error` and run failed render as WarningLine, the rest (the 5-min case included) in muted mono.
 6. R6 After a successful run the updated time changes without reload, "data hentet" goes after 5 s, a stale WarningLine disappears, and focus stays on the ↻.
 7. R7 Under `DEV_FIXTURE=stale` a tap shows the `unavailable` text and the ↻ is `--text`; nothing orange anywhere in the control.
