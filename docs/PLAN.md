@@ -115,3 +115,10 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | refresh-button | "Hent data nu": ↻ on the updated line → POST /api/refresh → workflow_dispatch, token server-side only, one run at a time, 5 min apart | M |
 | ftp-confirm | FTP warning only when eFTP is credible (an 8-min effort at ≥ 90 % of FTP in 42 days, intervals.icu power curve), else a quiet "ikke testet siden" line; tap to confirm (60 days / FTP change / eFTP ±5 %) or "rettet"; ftp_status + ftp_ack, a second web write | L |
 | ftp-analyse | Analyse › Cykel: "FTP: 230 W · sat senest <dato>" and an FTP level line on the eFTP chart | M |
+| motion-shell | Swipeable card-stack shell: all three tabs mounted (parallel routes, /train /load /analyse, / -> 307 /train), drag rules, release, rubber band, tab tap animation, indicator following p, reduced motion; run-web touch swipe + long-frame probe | L |
+| motion-numbers | Rolling digits (750 ms, 45 ms per digit) only when a value changes; the refresh spin checked | M |
+| motion-icons | Lucide as the one icon library (stroke 1.5); the three tab icons animate when chosen (lift, draw, grow) | M |
+| motion-load | Fitness curve draws in on entering Belastning (ring 0.75 s, prognose 0.85 s), 420 ms range morph with a sliding pill, scrub line/dot with live readout and vibrate per day | M |
+| motion-traening | Træning: exercises unfold with grid-rows (380 ms), the check draws, the dot pops, the set counter rolls | M |
+| motion-analyse | Analyse: bars grow with a 40 ms stagger, the eFTP / EF / e1RM lines draw in | M |
+| board-sparkline | Styrke board sparklines per lift, once every lift has >= 4 qualifying e1RM weeks (queued) | M |
