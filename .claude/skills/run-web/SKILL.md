@@ -77,6 +77,12 @@ focus landing in an inactive page), `key:<path>` (focus that tab's visible link,
 `inert` + `aria-hidden` + `visibility: hidden` (`notInert` lists any that aren't), where focus is, the indicator's transform, the visible tab bars
 (top, indicator shown) and `settle` (card-stack frames changed after the gesture ended: ~440 ms span = animated,
 0-1 changes = a snap). The output starts with `initial` (the hard-loaded state) and `mid` (the state at `--mid`).
+`scroll:<css>` (scroll the match's own `main`, active page or not, so it sits 80 px under the top), `click:<css>`
+(the first visible, non-inert match), `drag:<css>` (a horizontal touch drag across the match, 15 % -> 85 % in 30 moves of
+20 ms; on /load the plot is `[aria-label^=Fitness][data-noswipe]`, since `[aria-label^=Fitness]` alone hits the h2 first),
+`wait:<ms>`; no comma inside a selector. Probes: `--init <file.js>` runs in every document before the app (spies such as
+`navigator.vibrate`, per-frame samplers), `--report <file.js>` is an expression evaluated after the steps (in the JSON as
+`report`, or written to `--report-out <file.json>`). Don't run `pnpm lint/typecheck/test` alongside: load average went to 50.
 Frame numbers are only meaningful on an idle machine: check `uptime` and report the load average with them. `--mid` shoots
 the card stack half-way through the first swipe. Prints the URL and active page after each step; exits 1 on
 a long frame over 50 ms, a console error or a horizontal overflow. Safari has no long-animation-frame API:

@@ -9,7 +9,13 @@
 //   edge-left | edge-right (starting 10 px from the edge), tap:<path> (a click on that tab), key:<path> (focus + Enter), back | forward (history),
 //   scroll-down | scroll-up (a touch drag mostly in y: 300 px up/down with 20 px sideways),
 //   diag-left | diag-right (|dx| = |dy| = 60 px: below the 1.3 lock ratio, must not move a page),
-//   tabkeys (Tab pressed 60 times: reports whether focus ever reached an inactive page).
+//   tabkeys (Tab pressed 60 times: reports whether focus ever reached an inactive page),
+//   scroll:<css> (scroll the match's own <main>, active page or not, so the match sits 80 px under its top),
+//   click:<css> (click the first visible, non-inert match), drag:<css> (a horizontal touch drag across the
+//   match's middle, 15 % -> 85 % of its width in 30 moves of 20 ms), wait:<ms>. A <css> must not hold a comma.
+// Probes: --init <file.js> runs in every document before the app (Page.addScriptToEvaluateOnNewDocument:
+//   spies, per-frame samplers); --report <file.js> is an expression evaluated after the steps, its value in
+//   the JSON as `report` or, with --report-out <file.json>, written there.
 // Per step also: each page's scrollTop, whether every inactive page is inert + visibility hidden, the
 // indicator's transform, and the card-stack frames that changed after the gesture ended (count and span in ms:
 // a 440 ms animation spans ~440, a snap 0-1 changes).
@@ -18,7 +24,7 @@
 // (PerformanceObserver "long-animation-frame", > 50 ms) and the largest gap between animation frames
 // while gestures ran. Exits 1 on a long frame over 50 ms, a console error or a page that never got ready.
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -38,7 +44,10 @@ const { values: opt } = parseArgs({
     "reduce-motion": { type: "boolean", default: false },
     zoom200: { type: "boolean", default: false },
     timeout: { type: "string", default: "120" },
-    trace: { type: "string" }, // a CDP trace of the steps (devtools.timeline) to this file; its summary goes in the JSON
+    trace: { type: "string" },
+    init: { type: "string" }, // a script for every new document, before the app's own
+    report: { type: "string" }, // an expression evaluated after the steps
+    "report-out": { type: "string" }, // the report's value as JSON to this file // a CDP trace of the steps (devtools.timeline) to this file; its summary goes in the JSON
   },
 });
 const width = Number(opt.width);
@@ -112,6 +121,7 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 2, mobile: true });
   await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
   if (opt["reduce-motion"]) await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+  if (opt.init) await send("Page.addScriptToEvaluateOnNewDocument", { source: readFileSync(opt.init, "utf8") });
   await send("Page.navigate", { url: new URL(opt.path, opt.base).href });
 
   let ready = false;
@@ -231,6 +241,25 @@ try {
       await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
       await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
     }
+    else if (step.startsWith("scroll:"))
+      await evaluate(`(() => { const sel = ${JSON.stringify(step.slice(7))}; const all = [...document.querySelectorAll(sel)];
+        const el = all.find((e) => e.closest('[data-tab-page]')?.hasAttribute('data-active')) ?? all[0]; const m = el?.closest('main');
+        if (m) m.scrollTop += el.getBoundingClientRect().top - m.getBoundingClientRect().top - 80; return true; })()`);
+    else if (step.startsWith("click:"))
+      await evaluate(`[...document.querySelectorAll(${JSON.stringify(step.slice(6))})].find((e) => e.offsetParent !== null && !e.closest('[inert]'))?.click(); true`);
+    else if (step.startsWith("drag:")) {
+      const box = await evaluate(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(step.slice(5))})].find((e) => e.offsetParent !== null && !e.closest('[inert]'));
+        const r = e?.getBoundingClientRect(); return r ? [r.left, r.top, r.width, r.height] : null; })()`);
+      if (box === null) throw new Error(`drag: no visible ${step.slice(5)}`);
+      const [bx, by, bw, bh] = box, dy = Math.round(by + bh / 2);
+      await touch("touchStart", Math.round(bx + bw * 0.15), dy);
+      for (let k = 1; k <= 30; k++) {
+        await sleep(20);
+        await touch("touchMove", Math.round(bx + bw * (0.15 + (0.7 * k) / 30)), dy);
+      }
+      await touch("touchEnd", 0, 0);
+    }
+    else if (step.startsWith("wait:")) await sleep(Number(step.slice(5)));
     else if (step === "scroll-down") await vertical(1, -1, 20, 300);
     else if (step === "scroll-up") await vertical(1, 1, 20, 300);
     else if (step === "diag-left" || step === "diag-right") await vertical(step === "diag-left" ? -1 : 1, -1, 60, 60);
@@ -272,6 +301,14 @@ try {
       .map((e) => [e.name, Math.round(e.dur / 1000), e.args?.elementCount ?? e.args?.beginData?.dirtyObjects ?? e.args?.data?.type ?? e.args?.data?.functionName ?? ""]);
   }
   if (cpu > 1) await send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  let report;
+  if (opt.report) {
+    report = await evaluate(readFileSync(opt.report, "utf8"));
+    if (opt["report-out"]) {
+      writeFileSync(opt["report-out"], JSON.stringify(report));
+      report = `written to ${opt["report-out"]}`;
+    }
+  }
   const timing = await evaluate(`({ long: window.__long, gap: Math.round(window.__gap) })`);
   const overflow = await evaluate(
     `[...document.querySelectorAll('[data-tab-page] main')].some((m) => m.scrollWidth > m.clientWidth) || document.documentElement.scrollWidth > document.documentElement.clientWidth`,
@@ -282,7 +319,7 @@ try {
   }
   const long = timing.long === null ? null : timing.long.filter((d) => d > 50);
   console.log(
-    JSON.stringify({ path: opt.path, cpu, initial, mid: midState, steps: results, longFramesOver50ms: long, maxFrameGapMs: timing.gap, trace: traceSummary, horizontalOverflow: overflow, consoleErrors: errors }),
+    JSON.stringify({ path: opt.path, cpu, initial, mid: midState, steps: results, longFramesOver50ms: long, maxFrameGapMs: timing.gap, trace: traceSummary, horizontalOverflow: overflow, consoleErrors: errors, report }),
   );
   if ((long !== null && long.length > 0) || errors.length > 0 || overflow) exitCode = 1;
   ws.close();
