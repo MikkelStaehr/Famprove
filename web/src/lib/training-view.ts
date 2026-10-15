@@ -35,12 +35,14 @@ import {
   type LoggedSet,
   progress,
   type Progress,
+  type RunSet,
   sessionOrderWithWarmups,
   setKey,
   type SetRef,
   type SetState,
   stateOf,
 } from "./set-taps.ts";
+import { effectivePairs, exerciseIdMap, type PairSlot, pairSlots, type PairSource, sessionRuns } from "./supersets.ts";
 import type { ZoneKey } from "./zone-scale.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
@@ -187,10 +189,22 @@ export type StrengthSession = {
   readonly block: string;
   readonly week: number;
   readonly exercises: readonly ExerciseView[]; // sheet order
-  readonly order: readonly SetRef[]; // every set of the session in the sheet's order
+  readonly order: readonly SetRef[]; // every set of the session in the sheet's order (a superset's runs interleaved)
   /** The session's logged sets today (exercise_set_log), read back so progress survives a reload. */
   readonly log: readonly LoggedSet[];
   readonly logFailed: boolean; // the log couldn't be read: shown as open, with a warning (§5)
+  /** The supersets in force (lib/supersets.ts), in sheet order; the server orders taps the same way. */
+  readonly pairs: readonly SupersetView[];
+  /** Every boundary between two consecutive runs, for the ⇄ switch (paired or not, locked or not). */
+  readonly pairSlots: readonly PairSlot[];
+};
+
+/** A superset in force: the runs' first sheet rows, why (chosen today or suggested), and whether it can still be switched. */
+export type SupersetView = {
+  readonly rowA: number;
+  readonly rowB: number;
+  readonly source: PairSource;
+  readonly locked: boolean;
 };
 
 /** A strength activity logged this ISO week (the n-th is session n). */
@@ -383,6 +397,9 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
     references(data.previousWeek),
     new Map(data.plannedSets.map((p) => [plannedKey(p), p])),
   );
+  const runSets = exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name, variantId: e.variantId })));
+  const log = data.setLog.filter((l) => l.date === today && l.session === slot.session);
+  const supersets = sessionSupersets(data, today, slot.session, runSets, log);
   return {
     ...base,
     state: "next",
@@ -392,11 +409,40 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
       block: slot.block,
       week: slot.week,
       exercises,
-      order: sessionOrderWithWarmups(exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name })))),
-      log: data.setLog.filter((l) => l.date === today && l.session === slot.session),
+      order: sessionOrderWithWarmups(runSets, supersets.pairs),
+      log,
       logFailed: data.setLogFailed,
+      pairs: supersets.pairs,
+      pairSlots: supersets.slots,
     },
   };
+}
+
+/**
+ * The session's supersets (lib/supersets.ts): today's rows of this session decide, else the latest
+ * earlier row of the same ordered exercises suggests. Without superset rows (or exercise ids) there
+ * are none, and the order is the sheet's.
+ */
+export function sessionSupersets(
+  data: Pick<TrainingPlanData, "supersetPairs" | "exerciseIds">,
+  today: IsoDate,
+  session: number,
+  runSets: readonly RunSet[],
+  log: readonly LoggedSet[],
+): { readonly pairs: SupersetView[]; readonly slots: PairSlot[] } {
+  const rows = data.supersetPairs ?? [];
+  const runs = sessionRuns(runSets, exerciseIdMap(data.exerciseIds ?? []));
+  const effective = effectivePairs(
+    runs,
+    rows.filter((r) => r.date === today && r.session === session),
+    rows.filter((r) => r.date < today),
+  );
+  const slots = pairSlots(runs, effective, log);
+  const pairs = effective.map((p) => ({
+    ...p,
+    locked: slots.find((s) => s.rowA === p.rowA && s.rowB === p.rowB)?.locked ?? true,
+  }));
+  return { pairs, slots };
 }
 
 function nextDay(data: TrainingPlanData, today: IsoDate): NextDay | null {

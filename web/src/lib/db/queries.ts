@@ -17,6 +17,7 @@ import {
   ILLUSTRATIVE_FEEL,
   isPauseFixture,
   midsessionLog,
+  supersetFixture,
   illustrativeToday,
   midsessionPlanned,
   midsessionVariants,
@@ -53,6 +54,10 @@ import {
   PLANNED_TARGETS_SELECT,
   PRESCRIBED_SETS_SELECT,
   SET_LOG_SELECT,
+  SUPERSET_PAIRS_SELECT,
+  parseSupersetPairRow,
+  EXERCISE_IDS_SELECT,
+  parseExerciseIdRow,
   parseBlockRow,
   parseCyclingWeekRow,
   parseDailyLoadRow,
@@ -87,6 +92,8 @@ import type {
   DailyLoadRow,
   ExerciseCategoryRow,
   ExerciseFeelRow,
+  ExerciseIdRow,
+  SupersetPairRow,
   IsoDate,
   PlannedSetRow,
   PlannedTargetRow,
@@ -292,6 +299,10 @@ export type TrainingPlanData = {
   readonly plannedSets: readonly PlannedSetRow[]; // suggested kg per set, this ISO week (Python)
   readonly setLog: readonly SetLogRow[]; // today's logged sets, every session (exercise_set_log)
   readonly setLogFailed: boolean; // the set log couldn't be read: sets show as open, with a warning
+  /** superset_pairs up to today, every session (today's decide, earlier days suggest); absent = none read. */
+  readonly supersetPairs?: readonly SupersetPairRow[];
+  /** public.exercises ids by name and alias (superset runs are keyed by exercise id); absent = none read. */
+  readonly exerciseIds?: readonly ExerciseIdRow[];
 };
 
 /**
@@ -321,7 +332,7 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
   }
   const db = client();
   const horizon = addDays(today, NEXT_SESSION_DAYS);
-  const [sessions, sets, rides, upcomingRides, plannedSets, setLog] = await Promise.all([
+  const [sessions, sets, rides, upcomingRides, plannedSets, setLog, supersetPairs, exerciseIds] = await Promise.all([
     selectAll(
       db,
       STRENGTH_SESSIONS_SELECT.table,
@@ -368,6 +379,10 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
         return null;
       },
     ),
+    // Supersets reorder the session; the server orders taps by the same rows, so they must be read
+    // (a failure fails the plan rather than showing an order the server doesn't use).
+    selectAll(db, SUPERSET_PAIRS_SELECT.table, { ...SUPERSET_PAIRS_SELECT, filters: [["date", `lte.${today}`]] }, parseSupersetPairRow),
+    selectAll(db, EXERCISE_IDS_SELECT.table, EXERCISE_IDS_SELECT, parseExerciseIdRow),
   ]);
   // Last week's sets of the same tab(s): one query per (tab, week - 1). Tab names come from
   // this week's rows (server data) and go through URLSearchParams as eq. values.
@@ -397,8 +412,13 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     plannedSets,
     setLog: setLog ?? [],
     setLogFailed: setLog === null,
+    supersetPairs,
+    exerciseIds,
   };
   // Dev fixtures (never in production, never written): illustrative logs, ramps, adjustments.
+  if (fixture === "superset" || fixture === "superset-suggested") {
+    return { ...base, ...supersetFixture(fixture, base, today, new Date()) };
+  }
   if (fixture === "midsession") {
     return {
       ...base,

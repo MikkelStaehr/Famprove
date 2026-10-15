@@ -86,25 +86,61 @@ export function sessionOrder(sets: readonly SetRef[]): SetRef[] {
   return [...unique.values()].toSorted((a, b) => a.row - b.row || a.set - b.set);
 }
 
-/** The rows that start an exercise run: a row whose exercise differs from the row before it. */
-export function runStartRows(sets: readonly { readonly ref: SetRef; readonly name: string }[]): Set<number> {
-  const names = new Map<number, string>();
-  for (const s of sets) if (!names.has(s.ref.row)) names.set(s.ref.row, s.name.trim().toLowerCase());
+/** A set with its exercise name and, when known, its variant (strength_sets.variant_id). */
+export type RunSet = { readonly ref: SetRef; readonly name: string; readonly variantId?: number | null };
+
+/**
+ * The rows that start an exercise run: a row whose exercise (trimmed, case-insensitive name) or
+ * variant differs from the row before it (as training-view's sameRun; null matches only null). A
+ * caller that passes no variant gets the name-only runs it always had.
+ */
+export function runStartRows(sets: readonly RunSet[]): Set<number> {
+  const keys = new Map<number, string>();
+  for (const s of sets) if (!keys.has(s.ref.row)) keys.set(s.ref.row, `${s.name.trim().toLowerCase()}#${s.variantId ?? "ukendt"}`);
   const starts = new Set<number>();
   let previous: string | null = null;
-  for (const row of [...names.keys()].toSorted((a, b) => a - b)) {
-    const name = names.get(row) ?? "";
-    if (name !== previous) starts.add(row);
-    previous = name;
+  for (const row of [...keys.keys()].toSorted((a, b) => a - b)) {
+    const key = keys.get(row) ?? "";
+    if (key !== previous) starts.add(row);
+    previous = key;
   }
   return starts;
 }
 
-/** The sheet's order with a warm-up (set 0) before set 1 of each run's first row. */
-export function sessionOrderWithWarmups(sets: readonly { readonly ref: SetRef; readonly name: string }[]): SetRef[] {
+/** A superset pair in force (lib/supersets.ts): the first sheet rows of two consecutive runs. */
+export type PairRef = { readonly rowA: number; readonly rowB: number };
+
+/**
+ * The sheet's order with a warm-up (set 0) before set 1 of each run's first row. A pair's two runs
+ * interleave by position at A's place: A0 B0 A1 B1 ... (set 0 = the warm-up); the longer run's
+ * extra sets follow alone. Without pairs the order is the sheet's.
+ */
+export function sessionOrderWithWarmups(sets: readonly RunSet[], pairs: readonly PairRef[] = []): SetRef[] {
   const order = sessionOrder(sets.map((s) => s.ref));
   const starts = runStartRows(sets);
-  return order.flatMap((ref) => (ref.set === 1 && starts.has(ref.row) ? [{ row: ref.row, set: 0 }, ref] : [ref]));
+  const flat = order.flatMap((ref) => (ref.set === 1 && starts.has(ref.row) ? [{ row: ref.row, set: 0 }, ref] : [ref]));
+  if (pairs.length === 0) return flat;
+  const runs: SetRef[][] = [];
+  for (const ref of flat) {
+    const last = runs.at(-1);
+    if (last === undefined || (starts.has(ref.row) && last[0].row !== ref.row)) runs.push([ref]);
+    else last.push(ref);
+  }
+  const out: SetRef[] = [];
+  for (let i = 0; i < runs.length; i += 1) {
+    const a = runs[i];
+    const b = runs.at(i + 1);
+    if (b === undefined || !pairs.some((p) => p.rowA === a[0].row && p.rowB === b[0].row)) {
+      out.push(...a);
+      continue;
+    }
+    for (let k = 0; k < Math.max(a.length, b.length); k += 1) {
+      if (k < a.length) out.push(a[k]);
+      if (k < b.length) out.push(b[k]);
+    }
+    i += 1;
+  }
+  return out;
 }
 
 /** A warm-up whose set 1 is done or skipped is passed over (ticked on the overview). */

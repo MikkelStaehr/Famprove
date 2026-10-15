@@ -42,18 +42,25 @@
  *   ftp-warning / ftp-quiet  /load's FTP line (ftp-confirm.md §4): an illustrative ftp_status (and
  *          notice), credible and mismatched / not tested since 17 May; /analyse gets the same FTP
  *          (its FTP line, ftp-confirm.md §A); other screens: real rows.
+ *   superset  real Træning rows with an illustrative superset today (two consecutive accessory
+ *          runs per session), A1 and B1 done, resting before A2 (supersetFixture).
+ *   superset-suggested  as superset, the pair a suggestion from 7 days ago, nothing done today.
+ *          Under both, setSupersetPair and the taps write nothing (lib/db/superset-pairs.ts).
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
  */
 import { LIFTS } from "../lifts.ts";
 import { sessionOrderWithWarmups, setKey, type SetRef } from "../set-taps.ts";
+import { exerciseIdMap, exerciseIdOf, sessionRuns } from "../supersets.ts";
 import { PostgrestError } from "./postgrest.ts";
 import type {
   AnalysisSummaryRow,
   AppNoticeRow,
   DailyProjectionRow,
   ExerciseFeelRow,
+  ExerciseIdRow,
+  SupersetPairRow,
   FtpStatusRow,
   IsoDate,
   PlannedSetRow,
@@ -83,7 +90,9 @@ export type DevFixture =
   | "feel"
   | "calendar"
   | "ftp-warning"
-  | "ftp-quiet";
+  | "ftp-quiet"
+  | "superset"
+  | "superset-suggested";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -102,6 +111,8 @@ const FIXTURES: readonly DevFixture[] = [
   "calendar",
   "ftp-warning",
   "ftp-quiet",
+  "superset",
+  "superset-suggested",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
@@ -408,6 +419,65 @@ export function midsessionLog(sets: readonly PrescribedSetRow[], today: IsoDate,
     }
   }
   return log;
+}
+
+/**
+ * DEV_FIXTURE=superset / superset-suggested (slice supersets): per session of the week, the first
+ * two consecutive runs that are not competition lifts (by name; dev only) and have 2+ sets each
+ * become an illustrative pair. `superset`: chosen today, the log done up to and including B1 in
+ * the paired order (warm-ups included, 3 minutes apart, the last 1:42 ago), so the screen rests
+ * before A2. `superset-suggested`: a row from 7 days ago (paired), nothing logged today. Names
+ * without a public.exercises id get an illustrative negative id. Never written anywhere.
+ */
+export function supersetFixture(
+  fixture: "superset" | "superset-suggested",
+  data: { readonly sets: readonly PrescribedSetRow[]; readonly exerciseIds?: readonly ExerciseIdRow[] },
+  today: IsoDate,
+  now: Date,
+): { supersetPairs: SupersetPairRow[]; exerciseIds: ExerciseIdRow[]; setLog: SetLogRow[] } {
+  const exerciseIds = [...(data.exerciseIds ?? [])];
+  const known = exerciseIdMap(exerciseIds);
+  for (const s of data.sets) {
+    if (exerciseIdOf(known, s.name) === null) {
+      const id = -(exerciseIds.length + 1);
+      exerciseIds.push({ id, name: s.name.trim(), aliases: [] });
+      known.set(s.name.trim().toLowerCase(), id);
+    }
+  }
+  const pairs: SupersetPairRow[] = [];
+  const log: SetLogRow[] = [];
+  const bySession = new Map<number, PrescribedSetRow[]>();
+  for (const s of data.sets) bySession.set(s.session, [...(bySession.get(s.session) ?? []), s]);
+  for (const [session, rows] of bySession) {
+    const runSets = rows.map((r) => ({ ref: { row: r.sheetRow, set: r.setNo }, name: r.name, variantId: r.variantId }));
+    const runs = sessionRuns(runSets, known);
+    const nameOf = (row: number) => rows.find((r) => r.sheetRow === row)?.name.trim() ?? "";
+    const accessory = (row: number) => !/^(squat|bench|bænkpres|deadlift|dødløft)\b/i.test(nameOf(row));
+    const i = runs.findIndex((a, k) => {
+      const b = runs.at(k + 1);
+      return b !== undefined && accessory(a.row) && accessory(b.row) && a.sets >= 2 && b.sets >= 2 && a.exerciseId !== null && b.exerciseId !== null;
+    });
+    const a = runs.at(i);
+    const b = runs.at(i + 1);
+    if (i === -1 || a === undefined || b === undefined || a.exerciseId === null || b.exerciseId === null) continue;
+    const date = fixture === "superset" ? today : addDaysIso(today, -7);
+    const at = new Date(now.getTime() - 3_600_000).toISOString();
+    pairs.push({ date, session, rowA: a.row, rowB: b.row, exerciseA: a.exerciseId, variantA: a.variantId, exerciseB: b.exerciseId, variantB: b.variantId, paired: true, updatedAt: at });
+    if (fixture !== "superset") continue;
+    const order = sessionOrderWithWarmups(runSets, [{ rowA: a.row, rowB: b.row }]);
+    const upTo = order.findIndex((r) => r.row === b.row && r.set === 1) + 1; // through B1
+    const t = (k: number) => new Date(now.getTime() - 102_000 - (upTo - 1 - k) * 180_000).toISOString();
+    order.slice(0, upTo).forEach((ref, k) =>
+      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: new Date(Date.parse(t(k)) - 180_000).toISOString(), endedAt: t(k), skipped: false, updatedAt: t(k), feltRpe: null, repsDone: null }),
+    );
+  }
+  return { supersetPairs: pairs, exerciseIds, setLog: log };
+}
+
+function addDaysIso(date: IsoDate, days: number): IsoDate {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Three days: well past the 26 h staleness limit. */
