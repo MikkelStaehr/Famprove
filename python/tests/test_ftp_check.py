@@ -22,7 +22,7 @@ from training_load.domain.ftp_check import (
     suppressed_until,
     threshold_w,
 )
-from training_load.sources.intervals import parse_power_curves, power_curve_ranges
+from training_load.sources.intervals import after_range, parse_power_curves, power_curve_ranges
 
 TODAY = date(2026, 10, 15)
 
@@ -156,7 +156,8 @@ def test_power_curves_take_the_8_min_point_and_count_what_cannot_be_read() -> No
     }
     curves = parse_power_curves(payload)
     assert curves.best_42d == Effort(202, date(2026, 9, 20))
-    assert curves.weekly == [Effort(221, date(2026, 5, 17)), Effort(208, None)]
+    # "x" at 480 s is counted; its 600 s point (190 W, an unnamed ride) is still an effort that long
+    assert curves.weekly == [Effort(221, date(2026, 5, 17)), Effort(190, None), Effort(208, None)]
     assert curves.unreadable == 2
     with pytest.raises(ValueError):
         parse_power_curves({"message": "nope"})
@@ -252,3 +253,82 @@ def test_unreadable_power_curves_leave_the_check_as_it_was_and_the_run_goes_on()
     )
     assert (db.tables["ftp_status"], db.tables["app_notices"]) == before
     assert summary.ftp == 230  # planned_targets were still built
+
+
+# --- review round: a longer point, the after-answer range, a missing 42-day curve ----------------
+
+
+def test_a_longer_point_stands_in_when_the_grid_has_no_480_s() -> None:
+    payload = {
+        "list": [
+            {"id": "42d", "secs": [300, 600], "watts": [230, 210], "activity_id": ["i1", "i1"]}
+        ],
+        "activities": {"i1": {"start_date_local": "2026-10-01T09:00:00"}},
+    }
+    curves = parse_power_curves(payload)
+    assert (curves.best_42d, curves.has_42d) == (Effort(210, date(2026, 10, 1)), True)
+    tail = {
+        "id": "42d",
+        "secs": [480, 600, 6000],
+        "watts": [200, 205, 0],
+        "activity_id": ["i1"] * 3,
+    }
+    rises = parse_power_curves({"list": [tail], "activities": payload["activities"]})
+    assert (rises.best_42d, rises.unreadable) == (
+        Effort(205, date(2026, 10, 1)),
+        0,
+    )  # 0 W: no effort
+    assert parse_power_curves({"list": [], "activities": {}}).has_42d is False
+
+
+def test_the_after_range_is_its_own_curve_from_the_day_after_the_answer() -> None:
+    assert after_range(None, TODAY) is None
+    assert after_range(date(2026, 10, 16), TODAY) is None  # answered today: nothing after yet
+    assert after_range(date(2026, 10, 15), TODAY) == "r.2026-10-15.2026-10-15"
+    payload = {
+        "list": [_curve("r.2026-10-12.2026-10-18", 200), _curve("r.2026-10-15.2026-10-15", 215)],
+        "activities": {"i1": {"start_date_local": "2026-10-15T07:00:00"}},
+    }
+    curves = parse_power_curves(payload, after_id="r.2026-10-15.2026-10-15")
+    assert curves.best_after == Effort(215, date(2026, 10, 15))
+    assert curves.weekly == [Effort(200, date(2026, 10, 15))]
+
+
+def test_a_hard_effort_after_the_answer_brings_the_warning_back() -> None:
+    """The answer's week had its best (210 W) before the answer; the after range finds the later
+    hard effort, and eFTP moved more than 5 % (183 -> 193)."""
+    athlete = {"sportSettings": [{"types": ["Ride"], "ftp": 230, "mmp_model": {"ftp": 193}}]}
+
+    def handler(call: Call) -> FakeResponse:
+        if not call.url.endswith("/power-curves.json"):
+            return FakeResponse(body=athlete)
+        asked = dict(call.params or [])["curves"].split(",")
+        listed = [_curve("42d", 215, "i4"), _curve("r.2026-10-12.2026-10-18", 210, "i3")]
+        if "r.2026-10-15.2026-10-15" in asked:
+            listed.append(_curve("r.2026-10-15.2026-10-15", 215, "i4"))
+        return FakeResponse(
+            body={
+                "list": listed,
+                "activities": {
+                    "i3": {"start_date_local": "2026-10-13T09:00:00"},
+                    "i4": {"start_date_local": "2026-10-15T07:00:00"},
+                },
+            }
+        )
+
+    db = _db()
+    db.tables["ftp_ack"] = [
+        {
+            "id": 1,
+            "choice": "confirmed",
+            "ftp_w": 230,
+            "eftp_w": 183,
+            "at": "2026-10-14T19:00:00+00:00",
+        }
+    ]
+    send = FakeSend(handler=handler)
+    collect_plan.run(
+        SETTINGS, send=send, db=db, computed_at=datetime(2026, 10, 15, 10, 0, tzinfo=UTC)
+    )
+    assert [r["kind"] for r in db.tables["app_notices"]] == ["ftp_mismatch"]
+    assert db.tables["ftp_status"][0]["suppressed_until"] is None

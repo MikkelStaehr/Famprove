@@ -2,9 +2,9 @@
 
 The ftp_mismatch notice (power_check.ftp_notice: |FTP - eFTP| > 15 % of the FTP) shows only while
 intervals.icu's eFTP is credible: an effort of at least CREDIBLE_EFFORT_S at >= CREDIBLE_SHARE of
-the FTP set, within the last 42 days. On a power curve "an effort of 8 min or more at >= X" is the
-same as "the 8-min point >= X" (the curve never rises with duration), so the 42-day curve's 8-min
-point is the test. Not credible: /load shows a quiet line with the latest such effort in the last
+the FTP set, within the last 42 days. On the 42-day power curve that is the best power of any point
+from 8 min on (sources.intervals: a mean-max curve can rise a little with duration, so not only the
+8-min point). Not credible: /load shows a quiet line with the latest such effort in the last
 TESTED_WEEKS weeks ("ikke testet siden").
 
 Known blind spot (tech-lead, the user chose 90 % knowing it, 2026-10-15): the threshold is measured
@@ -37,7 +37,7 @@ type AckChoice = Literal["confirmed", "fixed"]
 
 @dataclass(frozen=True, slots=True)
 class Effort:
-    """A power-curve point: the best CREDIBLE_EFFORT_S power of a window and the ride holding it."""
+    """The best power of any effort of CREDIBLE_EFFORT_S or longer in a window, and its ride."""
 
     watts: int
     on: date | None  # local date of that ride; None when intervals.icu didn't name it (counted)
@@ -140,8 +140,11 @@ def ftp_status(
     rides: Sequence[tuple[date, int | None]],
     ack: FtpAck | None,
     today: date,
+    best_after: Effort | None = None,
 ) -> FtpStatus:
-    efforts = [*weekly, *([best_42d] if best_42d is not None else [])]
+    """``best_after``: the best effort since the day after the answer (its own range, so a hard
+    effort later in the answer's week counts even when that week's best came before it)."""
+    efforts = [*weekly, *(e for e in (best_42d, best_after) if e is not None)]
     return FtpStatus(
         ftp_w=ftp_w,
         eftp_w=eftp_w,

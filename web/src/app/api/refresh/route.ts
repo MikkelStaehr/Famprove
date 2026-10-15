@@ -1,4 +1,4 @@
-import { devFixture } from "@/lib/db/dev-fixture";
+import { devSwitchOn } from "@/lib/db/dev-fixture";
 import { dispatchDaily, listRuns, readGithubToken } from "@/lib/github/workflow";
 import {
   parseSince,
@@ -25,11 +25,6 @@ import {
  * run is harmless, the collectors are idempotent).
  */
 let lastStart: number | null = null;
-
-/** Under `next dev` with DEV_TODAY or DEV_FIXTURE the screen is not today's: start nothing. */
-function devSwitchOn(): boolean {
-  return process.env.NODE_ENV === "development" && (Boolean(process.env.DEV_TODAY) || devFixture() !== null);
-}
 
 function answer(body: RefreshAnswer | RefreshStatus, status: number, extra: HeadersInit = {}): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store", ...extra } });

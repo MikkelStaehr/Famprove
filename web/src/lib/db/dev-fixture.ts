@@ -400,6 +400,17 @@ export function devFixture(
 }
 
 /** The error DEV_FIXTURE=error throws in place of reading `table`. */
+/**
+ * Under `next dev` with DEV_TODAY or DEV_FIXTURE the screen is not today's or not real: every write
+ * path (set taps, the FTP answer) and the refresh route start nothing. The one copy of this guard.
+ */
+export function devSwitchOn(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): boolean {
+  return nodeEnv === "development" && (Boolean(env.DEV_TODAY) || devFixture(env, nodeEnv) !== null);
+}
+
 export function fixtureError(table: string): PostgrestError {
   return new PostgrestError(table, null, `DEV_FIXTURE=error: ${table} was not read`);
 }

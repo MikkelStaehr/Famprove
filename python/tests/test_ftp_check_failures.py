@@ -61,7 +61,9 @@ def test_a_42_day_curve_without_the_480_s_point_has_no_effort_and_is_not_credibl
 def test_watts_as_text_or_blank_is_counted_unreadable_never_0_and_never_credible(
     watts: object,
 ) -> None:
-    assert _status_of(_curves(watts)) == (False, None, 1)
+    # Counted, never 0; the 600 s point (190 W) is still an effort of 8 min or more (main session,
+    # review round: every point from 480 s on counts, a mean-max curve can rise with duration).
+    assert _status_of(_curves(watts)) == (False, 190, 1)
 
 
 def test_watts_on_the_threshold_as_a_float_is_credible() -> None:

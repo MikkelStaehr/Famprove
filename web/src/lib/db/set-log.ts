@@ -16,7 +16,7 @@ import {
   stateOf,
 } from "../set-taps.ts";
 import { localToday } from "../training-view.ts";
-import { devFixture } from "./dev-fixture.ts";
+import { devSwitchOn } from "./dev-fixture.ts";
 import { EnvError, readSupabaseEnv } from "./env.ts";
 import {
   createClient,
@@ -189,11 +189,6 @@ async function clearStarts(c: PostgrestClient, date: string, session: number, t:
     ],
     body: { started_at: null, updated_at: at },
   });
-}
-
-/** Under `next dev` with DEV_TODAY or DEV_FIXTURE the screen is not today's: write nothing. */
-function devSwitchOn(env: Readonly<Record<string, string | undefined>>, nodeEnv: string | undefined): boolean {
-  return nodeEnv === "development" && (Boolean(env.DEV_TODAY) || devFixture(env, nodeEnv) !== null);
 }
 
 /** Injectable for tests; production reads process.env and uses globalThis.fetch. */

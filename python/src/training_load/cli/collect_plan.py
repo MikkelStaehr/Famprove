@@ -14,7 +14,9 @@ import logging
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+
+import requests
 
 from training_load.config import (
     ConfigError,
@@ -67,23 +69,39 @@ def check_ftp(
 ) -> FtpStatus | None:
     """The FTP status for this run; None when the power curves can't be read (logged: the stored
     status and notice stay as they were)."""
+    ack = latest_ack(db)
+    # "230 W er rigtigt": its own range from the next day, for a hard effort since the answer.
+    after = (
+        ack.at.astimezone(LOCAL_TZ).date() + timedelta(days=1)
+        if ack is not None and ack.choice == "confirmed"
+        else None
+    )
     try:
         curves = fetch_power_curves(
-            send, api_key=intervals.api_key, athlete_id=intervals.athlete_id, today=today
+            send,
+            api_key=intervals.api_key,
+            athlete_id=intervals.athlete_id,
+            today=today,
+            after=after,
         )
-    except (HttpError, ValueError) as exc:
-        log.warning("FTP check skipped, power curves unreadable: %s", exc)
+    except (HttpError, ValueError, requests.RequestException) as exc:
+        # requests.RequestException: a connection that kept failing or timing out (http.request
+        # re-raises it after its retries); the check is skipped, planned_targets still get built.
+        log.warning("FTP check skipped, power curves unreadable: %s", type(exc).__name__)
         return None
     if curves.unreadable:
         log.warning("FTP check: %d power-curve points unreadable, left out", curves.unreadable)
+    if not curves.has_42d:
+        log.info("FTP check: no 42-day power curve (no ride with power in 42 days)")
     return ftp_status(
         ftp_w=ftps.ftp,
         eftp_w=ftps.eftp,
         best_42d=curves.best_42d,
         weekly=curves.weekly,
         rides=ride_ftps(db),
-        ack=latest_ack(db),
+        ack=ack,
         today=today,
+        best_after=curves.best_after,
     )
 
 

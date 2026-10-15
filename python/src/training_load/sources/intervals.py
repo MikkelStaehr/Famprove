@@ -264,6 +264,8 @@ class PowerCurves:
     best_42d: Effort | None  # None = no effort that long with power in the last 42 days
     weekly: list[Effort]  # one per week with such an effort (intervals.icu leaves out the rest)
     unreadable: int  # points with a malformed value or an unnamed ride: counted, logged
+    has_42d: bool  # False: intervals.icu listed no 42-day curve (no ride with power then; logged)
+    best_after: Effort | None = None  # the `after` range's effort (since the day after an answer)
 
 
 def power_curve_ranges(today: date, weeks: int) -> list[str]:
@@ -273,17 +275,37 @@ def power_curve_ranges(today: date, weeks: int) -> list[str]:
     return ["42d", *(f"r.{w.isoformat()}.{(w + timedelta(days=6)).isoformat()}" for w in starts)]
 
 
+def after_range(after: date | None, today: date) -> str | None:
+    """``r.<after>.<today>``: the efforts since an answer's next day; None when there is none."""
+    return None if after is None or after > today else f"r.{after.isoformat()}.{today.isoformat()}"
+
+
 def _curve_effort(
     curve: Mapping[str, object], activities: Mapping[str, object], secs: int
 ) -> tuple[Effort | None, bool]:
-    """(the curve's point at ``secs``, whether something in it was unreadable)."""
+    """(the best power of any effort of ``secs`` or longer in the curve, whether a point of those
+    was unreadable). A mean-max curve can rise a little with duration (samples 10, 0, 10: best 2 s
+    = 5, best 3 s = 6.7; the real curves do by 1-2 W in places), so every point from ``secs`` on
+    counts, not only the ``secs`` point."""
     points, watts, ids = curve.get("secs"), curve.get("watts"), curve.get("activity_id")
-    if not isinstance(points, list) or secs not in points:
-        return None, not isinstance(points, list)  # no effort that long in the window
-    i = points.index(secs)
-    value = watts[i] if isinstance(watts, list) and i < len(watts) else None
-    if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+    if not isinstance(points, list):
         return None, True
+    best: tuple[float, int] | None = None
+    bad = False
+    for i, s in enumerate(points):
+        if not isinstance(s, int) or isinstance(s, bool) or s < secs:
+            continue
+        value = watts[i] if isinstance(watts, list) and i < len(watts) else None
+        if isinstance(value, bool) or not isinstance(value, int | float) or value < 0:
+            bad = True
+            continue
+        if value == 0:
+            continue  # 0 W: no power held that long (the curve's tail past the ride), not an effort
+        if best is None or value > best[0]:
+            best = (value, i)
+    if best is None:
+        return None, bad  # no effort that long in the window
+    value, i = best
     ride = ids[i] if isinstance(ids, list) and i < len(ids) else None
     meta = activities.get(ride) if isinstance(ride, str) else None
     start = meta.get("start_date_local") if isinstance(meta, dict) else None
@@ -291,44 +313,71 @@ def _curve_effort(
         on = date.fromisoformat(start[:10]) if isinstance(start, str) else None
     except ValueError:
         on = None
-    return Effort(watts=round(value), on=on), on is None
+    return Effort(watts=round(value), on=on), bad or on is None
 
 
-def parse_power_curves(payload: object, *, secs: int = CREDIBLE_EFFORT_S) -> PowerCurves:
+def parse_power_curves(
+    payload: object, *, secs: int = CREDIBLE_EFFORT_S, after_id: str | None = None
+) -> PowerCurves:
     """GET /athlete/{id}/power-curves.json -> the ``secs`` point of each curve. A body without a
-    ``list`` of curves is a ValueError; a curve without that point has no effort that long."""
+    ``list`` of curves is a ValueError; a curve without that point has no effort that long.
+    intervals.icu leaves a range without rides out of the list (measured 2026-10-15: 53 asked,
+    14 listed), so a missing curve means no ride with power then, never an error."""
     if not isinstance(payload, dict) or not isinstance(payload.get("list"), list):
         raise ValueError("intervals.icu power curves: expected an object with a list")
     activities = payload.get("activities")
     names: Mapping[str, object] = activities if isinstance(activities, dict) else {}
     best_42d: Effort | None = None
+    best_after: Effort | None = None
     weekly: list[Effort] = []
     unreadable = 0
+    has_42d = False
     for curve in json_objects(payload["list"], "intervals.icu power curves"):
+        cid = curve.get("id")
+        has_42d = has_42d or cid == "42d"
         effort, bad = _curve_effort(curve, names, secs)
         unreadable += bad
         if effort is None:
             continue
-        if curve.get("id") == "42d":
+        if cid == "42d":
             best_42d = effort
-        elif isinstance(curve.get("id"), str) and str(curve.get("id")).startswith("r."):
+        elif after_id is not None and cid == after_id:
+            best_after = effort
+        elif isinstance(cid, str) and cid.startswith("r."):
             weekly.append(effort)
-    return PowerCurves(best_42d=best_42d, weekly=weekly, unreadable=unreadable)
+    return PowerCurves(
+        best_42d=best_42d,
+        weekly=weekly,
+        unreadable=unreadable,
+        has_42d=has_42d,
+        best_after=best_after,
+    )
 
 
 def fetch_power_curves(
-    send: HttpSend, *, api_key: str, athlete_id: str, today: date, weeks: int = TESTED_WEEKS
+    send: HttpSend,
+    *,
+    api_key: str,
+    athlete_id: str,
+    today: date,
+    after: date | None = None,
+    weeks: int = TESTED_WEEKS,
 ) -> PowerCurves:
-    """One GET (read-only): the ride power curves for the last 42 days and each of ``weeks`` ISO
-    weeks (type=Ride covers VirtualRide too; checked 2026-10-15)."""
+    """One GET (read-only): the ride power curves for the last 42 days, each of ``weeks`` ISO
+    weeks and, with ``after``, the days from ``after`` to today (type=Ride covers VirtualRide too;
+    checked 2026-10-15)."""
+    extra = after_range(after, today)
     response = request(
         send,
         "GET",
         f"{BASE_URL}/athlete/{quote(athlete_id, safe='')}/power-curves.json",
         headers={"Authorization": basic_auth_header(api_key), "Accept": "application/json"},
-        params=[("type", "Ride"), ("curves", ",".join(power_curve_ranges(today, weeks)))],
+        params=[
+            ("type", "Ride"),
+            ("curves", ",".join([*power_curve_ranges(today, weeks), *([extra] if extra else [])])),
+        ],
     )
-    return parse_power_curves(response.json())
+    return parse_power_curves(response.json(), after_id=extra)
 
 
 def parse_power_stream(payload: object) -> tuple[list[int | None], list[int | None]] | None:

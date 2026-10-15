@@ -22,7 +22,7 @@ comment on table public.ftp_status is
   'The FTP check, one row, rebuilt by collect-plan (domain/ftp_check.py). Every null means unknown or none, never 0. The ftp_mismatch notice (app_notices) is written only while credible and not suppressed.';
 comment on column public.ftp_status.ftp_w is 'The FTP set in intervals.icu (sportSettings.ftp). Null = intervals.icu has none.';
 comment on column public.ftp_status.eftp_w is 'intervals.icu''s eFTP (sportSettings.mmp_model.ftp). Null = unknown.';
-comment on column public.ftp_status.best_8min_42d_w is 'The ride power curve''s 8-min point over the last 42 days (type Ride, VirtualRide included). Null = no effort that long with power.';
+comment on column public.ftp_status.best_8min_42d_w is 'The best power of any effort of 8 min or more in the last 42 days: the highest point from 480 s on of the ride power curve (type Ride, VirtualRide included; a mean-max curve can rise a little with duration). Null = no effort that long with power.';
 comment on column public.ftp_status.threshold_w is '90 % of ftp_w, rounded up (user, 2026-10-15: "høj intensitet"). Null without an FTP.';
 comment on column public.ftp_status.credible is 'best_8min_42d_w >= threshold_w: an effort of 8 min or more at >= 90 % of the FTP in 42 days. Null without an FTP.';
 comment on column public.ftp_status.last_tested_on is 'Local date of the latest ride with such an effort in the last 52 ISO weeks. Null = none ("ikke testet de sidste 52 uger").';
@@ -54,3 +54,4 @@ comment on column public.ftp_ack.at is 'Server time of the tap (the column defau
 alter table public.ftp_ack enable row level security;
 revoke all on table public.ftp_ack from anon, authenticated, service_role;
 grant select, insert, delete on table public.ftp_ack to service_role;
+revoke all on sequence public.ftp_ack_id_seq from anon, authenticated;

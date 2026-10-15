@@ -7,7 +7,7 @@ import {
   parseAckId,
   parseFtpChoice,
 } from "../ftp-line.ts";
-import { devFixture } from "./dev-fixture.ts";
+import { devSwitchOn } from "./dev-fixture.ts";
 import { readSupabaseEnv } from "./env.ts";
 import { createClient, insertReturning, type PostgrestClient, selectFirst, write } from "./postgrest.ts";
 import {
@@ -41,11 +41,6 @@ const ACK = FTP_ACK_SELECT.table;
 function client(): PostgrestClient {
   const env = readSupabaseEnv();
   return createClient(env.url, env.serviceKey, (url, init) => fetch(url, init));
-}
-
-/** Under `next dev` with DEV_TODAY or DEV_FIXTURE the screen is not today's: write nothing. */
-function devSwitchOn(env: Readonly<Record<string, string | undefined>>, nodeEnv: string | undefined): boolean {
-  return nodeEnv === "development" && (Boolean(env.DEV_TODAY) || devFixture(env, nodeEnv) !== null);
 }
 
 /** Injectable for tests; production reads process.env and uses globalThis.fetch. */
