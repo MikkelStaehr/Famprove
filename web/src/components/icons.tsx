@@ -21,7 +21,8 @@ export type IconName =
   | "arrow-flat"
   | "x"
   | "minus"
-  | "plus";
+  | "plus"
+  | "refresh";
 
 /** Part B sizes: 22 phone tab bar, 20 desktop tabs / card corners / icon buttons, 18 ListRow, 16 WarningLine and chevrons. */
 export type IconSize = 16 | 18 | 20 | 22;
@@ -50,6 +51,8 @@ const PATHS: Readonly<Record<IconName, ReactNode>> = {
   x: <path d="M6 6l12 12M18 6L6 18" />,
   minus: <path d="M5 12h14" />,
   plus: <path d="M5 12h14M12 5v14" />,
+  // Hent data nu (refresh.md §1): an open clockwise arc, arrowhead top right.
+  refresh: <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />,
 };
 
 type IconProps = {

@@ -1,6 +1,8 @@
 import type { Freshness } from "@/lib/dashboard-view";
 import { updatedText } from "@/lib/format";
 
+import { RefreshButton, WithRefresh } from "./Refresh";
+
 import { WarningLine } from "./WarningLine";
 
 type UpdatedLineProps = {
@@ -11,12 +13,19 @@ type UpdatedLineProps = {
   readonly unknownNote: string;
 };
 
-/** "opdateret <time>" in Geist Mono 12 muted; stale or unknown = ◆ + words in --text (WarningLine), never colour alone. */
+/**
+ * "opdateret <time>" in Geist Mono 12 muted; stale or unknown = ◆ + words in --text (WarningLine),
+ * never colour alone. Each ends with the ↻ (refresh.md §1), so it needs a RefreshProvider above it.
+ */
 export function UpdatedLine({ freshness, staleNote, unknownNote }: UpdatedLineProps) {
   if (freshness.kind === "fresh") {
     return (
       <p className="font-mono text-12 text-text-muted">
-        opdateret <time dateTime={freshness.computedAt}>{updatedText(freshness.computedAt, null).sentence}</time>
+        opdateret{" "}
+        <span className="whitespace-nowrap">
+          <time dateTime={freshness.computedAt}>{updatedText(freshness.computedAt, null).sentence}</time>
+          <RefreshButton attention={false} />
+        </span>
       </p>
     );
   }
@@ -26,10 +35,10 @@ export function UpdatedLine({ freshness, staleNote, unknownNote }: UpdatedLinePr
         <>
           Forældet: sidst opdateret{" "}
           <time dateTime={freshness.computedAt}>{updatedText(freshness.computedAt, null).sentence}</time>.{" "}
-          {staleNote}
+          <WithRefresh text={staleNote} attention />
         </>
       ) : (
-        unknownNote
+        <WithRefresh text={unknownNote} attention />
       )}
     </WarningLine>
   );

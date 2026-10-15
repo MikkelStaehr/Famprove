@@ -9,6 +9,7 @@ import { SessionBlock, SessionWeekSentence } from "@/components/SessionBlock";
 import { SetLogProvider } from "@/components/SetLogProvider";
 import { StrengthCard } from "@/components/StrengthCard";
 import { RestToday, RideToday } from "@/components/TodayCard";
+import { RefreshProvider, RefreshStatus, WithRefresh } from "@/components/Refresh";
 import { WarningLine } from "@/components/WarningLine";
 import { type WeekBody, WeekCard } from "@/components/WeekCard";
 import { dayDetails, weekView } from "@/lib/dashboard-view";
@@ -149,13 +150,22 @@ export default async function TrainingPage() {
   // Phone: one column (max 640 from sm). Desktop (lg): 7fr | 5fr, DOM order = phone order (reset-traening.md §4).
   const page = (
     <div className="mx-auto flex w-full max-w-160 flex-col gap-3 lg:max-w-none lg:gap-4">
+      <RefreshProvider>
       <header className="flex flex-col gap-2 px-1 pt-1 pb-2">
         <div className="flex flex-col gap-0.5">
           <h1 className="font-sans text-22 font-semibold text-text">Træning</h1>
-          <p className="font-mono text-12 text-text-muted tabular-nums">
-            <time dateTime={today}>{formatDay(today)}</time>
-            {header !== null && <> · {updatedCaption(header.freshness, today)}</>}
-          </p>
+          <div>
+            <p className="font-mono text-12 text-text-muted tabular-nums">
+              <time dateTime={today}>{formatDay(today)}</time>
+              {header !== null && (
+                <>
+                  {" · "}
+                  <WithRefresh text={updatedCaption(header.freshness, today)} attention={header.freshness.kind !== "fresh"} />
+                </>
+              )}
+            </p>
+            <RefreshStatus />
+          </div>
         </div>
         {header !== null && header.freshness.kind !== "fresh" && (
           <WarningLine>
@@ -165,6 +175,7 @@ export default async function TrainingPage() {
           </WarningLine>
         )}
       </header>
+      </RefreshProvider>
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[7fr_5fr] lg:grid-rows-[auto_auto_auto_1fr] lg:items-start lg:gap-4">
         {weekCard}
         {plan.kind === "error" ? (

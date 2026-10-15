@@ -295,7 +295,7 @@ Line icons, 24 viewBox, `fill="none"`, `stroke="currentColor"`, **stroke-width 1
 - **trend** (Belastning tab): `M3 17l5-6 4 3 4-7 5 5`
 - **bars** (Analyse tab): `M4 20V10M10 20V4M16 20v-7M22 20H2`
 - **arrow-right** (Begynd træning): `M5 12h14M13 6l6 6-6 6`
-- New, same style: **chevron-left/right** (`M15 6l-6 6 6 6` / `M9 6l6 6-6 6`), **chevron-down** (`M6 9l6 6 6-6`), **warning** (`M12 4l9 16H3z` + `M12 10v4` + `M12 17v.5`), **check** (`M5 12l5 5 9-10`), **arrow-up/down/flat** for deltas (`M12 19V5M6 11l6-6 6 6` / mirrored / `M5 12h14M13 6l6 6-6 6`).
+- New, same style: **chevron-left/right** (`M15 6l-6 6 6 6` / `M9 6l6 6-6 6`), **chevron-down** (`M6 9l6 6 6-6`), **warning** (`M12 4l9 16H3z` + `M12 10v4` + `M12 17v.5`), **check** (`M5 12l5 5 9-10`), **arrow-up/down/flat** for deltas (`M12 19V5M6 11l6-6 6 6` / mirrored / `M5 12h14M13 6l6 6-6 6`), **refresh** (Hent data nu, 16px after the "opdateret" time; `design/specs/refresh.md`: `M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4`).
 
 ## Components (look)
 - **Card:** `--card`, 1px `--border`, `--radius-card`, padding 18px, column gap 14px. Header row: `SectionTitle` left, `MonoCaption` text-12 or a control right, `justify-between`, `items-center`.
