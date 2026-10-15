@@ -141,7 +141,7 @@ function FtpWarning({ text, ftpW }: { readonly text: string; readonly ftpW: numb
             aria-expanded={phase.open}
             aria-controls={panelId}
             onClick={toggle}
-            className="group flex min-h-11 max-w-full items-center self-start rounded-control py-[13px] text-left font-sans text-13 text-text active:opacity-85"
+            className="group flex min-h-11 max-w-[65ch] items-center self-start rounded-control py-[13px] text-left font-sans text-13 text-text active:opacity-85"
           >
             <span className="flex items-start gap-2">
               <span className="flex h-lh shrink-0 items-center text-warning">
