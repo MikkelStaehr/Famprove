@@ -174,9 +174,9 @@ def run(google: GoogleSettings, *, bodyweight: float, send: HttpSend, db: Postgr
         )
         add_unknown(db, unknown)
         catalog = Catalog(all_exercises(db), all_variants(db))
-    # Variants from "V:" lines (user, 2026-10-14): unknown ones are added with every value
-    # inheriting from the exercise (insert-only), so they score exactly as the exercise until the
-    # user sets their values; each set then carries its variant's id.
+    # Variants from NOTES (user, 2026-10-14; "V:" optional since 2026-10-15): unknown ones are
+    # added with every value inheriting from the exercise (insert-only), so they score exactly as
+    # the exercise until the user sets their values; each set then carries its variant's id.
     pairs = ((p["name"], p["variant"], p["variant_display"]) for p in parsed)
     if new_variants := catalog.unknown_variants(pairs):
         log.warning(

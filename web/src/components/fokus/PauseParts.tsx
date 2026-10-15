@@ -10,7 +10,6 @@ import {
   type FokusExercise,
   nextFeel,
   nextSetSummary,
-  NOTE_CLAMP_CHARS,
   rampBasis,
   rampState,
   repsRange,
@@ -27,7 +26,7 @@ import { dotField, FIELD_WIDTH } from "@/lib/fokus-marks";
 
 import { Icon } from "@/components/icons";
 
-import { ArrowIcon, CAPTION, INK_LINK, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
+import { ArrowIcon, CAPTION, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
@@ -355,22 +354,6 @@ export function NextSetCard({
       )}
       {summary.newVariant !== null && <p className="text-14 text-text-muted">{summary.newVariant}</p>}
     </section>
-  );
-}
-
-/** The coach's note (round 3: in the set view, under the figures): a quiet muted line, long ones clamped. */
-export function Note({ text }: { readonly text: string }) {
-  const [open, setOpen] = useState(false);
-  const long = text.length > NOTE_CLAMP_CHARS;
-  return (
-    <div className="flex flex-col items-start rounded-tile border border-border bg-card p-3.5">
-      <p className={`font-sans text-16 text-text-muted [overflow-wrap:anywhere] ${long && !open ? "line-clamp-3" : ""}`}>Note: {text}</p>
-      {long && !open && (
-        <button type="button" onClick={() => setOpen(true)} className={`-my-2.5 ${INK_LINK}`}>
-          Hele noten
-        </button>
-      )}
-    </div>
   );
 }
 

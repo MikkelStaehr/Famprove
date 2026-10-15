@@ -50,7 +50,6 @@ export type FokusExercise = Pick<
   | "restMinS"
   | "restMaxS"
   | "ramp"
-  | "notes"
   | "sets"
 > & {
   /** This week's sheet kg (ExerciseView.kg): never shown (D3); only the finished signature's bar height reads it. */
@@ -577,9 +576,6 @@ export function durationText(minutes: number): string {
   const m = minutes % 60;
   return m === 0 ? `${h} t` : `${h} t ${m} min`;
 }
-
-/** Notes up to this many characters show in full; longer ones clamp to 2 lines with "Hele noten". */
-export const NOTE_CLAMP_CHARS = 60;
 
 /** A range as one figure (round 4): "8 - 12" -> "8–12" (en dash, no spaces); a leading minus stays. */
 export function rangeFigure(text: string): string {

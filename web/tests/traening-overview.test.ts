@@ -40,7 +40,6 @@ function row(row: number, overrides: Partial<ExerciseView> = {}, sets = 2): Exer
     restMinS: null,
     restMaxS: null,
     ramp: null,
-    notes: null,
     sets: Array.from({ length: sets }, (_, i) => ({ row, set: i + 1 })),
     ...overrides,
   };

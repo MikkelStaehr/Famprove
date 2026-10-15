@@ -24,8 +24,6 @@ export const CAPTION = "font-mono text-13 font-normal text-text-muted uppercase"
 /** Spring over (round 4): a centred muted underlined text link, 44px target, no box. */
 export const MUTED_LINK =
   "min-h-11 px-4 font-sans text-16 font-normal text-text-muted underline decoration-1 underline-offset-4";
-/** An ink text action (Hele noten): Geist 500, underlined 1px at 4px. */
-export const INK_LINK = "min-h-11 font-sans text-16 font-medium text-text underline decoration-1 underline-offset-4";
 
 /** A 1px divider in --border (never an outline, [A5]). */
 export function Hairline({ className = "" }: { readonly className?: string }) {

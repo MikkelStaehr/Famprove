@@ -46,7 +46,6 @@ const RAW = {
   prescribed: "RPE 8 - 9",
   logged_kg: null,
   bodyweight: false,
-  notes: null,
 };
 
 test("parsePrescribedSetRow: the display name verbatim; equal to the exercise name is no variant; both or neither", () => {
@@ -74,7 +73,7 @@ test("planned_sets: basis new_variant parses without a suggestion, never with on
 function set(overrides: Partial<PrescribedSetRow>): PrescribedSetRow {
   return {
     weekStart: "2026-10-12", session: 1, block: "B", week: 3, sheetRow: 40, setNo: 1, name: "Bicep of choice", type: "BICEPS",
-    setsText: "1", repsText: "20 - 30", prescribed: "RPE 8 - 9", loggedKg: null, bodyweight: false, notes: null,
+    setsText: "1", repsText: "20 - 30", prescribed: "RPE 8 - 9", loggedKg: null, bodyweight: false,
     variantId: null, variant: null, ...overrides,
   };
 }

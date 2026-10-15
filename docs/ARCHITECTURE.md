@@ -67,7 +67,7 @@ Next.js (web/), server components only
 ## Tables
 `activities` (rides; `data_warning` = the power-data check, domain/power_check.py) · `strength_activities` (WeightTraining from intervals.icu) ·
 `strength_sets` (every prescribed set: plan + logged kg + effective kg + cells as written; ISO week + session number; the muscle_factor it was scored with) ·
-`exercises` (hand-edited catalogue: muscle factor, bodyweight fraction, per side, kg per dumbbell, category per exercise name and its aliases) · `exercise_variants` (hand-edited, from "V:" in the sheet's NOTES: per-variant overrides, null = inherit; `strength_sets.variant_id`) ·
+`exercises` (hand-edited catalogue: muscle factor, bodyweight fraction, per side, kg per dumbbell, category per exercise name and its aliases) · `exercise_variants` (hand-edited, from the text in the sheet's NOTES: per-variant overrides, null = inherit; `strength_sets.variant_id`) ·
 `strength_sessions` (derived: per ISO week and session number, the activity that did it, its date, TSS) ·
 `daily_load` (one row per day since 2026-01-01: TSS, CTL, ATL, TSB, ramp, zone, `computed_at`) ·
 `blocks` (strength blocks + deload) · `weekly_load` (view) · `planned_sessions` (you fill) ·

@@ -61,7 +61,7 @@ test("DEV_FIXTURE=midsession: per session, 3 sets done 3 min apart, then one ski
     prescribed: "RPE 6",
     loggedKg: null,
     bodyweight: false,
-    notes: null, variantId: null, variant: null,
+    variantId: null, variant: null,
   });
   const now = new Date("2026-10-12T16:00:00Z");
   const log = midsessionLog([set(1, 26, 1), set(1, 25, 2), set(1, 25, 1), set(1, 27, 1), set(1, 28, 1), set(2, 77, 1)], "2026-10-12", now);
@@ -86,7 +86,7 @@ test("DEV_FIXTURE warmup / pause / exercise-end: each gives its Fokus view (pure
     prescribed: "RPE 7",
     loggedKg: 60,
     bodyweight: false,
-    notes: null, variantId: null, variant: null,
+    variantId: null, variant: null,
   });
   const sets = [row(5, 1, "Dips", "6 - 10"), row(5, 2, "Dips", "6 - 10"), row(6, 1, "Squat", "5"), row(6, 2, "Squat", "5")];
   const order = sessionOrderWithWarmups(sets.map((s) => ({ ref: { row: s.sheetRow, set: s.setNo }, name: s.name })));
@@ -101,7 +101,6 @@ test("DEV_FIXTURE warmup / pause / exercise-end: each gives its Fokus view (pure
   assert.ok(!viewOf("warmup").out.plannedSets.some((p) => p.ramp !== null));
   const pause = viewOf("pause");
   assert.equal(pause.view.kind, "pause");
-  assert.ok(pause.out.sets.some((s) => s.notes !== null));
   assert.ok(pause.out.setLog.some((l) => l.repsDone === 10)); // the server's default at Udført
   const end = viewOf("exercise-end");
   assert.deepEqual(end.view, { kind: "warmup", warmup: { row: 6, set: 0 }, since: new Date(now.getTime() - 40_000).toISOString(), feel: { row: 5, set: 2 } });
@@ -111,11 +110,10 @@ test("DEV_FIXTURE warmup / pause / exercise-end: each gives its Fokus view (pure
 test("DEV_FIXTURE=midsession: adjustments (+2,5, capped, hold) and a note, illustrative", () => {
   const row = (sheetRow: number) => ({
     weekStart: "2026-10-12", session: 1, block: "B", week: 3, sheetRow, setNo: 1, name: `E${sheetRow}`, type: "X",
-    setsText: "1", repsText: "5", prescribed: "RPE 7", loggedKg: 50, bodyweight: false, notes: null, variantId: null, variant: null,
+    setsText: "1", repsText: "5", prescribed: "RPE 7", loggedKg: 50, bodyweight: false, variantId: null, variant: null,
   });
   const out = midsessionPlanned([row(1), row(2), row(3), row(4)], []);
-  assert.deepEqual(out.plannedSets.map((p) => [p.sheetRow, p.adjustmentKg, p.uncappedKg !== null]), [[1, 2.5, false], [2, 2.5, true], [3, 0, false]]);
-  assert.deepEqual(out.sets.filter((s) => s.notes !== null).map((s) => s.sheetRow), [4]);
+  assert.deepEqual(out.map((p) => [p.sheetRow, p.adjustmentKg, p.uncappedKg !== null]), [[1, 2.5, false], [2, 2.5, true], [3, 0, false]]);
 });
 
 test("DEV_FIXTURE pause-rated / finished (fokus-round4.md §5): pure, nothing is written", () => {
@@ -133,7 +131,7 @@ test("DEV_FIXTURE pause-rated / finished (fokus-round4.md §5): pure, nothing is
     prescribed: "RPE 7",
     loggedKg,
     bodyweight: false,
-    notes: null, variantId: null, variant: null,
+    variantId: null, variant: null,
   });
   const sets = [
     row(5, 1, "Dips", "6 - 10"), row(5, 2, "Dips", "6 - 10"), row(5, 3, "Dips", "6 - 10"),

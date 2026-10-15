@@ -979,8 +979,7 @@ export type PrescribedSetRow = {
   readonly prescribed: string | null; // as written, e.g. "RPE 6 - 7", "-10%"
   readonly loggedKg: number | null; // null: not entered/unreadable; 0 is real only if bodyweight (bodyweight only)
   readonly bodyweight: boolean;
-  readonly notes: string | null; // the coach's NOTES cell as written; null = blank
-  /** strength_sets.variant_id: the sheet's "V:" variant in force; null = ukendt (matches only null). */
+  /** strength_sets.variant_id: the sheet's NOTES variant in force; null = ukendt (matches only null). */
   readonly variantId: number | null;
   /** exercise_variants.display_name as shown; null without a variant or when it equals the exercise name. */
   readonly variant: string | null;
@@ -1159,7 +1158,7 @@ export function parseSetLogRow(raw: unknown): SetLogRow {
 export const PRESCRIBED_SETS_SELECT = {
   table: "strength_sets",
   columns:
-    "week_start,session,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight,notes,variant_id,exercise_variants(display_name)",
+    "week_start,session,sheet_id,block,week,sheet_row,set_no,name,type,sets_text,reps_text,prescribed,logged_kg,bodyweight,variant_id,exercise_variants(display_name)",
   order: "week_start,session,sheet_id,block,sheet_row,week,set_no", // unique (includes the primary key)
 } as const;
 
@@ -1179,7 +1178,6 @@ export function parsePrescribedSetRow(raw: unknown): PrescribedSetRow {
     prescribed: f.stringOrNull("prescribed"),
     loggedKg: f.numberOrNull("logged_kg"),
     bodyweight: f.boolean("bodyweight"),
-    notes: f.stringOrNull("notes"),
     ...variantOf(f, PRESCRIBED_SETS_SELECT.table, f.string("name")),
   };
 }

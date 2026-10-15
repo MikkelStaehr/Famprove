@@ -18,15 +18,14 @@
  *          write (taps are refused under a dev switch, lib/db/set-log.ts).
  *   warmup / pause / exercise-end  real Træning rows with an illustrative set log for today
  *          (fokus-pause.md §8): "Begynd træning" just tapped (Variant A with a ramp); set 1 of a
- *          range exercise done 2:10 ago, with a note (Variant B before the minimum); the last set of
- *          a range exercise done, the next run's warm-up started, with a ramp and a 2-line note
- *          (Variant C, the fold's worst case). Ramps, rests and notes the real rows lack are
- *          illustrative, never real suggestions.
+ *          range exercise done 2:10 ago (Variant B before the minimum); the last set of a range
+ *          exercise done, the next run's warm-up started, with a ramp (Variant C). Ramps and rests
+ *          the real rows lack are illustrative, never real suggestions.
  *   pause-rated / finished  (fokus-round4.md §5) as `pause`, the done set 3:40 ago and rated
  *          Hårdere; every set tapped (2 skipped, warm-ups, reps_done on range sets, mixed ratings
  *          incl. unrated, rests 1:30–5:00 and one > 6 min), logged kg for the first exercise only.
  *   feel   /analyse/styrke with two illustrative exercise_feel rows (Python's sentence form).
- *   midsession also gives planned rows an adjustment (+2,5, a capped +2,5, a hold) and a note.
+ *   midsession also gives planned rows an adjustment (+2,5, a capped +2,5, a hold).
  *   answers  real /analyse rows with illustrative analysis_summary rows, all three in `answer`
  *          (eFTP flat, EF up, volume with a plan, 3 of 4 done; analyse.md §12d), so the normal
  *          state of the answer blocks can be screenshotted. The sentences are Python's (the
@@ -114,8 +113,6 @@ export const FINISHED_LONG_REST_S = 400;
 export const FINISHED_FEELS = [0, -1, 0, 1, null, 0, 1] as const;
 
 const RANGE = /^\s*\d+\s*[-–]\s*\d+\s*$/;
-const NOTE_SHORT = "Palloff + GHD";
-const NOTE_LONG = "Hold pausen i bunden et sekund, og stop sættet, hvis ryggen runder. Palloff + GHD efter sidste sæt.";
 const FIXTURE_RAMP_BASIS_KG = 100; // only when the real row has no suggestion to ramp from
 
 /** An illustrative 40/60/80 % ramp of `kg`, rounded to 2.5 (dev only; Python owns the real one). */
@@ -147,8 +144,8 @@ function plannedFor(s: PrescribedSetRow, planned: readonly PlannedSetRow[]): Pla
 }
 
 /**
- * The Træning data for a pause fixture: the set log, and planned rows / sets with the ramp, rest
- * and note each state needs. `now` anchors the times. Nothing is written anywhere.
+ * The Træning data for a pause fixture: the set log, and planned rows with the ramp and rest each
+ * state needs. `now` anchors the times. Nothing is written anywhere.
  */
 export function pauseFixture(
   fixture: PauseFixture,
@@ -162,12 +159,6 @@ export function pauseFixture(
   const patch = (s: PrescribedSetRow, change: Partial<PlannedSetRow>) => {
     const p = plannedFor(s, planned);
     outPlanned.set(`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, { ...p, ...change });
-  };
-  const note = (row: PrescribedSetRow, text: string) => {
-    for (let i = 0; i < outSets.length; i += 1) {
-      const s = outSets[i];
-      if (s.session === row.session && s.sheetRow === row.sheetRow) outSets[i] = { ...s, notes: text };
-    }
   };
   const log: SetLogRow[] = [];
   const t = (secondsAgo: number) => new Date(now.getTime() - secondsAgo * 1000).toISOString();
@@ -228,7 +219,6 @@ export function pauseFixture(
       if (next !== undefined) startOpen(next, ago);
       const r = rowOf(order[at]);
       if (r !== undefined) {
-        note(r, NOTE_SHORT);
         for (const s of rows.filter((x) => x.sheetRow === r.sheetRow)) {
           patch(s, { restMinS: 180, restMaxS: 300 }); // 3–5 min, so 2:10 is before the minimum
         }
@@ -244,8 +234,6 @@ export function pauseFixture(
     doneUpTo(k, 40);
     startOpen(warm, 40);
     if (main(warm)) rampOn(warm); // a ramp only ever on a main lift: an accessory's warm-up is timer only
-    const next = rowOf(warm);
-    if (next !== undefined) note(next, NOTE_LONG);
   }
   return { sets: outSets, plannedSets: [...outPlanned.values()], setLog: log };
 }
@@ -292,12 +280,12 @@ function finishedLog(
 
 /**
  * DEV_FIXTURE=midsession's planned rows: the first three rows with a suggestion get +2,5
- * (lettere), a capped +2,5, and a hold; the fourth row gets a note. Illustrative only.
+ * (lettere), a capped +2,5, and a hold. Illustrative only.
  */
 export function midsessionPlanned(
   sets: readonly PrescribedSetRow[],
   planned: readonly PlannedSetRow[],
-): { sets: PrescribedSetRow[]; plannedSets: PlannedSetRow[] } {
+): PlannedSetRow[] {
   // The first three sheet rows; a row without a real suggestion gets an illustrative one.
   // Per session: a week's sessions are different sheet rows.
   const rowsOf = (session: number) =>
@@ -316,10 +304,7 @@ export function midsessionPlanned(
     const capped = i === 1 ? { uncappedKg: kg + 2.5 } : {};
     out.set(`${p.block}#${p.sheetRow}#${p.week}#${p.setNo}`, { ...p, suggestedKg: kg, basis: p.suggestedKg === null ? "rpe_e1rm" : p.basis, ...changes[i], ...capped });
   }
-  return {
-    sets: sets.map((s) => (rowsOf(s.session)[3] === s.sheetRow ? { ...s, notes: NOTE_SHORT } : s)),
-    plannedSets: [...out.values()],
-  };
+  return [...out.values()];
 }
 
 /** DEV_FIXTURE=feel: two exercise_feel rows in Python's sentence form (not real verdicts). */

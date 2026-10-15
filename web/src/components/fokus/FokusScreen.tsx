@@ -53,7 +53,7 @@ import { FokusProgress } from "./FokusProgress";
 import { Icon } from "@/components/icons";
 import { CAPTION, CheckIcon, COMPACT_SECONDARY, FokusWarning as WarningLine, MUTED_LINK, OUTLINED, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { SessionSignature } from "./SessionSignature";
-import { FeelBlock, Footer, NextSetCard, Note, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
+import { FeelBlock, Footer, NextSetCard, PauseCard, PrimaryButton, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
 
 export type FokusSession = {
@@ -311,8 +311,8 @@ type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
 
 /**
  * §4.2 + round 4 §2: the current set. One value row (REPS · RPE/PROCENT · FORSLAG/SIDSTE UGE, the
- * unit once), then the dot row, the adjustment, the coach note; Spring over as a muted link; Udført
- * the one ink slab.
+ * unit once), then the dot row and the adjustment; Spring over as a muted link; Udført the one ink
+ * slab. NOTES is never shown: its text is the variant (user, 2026-10-15), already the title.
  */
 function SetView({
   current,
@@ -333,7 +333,6 @@ function SetView({
   const e = current.exercise;
   const kg = kgBlock(e, week);
   const adjustment = adjustmentLine(e);
-  const note = e.notes === null ? "" : e.notes.trim();
   const lastWeek = lastWeekLine(e, week);
   const cell = prescribedCell(e.prescribed);
   const under = exerciseUnder(e);
@@ -406,7 +405,6 @@ function SetView({
               )}
             </p>
           )}
-          {note !== "" && <Note text={note} />}
         </div>
         </div>
 

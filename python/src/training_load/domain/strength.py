@@ -72,7 +72,7 @@ class StrengthSet:
     # per side, both counted; kg_factor 2 = logged kg per dumbbell, so kg = 2 x logged + bodyweight.
     sides: int = 1
     kg_factor: int = 1
-    # public.exercise_variants.id of the "V:" variant in force that week (user, 2026-10-14);
+    # public.exercise_variants.id of the NOTES variant in force that week (user, 2026-10-14);
     # None = ukendt, its own group: never mixed with a named variant.
     variant_id: int | None = None
     notes: str | None = None  # the coach's NOTES cell as written; None = blank

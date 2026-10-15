@@ -41,7 +41,7 @@ class ParsedSet(TypedDict):
     e1rm: float | None      # fanens 1RM for sættets løft (SQUAT/BENCH/DEADLIFT), ellers None
     raw: dict[str, object]  # ugens celler som skrevet: sets, reps, load, weight, lsrpe, notes, mean_weight
     logged_rpe: float | None  # LSRPE (loggede RPE), kun hele/halve 1-10; ellers None (talt)
-    variant: str | None       # normaliseret variantnavn fra "V:" i NOTES (videreført i blokken); None = ukendt
+    variant: str | None       # normaliseret variantnavn fra NOTES (al tekst undtagen "N:"-linjer; videreført i blokken); None = ukendt
     variant_display: str | None  # varianten som skrevet første gang (mellemrum samlet); None = ukendt
     score: float          # rå score, før STRENGTH_K
 
@@ -98,30 +98,38 @@ def cell_text(cell: object) -> str | None:
     return str(cell).strip() or None
 
 VARIANT_LINE = re.compile(r"^\s*(?:v|variant)\s*:\s*(.*)$", re.IGNORECASE)
+NOTE_LINE = re.compile(r"^\s*n\s*:\s*(.*)$", re.IGNORECASE)
 
 
 def split_notes(cell: object) -> tuple[str | None, str | None, int]:
-    """(variant as written, the coach's note, extra V: lines) of a NOTES cell (user, 2026-10-14):
-    a line "V: <variant>" or "Variant: <variant>" (any case) names the variant; the first such line
-    wins (more are counted), every other line is the coach's note. Line breaks: \r\n, \r, \n."""
+    """(variant as written, the user's remark, extra variant lines) of a NOTES cell (user,
+    2026-10-15): only the user writes in NOTES, so every line names the variant, with or without
+    "V:" / "Variant:" (any case), except a line starting "N:" (any case), which is a remark and
+    never a variant. The first variant line wins (more are counted). Line breaks: \r\n, \r, \n."""
     text = cell_text(cell)
     if text is None:
         return None, None, 0
     variant, extra, note = None, 0, []
     for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if not line.strip():
+            continue
+        n = NOTE_LINE.match(line)
+        if n is not None:
+            if n.group(1).strip():
+                note.append(n.group(1).strip())
+            continue
         m = VARIANT_LINE.match(line)
-        if m is None:
-            if line.strip():
-                note.append(line.strip())
-        elif variant is None:
-            variant = m.group(1).strip()
+        written = line.strip() if m is None else m.group(1).strip()
+        if variant is None:
+            variant = written
         else:
             extra += 1
     return variant, ("\n".join(note) or None), extra
 
 
 def notes_text(raw: dict[str, object]) -> str | None:
-    """The coach's note of a parsed set: raw["notes"] without any "V:" line; None when blank."""
+    """The user's remark of a parsed set: raw["notes"]'s "N:" lines without the "N:"; None when
+    there are none."""
     return split_notes(raw.get("notes"))[1]
 
 def prescribed_text(load: object) -> str | None:
@@ -141,7 +149,7 @@ LSRPE_NOT_HALF = "logged RPE not a whole or half value"
 LSRPE_COLUMN_MISSING = "no LSRPE column in the header"
 RPE_UNKNOWN = "RPE unknown, set scored at RPE 6"   # en sæt-score afhænger af UNKNOWN_RPE (kg > 0)
 VARIANT_EMPTY = "variant line without a name"     # "V:" uden navn: varianten fortsætter uændret
-VARIANT_TWICE = "more than one variant line in a cell"   # den første vinder
+VARIANT_TWICE = "more than one variant line in a cell"   # den første vinder; "N:"-linjer tæller ikke
 RAW_KEYS = ("sets", "reps", "load", "weight", "lsrpe", "notes", "mean_weight")  # ugens 7 første kolonner
 
 
@@ -242,10 +250,10 @@ def parse_all(data: bytes, scoring, issues: Counter[str] | None = None,
 
 def row_variants(r, name, notes_cols, issues: Counter[str]):
     """(the variant in force per week, whether the week's own NOTES named one) for one sheet row
-    (user, 2026-10-14): "V: <variant>" in a week's NOTES holds from that week to the end of the
-    block or the next "V:"; weeks before the first are None (ukendt). "V: <the row's own name>"
-    ends the variant. An empty "V:" keeps the current one (counted). ``notes_cols``: each week's
-    NOTES column from the header row."""
+    (user, 2026-10-14; any text but "N:" since 2026-10-15): a variant in a week's NOTES holds
+    from that week to the end of the block or the next variant; weeks before the first are None
+    (ukendt). The row's own name ends the variant. An empty "V:" keeps the current one
+    (counted). ``notes_cols``: each week's NOTES column from the header row."""
     own = variant_key(name)
     current, states, named = None, [], []
     for col in notes_cols:
@@ -372,7 +380,7 @@ def parse_tab(ws, tab, scoring, issues: Counter[str] | None = None):
             continue
         states = row_variants(r, name, [c["notes"] for c in cols], issues)
         if run_head is not None and run_head[0] == (section, variant_key(name)):
-            # En række i samme øvelses-run uden egen "V:" følger run'ens første række uge for uge.
+            # En række i samme øvelses-run uden egen variant følger run'ens første række uge for uge.
             first_own = next((w for w, st in enumerate(states[1]) if st), len(week_dates))
             states = ([run_head[1][w] if w < first_own else states[0][w] for w in range(len(week_dates))], states[1])
         else:

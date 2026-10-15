@@ -61,8 +61,9 @@ class Scorer(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class ExerciseVariant:
-    """A row of public.exercise_variants (user, 2026-10-14): a variant of an exercise written as
-    "V: <variant>" in the sheet. Every scoring field is an override; None = inherit."""
+    """A row of public.exercise_variants (user, 2026-10-14): a variant of an exercise written in
+    the sheet's NOTES (any text but an "N:" remark; "V:" optional since 2026-10-15). Every
+    scoring field is an override; None = inherit."""
 
     id: int
     exercise_id: int
@@ -134,7 +135,7 @@ class Catalog:
 
     @staticmethod
     def names_itself(exercise: Exercise, variant: str) -> bool:
-        """ "V: <the exercise's own name or one of its aliases>" names no variant (ukendt)."""
+        """The exercise's own name or one of its aliases in NOTES names no variant (ukendt)."""
         key = variant_key(variant)
         return key in {variant_key(n) for n in (exercise.name, *exercise.aliases)}
 

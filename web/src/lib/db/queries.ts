@@ -359,12 +359,11 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     setLog: setLog ?? [],
     setLogFailed: setLog === null,
   };
-  // Dev fixtures (never in production, never written): illustrative logs, ramps, notes.
+  // Dev fixtures (never in production, never written): illustrative logs, ramps, adjustments.
   if (fixture === "midsession") {
-    const m = midsessionPlanned(sets, plannedSets);
     return {
       ...base,
-      ...midsessionVariants(m.sets, base.previousWeek, m.plannedSets),
+      ...midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets)),
       setLog: midsessionLog(sets, today, new Date()),
     };
   }

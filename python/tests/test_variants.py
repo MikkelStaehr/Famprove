@@ -1,6 +1,6 @@
-"""Exercise variants from "V:" lines in the sheet's NOTES (user, 2026-10-14): parsing,
-carry-forward, runs, the catalogue's inheritance, collect-strength's insert-only, and the
-per-variant grouping."""
+"""Exercise variants from the sheet's NOTES (user, 2026-10-14; any text but an "N:" remark since
+2026-10-15): parsing, carry-forward, runs, the catalogue's inheritance, collect-strength's
+insert-only, and the per-variant grouping."""
 
 import io
 from collections import Counter
@@ -26,27 +26,42 @@ from training_load.sources.strength_sheet import (
 # --- split_notes / variant_key (edge cases 1-10) ------------------------------------------------
 
 
-def test_a_v_line_names_the_variant_and_the_rest_is_the_note() -> None:
+def test_any_text_names_the_variant_with_or_without_v() -> None:
+    # user, 2026-10-15: only the user writes in NOTES, so its text is the variant; "V:" still works
+    assert split_notes("DB Preacher Curl") == ("DB Preacher Curl", None, 0)
+    assert split_notes("  GHD+Palloff ") == ("GHD+Palloff", None, 0)
     assert split_notes("V: DB Preacher Curl") == ("DB Preacher Curl", None, 0)
     assert split_notes("variant:  Kabel   curl")[0] == "Kabel   curl"
     assert variant_key("  Kabel   CURL ") == "kabel curl"
     assert split_notes("V : x")[0] == "x"
-    assert split_notes("Pause i bunden\nV: Tempo") == ("Tempo", "Pause i bunden", 0)
-    assert split_notes("V: Tempo\nPause i bunden") == ("Tempo", "Pause i bunden", 0)
-    assert split_notes("V: Tempo\r\nPause\rTo sek") == ("Tempo", "Pause\nTo sek", 0)
+    for text in ("Vægt: 5", "NB: V-grip", "Variation af squat", "Machine"):
+        assert split_notes(text) == (text, None, 0)
+    assert split_notes(5) == ("5", None, 0)
 
 
-def test_empty_and_double_v_lines_and_lookalikes() -> None:
+def test_an_n_line_is_a_remark_and_never_the_variant() -> None:
+    assert split_notes("N: Pause i bunden") == (None, "Pause i bunden", 0)
+    assert split_notes("n:pause") == (None, "pause", 0)
+    assert split_notes("N :  To sek") == (None, "To sek", 0)
+    assert split_notes("N:") == (None, None, 0)
+    assert split_notes("N: Pause i bunden\nTempo") == ("Tempo", "Pause i bunden", 0)
+    assert split_notes("V: Tempo\r\nN: Pause\rn: To sek") == ("Tempo", "Pause\nTo sek", 0)
+    assert split_notes("Tempo\n\n  \nN: Pause") == ("Tempo", "Pause", 0)
+
+
+def test_empty_and_double_variant_lines() -> None:
     assert split_notes("V:") == ("", None, 0)
     assert split_notes("V: A\nV: B") == ("A", None, 1)
-    for note in ("Vægt: 5", "NB: V-grip", "Variation af squat"):
-        assert split_notes(note) == (None, note, 0)
-    assert split_notes(5)[0] is None
+    assert split_notes("A\nB") == ("A", None, 1)
+    assert split_notes("A\nV: B\nN: c") == ("A", "c", 1)
+    assert split_notes(None) == (None, None, 0)
+    assert split_notes("   ") == (None, None, 0)
 
 
-def test_the_note_never_shows_the_v_line() -> None:
-    assert notes_text({"notes": "V: DB curl\nLangsomt ned"}) == "Langsomt ned"
+def test_the_remark_is_only_the_n_lines() -> None:
+    assert notes_text({"notes": "DB curl\nN: Langsomt ned"}) == "Langsomt ned"
     assert notes_text({"notes": "V: DB curl"}) is None
+    assert notes_text({"notes": "DB curl"}) is None
 
 
 # --- carry-forward (11, 14) -----------------------------------------------------------------------
@@ -160,6 +175,22 @@ def test_a_run_follows_its_head_and_a_new_tab_starts_unknown() -> None:
     assert {by[("Program - blok 12 x", r, w)] for r in (6, 7) for w in (1, 2, 3)} == {None}
     shown = {p["variant_display"] for p in parsed if p["variant"]}
     assert shown == {"Kabel curl"}
+
+
+def test_plain_text_carries_on_an_n_remark_keeps_it_and_the_own_name_ends_it() -> None:
+    xlsx = _workbook({
+        "Program - blok 12 x": [
+            _sets_row("Bicep of choice", {0: "DB Preacher Curl", 1: "N: tung dag"}),
+            _sets_row("Tricep of choice", {1: "V: Kabel pushdown", 2: "tricep of choice"}),
+        ],
+    })  # fmt: skip
+    plain = lambda _t, _n, _v=None: Scoring(0.6, None)  # noqa: E731
+    parsed = parse_all(xlsx, plain)
+    by = {(p["row"], p["week"]): (p["variant"], p["variant_display"]) for p in parsed}
+    assert [by[(6, w)] for w in (1, 2, 3)] == [("db preacher curl", "DB Preacher Curl")] * 3
+    assert [by[(7, w)][0] for w in (1, 2, 3)] == [None, "kabel pushdown", None]
+    remarks = {(p["row"], p["week"]): notes_text(p["raw"]) for p in parsed}
+    assert remarks[(6, 2)] == "tung dag" and remarks[(6, 1)] is None
 
 
 # --- the catalogue: aliases and inheritance (15) -------------------------------------------------

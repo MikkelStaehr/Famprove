@@ -48,7 +48,6 @@ const SQUAT: FokusExercise = {
   restMinS: null,
   restMaxS: null,
   ramp: null,
-  notes: null,
   sets: [
     { row: 4, set: 1 },
     { row: 4, set: 2 },
@@ -71,7 +70,6 @@ const PULLDOWN: FokusExercise = {
   restMinS: null,
   restMaxS: null,
   ramp: null,
-  notes: null,
   sets: [{ row: 7, set: 1 }],
 };
 const EXERCISES = [SQUAT, PULLDOWN];

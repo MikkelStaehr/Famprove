@@ -103,7 +103,6 @@ export type ExerciseView = {
   readonly restMinS: number | null; // recommended rest after a set; null = none shown
   readonly restMaxS: number | null;
   readonly ramp: readonly RampStep[] | null; // a main lift's warm-up ramp (first row of a run)
-  readonly notes: string | null; // the coach's NOTES cell as written
   readonly sets: readonly SetRef[]; // this row's sets, 1..n (each has its own tick)
 };
 
@@ -261,7 +260,6 @@ function exercisesOf(
         restMinS: suggestion?.restMinS ?? null,
         restMaxS: suggestion?.restMaxS ?? null,
         ramp: suggestion?.ramp ?? null,
-        notes: s.notes,
         sets: [],
       });
     }
@@ -505,7 +503,7 @@ export type RunPosition = { readonly index: number; readonly of: number };
  * Keyed by setKey; a single-row run is numbered as before. Both Træning and Fokus use this.
  */
 /** Two consecutive rows are one run: the same trimmed name and the same variant (a row may name
- * its own "V:", user 2026-10-14; null only matches null). */
+ * its own variant in NOTES, user 2026-10-14; null only matches null). */
 function sameRun(
   a: Pick<ExerciseView, "name" | "variantId">,
   b: Pick<ExerciseView, "name" | "variantId">,

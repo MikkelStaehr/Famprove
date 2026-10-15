@@ -24,7 +24,7 @@ Reps and kg figures (`text-44` → Geist Mono 44, −0.03em), the RestTimer and 
 ## 3. Surfaces (no layout change: the same blocks in the same order with the same gaps)
 - **Set view**: the figure block (name, caption, reps / kg / last-week grid, notes, DotRow) sits in a hero Card (radius 26, padding 20, `--card`, 1px `--border`). The existing margins become the card's outer margin. The 21rem container query uses the card's inner width.
 - **PauseCard, WarmupCard, NextSetCard**: Card (radius 22, padding 20). The NextSetCard's dashed outline becomes a 1px dashed `--shade-1` border, since it is a preview. The words "Næste sæt" say so; the dash is not the only cue.
-- **Note** (coach's NOTES): Tile (radius 18, padding 14, `--card`), with the existing 1px left rule replaced by the tile itself.
+- **Note**: removed 2026-10-15 (user, slice `variants-notes`): NOTES holds the variant, already the title, so Fokus shows no note.
 - **FinishedView**: the counts in a hero Card. The "Til Træning" link is the primary dock.
 - **Dock** (`PRIMARY_DOCK`): `--bg` fill, sticky as today, no grain. A 12px gradient from transparent to `--bg` above it hides content scrolling under it.
 

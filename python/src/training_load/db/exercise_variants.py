@@ -1,6 +1,6 @@
-"""public.exercise_variants (user, 2026-10-14): variants of an exercise from "V:" lines in the
-sheet. Hand-edited like public.exercises: code reads them and inserts unknown ones, never
-updates them."""
+"""public.exercise_variants (user, 2026-10-14): variants of an exercise from the sheet's NOTES
+(any text but an "N:" remark). Hand-edited like public.exercises: code reads them and inserts
+unknown ones, never updates them."""
 
 from collections.abc import Sequence
 from typing import Final
