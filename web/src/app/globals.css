@@ -331,3 +331,21 @@ main:has(> [data-screen="fokus"]) {
     transform: scale(1);
   }
 }
+
+/* Træning's superset rail (supersets.md S6): drawn in from the top (scaleY 0 -> 1, 160 ms
+   ease-out) only when a tap switched the pair on in this visit; never on first paint, never
+   under reduced motion (the provider also skips it under REDUCED_MOTION). */
+@media (prefers-reduced-motion: no-preference) {
+  .seam-rail-draw {
+    transform-origin: top;
+    animation: seam-rail 160ms ease-out both;
+  }
+}
+@keyframes seam-rail {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}

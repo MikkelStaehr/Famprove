@@ -35,6 +35,7 @@ import {
   isMainLift,
   rampState,
 } from "@/lib/fokus-view";
+import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf } from "@/lib/superset-view";
 import { adjustmentLine, CAPPED_WORD, spokenName } from "@/lib/training-view";
 import { type Signature, signature } from "@/lib/fokus-marks";
 import {
@@ -42,6 +43,7 @@ import {
   lastTap,
   type LoggedSet,
   nextOpen,
+  type PairRef,
   progress,
   type SetRef,
   setKey,
@@ -61,6 +63,8 @@ export type FokusSession = {
   readonly exercises: readonly FokusExercise[];
   readonly order: readonly SetRef[];
   readonly log: readonly LoggedSet[];
+  /** The supersets in force (supersets.md S10–S17); `order` is already interleaved by them. */
+  readonly pairs?: readonly PairRef[];
 };
 
 type FokusScreenProps = {
@@ -103,7 +107,12 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     if (focusRequest > 0) primary.current?.focus();
   }, [focusRequest]);
 
-  const view = fokusView(session.order, log);
+  const pairs = session.pairs ?? [];
+  const exercises = session.exercises;
+  // supersets.md S13: A → B shows B at once, with no rest strip, timer or vibration.
+  const view = fokusView(session.order, log, (after, next) => pairHandOff(exercises, pairs, after, next));
+  /** The row whose rest window applies after `ref`: R3, the pair's larger window after B; else its own. */
+  const restRowFor = (ref: SetRef) => restWindowOf(exercises, pairs, ref)?.row ?? null;
   // fokus-flow.md §4: the screen stays on from an open, begun session until it is finished.
   useWakeLock(log.size > 0 && view.kind !== "finished");
   const p = progress(session.order, log);
@@ -119,6 +128,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     const following = nextOpen(session.order, log, current.ref);
     tap("done", current.ref);
     const next = following === null ? null : at(following);
+    const handOff = handOffName(exercises, pairs, current.ref, following) !== null;
     after(
       following === null
         ? FINISHED_SENTENCE
@@ -126,7 +136,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           ? warmupSentence(current, next.exercise)
           : next === null
             ? ""
-            : nextSentence(current, next, current.exercise),
+            : nextSentence(current, next, handOff ? null : restRowFor(current.ref)),
     );
   };
 
@@ -145,9 +155,16 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
   /** "✓ Opvarmning udført": a done on the warm-up, which ends it and starts set 1 (its timer counts from this tap). */
   const onWarmupEnd = (warmup: SetRef) => {
+    const following = nextOpen(session.order, log, warmup);
     tap("done", warmup);
-    const one = at(setOneOf(warmup));
-    after(one === null ? "" : nextSentence(null, one, one.exercise));
+    // R2: A's warm-up hands off to B's warm-up (A0 → B0), no timer.
+    const b = following !== null && isWarmup(following) ? handOffName(exercises, pairs, warmup, following) : null;
+    if (b !== null) {
+      after(`Opvarmning udført. Næste: opvarmning, ${b}.`);
+      return;
+    }
+    const one = following === null ? null : at(isWarmup(following) ? setOneOf(following) : following);
+    after(one === null ? "" : nextSentence(null, one, restRowFor(warmup) ?? one.exercise));
   };
 
   const onFeelOrReps = useCallback(
@@ -156,6 +173,13 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   );
 
   const begun = begunWarmup(session.order, log);
+
+  /** The exercise whose rest window the strip shows: R3's pair window after B, else as before (a warm-up's done: the set it opens). */
+  const restOfSet = (after: SetRef, next: SetRef): FokusExercise | null => {
+    const win = restWindowOf(exercises, pairs, after);
+    if (win?.superset === true) return win.row;
+    return at(isWarmup(after) ? next : after)?.exercise ?? null;
+  };
 
   const onUndo = () => {
     if (latest === null) {
@@ -248,7 +272,10 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           key={`set-${setKey(view.next)}`}
           next={at(view.next)}
           rest={view.showRest ? view.rest : null}
-          restOf={view.rest === null ? null : at(isWarmup(view.rest.after) ? view.next : view.rest.after)}
+          restOf={view.rest === null ? null : restOfSet(view.rest.after, view.next)}
+          restSuperset={view.rest !== null && restWindowOf(exercises, pairs, view.rest.after)?.superset === true}
+          handOff={handOffName(exercises, pairs, view.next, nextOpen(session.order, log, view.next))}
+          pairLine={pairLine(exercises, pairs, view.next)}
           feel={view.feel === null ? null : at(view.feel)}
           logged={view.feel === null ? undefined : log.get(setKey(view.feel))}
           week={session.week}
@@ -262,7 +289,8 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       {view.kind === "warmup" && (
         <WarmupView
           key={`warmup-${setKey(view.warmup)}`}
-          since={view.since}
+          since={latest !== null && latest.kind === "done" && pairHandOff(exercises, pairs, latest.ref, view.warmup) ? null : view.since}
+          handOff={handOffName(exercises, pairs, view.warmup, nextOpen(session.order, log, view.warmup))}
           mainLifts={mainLifts}
           warmup={view.warmup}
           setOne={at(setOneOf(view.warmup))}
@@ -304,6 +332,9 @@ function SetView({
   next,
   rest,
   restOf,
+  restSuperset,
+  handOff,
+  pairLine: line,
   feel,
   logged,
   week,
@@ -315,7 +346,12 @@ function SetView({
 }: {
   readonly next: SetInContext | null;
   readonly rest: { readonly since: string } | null;
-  readonly restOf: SetInContext | null;
+  readonly restOf: FokusExercise | null;
+  readonly restSuperset: boolean;
+  /** S12: B's display name when this done hands off to B; null = the usual label. */
+  readonly handOff: string | null;
+  /** S11 / S16: the pair line under the name stack. */
+  readonly pairLine: string | null;
   readonly feel: SetInContext | null;
   readonly logged: LoggedSet | undefined;
   readonly week: number;
@@ -332,11 +368,11 @@ function SetView({
   const lastWeek = lastWeekLine(e, week);
   const cell = prescribedCell(e.prescribed);
   const under = exerciseUnder(e);
-  const label = doneLabel(next);
+  const label = handOff === null ? doneLabel(next) : handOffLabel(handOff, next, spokenName(e));
   return (
     <div className={`mt-2 flex flex-1 flex-col gap-3 ${FADE_IN}`}>
       {rest !== null && restOf !== null && (
-        <RestStrip key={rest.since} since={rest.since} exercise={restOf.exercise} onAnnounce={onAnnounce} />
+        <RestStrip key={rest.since} since={rest.since} exercise={restOf} superset={restSuperset} onAnnounce={onAnnounce} />
       )}
       {/* §1.3: the next set in a hero Card (26, padding 20). */}
       <section aria-labelledby="fokus-set" className="flex flex-col rounded-hero border border-border bg-card p-5">
@@ -346,6 +382,12 @@ function SetView({
         </h2>
         {/* variants.md §3: the sheet's exercise muted under the variant (4px, same block). */}
         {under !== null && <p className="mt-1 font-sans text-16 text-balance text-text-muted">{under}</p>}
+        {line !== null && (
+          <p className="mt-2 flex items-center gap-2 font-sans text-14 text-text-muted">
+            <Icon name="arrow-left-right" size={16} />
+            {line}
+          </p>
+        )}
 
         {/* Two columns: reps | today's kg with Sidste uge under it; below 18rem one column (200 % text). */}
         <div className="@container mt-4">
@@ -416,6 +458,7 @@ function SetView({
 /** fokus-pause.md §2 and §4 (Variants A and C): the warm-up, after the feel of the set before. */
 function WarmupView({
   since,
+  handOff,
   mainLifts,
   warmup,
   setOne,
@@ -427,6 +470,8 @@ function WarmupView({
   onTap,
 }: {
   readonly since: string | null; // null: no recorded start (§2.2), a static 0:00
+  /** R2: B's display name when A's warm-up hands off to B's; null = the usual label. */
+  readonly handOff: string | null;
   readonly mainLifts: readonly string[] | null;
   readonly warmup: SetRef;
   readonly setOne: SetInContext | null;
@@ -453,8 +498,8 @@ function WarmupView({
       <DoneButton
         primary={primary}
         onClick={() => onWarmupEnd(warmup)}
-        visible="Opvarmning udført"
-        spoken={`Opvarmning udført, ${spokenName(setOne.exercise)}`}
+        visible={handOff === null ? "Opvarmning udført" : handOffLabel(handOff, null, spokenName(setOne.exercise)).visible}
+        spoken={handOff === null ? `Opvarmning udført, ${spokenName(setOne.exercise)}` : handOffLabel(handOff, null, spokenName(setOne.exercise)).spoken}
       />
     </div>
   );

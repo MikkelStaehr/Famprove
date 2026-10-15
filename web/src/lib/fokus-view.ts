@@ -82,7 +82,12 @@ export type FokusView =
   | { readonly kind: "warmup"; readonly warmup: SetRef; readonly since: string | null; readonly feel: SetRef | null }
   | { readonly kind: "finished"; readonly feel: SetRef | null };
 
-export function fokusView(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): FokusView {
+/** `handOff(after, next)`: true when `next` is `after`'s paired B straight after it (supersets.md S13): no rest strip. */
+export function fokusView(
+  order: readonly SetRef[],
+  log: ReadonlyMap<string, LoggedSet>,
+  handOff: (after: SetRef, next: SetRef) => boolean = () => false,
+): FokusView {
   const open = firstOpen(order, log);
   const latest = lastTap(log);
   // restStart excludes a warm-up's done; the feel row never rates a warm-up.
@@ -92,7 +97,7 @@ export function fokusView(order: readonly SetRef[], log: ReadonlyMap<string, Log
     return { kind: "warmup", warmup: open, since: log.get(setKey(open))?.startedAt ?? null, feel };
   }
   const rest = latest !== null && latest.kind === "done" ? { since: latest.at, after: latest.ref } : null;
-  return { kind: "set", next: open, rest, showRest: rest !== null, feel };
+  return { kind: "set", next: open, rest, showRest: rest !== null && !handOff(rest.after, open), feel };
 }
 
 /** One set in context: its sheet row, "Sæt n af m" numbered across the run (spec §10 D11). */
@@ -292,7 +297,7 @@ function spokenReps(repsText: string): string {
  * af 4, 5 reps, i dag 142,5 kg. Pause, anbefalet 3 til 5 minutter." `done` null after a warm-up's
  * done (its own head), `restOf` the row whose rest values apply.
  */
-export function nextSentence(done: SetInContext | null, next: SetInContext, restOf: FokusExercise): string {
+export function nextSentence(done: SetInContext | null, next: SetInContext, restOf: FokusExercise | null): string {
   const head = done === null ? `Opvarmning udført, ${spokenName(next.exercise)}.` : `${spokenName(done.exercise)}, sæt ${done.number} udført.`;
   const e = next.exercise;
   const parts = [setTitle(next).toLowerCase()];
@@ -301,7 +306,7 @@ export function nextSentence(done: SetInContext | null, next: SetInContext, rest
   if (today !== null) parts.push(today.spoken);
   const named = done !== null && done.exercise.row !== e.row && spokenName(done.exercise) !== spokenName(e);
   const what = named ? `${spokenName(e)}, ${parts.join(", ")}` : parts.join(", ");
-  return `${head} Næste: ${what}. ${restWords(restOf)}`;
+  return restOf === null ? `${head} Næste: ${what}.` : `${head} Næste: ${what}. ${restWords(restOf)}`;
 }
 
 /** "Pause, anbefalet 3 til 5 minutter." / "Pause." without a recommended rest. */
@@ -311,9 +316,13 @@ function restWords(e: FokusExercise): string {
     : "Pause.";
 }
 
-/** The primary on a set (fokus-flow.md §1.5, §5): visible "Sæt 2 udført", spoken "Sæt 2 af 4 udført, Squat". */
+/**
+ * The primary on a set (fokus-flow.md §1.5, §5): visible "Sæt 2 udført", spoken "Sæt 2 udført,
+ * 2 af 4, Squat" (WCAG 2.5.3: the name starts with the visible words, in order).
+ */
 export function doneLabel(s: SetInContext): { readonly visible: string; readonly spoken: string } {
-  return { visible: `Sæt ${s.number} udført`, spoken: `Sæt ${s.number} af ${s.count} udført, ${spokenName(s.exercise)}` };
+  const visible = `Sæt ${s.number} udført`;
+  return { visible, spoken: `${visible}, ${s.number} af ${s.count}, ${spokenName(s.exercise)}` };
 }
 
 /** The next-set card's caption (§1.3): "Næste · sæt 2 af 4" (uppercase by its caption style). */
@@ -531,16 +540,6 @@ export function restSentence(band: RestBand, minS: number | null, maxS: number |
 function spokenMinutes(seconds: number): string {
   const m = restMinutes(seconds).replace("½", ",5");
   return m === "1" ? "1 minut" : `${m.startsWith(",") ? "0" + m : m} minutter`;
-}
-
-/** "Squat, sæt 2 udført. Pause, anbefalet 3 til 5 minutter. Hvordan var sæt 2?" */
-export function pauseSentence(s: SetInContext): string {
-  const e = s.exercise;
-  const rest =
-    e.restMinS !== null && e.restMaxS !== null
-      ? `Pause, anbefalet ${restMinutes(e.restMinS).replace("½", ",5")} til ${restMinutes(e.restMaxS).replace("½", ",5")} minutter.`
-      : "Pause.";
-  return `${spokenName(e)}, sæt ${s.number} udført. ${rest} ${feelQuestion(s, false)}`;
 }
 
 /** "Squat, sæt 4 udført. Opvarmning, Bænkpres: 5 reps 57,5 kg, 3 reps 85 kg, 2 reps 115 kg." */

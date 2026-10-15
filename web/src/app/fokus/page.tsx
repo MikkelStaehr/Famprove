@@ -91,6 +91,7 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
           exercises: next.exercises,
           order: next.order,
           log: next.log,
+          pairs: next.pairs,
         }}
         date={today}
         staleNote={stale}

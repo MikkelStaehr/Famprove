@@ -3,6 +3,7 @@
 import { type RefObject, useEffect, useId, useRef, useState } from "react";
 
 import {
+  displayName,
   exerciseUnder,
   FEEL_OPTIONS,
   feelQuestion,
@@ -117,7 +118,7 @@ export function FeelBlock({
         })}
       </div>
       {range !== null && (
-        <RepsStepper set={set} top={range.top} low={range.low} logged={logged?.repsDone ?? null} onTap={onTap} />
+        <RepsStepper set={set} named={named} top={range.top} low={range.low} logged={logged?.repsDone ?? null} onTap={onTap} />
       )}
     </section>
   );
@@ -125,12 +126,14 @@ export function FeelBlock({
 
 function RepsStepper({
   set,
+  named,
   low,
   top,
   logged,
   onTap,
 }: {
   readonly set: SetInContext;
+  readonly named: boolean;
   readonly low: number;
   readonly top: number;
   readonly logged: number | null;
@@ -164,7 +167,10 @@ function RepsStepper({
   return (
     <div role="group" aria-labelledby={`${id}-l`} className="mt-3 flex items-center justify-between gap-3">
       <p id={`${id}-l`} className="flex flex-col">
-        <span className="font-sans text-16">Reps i sæt {set.number}</span>
+        <span className="font-sans text-16">
+          Reps i sæt {set.number}
+          {named && ` · ${displayName(set.exercise)}`}
+        </span>
         {/* A small tabular number, not a caption label: mono in the muted grey (Barley Corn is for captions only). */}
         <span className="font-mono text-14 text-text-muted">
           {low}–{top}
@@ -193,7 +199,18 @@ function RepsStepper({
  * check icon once ready (words carry it, never colour). Null rest values: the timer only. Crossing
  * the minimum vibrates once (lib/rest-signal) and is announced once; the timer never is.
  */
-export function RestStrip({ since, exercise, onAnnounce }: { readonly since: string; readonly exercise: FokusExercise; readonly onAnnounce: (s: string) => void }) {
+export function RestStrip({
+  since,
+  exercise,
+  superset = false,
+  onAnnounce,
+}: {
+  readonly since: string;
+  readonly exercise: FokusExercise;
+  /** The rest after a superset's B (supersets.md S14): the label says so. */
+  readonly superset?: boolean;
+  readonly onAnnounce: (s: string) => void;
+}) {
   const seconds = useElapsed(since);
   const minS = exercise.restMinS;
   const maxS = exercise.restMaxS;
@@ -221,7 +238,7 @@ export function RestStrip({ since, exercise, onAnnounce }: { readonly since: str
     <section aria-label="Pause" className="flex flex-col rounded-card border border-border bg-card p-4">
       <p className="flex flex-wrap items-baseline justify-between gap-x-3">
         <span className={CAPTION}>Pause</span>
-        {advice !== null && <span className="font-mono text-13 text-text-muted">{advice}</span>}
+        {advice !== null && <span className="font-mono text-13 text-text-muted">{superset ? `${advice} · superset` : advice}</span>}
       </p>
       <div className="mt-2">
         <RestTimer seconds={seconds} label="Pause" />
