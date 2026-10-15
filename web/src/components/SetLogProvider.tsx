@@ -7,6 +7,7 @@ import { REDUCED_MOTION } from "@/lib/motion";
 import {
   clientOrder,
   clientPairs,
+  orderPairs,
   SEAM_IDLE,
   type SeamSave,
   seamReducer,
@@ -59,9 +60,11 @@ export function SetLogProvider({ session, date, devSwitches, children }: Provide
   const [drawn, setDrawn] = useState<ReadonlySet<string>>(() => new Set());
   const [status, setStatus] = useState("");
   const pairs = useMemo(() => clientPairs(session.pairSlots, saves), [session.pairSlots, saves]);
+  // The order follows only stored choices: a failed save stays on the seam (S7), not in the order.
+  const ordered = useMemo(() => orderPairs(session.pairSlots, saves), [session.pairSlots, saves]);
   const order = useMemo(
-    () => (saves.size === 0 ? session.order : clientOrder(session.exercises, pairs)),
-    [saves.size, session.order, session.exercises, pairs],
+    () => (saves.size === 0 ? session.order : clientOrder(session.exercises, ordered)),
+    [saves.size, session.order, session.exercises, ordered],
   );
   const setLog = useSetLog(session.log, order, date, session.session);
   const view = useMemo(() => checklistView(session.exercises, order, setLog.log), [session.exercises, order, setLog.log]);

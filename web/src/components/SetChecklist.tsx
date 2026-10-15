@@ -94,20 +94,18 @@ export function SetChecklist() {
     if (grouped) {
       // S4: the pair as one block, a 2px --text rail from A's top to B's bottom, rows indented 12px.
       items.push(
-        <li
-          key={run.key}
-          role="group"
-          aria-label={`Superset: ${seam.both}`}
-          className={`relative pl-3${i === 0 ? "" : " border-t border-border"}`}
-        >
-          <span
-            aria-hidden="true"
-            data-superset-rail="true"
-            className={`absolute inset-y-0 left-0 w-0.5 bg-text${seams.drawn.has(slotKey(seam)) ? " seam-rail-draw" : ""}`}
-          />
-          {item(run, true)}
-          <Seam v={seam} />
-          {item(partner, true)}
+        <li key={run.key} className={`relative${i === 0 ? "" : " border-t border-border"}`}>
+          {/* The group sits inside the <li>, so the list keeps its listitem (design-lead review, WCAG 1.3.1). */}
+          <div role="group" aria-label={`Superset: ${seam.both}`} className="relative pl-3">
+            <span
+              aria-hidden="true"
+              data-superset-rail="true"
+              className={`absolute inset-y-0 left-0 w-0.5 bg-text${seams.drawn.has(slotKey(seam)) ? " seam-rail-draw" : ""}`}
+            />
+            {item(run, true)}
+            <Seam v={seam} />
+            {item(partner, true)}
+          </div>
         </li>,
       );
       i += 1;
@@ -189,7 +187,7 @@ function Seam({ v }: { readonly v: SeamView }) {
           </button>
         </WarningLine>
       )}
-      {save?.status === "refused" && <WarningLine>{refusedText(v)}</WarningLine>}
+      {save?.status === "refused" && <WarningLine>{refusedText(v, save.reason)}</WarningLine>}
     </div>
   );
 }

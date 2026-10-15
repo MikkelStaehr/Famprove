@@ -625,7 +625,7 @@ function sameRun(
   a: Pick<ExerciseView, "name" | "variantId">,
   b: Pick<ExerciseView, "name" | "variantId">,
 ): boolean {
-  return a.name.trim() === b.name.trim() && a.variantId === b.variantId;
+  return a.name.trim().toLowerCase() === b.name.trim().toLowerCase() && a.variantId === b.variantId;
 }
 
 export function runPositions(

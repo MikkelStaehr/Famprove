@@ -37,7 +37,20 @@ test("order: a run over two rows interleaves as one run; a variant starts its ow
   const s = [...sets([[11, 2, "Curl"], [12, 1, "Curl"], [13, 3, "Pushdown"]])];
   assert.equal(show(sessionOrderWithWarmups(s, [{ rowA: 11, rowB: 13 }])), "11.0 13.0 11.1 13.1 11.2 13.2 12.1 13.3");
   const v = [{ ref: { row: 11, set: 1 }, name: "Curl", variantId: null }, { ref: { row: 12, set: 1 }, name: "Curl", variantId: 5 }];
-  assert.equal(show(sessionOrderWithWarmups(v)), "11.0 11.1 12.0 12.1");
+  // Warm-ups follow the name only (Python's ramp does too): the variant row gets no set 0 of its own.
+  assert.equal(show(sessionOrderWithWarmups(v)), "11.0 11.1 12.1");
+  // ...but it is its own superset run; paired with the plain row, the warm-up still comes first.
+  assert.equal(show(sessionOrderWithWarmups(v, [{ rowA: 11, rowB: 12 }])), "11.0 11.1 12.1");
+});
+
+test("order: a pair whose B has no warm-up keeps A0 first, then the working sets by position", () => {
+  const v = [
+    { ref: { row: 11, set: 1 }, name: "Curl", variantId: null },
+    { ref: { row: 11, set: 2 }, name: "Curl", variantId: null },
+    { ref: { row: 12, set: 1 }, name: "Curl", variantId: 5 },
+    { ref: { row: 12, set: 2 }, name: "Curl", variantId: 5 },
+  ];
+  assert.equal(show(sessionOrderWithWarmups(v, [{ rowA: 11, rowB: 12 }])), "11.0 11.1 12.1 11.2 12.2");
 });
 
 // --- effectivePairs --------------------------------------------------------------------------

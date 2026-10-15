@@ -111,14 +111,26 @@ export function runStartRows(sets: readonly RunSet[]): Set<number> {
 export type PairRef = { readonly rowA: number; readonly rowB: number };
 
 /**
- * The sheet's order with a warm-up (set 0) before set 1 of each run's first row. A pair's two runs
- * interleave by position at A's place: A0 B0 A1 B1 ... (set 0 = the warm-up); the longer run's
- * extra sets follow alone. Without pairs the order is the sheet's.
+ * The rows that get a warm-up (set 0): a row whose exercise name (trimmed, case-insensitive)
+ * differs from the row before it. Name only, never the variant: Python's warm-up ramp
+ * (planned_sets.py) is keyed the same way, and a variant row inside a run never got its own
+ * warm-up (reviewer 2026-10-15: a variant split here would add a set 0 mid-session).
+ */
+export function warmupRows(sets: readonly RunSet[]): Set<number> {
+  return runStartRows(sets.map((s) => ({ ref: s.ref, name: s.name })));
+}
+
+/**
+ * The sheet's order with a warm-up (set 0) before set 1 of each warm-up row (warmupRows). A pair's
+ * two runs (runStartRows: name and variant) interleave at A's place: their warm-ups first (A0 B0,
+ * when each has one), then the working sets by position, A1 B1 A2 B2 ...; the longer run's extra
+ * sets follow alone. Without pairs the order is the sheet's.
  */
 export function sessionOrderWithWarmups(sets: readonly RunSet[], pairs: readonly PairRef[] = []): SetRef[] {
   const order = sessionOrder(sets.map((s) => s.ref));
+  const warm = warmupRows(sets);
   const starts = runStartRows(sets);
-  const flat = order.flatMap((ref) => (ref.set === 1 && starts.has(ref.row) ? [{ row: ref.row, set: 0 }, ref] : [ref]));
+  const flat = order.flatMap((ref) => (ref.set === 1 && warm.has(ref.row) ? [{ row: ref.row, set: 0 }, ref] : [ref]));
   if (pairs.length === 0) return flat;
   const runs: SetRef[][] = [];
   for (const ref of flat) {
@@ -134,9 +146,12 @@ export function sessionOrderWithWarmups(sets: readonly RunSet[], pairs: readonly
       out.push(...a);
       continue;
     }
-    for (let k = 0; k < Math.max(a.length, b.length); k += 1) {
-      if (k < a.length) out.push(a[k]);
-      if (k < b.length) out.push(b[k]);
+    out.push(...a.filter(isWarmup), ...b.filter(isWarmup));
+    const aw = a.filter((r) => !isWarmup(r));
+    const bw = b.filter((r) => !isWarmup(r));
+    for (let k = 0; k < Math.max(aw.length, bw.length); k += 1) {
+      if (k < aw.length) out.push(aw[k]);
+      if (k < bw.length) out.push(bw[k]);
     }
     i += 1;
   }

@@ -63,7 +63,10 @@ which a `next start` on port 3000 may be serving — so prefer dev mode, or ask 
 ## Swipes and frame timing (the tab shell)
 `swipe.mjs` drives the tab shell with real touch events (pointerType "touch") and measures frames: long
 animation frames over 50 ms (PerformanceObserver) and the largest gap between animation frames while the
-gestures run, optionally under CPU throttling. Same browser and port rules as `shoot.mjs`.
+gestures run, optionally under CPU throttling. Same browser and port rules as `shoot.mjs`. It also works on
+a page outside the tab shell (`/fokus`): ready once `<main>` has no skeleton, so `click:` / `wait:` steps,
+`--init`, `--report` and `--out` can shoot a state that needs a tap first (e.g. a view after a client-only
+step), without writing anything (taps are refused under a dev switch).
 
 ```bash
 # Pixel-class phone, 4x CPU throttle: swipe to Analyse, back, tap Træning, browser back

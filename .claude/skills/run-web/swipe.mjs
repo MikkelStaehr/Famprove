@@ -129,10 +129,14 @@ try {
     await sleep(200);
     // Every tab, not only the active one: the others stream in from their defaults, and a swipe
     // measured while they hydrate measures the stream, not the swipe.
+    // A page outside the tab shell (/fokus) has no [data-tab-page]: ready once the document is
+    // complete and its <main> holds no skeleton (tester 2026-10-15: it waited 30 s and exited 1).
     ready = await evaluate(
-      `[...document.querySelectorAll('[data-tab-page]')].length === 3` +
+      `([...document.querySelectorAll('[data-tab-page]')].length === 3` +
         ` && [...document.querySelectorAll('[data-tab-page]')].every((p) => p.querySelector('main h1'))` +
-        ` && !document.querySelector('[data-tab-page] [class*="animate-pulse"]')`,
+        ` && !document.querySelector('[data-tab-page] [class*="animate-pulse"]'))` +
+        ` || (document.readyState === 'complete' && !document.querySelector('[data-tab-page]')` +
+        ` && !!document.querySelector('main') && !document.querySelector('main [class*="animate-pulse"]'))`,
     );
   }
   if (!ready) {

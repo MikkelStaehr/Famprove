@@ -8,8 +8,10 @@ import {
   clientPairs,
   handOffLabel,
   handOffName,
+  orderPairs,
   pairHandOff,
   pairLine,
+  refusedText,
   restWindowOf,
   SEAM_IDLE,
   seamReducer,
@@ -158,7 +160,25 @@ test("S6–S8: optimistic, failed and refused transitions", () => {
   assert.deepEqual(seamReducer(tapped, { kind: "result", result: null }), { override: true, status: "failed" });
   assert.deepEqual(seamReducer(tapped, { kind: "result", result: { ok: false, reason: "failed" } }), { override: true, status: "failed" });
   // S8: a refusal returns to the stored state.
-  assert.deepEqual(seamReducer(tapped, { kind: "result", result: { ok: false, reason: "started" } }), { override: null, status: "refused" });
+  assert.deepEqual(seamReducer(tapped, { kind: "result", result: { ok: false, reason: "started" } }), { override: null, status: "refused", reason: "started" });
+});
+
+test("S8: each refusal reason has its own line", () => {
+  const v = { started: "Bench" };
+  assert.equal(refusedText(v, "started"), "Supersettet kan ikke ændres, fordi Bench er gået i gang.");
+  assert.match(refusedText(v, "overlap"), /andet superset/);
+  assert.match(refusedText(v, "not_today"), /på dagen/);
+  assert.match(refusedText(v, "not_consecutive"), /genindlæs/);
+  assert.equal(refusedText(v), refusedText(v, "started"));
+});
+
+test("a failed save stays on the seam but not in the tap order (reviewer: server and client order agree)", () => {
+  const slots: PairSlot[] = [{ rowA: 10, rowB: 11, paired: false, source: null, locked: false }];
+  const failed = new Map([["10-11", { override: true, status: "failed" as const }]]);
+  const saving = new Map([["10-11", { override: true, status: "saving" as const }]]);
+  assert.deepEqual(clientPairs(slots, failed), [{ rowA: 10, rowB: 11, source: "today" }]);
+  assert.deepEqual(orderPairs(slots, failed), []);
+  assert.deepEqual(orderPairs(slots, saving), [{ rowA: 10, rowB: 11, source: "today" }]);
 });
 
 test("S5: a fresh switch changes the client's tap order", () => {

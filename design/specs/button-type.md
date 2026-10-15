@@ -9,7 +9,7 @@
 - Nothing else changes: positions, sizes of the dock, copy and logic stay.
 
 ## Acceptance (390 and 1280, `DEV_FIXTURE=midsession`, `pause`, `exercise-end`; Prøv igen on `/load`)
-- **B1** Every `<button>` and button-styled link on `/train` and `/fokus` renders its label in Geist Mono 500, 15px, uppercase, letter-spacing 0.6px (computed style); the font check finds no fallback.
+- **B1** Every `<button>` and button-styled link on `/train` and `/fokus` renders its label in Geist Mono 500, 15px, uppercase, letter-spacing 0.6px (computed style); the font check finds no fallback. Not buttons in this sense: the exercise rows on Træning that open and close (their label is the exercise name, Geist 16; tester 2026-10-15 asked, kept as rows) and icon-only buttons (↻, stepper − / +).
 - **B2** `/fokus` has at most one element with `--inverse-bg` fill per view, and it is the done; the finished view and `/` have none.
 - **B3** Every other button has a 1px border whose colour is `--text-muted` and a dark fill; border contrast ≥ 3:1 against its surround, computed by `ui` at render.
 - **B4** Spring over is a bordered button ≥ 44px, no longer an underlined link.

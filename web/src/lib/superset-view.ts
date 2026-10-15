@@ -6,7 +6,7 @@
  */
 
 import { type LoggedSet, type PairRef, runStartRows, type RunSet, sessionOrderWithWarmups, type SetRef, setKey } from "./set-taps.ts";
-import { type EffectivePair, type PairSlot, pairSlots, type PairSource, sessionRuns, type SupersetResult } from "./supersets.ts";
+import { type EffectivePair, type PairSlot, pairSlots, type PairSource, sessionRuns, type SupersetRefusal, type SupersetResult } from "./supersets.ts";
 import { type ExerciseView, titleName } from "./training-view.ts";
 
 type Named = Pick<ExerciseView, "name" | "variant" | "variantId" | "row" | "sets">;
@@ -42,6 +42,8 @@ export function slotKey(p: PairRef): string {
 export type SeamSave = {
   readonly override: boolean | null;
   readonly status: "idle" | "saving" | "failed" | "refused";
+  /** Why the server refused (status refused only), for S8's line. */
+  readonly reason?: SupersetRefusal;
 };
 
 export type SeamEvent =
@@ -58,7 +60,7 @@ export function seamReducer(state: SeamSave, event: SeamEvent): SeamSave {
   if (event.kind === "tap") return { override: event.paired, status: "saving" };
   const r = event.result;
   if (r === null || (!r.ok && r.reason === "failed")) return { override: state.override, status: "failed" };
-  if (!r.ok && r.reason !== "dev") return { override: null, status: "refused" };
+  if (!r.ok && r.reason !== "dev") return { override: null, status: "refused", reason: r.reason };
   return { override: state.override, status: "idle" };
 }
 
@@ -75,6 +77,19 @@ export function clientPairs(
     } else if (override) out.push({ rowA: s.rowA, rowB: s.rowB, source: "today" });
   }
   return out;
+}
+
+/**
+ * The pairs the tap order follows: as clientPairs, but a choice whose save failed is left out
+ * until it is stored (reviewer 2026-10-15: the server orders by the stored pairs, so a failed
+ * choice in the order would start a different set than NÆSTE shows). The seam still shows it.
+ */
+export function orderPairs(
+  serverSlots: readonly PairSlot[],
+  saves: ReadonlyMap<string, SeamSave>,
+): (PairRef & { readonly source: PairSource })[] {
+  const stored = new Map([...saves].filter(([, v]) => v.status !== "failed"));
+  return clientPairs(serverSlots, stored);
 }
 
 /** The tap order (S10) for the client's pairs, so NÆSTE and the progress follow a fresh switch. */
@@ -129,9 +144,20 @@ export function seamSentence(v: Pick<SeamView, "both">, paired: boolean): string
   return paired ? `${v.both} tages som superset.` : `${v.both} tages hver for sig.`;
 }
 
-/** S8: the refusal's line. */
-export function refusedText(v: Pick<SeamView, "started">): string {
-  return `Supersettet kan ikke ændres, fordi ${v.started} er gået i gang.`;
+/** S8: the refusal's line, per the server's reason. */
+export function refusedText(v: Pick<SeamView, "started">, reason?: SupersetRefusal): string {
+  switch (reason) {
+    case "overlap":
+      return "Supersettet kan ikke vælges, fordi en af øvelserne allerede er i et andet superset.";
+    case "not_today":
+      return "Supersettet kan kun ændres på dagen.";
+    case "invalid":
+    case "no_session":
+    case "not_consecutive":
+      return "Supersettet kan ikke ændres. Planen er ændret; genindlæs siden.";
+    default:
+      return `Supersettet kan ikke ændres, fordi ${v.started} er gået i gang.`;
+  }
 }
 
 // ---------------------------------------------------------------- Fokus in a pair (S10–S17)
