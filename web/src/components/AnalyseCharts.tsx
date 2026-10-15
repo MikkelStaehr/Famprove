@@ -1,5 +1,6 @@
 "use client";
 
+import { type RefObject, useRef } from "react";
 import { CartesianGrid, ComposedChart, Line, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts";
 
 import { type BlockSpan, E1RM_PANELS_HEIGHT, type E1rmPanel, type StrengthWeek } from "@/lib/analyse-styrke-view";
@@ -13,10 +14,12 @@ import { LIFT_NAME, LIFTS, type StrengthLift } from "@/lib/lifts";
 import { ChartBoundary, useHydrated, useWide, useWidth } from "./chart-hooks";
 import { HollowDot } from "./ChartMarks";
 import { ChartReadout, Marker, PLOT_FOCUS, useChartPick } from "./ChartReadout";
+import { AnalyseMotion } from "./motion/useAnalyseMotion";
 
 /**
  * /analyse charts (design/specs/analyse.md §4-§5). One x domain [lo, hi] for all three, the pause
- * seams drawn the same way in each, no motion. Plots the view model's values as-is.
+ * seams drawn the same way in each. Plots the view model's values as-is. Recharts' own animations
+ * stay off; the entry motion (bars grow, lines draw) is AnalyseMotion's, on the rendered DOM.
  */
 
 // Ember (reset-analyse-cykel.md §4, C): no left axis, the plot runs from the card's left edge; the
@@ -170,7 +173,10 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
     toggle: true,
     hover: false,
   });
-  if (!hydrated) return <Skeleton height="h-(--chart-height)" />;
+  const motionRef = useRef<HTMLDivElement | null>(null);
+  // A leaf, so a tab change never re-renders this chart (AnalyseMotion); the same place in both branches.
+  const motion = <AnalyseMotion root={motionRef} ready={hydrated} />;
+  if (!hydrated) return <>{motion}<Skeleton height="h-(--chart-height)" /></>;
   const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
   // Today = the domain's last day (analyse-view: hi = today + 0.5); the same x in all three cards.
   const todayX = axis.hi - 0.5;
@@ -230,6 +236,8 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
     );
   return (
     <>
+    {motion}
+    <div ref={motionRef} className="contents" data-motion-group="">
     <div
       {...plotProps}
       aria-label={`${title}. Piletaster vælger en tur`}
@@ -295,7 +303,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
           />
         )}
         {variant === "ef" && (
-          <Line dataKey="dots" stroke="none" dot={efDot} activeDot={false} isAnimationActive={false} legendType="none" />
+          <Line dataKey="dots" className="motion-marks" stroke="none" dot={efDot} activeDot={false} isAnimationActive={false} legendType="none" />
         )}
         {/* One segment per run: the 2px --text line breaks after > 21 days (eftpGapBefore / efGapBefore).
             eFTP draws its TSS-sized dots on it; the EF trend is the line alone. */}
@@ -303,6 +311,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
           <Line
             key={k}
             dataKey={k}
+            className="motion-line"
             type="linear"
             stroke={AMARKS.line.color}
             strokeWidth={AMARKS.line.width}
@@ -314,7 +323,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
             connectNulls={false}
           />
         ))}
-        <Line dataKey="excl" stroke="none" dot={crossShape} activeDot={false} isAnimationActive={false} legendType="none" />
+        <Line dataKey="excl" className="motion-marks" stroke="none" dot={crossShape} activeDot={false} isAnimationActive={false} legendType="none" />
         {picked !== undefined && ringY !== null && (
           <ReferenceDot x={picked.x} y={ringY} r={4} fill="none" stroke="var(--text)" strokeWidth={1} ifOverflow="visible" />
         )}
@@ -323,6 +332,7 @@ function MarkChartInner({ axis, chart, title, variant }: LineChartProps) {
       <TodayLine axis={axis} x={todayX} />
     </div>
     <ChartReadout readout={readout} all={all} lines={3} cells />
+    </div>
     </>
   );
 }
@@ -357,6 +367,7 @@ function WeekGroup<W extends PickWeek>({
   hasData,
   children,
   todayX,
+  motionRef,
 }: {
   readonly axis: XDomain;
   readonly weeks: readonly W[];
@@ -373,6 +384,8 @@ function WeekGroup<W extends PickWeek>({
    * user 2026-10-14: on weekly charts it was a lone tick without a date).
    */
   readonly todayX?: number;
+  /** AnalyseMotion's root: the bars and lines in this group grow and draw on entry. */
+  readonly motionRef: RefObject<HTMLDivElement | null>;
 }) {
   const latestIndex = restingWeekIndex(weeks, hasData);
   const [widthRef, boxWidth] = useWidth();
@@ -399,7 +412,7 @@ function WeekGroup<W extends PickWeek>({
       : ticksClearOfToday(ticks, { lo: axis.lo, hi: axis.hi, today: todayX ?? null, width: boxWidth - Y_AXIS_WIDTH - MARGIN_RIGHT });
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={motionRef} className="flex flex-col gap-2">
       <div
         {...plotProps}
         className={`relative flex flex-col gap-2 ${PLOT_FOCUS}`}
@@ -469,7 +482,7 @@ function Strip({
         <span className="font-mono text-11 text-text-muted uppercase">{label}</span>
         <span className="font-mono text-11 text-text-muted">{vMax.toLocaleString("da-DK")}</span>
       </div>
-      <div className="relative" style={{ height }}>
+      <div className="relative" style={{ height }} data-motion-bars="">
         <div className="absolute border-t border-dashed border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: STRIP_TOP }} />
         <div className="absolute h-px" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, bottom: 0, background: AMARKS.baseline.color }} />
         {bars.map((w) => {
@@ -479,14 +492,14 @@ function Strip({
           const width = `max(1px, calc(${xCss(axis, w.x1)} - ${xCss(axis, w.x0)} - ${g}px))`;
           if (zero)
             return (
-              <div key={w.x0} data-mark="zero" className="absolute bottom-0" style={{ left, width, height: AMARKS.stub.height, background: AMARKS.stub.color }} />
+              <div key={w.x0} data-mark="zero" className="absolute bottom-0 origin-bottom" style={{ left, width, height: AMARKS.stub.height, background: AMARKS.stub.color }} />
             );
           const h = `calc((100% - ${STRIP_TOP}px) * ${w.value / vMax})`;
           return (
             <div
               key={w.x0}
               data-mark={w.deload ? "deload" : "bar"}
-              className="absolute bottom-0"
+              className="absolute bottom-0 origin-bottom"
               style={{
                 left,
                 width,
@@ -523,11 +536,15 @@ export function WeekStrips(props: WeeksProps) {
 function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
   const hydrated = useHydrated();
   const wide = useWide();
-  if (!hydrated) return <Skeleton height="h-[262px]" />;
+  const motionRef = useRef<HTMLDivElement | null>(null);
+  const motion = <AnalyseMotion root={motionRef} ready={hydrated} />;
+  if (!hydrated) return <>{motion}<Skeleton height="h-[262px]" /></>;
   const ticks = wide ? axis.ticksWide : axis.ticksNarrow;
   const bars = (active: WeekBar | null, value: (w: WeekBar) => number): StripBar[] =>
     weeks.map((w) => ({ x0: w.x0, x1: w.x1, value: value(w), zero: w.zero, current: w.current, active: w === active }));
   return (
+    <>
+    {motion}
     <WeekGroup
       axis={axis}
       weeks={weeks}
@@ -540,6 +557,7 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
       overlay={<SeamOverlay axis={axis} bottom={X_AXIS_HEIGHT} />}
       hasData={(w) => !w.zero}
       todayX={axis.hi - 0.5}
+      motionRef={motionRef}
     >
       {(active) => (
         <>
@@ -549,6 +567,7 @@ function WeekStripsInner({ axis, weeks, max }: WeeksProps) {
         </>
       )}
     </WeekGroup>
+    </>
   );
 }
 
@@ -650,7 +669,7 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
           {panel.empty}
         </p>
       ) : (
-        <div className="relative" style={{ height: PANEL }} aria-hidden="true">
+        <div className="relative" style={{ height: PANEL }} aria-hidden="true" data-motion-group="">
           {panel.ticks.map((t) => (
             <div key={t}>
               <div className="absolute border-t border-dashed border-border" style={{ left: Y_AXIS_WIDTH, right: MARGIN_RIGHT, top: top(t) }} />
@@ -687,6 +706,7 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
             {panel.segments.map((seg) => (
               <polyline
                 key={seg[0]?.x}
+                className="motion-line"
                 points={seg.map((p) => `${sx(p.x)},${(1 - f(p.y)) * 1000}`).join(" ")}
                 fill="none"
                 stroke={e.line.color}
@@ -696,6 +716,8 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
               />
             ))}
           </svg>
+          {/* Fades in after the panel's line (AnalyseMotion); the same box as the panel. */}
+          <div className="pointer-events-none absolute inset-0" data-motion-marks="">
           {panel.points.map((p) => {
             const r = p.logged ? e.logged.r : e.prescribed.r;
             const x = xCss(axis, p.x);
@@ -723,6 +745,7 @@ function E1rmPlot({ axis, panel }: { readonly axis: XDomain; readonly panel: E1r
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>
@@ -749,8 +772,12 @@ export function E1rmPanels(props: PanelsProps) {
 function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProps) {
   const hydrated = useHydrated();
   const wide = useWide();
-  if (!hydrated) return <Skeleton height={E1RM_PANELS_HEIGHT} />;
+  const motionRef = useRef<HTMLDivElement | null>(null);
+  const motion = <AnalyseMotion root={motionRef} ready={hydrated} />;
+  if (!hydrated) return <>{motion}<Skeleton height={E1RM_PANELS_HEIGHT} /></>;
   return (
+    <>
+    {motion}
     <WeekGroup
       axis={axis}
       weeks={weeks}
@@ -760,6 +787,7 @@ function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProp
       cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
       padTop={BLOCK_ROOM}
+      motionRef={motionRef}
     >
       {() => (
         // 24px between panels (12 + a 1px --border rule + 12), so one panel's bottom y label never
@@ -773,6 +801,7 @@ function E1rmPanelsInner({ axis, blocks, phaseRules, weeks, panels }: PanelsProp
         </div>
       )}
     </WeekGroup>
+    </>
   );
 }
 
@@ -791,8 +820,12 @@ const TONNAGE_STRIP = 72;
 function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnageProps) {
   const hydrated = useHydrated();
   const wide = useWide();
-  if (!hydrated) return <Skeleton height="h-[324px]" />;
+  const motionRef = useRef<HTMLDivElement | null>(null);
+  const motion = <AnalyseMotion root={motionRef} ready={hydrated} />;
+  if (!hydrated) return <>{motion}<Skeleton height="h-[324px]" /></>;
   return (
+    <>
+    {motion}
     <WeekGroup
       axis={axis}
       weeks={weeks}
@@ -802,6 +835,7 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnagePro
       cells={false}
       overlay={<BlockOverlay axis={axis} blocks={blocks} phaseRules={phaseRules} />}
       padTop={BLOCK_ROOM}
+      motionRef={motionRef}
     >
       {(active) =>
         LIFTS.map((lift) => (
@@ -824,5 +858,6 @@ function TonnageStripsInner({ axis, blocks, phaseRules, weeks, max }: TonnagePro
         ))
       }
     </WeekGroup>
+    </>
   );
 }

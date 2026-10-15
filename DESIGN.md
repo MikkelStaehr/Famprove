@@ -332,7 +332,8 @@ Calm and quick; motion confirms where you are and what changed, never decorates.
 | Number roll (digit columns) | 750 ms | `--ease`, +45 ms delay per digit, left to right | |
 | Unfold (exercise row, `grid-template-rows` 0fr → 1fr) | 380 ms | `--ease`; chevron rotates 350 ms | |
 | Set check: ✓ stroke draw / set dot pop (0.4 → 1.35 → 1) | 400 ms / 400 ms | `--ease` | |
-| TSS bars grow (scaleY from the bottom) | 600 ms | `--ease`, 40 ms stagger per bar | |
+| Bars grow (scaleY from the bottom; Analyse's weekly and tonnage strips) on entering Analyse or switching Cykel/Styrke | 600 ms | `--ease`, 40 ms stagger per bar, the whole ripple capped at the reference's 480 ms (12 bars): min(40, 480/(n−1)) ms with ~94 weekly bars; starts after the 440 ms stack settles | |
+| Analyse lines draw in (eFTP, EF trend, e1RM; stroke-dashoffset) on entering Analyse or switching Cykel/Styrke | 800 ms | `--ease`, after the stack settles line i starts at 200 + 120·i ms; its dots and markers fade in after it (250 ms); the FTP level line stays put | |
 | Tab icon on becoming current: barbell lift / trend line draw / bars grow | 600 / 650 / 500 ms | `--ease`; the bars icon's three bars 70 ms apart | |
 | Segment pill slide; ZoneBar tick to today | 350 ms; 900 ms | `--ease` | |
 | Segment and tab colour; `<details>` chevron | 120 ms ease-out; 150 ms | | |
