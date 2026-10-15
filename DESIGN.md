@@ -39,7 +39,7 @@ Token **names and roles** are fixed here; their **values** come from Part B.
 - Colour roles: `--bg`, `--card`, `--border`, `--raised`, `--axis`, `--track`, `--shade-1`, `--shade-2`, `--text`, `--text-muted`, `--today`, `--warning`, `--focus`, the five `--zone-*` roles and the inverse trio `--inverse-bg`, `--inverse-text`, `--inverse-muted`.
 - One theme only (dark, `color-scheme: dark`). It meets the accessibility rules below. A light theme, if ever added, must meet them too.
 - Spacing: even pixels. Layout steps between cards and sections are 12, 16, 24, 32, 48, 64; inside a component the 2px steps Part B names (3, 6, 10, 14, 18, 22 included) are allowed because they are the direction's measured values. Nothing odd except the 3px control padding.
-- Radius: named tokens from Part B (`--radius-card`, `--radius-tile`, `--radius-hero`, `--radius-half`, `--radius-control`, `--radius-segment`, `--radius-button`, `--radius-cell`); no raw `rounded-[…]` values in components.
+- Radius: named tokens from Part B (`--radius-card`, `--radius-tile`, `--radius-hero`, `--radius-half`, `--radius-control`, `--radius-segment`, `--radius-button`, `--radius-cell`, and for the tab shell `--radius-stack` 24px: the page sliding in on top, its left corners only; `--radius-sink` 26px: the page sinking back, scaled by t, `design/specs/motion-shell.md`); no raw `rounded-[…]` values in components. *(Stack and sink tokens approved by the user 2026-10-15.)*
 - Type: one scale, named by px (`text-11 … text-56`, set by Part B). Tabular numerals for every number that is compared or read mid-set. Glance sizes for `/` and `/fokus` are in "Træning" below.
 - Semantic colours carry meaning only with a label, icon or shape, never colour alone. Zone colours are always next to the zone's word.
 - Tokens only: no magic values in components. Tailwind's default colour, text-size and radius scales stay removed.
@@ -70,8 +70,8 @@ Two usage modes, two layouts. **Phone** (390px): in the gym and on the bike; Tr�
 - **States on desktop:** skeletons use the same cards and grid classes as the page (no jump when data arrives). `ErrorState` and `EmptyState` replace the whole grid with one full-width card, text capped at 60ch.
 
 **Navigation (`TabBar`, three tabs: Træning · Belastning · Analyse; never on `/fokus`):**
-- **Phone (below `lg`): bottom bar.** `fixed inset-x-0 bottom-0`, `--bg`, 1px `--border` top border. Three equal tabs (`justify-around`), each a link with a 22px line icon above a `text-11` Geist label, gap 4px, `min-w-16`, padding 6px; the bar has 10px top padding and `max(24px, env(safe-area-inset-bottom))` bottom. Each tab's hit area is ≥ 44 × 44. Bar height `--bottom-bar` = `calc(4.5rem + env(safe-area-inset-bottom))`. `main` gets `padding-bottom: calc(var(--bottom-bar) + 24px)` and `html` gets `scroll-padding-bottom: var(--bottom-bar)` so a focused element is never hidden under the bar (WCAG 2.4.11).
-- **Large text:** when the labels would wrap (container query `@max-[20.5rem]` on the nav), the bar is **not fixed**: it falls back to a static strip at the top of the page.
+- **Phone (below `lg`): bottom bar.** `fixed inset-x-0 bottom-0`, `--bg`, 1px `--border` top border. Three equal tabs (`justify-around`), each a link with a 22px line icon above a `text-11` Geist label, gap 4px, `min-w-16`, padding 6px; the bar has 10px top padding and `max(24px, env(safe-area-inset-bottom))` bottom. Each tab's hit area is ≥ 44 × 44. **Indicator** (approved by the user 2026-10-15): a 2px `--text` line on the bar's top edge that follows the swipe position p (not only the settled tab): an outer track one tab wide, translated by p × tab width, holding a 28px inner bar centred in the tab, radius 1px, `aria-hidden` (the current tab is still named by `aria-current`, weight and colour). Bar height `--bottom-bar` = `calc(4.5rem + env(safe-area-inset-bottom))`. `main` gets `padding-bottom: calc(var(--bottom-bar) + 24px)` and `html` gets `scroll-padding-bottom: var(--bottom-bar)` so a focused element is never hidden under the bar (WCAG 2.4.11).
+- **Large text:** when the labels would wrap (container query `@max-[20.5rem]` on the nav), the bar is **not fixed**: it falls back to a static strip at the top of the page, without the indicator (current tab by weight and colour only).
 - **Desktop (`lg`): top bar.** Static, in the frame, 16px from the top, 24px above the h1, left-aligned: a `SegmentedControl`-style track (`--card` fill, 1px `--border`, `--radius-button`, 4px padding) holding the three tabs as links, each 44px tall, 20px icon + `text-14` Geist 500 label, gap 8px, padding 0 16px, `--radius-control`.
 - **Current tab** (every width): `aria-current="page"`, `--text` icon and label, label weight 600; the others `--text-muted`, weight 400. On desktop the current tab also gets the `--raised` fill. Weight plus colour (plus fill on desktop), never colour alone. `/analyse/styrke` marks Analyse.
 - DOM: one `<header><nav aria-label="Hovedmenu">` before `<main>` on every width, so keyboard users meet the nav first; only its position changes.
@@ -107,7 +107,7 @@ Two usage modes, two layouts. **Phone** (390px): in the gym and on the bike; Tr�
 Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cykel's eFTP, EF and weekly strips, and Styrke's e1RM panels and tonnage strips.
 - **Marker.** Selecting a day, ride or week draws a 1px `--text` vertical rule the full height of the plot. On a point chart it snaps to the nearest point and that point gets a 2px `--card` ring (not on Belastning's fitness curve: a hairline only, no dot; `review-round.md` §2). On bar and week strips it sits at the slot centre. On the training-day grid the selected cell gets a 1.5px `--text` outline (offset 1px). The marker is `--text`, never `--today` (`--today` means "today", not "selected").
 - **Touch and pen** (`pointerType` ≠ `mouse`): there is **no floating tooltip**. Tap or drag moves the marker, and the values show in the **readout row**. The plot has `touch-action: pan-y`, so a vertical drag still scrolls the page and a horizontal drag scrubs. A tap outside the card's plot clears the selection (a document `pointerdown` outside it), and so does Esc.
-- **Readout row.** It sits directly under the x labels, 8px down, inside the card and above the notes, at every width. It reserves a **fixed height**: the height of the chart's tallest possible readout, so nothing jumps between days. Every fact is its own line and may wrap; nothing is truncated. At 200% text it may grow. It is `aria-live="polite"` and is updated at most once per 150ms while dragging.
+- **Readout row.** It sits directly under the x labels, 8px down, inside the card and above the notes, at every width. It reserves a **fixed height**: the height of the chart's tallest possible readout, so nothing jumps between days. Every fact is its own line and may wrap; nothing is truncated. At 200% text it may grow. The **visible** readout follows the finger every frame; the **screen-reader live region** (`aria-live="polite"`, a visually hidden copy) is updated at most once per 150ms while dragging. *(Throttle limited to the live region: approved by the user 2026-10-15.)*
   - Line 1 is `text-13` Geist 500 `--text`: the date or week, then ` · ` and a status when one applies.
   - Line 2 holds the value cells, Geist Mono `text-14` 500 tabular. Each cell is the series' legend swatch, then its label in `--text-muted`, then the value. Cells are 16px apart and wrap.
   - Further lines are `text-13` `--text-muted` facts.
@@ -281,8 +281,10 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 | `--radius-control` | 10 | `SegmentedControl` track, desktop tab, week-strip day box, tooltip |
 | `--radius-segment` | 7 | a segment |
 | `--radius-cell` | 4 | training-day grid cell (3px on legend swatches and bar tops) |
+| `--radius-stack` | 24 | tab shell: the page sliding in on top, left corners only, while it is off its rest position |
+| `--radius-sink` | 26 | tab shell: the page sinking back, × t (0 at rest, 26 when fully covered) |
 | pill | 999 | `ZonePill` |
-- Cards: `--card` fill + 1px `--border` border. **No shadows anywhere.** Elevation is fill: `--bg` < `--card` < `--raised`; the inverse card is the one light surface on a screen.
+- Cards: `--card` fill + 1px `--border` border. **No shadows anywhere**, with one exception: `--shadow-stack: -18px 0 36px rgba(0,0,0,.55)` on the tab-shell page sliding in on top, only while it moves (0 < d < 1). It reads as a page edge, not as card elevation. Elevation is fill: `--bg` < `--card` < `--raised`; the inverse card is the one light surface on a screen.
 - Lines: borders 1px; icons 1.5px stroke; chart main line 2px; today line 1.5px (Analyse › Cykel only).
 
 ## Space and density
@@ -321,5 +323,26 @@ Line icons, 24 viewBox, `fill="none"`, `stroke="currentColor"`, **stroke-width 1
 - **Training-day grid week numbers:** the ISO week above each column, Geist Mono `text-10` [A9] `--text-muted`, centred on the 20px cell, 6px above row 1; the current week's in `--text` 500; `aria-hidden`. Day labels: all seven, `M T O T F L S`.
 - Every chart has an sr sentence, units on an axis or in the caption (exception: Belastning's fitness curve, whose `TSS/dag` lives in the readout cells and sr sentence), and the readout row. No 3D, no gradients, no shadows.
 
-## Motion
-Calm and quick; motion confirms, it never decorates. Segment and tab selection: background and colour 120ms ease-out. A range change (4U / 12U / Sæson) cross-fades the plot 150ms; paths never morph. `<details>` chevrons rotate 150ms. Button press: opacity 0.85 on `:active` (no scale). Skeleton pulse 1.2s. The rest timer steps once a second with no transition. `prefers-reduced-motion: reduce`: every duration is 0 and the skeleton is static.
+## Motion (rewritten 2026-10-15, slice `motion-shell`; reference `design/reference/famprove-motion.html`, local)
+Calm and quick; motion confirms where you are and what changed, never decorates. One ease, `--ease: cubic-bezier(.2,.8,.2,1)`, unless the row names another. JS-driven easings: easeOutQuart = 1 − (1 − t)⁴, easeOutCubic = 1 − (1 − t)³.
+
+| What | Duration | Ease / timing | Spec |
+|---|---|---|---|
+| Tab shell card stack (swipe release, tab tap, back/forward) | 440 ms | easeOutQuart (rAF) | `motion-shell.md` |
+| Tab indicator | follows p every frame; no own transition | | `motion-shell.md` |
+| Fitness curve draw-in (stroke-dashoffset) | 900 ms | `--ease`; today's ring fades in at 750 ms (250 ms), the prognose at 850 ms (500 ms) | |
+| Range change (4U / 12U / Sæson): path morph | 420 ms | easeOutCubic (rAF); gridlines fade out and back | |
+| Number roll (digit columns) | 750 ms | `--ease`, +45 ms delay per digit, left to right | |
+| Unfold (exercise row, `grid-template-rows` 0fr → 1fr) | 380 ms | `--ease`; chevron rotates 350 ms | |
+| Set check: ✓ stroke draw / set dot pop (0.4 → 1.35 → 1) | 400 ms / 400 ms | `--ease` | |
+| TSS bars grow (scaleY from the bottom) | 600 ms | `--ease`, 40 ms stagger per bar | |
+| Tab icon on becoming current: barbell lift / trend line draw / bars grow | 600 / 650 / 500 ms | `--ease`; the bars icon's three bars 70 ms apart | |
+| Segment pill slide; ZoneBar tick to today | 350 ms; 900 ms | `--ease` | |
+| Segment and tab colour; `<details>` chevron | 120 ms ease-out; 150 ms | | |
+| Button press | opacity 0.85 on `:active`, no scale | | |
+| Skeleton pulse | 1.2 s opacity | | |
+| Rest timer | steps once a second, no transition | | |
+
+- **Sinking page:** darkened by a black scrim at opacity 0.55 × t over the page, never `filter: brightness` (same pixels on a dark page; opacity is cheaper).
+- **Nothing animates on first paint.** A hard load, reload or `router.refresh()` shows the final state at once: curves drawn, bars full, numbers set, current tab icon still. Motion plays only on a change the user caused (a tab change, a range change, a tap, a new value after ↻).
+- **`prefers-reduced-motion: reduce`:** everything is off: every duration and delay is 0, the card stack snaps, the curve and bars appear complete, digits change in place, the skeleton is static.
