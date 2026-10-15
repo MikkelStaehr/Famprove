@@ -111,3 +111,5 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | per-side-dumbbell | Unilateral and dumbbell exercises: exercises.per_side (reps per side, both counted) and kg_per_dumbbell (x2), recorded per set; marked after the user sees the lists | M |
 | variants | Exercise variants from 'V:' in the sheet's NOTES: exercise_variants with aliases and inherited fields, per (exercise, variant) grouping, variant names on Træning/Fokus | L |
 | sheet-layout | Parser guard: each week's columns from the day's header row, a training day bounded by its WEEK row and the next Micro Length/DAY/MICROCYCLE row; anything else stops collect-strength | M |
+| variants-notes | Variants from any NOTES text ("V:" optional, "N:" = a remark), Fokus shows no NOTES; one run, six cells checked | M |
+| refresh-button | "Hent data nu": ↻ on the updated line → POST /api/refresh → workflow_dispatch, token server-side only, one run at a time, 5 min apart | M |
