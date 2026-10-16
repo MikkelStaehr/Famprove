@@ -5,7 +5,7 @@
  * pair line. The pairs themselves come from lib/supersets.ts (the server's rules).
  */
 
-import { type LoggedSet, type PairRef, runStartRows, type RunSet, sessionOrderWithWarmups, type SetRef, setKey } from "./set-taps.ts";
+import { isWarmup, type LoggedSet, type PairRef, runStartRows, type RunSet, sessionOrderWithWarmups, type SetRef, setKey } from "./set-taps.ts";
 import { type EffectivePair, type PairSlot, pairSlots, type PairSource, sessionRuns, type SupersetRefusal, type SupersetResult } from "./supersets.ts";
 import { type ExerciseView, titleName } from "./training-view.ts";
 
@@ -210,8 +210,12 @@ export function pairRole(exercises: readonly FokusRow[], pairs: readonly PairRef
   return { role, partner, partnerRows, solo };
 }
 
-/** Whether `next` is `after`'s paired B, straight after it (A → B: no rest, no timer; S13). */
+/**
+ * Whether `next` is `after`'s paired B, straight after it (A → B: no rest, no timer; S13). Working
+ * sets only: warm-ups are not part of the superset (user, 2026-10-16), so A0 → B0 is two solo sets.
+ */
 export function pairHandOff(exercises: readonly FokusRow[], pairs: readonly PairRef[], after: SetRef, next: SetRef): boolean {
+  if (isWarmup(after) || isWarmup(next)) return false;
   const role = pairRole(exercises, pairs, after);
   return role !== null && role.role === "a" && role.partnerRows.includes(next.row);
 }
@@ -230,20 +234,20 @@ export function handOffName(
 
 /**
  * R3: the rest after B uses the whole window of the run with the larger rest_max_s (both bounds
- * from it); after any other set (or a solo one) the set's own window. Returns the row whose window applies.
+ * from it); after any other set (a warm-up, a solo one) the set's own window. Returns the row whose window applies.
  */
 export function restWindowOf<E extends FokusRow>(exercises: readonly E[], pairs: readonly PairRef[], after: SetRef): { readonly row: E; readonly superset: boolean } | null {
   const own = exercises.find((e) => e.row === after.row);
   if (own === undefined) return null;
   const role = pairRole(exercises, pairs, after);
-  if (role === null || role.role !== "b" || role.solo) return { row: own, superset: false };
+  if (isWarmup(after) || role === null || role.role !== "b" || role.solo) return { row: own, superset: false };
   const partner = exercises.find((e) => e.row === role.partner.row);
   if (partner === undefined) return { row: own, superset: true };
   const larger = (partner.restMaxS ?? -1) > (own.restMaxS ?? -1) ? partner : own;
   return { row: larger, superset: true };
 }
 
-/** S12: A's done, "Videre til Pull-ups"; spoken "Videre til Pull-ups, sæt 2 af 4 udført, Bench" (A0: "opvarmning udført"). */
+/** S12: A's done, "Videre til Pull-ups"; spoken "Videre til Pull-ups, sæt 2 af 4 udført, Bench" (a working set only). */
 export function handOffLabel(
   bName: string,
   done: { readonly number: number; readonly count: number } | null,
@@ -253,8 +257,9 @@ export function handOffLabel(
   return { visible: `Videre til ${bName}`, spoken: `Videre til ${bName}, ${what}, ${aName}` };
 }
 
-/** S11 / S16: the line under the name stack, null outside a pair. */
+/** S11 / S16: the line under the name stack, null outside a pair and on a warm-up (it runs alone). */
 export function pairLine(exercises: readonly FokusRow[], pairs: readonly PairRef[], ref: SetRef): string | null {
+  if (isWarmup(ref)) return null;
   const role = pairRole(exercises, pairs, ref);
   if (role === null) return null;
   const other = titleName(role.partner);

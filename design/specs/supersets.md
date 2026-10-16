@@ -4,7 +4,7 @@
 
 **Readings (user decides):**
 - R1: the ⇄ sits on the seam *between* the two rows. Option: inside A's expanded row only (calmer list, but you would have to open a row to find it).
-- R2: A's warm-up done also reads `✓ Videre til <B>` (A0 → B0, no timer). Option: B's warm-up is skipped automatically in a pair (loses B's warm-up/set 1 boundary).
+- R2 (decided by the user 2026-10-16): warm-ups are not part of the superset. A's warm-up, then B's, each alone (`✓ Opvarmning udført`, the usual rest, no pair line); the superset starts at the first working set.
 - R3: the rest after B uses the whole window with the larger `rest_max_s` (both bounds from it). Option: max of each bound separately.
 
 ## Træning (`/`): the seam (the one new surface)
@@ -30,9 +30,9 @@
 ## Fokus (`/fokus`) in a pair
 - **S10 Tap order.** A0, B0, A1, B1, A2, B2 …; the longer run's extra sets run alone at the end (4 + 3: … A3 B3 A4). A skip moves on like a done (writes no time). Fortryd walks back in this order.
 - **S11 Pair line.** In the hero card, under the name stack, Geist 14 `--text-muted` with the 16px swap icon: on A `Superset med Pull-ups · den følger uden pause`; on B `Superset med Bench · pause bagefter`.
-- **S12 A's done.** The one light done reads `✓ Videre til Pull-ups` (source sentence case, rendered caps; wraps to 2 lines, grows from 56px, never truncated). Accessible name `Videre til Pull-ups, sæt 2 af 4 udført, Bench`. Same on A0 (R2).
+- **S12 A's done.** The one light done reads `✓ Videre til Pull-ups` (source sentence case, rendered caps; wraps to 2 lines, grows from 56px, never truncated). Accessible name `Videre til Pull-ups, sæt 2 af 4 udført, Bench`. Working sets only: A0's done is the usual `✓ Opvarmning udført` (R2).
 - **S13 A → B.** B's hero card shows at once with **no rest strip** (fokus-flow §1.2 is absent when the shown set's predecessor is its paired A). No vibration, no timer. Status: `Bench, sæt 2 udført. Næste: Pull-ups, sæt 2 af 3, 8 reps.`
-- **S14 Rest after B.** B's done (`✓ Sæt 2 udført`) starts the rest; the view is the next A set (fokus-flow §1), its pair line saying B follows. `Anbefalet` and the vibration at Min use the pair's window (R3); the strip's label row reads `PAUSE` ↔ `Anbefalet 3–5 min · superset`. B0's done (`✓ Opvarmning udført`) leads to A1 the same way.
+- **S14 Rest after B.** B's done (`✓ Sæt 2 udført`) starts the rest; the view is the next A set (fokus-flow §1), its pair line saying B follows. `Anbefalet` and the vibration at Min use the pair's window (R3); the strip's label row reads `PAUSE` ↔ `Anbefalet 3–5 min · superset`. B0's done (`✓ Opvarmning udført`) leads to A1 with B's own window, as after any warm-up (R2).
 - **S15 Feel.** Each set's feel row shows once, on the view right after its own done, and names the exercise because the card shows the other one: `Hvordan var sæt 2 i Bench?` (on B's view) and `Hvordan var sæt 2 i Pull-ups?` (on A's view). The reps stepper follows the same rule (`Reps i sæt 2 · Bench`). Optional as before.
 - **S16 Tail.** Sets after the shorter run ends are solo: done `✓ Sæt 4 udført`, the exercise's own rest window, pair line replaced by `Alene – Pull-ups er færdig`.
 - **S17 Progress.** Fokus's and Træning's segmented progress order their segments by the tap order (A1 B1 A2 B2 …), so they fill left to right; count `3/19` unchanged. Warm-ups stay out of it, as now.

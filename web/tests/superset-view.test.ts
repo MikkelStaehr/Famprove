@@ -69,10 +69,14 @@ test("S10/S16: 4 + 3 ends with A4 alone", () => {
   assert.deepEqual(working(orderOf(session(4, 3))), ["10#1", "11#1", "10#2", "11#2", "10#3", "11#3", "10#4"]);
 });
 
-test("S12: A's done reads Videre til B, also on A0 (R2); B's and the tail's don't", () => {
+test("S12: A's working done reads Videre til B; the warm-ups run alone (user 2026-10-16); B's and the tail's don't", () => {
   const rows = session(4, 3);
   assert.equal(handOffName(rows, PAIRS, { row: 10, set: 2 }, { row: 11, set: 2 }), "Pull-ups");
-  assert.equal(handOffName(rows, PAIRS, { row: 10, set: 0 }, { row: 11, set: 0 }), "Pull-ups");
+  assert.equal(handOffName(rows, PAIRS, { row: 10, set: 0 }, { row: 11, set: 0 }), null); // A0 → B0: two solo warm-ups
+  assert.equal(handOffName(rows, PAIRS, { row: 11, set: 0 }, { row: 10, set: 1 }), null); // B0 → A1: the superset starts
+  assert.equal(handOffName(rows, PAIRS, { row: 10, set: 1 }, { row: 11, set: 1 }), "Pull-ups");
+  assert.equal(pairLine(rows, PAIRS, { row: 10, set: 0 }), null);
+  assert.equal(pairLine(rows, PAIRS, { row: 11, set: 0 }), null);
   assert.equal(handOffName(rows, PAIRS, { row: 11, set: 2 }, { row: 10, set: 3 }), null);
   assert.equal(handOffName(rows, PAIRS, { row: 10, set: 4 }, { row: 12, set: 0 }), null);
   const label = handOffLabel("Pull-ups", { number: 2, count: 4 }, "Bench");
@@ -104,12 +108,13 @@ test("S13/S14: showRest is false after A and true after B", () => {
   }
 });
 
-test("R3: the rest after B (and B0) uses the whole window of the run with the larger rest_max_s", () => {
+test("R3: the rest after B uses the whole window of the run with the larger rest_max_s; after a warm-up its own", () => {
   const rows = session(3, 3);
   const afterB = restWindowOf(rows, PAIRS, { row: 11, set: 1 });
   assert.equal(afterB?.superset, true);
   assert.deepEqual([afterB?.row.restMinS, afterB?.row.restMaxS], [180, 300]);
-  assert.equal(restWindowOf(rows, PAIRS, { row: 11, set: 0 })?.superset, true);
+  assert.equal(restWindowOf(rows, PAIRS, { row: 11, set: 0 })?.superset, false); // B0 runs alone
+  assert.equal(restWindowOf(rows, PAIRS, { row: 10, set: 0 })?.superset, false);
   // The larger window on A's side wins as a whole.
   const flipped = [{ ...rows[0], restMinS: 120, restMaxS: 360 }, rows[1], rows[2]];
   assert.deepEqual([restWindowOf(flipped, PAIRS, { row: 11, set: 2 })?.row.restMinS, restWindowOf(flipped, PAIRS, { row: 11, set: 2 })?.row.restMaxS], [120, 360]);
