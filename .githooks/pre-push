@@ -1,0 +1,60 @@
+#!/bin/sh
+# Golden test before push (user, 2026-10-16; CLAUDE.md "Golden test before push").
+# When the pushed commits change the Python domain or compute, run python/tests/test_golden.py
+# (compute on the git-ignored snapshot of the real tables, today and 4 weeks back) and stop the
+# push if it is red. Skips with a message when the snapshot is missing (a fresh clone, CI).
+# Enable once per clone:  git config core.hooksPath .githooks
+# Skip it on purpose:      git push --no-verify
+set -u
+
+root=$(git rev-parse --show-toplevel) || exit 1
+zero=0000000000000000000000000000000000000000
+paths="python/src/training_load/domain python/src/training_load/cli/compute.py"
+touched=""
+
+# stdin: one line per pushed ref: <local ref> <local sha> <remote ref> <remote sha>
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # a deleted branch pushes no code
+  if [ "$remote_sha" = "$zero" ]; then
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null || true)
+  else
+    base=$remote_sha
+  fi
+  if [ -z "$base" ]; then
+    touched="(no common base: checking anyway)" # nothing to compare with: assume it changed
+  else
+    # shellcheck disable=SC2086 # $paths is a list of pathspecs on purpose
+    found=$(git diff --name-only "$base" "$local_sha" -- $paths)
+    [ -n "$found" ] && touched="$touched $found"
+  fi
+done
+
+[ -z "$touched" ] && exit 0
+
+snapshot="$root/python/tests/golden/inputs.json"
+expected="$root/python/tests/golden/expected.json"
+echo "pre-push: Python-domænet eller compute er ændret:$touched" >&2
+if [ ! -f "$snapshot" ] || [ ! -f "$expected" ]; then
+  echo "pre-push: golden: SPRUNGET OVER - øjebliksbilledet mangler (python/tests/golden/inputs.json / expected.json, git-ignoreret)." >&2
+  echo "pre-push:   Opret det på koden FØR ændringen: cd python && uv run python tests/golden_dump.py && REGENERATE_GOLDEN=1 uv run pytest tests/test_golden.py" >&2
+  exit 0
+fi
+
+uv=$(command -v uv 2>/dev/null || true)
+[ -z "$uv" ] && [ -x "$HOME/.local/bin/uv" ] && uv="$HOME/.local/bin/uv" # a GUI git's PATH may lack it
+if [ -z "$uv" ]; then
+  echo "pre-push: golden: KAN IKKE KØRE - uv findes ikke. Push stoppet (git push --no-verify for at springe over med vilje)." >&2
+  exit 1
+fi
+if [ -n "$(git -C "$root" status --porcelain -- python/src)" ]; then
+  echo "pre-push: bemærk: python/src har ucommittede ændringer; golden-testen kører på arbejdstræet." >&2
+fi
+
+echo "pre-push: kører golden-testen ..." >&2
+if (cd "$root/python" && PYTHONIOENCODING=utf-8 "$uv" run pytest -q -p no:cacheprovider tests/test_golden.py) >&2; then
+  echo "pre-push: golden: grøn" >&2
+  exit 0
+fi
+echo "pre-push: golden: RØD - compute skriver noget andet end goldens. Push stoppet." >&2
+echo "pre-push:   En tilsigtet ændring: gennemgå forskellen, kør REGENERATE_GOLDEN=1 og sig det i commit og rapport." >&2
+exit 1
