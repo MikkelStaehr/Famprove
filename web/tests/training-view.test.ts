@@ -210,9 +210,9 @@ test("next session: each row lists its sets, Python's suggestion, and today's lo
         { block: BLOK, sheetRow: 27, week: 1, setNo: 1, suggestedKg: null, basis: "not_rpe", uncappedKg: null, adjustmentKg: null, adjustmentReason: null, restMinS: null, restMaxS: null, ramp: null, todayKg: null, todayBasis: null },
       ],
       setLog: [
-        { date: "2026-09-28", session: 1, row: 25, set: 1, startedAt: "2026-09-28T16:00:00Z", endedAt: "2026-09-28T16:03:00Z", skipped: false, updatedAt: "2026-09-28T16:03:00Z", feltRpe: null, repsDone: null },
-        { date: "2026-09-28", session: 2, row: 40, set: 1, startedAt: null, endedAt: null, skipped: true, updatedAt: "2026-09-28T16:04:00Z", feltRpe: null, repsDone: null },
-        { date: "2026-09-27", session: 1, row: 25, set: 1, startedAt: null, endedAt: null, skipped: true, updatedAt: "2026-09-27T16:04:00Z", feltRpe: null, repsDone: null },
+        { date: "2026-09-28", session: 1, row: 25, set: 1, startedAt: "2026-09-28T16:00:00Z", endedAt: "2026-09-28T16:03:00Z", skipped: false, skippedAt: null, updatedAt: "2026-09-28T16:03:00Z", feltRpe: null, repsDone: null },
+        { date: "2026-09-28", session: 2, row: 40, set: 1, startedAt: null, endedAt: null, skipped: true, skippedAt: "2026-09-28T16:04:00Z", updatedAt: "2026-09-28T16:04:00Z", feltRpe: null, repsDone: null },
+        { date: "2026-09-27", session: 1, row: 25, set: 1, startedAt: null, endedAt: null, skipped: true, skippedAt: "2026-09-27T16:04:00Z", updatedAt: "2026-09-27T16:04:00Z", feltRpe: null, repsDone: null },
       ],
     }),
     "2026-09-28",

@@ -116,14 +116,14 @@ const tap = (kind: SetTapInput["kind"], row: number, set: number): SetTapInput =
 const tapOpts = (db: FakeDb) => ({ env: {}, nodeEnv: "production", client: () => createClient("https://fake.supabase.co", "sb_secret_fake", fetchFor(db)) });
 function dbLog(db: FakeDb): Map<string, LoggedSet> {
   return new Map(db.tables.exercise_set_log.map((r) => {
-    const l: LoggedSet = { row: Number(r.row_no), set: Number(r.set_no), startedAt: (r.started_at as string | null) ?? null, endedAt: (r.ended_at as string | null) ?? null, skipped: r.skipped === true, updatedAt: (r.updated_at as string | null) ?? null };
+    const l: LoggedSet = { row: Number(r.row_no), set: Number(r.set_no), startedAt: (r.started_at as string | null) ?? null, endedAt: (r.ended_at as string | null) ?? null, skipped: r.skipped === true, skippedAt: (r.skipped_at as string | null) ?? null, updatedAt: (r.updated_at as string | null) ?? null };
     return [setKey(l), l];
   }));
 }
 console.error = () => {};
 
 test("S-c: started = any log row of either run except A's warm-up (A1, B1 skipped, B2 ended); DEV_TODAY writes nothing", async () => {
-  for (const r of [logRow(11, 1), logRow(12, 1, { started_at: null, skipped: true }), logRow(12, 2, { ended_at: at(1).toISOString() })]) {
+  for (const r of [logRow(11, 1), logRow(12, 1, { started_at: null, skipped: true, skipped_at: NOW.toISOString() }), logRow(12, 2, { ended_at: at(1).toISOString() })]) {
     const db = fakeDb();
     db.tables.exercise_set_log.push(r);
     assert.deepEqual(await recordSupersetPair(pairInput(true), NOW, opts(db)), { ok: false, reason: "started" }, `${r.row_no}.${r.set_no}`);
@@ -207,7 +207,7 @@ test("F-e: the same log gives the same Fokus view (a reload), also with a pair h
     const log = new Map<string, LoggedSet>();
     order.slice(0, n).forEach((ref, i) => {
       const t = at(i).toISOString();
-      log.set(setKey(ref), { ...ref, startedAt: t, endedAt: t, skipped: false, updatedAt: t });
+      log.set(setKey(ref), { ...ref, startedAt: t, endedAt: t, skipped: false, skippedAt: null, updatedAt: t });
     });
     const reloaded = new Map(JSON.parse(JSON.stringify([...log])) as [string, LoggedSet][]);
     assert.deepEqual(fokusState(order, reloaded, handOff), fokusState(order, log, handOff), `after ${n}`);

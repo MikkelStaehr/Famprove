@@ -245,7 +245,7 @@ const tapOpts = (db: FakeDb) => ({ env: {}, nodeEnv: "production", client: () =>
 function dbLog(db: FakeDb): Map<string, LoggedSet> {
   return new Map(
     db.tables.exercise_set_log.map((r) => {
-      const l: LoggedSet = { row: Number(r.row_no), set: Number(r.set_no), startedAt: (r.started_at as string | null) ?? null, endedAt: (r.ended_at as string | null) ?? null, skipped: r.skipped === true, updatedAt: (r.updated_at as string | null) ?? null };
+      const l: LoggedSet = { row: Number(r.row_no), set: Number(r.set_no), startedAt: (r.started_at as string | null) ?? null, endedAt: (r.ended_at as string | null) ?? null, skipped: r.skipped === true, skippedAt: (r.skipped_at as string | null) ?? null, updatedAt: (r.updated_at as string | null) ?? null };
       return [setKey(l), l];
     }),
   );

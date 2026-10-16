@@ -1180,7 +1180,7 @@ function rampOf(f: Fields): readonly RampStep[] | null {
 /**
  * public.exercise_set_log: one row per set of a strength session that has been begun, done or
  * skipped on the Træning screens (the app's only write, lib/db/set-log.ts). Timestamps are the
- * server's clock; a skipped set has none.
+ * server's clock; a skipped set has no start or end, only its skip time (skipped_at).
  */
 export type SetLogRow = {
   readonly date: IsoDate;
@@ -1190,14 +1190,15 @@ export type SetLogRow = {
   readonly startedAt: string | null;
   readonly endedAt: string | null;
   readonly skipped: boolean;
-  readonly updatedAt: string; // the row's latest write; for a skipped set, the skip's time
+  readonly skippedAt: string | null; // the skip tap's time; null exactly when not skipped (the table's check)
+  readonly updatedAt: string; // the row's latest write (never read as the skip time: skippedAt is)
   readonly feltRpe: number | null; // -1 Lettere, 0 Som ventet, +1 Hårdere; null = not rated
   readonly repsDone: number | null; // reps done on a range set; null = none
 };
 
 export const SET_LOG_SELECT = {
   table: "exercise_set_log",
-  columns: "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done",
+  columns: "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done",
   order: "date,session_no,row_no,set_no", // the primary key
 } as const;
 
@@ -1211,12 +1212,16 @@ export function parseSetLogRow(raw: unknown): SetLogRow {
     startedAt: f.timestampOrNull("started_at"),
     endedAt: f.timestampOrNull("ended_at"),
     skipped: f.boolean("skipped"),
+    skippedAt: f.timestampOrNull("skipped_at"),
     updatedAt: f.timestamp("updated_at"),
     feltRpe: f.optionalNumber("felt_rpe"),
     repsDone: f.optionalNumber("reps_done"),
   };
   if (row.skipped && (row.startedAt !== null || row.endedAt !== null)) {
     throw new RowError("exercise_set_log: a skipped set has no timestamps");
+  }
+  if (row.skipped !== (row.skippedAt !== null)) {
+    throw new RowError("exercise_set_log.skipped_at: expected a time exactly on a skipped set");
   }
   const kind = f.optionalString("kind") ?? "set"; // rows read before the column existed are sets
   if ((kind === "warmup") !== (row.set === 0) || (kind !== "set" && kind !== "warmup")) {

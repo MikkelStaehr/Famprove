@@ -119,7 +119,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -302,7 +302,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -574,7 +574,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -846,7 +846,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -1118,7 +1118,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -1390,7 +1390,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -1416,6 +1416,7 @@
        "exercise_id": 2,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:11:00.000Z",
        "updated_at": "2026-10-12T08:11:00.000Z"
       }
      },
@@ -1442,6 +1443,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:11:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:11:00.000Z"
@@ -1621,7 +1623,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -1893,7 +1895,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -2165,7 +2167,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -2486,7 +2488,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -2641,7 +2643,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -2796,7 +2798,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -3015,7 +3017,8 @@
     "set_no": 1,
     "exercise_id": 2,
     "kind": "set",
-    "updated_at": "2026-10-12T08:11:00.000Z"
+    "updated_at": "2026-10-12T08:11:00.000Z",
+    "skipped_at": "2026-10-12T08:11:00.000Z"
    },
    {
     "started_at": "2026-10-12T08:11:00.000Z",
@@ -3195,7 +3198,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -3378,7 +3381,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -3560,7 +3563,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -3743,7 +3746,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -4015,7 +4018,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -4287,7 +4290,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -4535,7 +4538,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -4807,7 +4810,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -4833,6 +4836,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:09:00.000Z",
        "updated_at": "2026-10-12T08:09:00.000Z"
       }
      },
@@ -4859,6 +4863,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:09:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:09:00.000Z"
@@ -5038,7 +5043,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -5092,10 +5097,15 @@
        [
         "set_no",
         "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:09:00.000Z"
        ]
       ],
       "body": {
        "skipped": false,
+       "skipped_at": null,
        "started_at": "2026-10-12T08:08:00.000Z",
        "updated_at": "2026-10-12T08:10:00.000Z"
       }
@@ -5247,7 +5257,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -5273,6 +5283,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:11:00.000Z",
        "updated_at": "2026-10-12T08:11:00.000Z"
       }
      },
@@ -5299,6 +5310,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:11:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:11:00.000Z"
@@ -5402,7 +5414,8 @@
     "set_no": 2,
     "exercise_id": 1,
     "kind": "set",
-    "updated_at": "2026-10-12T08:11:00.000Z"
+    "updated_at": "2026-10-12T08:11:00.000Z",
+    "skipped_at": "2026-10-12T08:11:00.000Z"
    },
    {
     "started_at": "2026-10-12T08:11:00.000Z",
@@ -5638,7 +5651,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -5767,7 +5780,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -5923,7 +5936,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -6106,7 +6119,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -6289,7 +6302,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -6556,7 +6569,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -6719,7 +6732,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -6902,7 +6915,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -7174,7 +7187,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -7446,7 +7459,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -7718,7 +7731,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -7990,7 +8003,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -8262,7 +8275,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -8288,6 +8301,7 @@
        "exercise_id": 2,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:11:00.000Z",
        "updated_at": "2026-10-12T08:11:00.000Z"
       }
      },
@@ -8314,6 +8328,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:11:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:11:00.000Z"
@@ -8493,7 +8508,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -8731,7 +8746,8 @@
     "set_no": 2,
     "exercise_id": 2,
     "kind": "set",
-    "updated_at": "2026-10-12T08:11:00.000Z"
+    "updated_at": "2026-10-12T08:11:00.000Z",
+    "skipped_at": "2026-10-12T08:11:00.000Z"
    },
    {
     "started_at": "2026-10-12T08:11:00.000Z",
@@ -8947,7 +8963,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -9329,7 +9345,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -9746,7 +9762,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -10065,7 +10081,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -10194,7 +10210,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -10513,7 +10529,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -10663,7 +10679,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -10982,7 +10998,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -11166,7 +11182,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -11485,7 +11501,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -11703,7 +11719,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -12022,7 +12038,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -12260,7 +12276,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -12579,7 +12595,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -12851,7 +12867,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -13235,7 +13251,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -13666,7 +13682,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -14132,7 +14148,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -14500,7 +14516,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -14629,7 +14645,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -14997,7 +15013,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -15146,7 +15162,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -15514,7 +15530,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -15692,7 +15708,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -16060,7 +16076,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -16259,7 +16275,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -16578,7 +16594,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -16811,7 +16827,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -17130,7 +17146,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -17397,7 +17413,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -17716,7 +17732,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -18003,7 +18019,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -18322,7 +18338,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -18643,7 +18659,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -19027,7 +19043,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -19053,6 +19069,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -19079,6 +19096,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -19181,7 +19199,8 @@
      "set_no": 2,
      "exercise_id": 1,
      "kind": "set",
-     "updated_at": "2026-10-12T08:06:00.000Z"
+     "updated_at": "2026-10-12T08:06:00.000Z",
+     "skipped_at": "2026-10-12T08:06:00.000Z"
     },
     {
      "started_at": "2026-10-12T08:06:00.000Z",
@@ -19382,7 +19401,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -19408,6 +19427,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -19434,6 +19454,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -19536,7 +19557,8 @@
      "set_no": 2,
      "exercise_id": 1,
      "kind": "set",
-     "updated_at": "2026-10-12T08:06:00.000Z"
+     "updated_at": "2026-10-12T08:06:00.000Z",
+     "skipped_at": "2026-10-12T08:06:00.000Z"
     },
     {
      "started_at": "2026-10-12T08:06:00.000Z",
@@ -19772,7 +19794,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -19798,6 +19820,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -19824,6 +19847,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -19926,7 +19950,8 @@
      "set_no": 2,
      "exercise_id": 1,
      "kind": "set",
-     "updated_at": "2026-10-12T08:06:00.000Z"
+     "updated_at": "2026-10-12T08:06:00.000Z",
+     "skipped_at": "2026-10-12T08:06:00.000Z"
     },
     {
      "started_at": "2026-10-12T08:06:00.000Z",
@@ -20064,7 +20089,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -20193,7 +20218,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -20219,6 +20244,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -20245,6 +20271,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -20347,7 +20374,8 @@
      "set_no": 2,
      "exercise_id": 1,
      "kind": "set",
-     "updated_at": "2026-10-12T08:06:00.000Z"
+     "updated_at": "2026-10-12T08:06:00.000Z",
+     "skipped_at": "2026-10-12T08:06:00.000Z"
     },
     {
      "started_at": "2026-10-12T08:06:00.000Z",
@@ -20485,7 +20513,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -20511,6 +20539,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      }
@@ -20634,7 +20663,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -20660,6 +20689,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -20686,6 +20716,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -20788,7 +20819,8 @@
      "set_no": 2,
      "exercise_id": 1,
      "kind": "set",
-     "updated_at": "2026-10-12T08:06:00.000Z"
+     "updated_at": "2026-10-12T08:06:00.000Z",
+     "skipped_at": "2026-10-12T08:06:00.000Z"
     },
     {
      "started_at": "2026-10-12T08:06:00.000Z",
@@ -20926,7 +20958,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -20952,6 +20984,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -20978,6 +21011,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -21103,7 +21137,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -21129,6 +21163,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -21155,6 +21190,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -21257,7 +21293,8 @@
      "set_no": 2,
      "exercise_id": 1,
      "kind": "set",
-     "updated_at": "2026-10-12T08:06:00.000Z"
+     "updated_at": "2026-10-12T08:06:00.000Z",
+     "skipped_at": "2026-10-12T08:06:00.000Z"
     },
     {
      "started_at": "2026-10-12T08:06:00.000Z",
@@ -21395,7 +21432,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -21421,6 +21458,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -21447,6 +21485,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -21592,7 +21631,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -21698,7 +21737,8 @@
      "set_no": 2,
      "exercise_id": 1,
      "kind": "set",
-     "updated_at": "2026-10-12T08:06:00.000Z"
+     "updated_at": "2026-10-12T08:06:00.000Z",
+     "skipped_at": "2026-10-12T08:06:00.000Z"
     },
     {
      "started_at": "2026-10-12T08:06:00.000Z",
@@ -21836,7 +21876,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -21862,6 +21902,7 @@
        "exercise_id": 1,
        "kind": "set",
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "updated_at": "2026-10-12T08:06:00.000Z"
       }
      },
@@ -21888,6 +21929,7 @@
       ],
       "body": {
        "skipped": true,
+       "skipped_at": "2026-10-12T08:06:00.000Z",
        "started_at": null,
        "ended_at": null,
        "updated_at": "2026-10-12T08:06:00.000Z"
@@ -22067,7 +22109,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -22173,7 +22215,7878 @@
      "set_no": 2,
      "exercise_id": 1,
      "kind": "set",
+     "updated_at": "2026-10-12T08:06:00.000Z",
+     "skipped_at": "2026-10-12T08:06:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
      "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  }
+ ],
+ "cut: undo skip 25#2": [
+  {
+   "k": 1,
+   "cut": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:07:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "started_at": "2026-10-12T08:05:00.000Z",
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "DELETE",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:05:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:07:00.000Z",
+     "skipped_at": null
+    }
+   ]
+  },
+  {
+   "k": 2,
+   "cut": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:07:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "started_at": "2026-10-12T08:05:00.000Z",
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "DELETE",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:05:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:07:00.000Z",
+     "skipped_at": null
+    }
+   ]
+  },
+  {
+   "k": 3,
+   "cut": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:07:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "started_at": "2026-10-12T08:05:00.000Z",
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "DELETE",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:05:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:07:00.000Z",
+     "skipped_at": null
+    }
+   ]
+  },
+  {
+   "k": 4,
+   "cut": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:07:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "started_at": "2026-10-12T08:05:00.000Z",
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "DELETE",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:05:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:07:00.000Z",
+     "skipped_at": null
+    }
+   ]
+  },
+  {
+   "k": 5,
+   "cut": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     }
+    ]
+   },
+   "retry": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:07:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "started_at": "2026-10-12T08:05:00.000Z",
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "DELETE",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:05:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:07:00.000Z",
+     "skipped_at": null
+    }
+   ]
+  },
+  {
+   "k": 6,
+   "cut": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "started_at": "2026-10-12T08:05:00.000Z",
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     }
+    ]
+   },
+   "retry": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:07:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "started_at": "2026-10-12T08:05:00.000Z",
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "DELETE",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:05:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:07:00.000Z",
+     "skipped_at": null
+    }
+   ]
+  },
+  {
+   "k": 7,
+   "cut": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "started_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "started_at": null,
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped_at",
+        "eq.2026-10-12T08:06:00.000Z"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "started_at": "2026-10-12T08:05:00.000Z",
+       "updated_at": "2026-10-12T08:07:00.000Z"
+      }
+     },
+     {
+      "method": "DELETE",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "undo 25#2 @7",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:07:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "DELETE",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:05:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:07:00.000Z",
+     "skipped_at": null
+    }
+   ]
+  }
+ ],
+ "cut: done on a skipped set 25#2": [
+  {
+   "k": 1,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 2,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 3,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 4,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 5,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 6,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 7,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 8,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 9,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
+    },
+    {
+     "started_at": "2026-10-12T08:06:00.000Z",
+     "ended_at": null,
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 26,
+     "set_no": 0,
+     "exercise_id": 2,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:06:00.000Z"
+    }
+   ]
+  },
+  {
+   "k": 10,
+   "cut": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": false,
+     "reason": "failed"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ]
+      ],
+      "body": {
+       "skipped": false,
+       "skipped_at": null,
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "retry": {
+    "tap": "done 25#2 @8",
+    "result": {
+     "ok": true,
+     "at": "2026-10-12T08:08:00.000Z"
+    },
+    "requests": [
+     {
+      "method": "GET",
+      "table": "strength_sets",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "sheet_id,block,sheet_row,week,set_no"
+       ],
+       [
+        "select",
+        "sheet_row,set_no,name,reps_text,variant_id"
+       ],
+       [
+        "session",
+        "eq.1"
+       ],
+       [
+        "week_start",
+        "eq.2026-10-12"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercises",
+      "query": [
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "id"
+       ],
+       [
+        "select",
+        "id,name,aliases"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "superset_pairs",
+      "query": [
+       [
+        "date",
+        "lte.2026-10-12"
+       ],
+       [
+        "exercise_a",
+        "in.(1,2,3)"
+       ],
+       [
+        "exercise_b",
+        "in.(1,2,3)"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date.desc,session_no,row_a"
+       ],
+       [
+        "select",
+        "date,session_no,row_a,row_b,exercise_a,variant_a,exercise_b,variant_b,paired,updated_at"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "GET",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "limit",
+        "1000"
+       ],
+       [
+        "offset",
+        "0"
+       ],
+       [
+        "order",
+        "date,session_no,row_no,set_no"
+       ],
+       [
+        "select",
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ]
+      ],
+      "body": null
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 25,
+       "set_no": 2,
+       "exercise_id": 1,
+       "kind": "set",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "ended_at",
+        "is.null"
+       ],
+       [
+        "row_no",
+        "eq.25"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.2"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ]
+      ],
+      "body": {
+       "ended_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "POST",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "on_conflict",
+        "date,session_no,row_no,set_no"
+       ]
+      ],
+      "body": {
+       "date": "2026-10-12",
+       "session_no": 1,
+       "row_no": 26,
+       "set_no": 0,
+       "exercise_id": 2,
+       "kind": "warmup",
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     },
+     {
+      "method": "PATCH",
+      "table": "exercise_set_log",
+      "query": [
+       [
+        "date",
+        "eq.2026-10-12"
+       ],
+       [
+        "row_no",
+        "eq.26"
+       ],
+       [
+        "session_no",
+        "eq.1"
+       ],
+       [
+        "set_no",
+        "eq.0"
+       ],
+       [
+        "skipped",
+        "is.false"
+       ],
+       [
+        "started_at",
+        "is.null"
+       ]
+      ],
+      "body": {
+       "started_at": "2026-10-12T08:08:00.000Z",
+       "updated_at": "2026-10-12T08:08:00.000Z"
+      }
+     }
+    ]
+   },
+   "log": [
+    {
+     "started_at": "2026-10-12T08:00:00.000Z",
+     "ended_at": "2026-10-12T08:02:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 0,
+     "exercise_id": 1,
+     "kind": "warmup",
+     "updated_at": "2026-10-12T08:02:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:02:00.000Z",
+     "ended_at": "2026-10-12T08:05:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 1,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:05:00.000Z"
+    },
+    {
+     "started_at": "2026-10-12T08:08:00.000Z",
+     "ended_at": "2026-10-12T08:08:00.000Z",
+     "skipped": false,
+     "felt_rpe": null,
+     "reps_done": null,
+     "date": "2026-10-12",
+     "session_no": 1,
+     "row_no": 25,
+     "set_no": 2,
+     "exercise_id": 1,
+     "kind": "set",
+     "updated_at": "2026-10-12T08:08:00.000Z",
+     "skipped_at": null
     },
     {
      "started_at": "2026-10-12T08:06:00.000Z",
@@ -22376,7 +30289,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -22720,7 +30633,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -23099,7 +31012,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -23380,7 +31293,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -23509,7 +31422,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -23790,7 +31703,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -23945,7 +31858,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -24226,7 +32139,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -24415,7 +32328,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -24696,7 +32609,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -24917,7 +32830,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -25198,7 +33111,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -25446,7 +33359,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -25700,7 +33613,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -26096,7 +34009,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -26527,7 +34440,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -26860,7 +34773,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -26989,7 +34902,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -27322,7 +35235,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -27472,7 +35385,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -27805,7 +35718,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -27989,7 +35902,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -28322,7 +36235,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -28540,7 +36453,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -28873,7 +36786,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -29111,7 +37024,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -29444,7 +37357,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",
@@ -29716,7 +37629,7 @@
        ],
        [
         "select",
-        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,updated_at,felt_rpe,reps_done"
+        "date,session_no,row_no,set_no,kind,started_at,ended_at,skipped,skipped_at,updated_at,felt_rpe,reps_done"
        ],
        [
         "session_no",

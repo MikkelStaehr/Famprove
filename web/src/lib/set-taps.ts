@@ -8,8 +8,8 @@
  *   begin  set k   -> k.started_at = T if null ("Begynd træning", the first open set)
  *   done   set k   -> k.ended_at = T if null, k.started_at = T if null, and the next open set's
  *                     started_at = T if null: a set's span includes the rest before it (the HR
- *                     stream is split by these later). A skipped k is un-skipped first.
- *   skip   set k   -> k skipped, no timestamps; the next open set's started_at = T if null.
+ *                     stream is split by these later). A skipped k is un-skipped first (skipped_at cleared).
+ *   skip   set k   -> k skipped at T (skipped_at), no start or end; the next open set's started_at = T if null.
  *                     Refused on a done set (undo its done first: its end would be lost).
  *   undo   set k   -> clears what k's last tap wrote: a done's end, and every start that holds
  *                     the same T on a set that isn't done; a skip (k's start comes back from the
@@ -50,7 +50,9 @@ export type LoggedSet = SetRef & {
   readonly startedAt: string | null;
   readonly endedAt: string | null;
   readonly skipped: boolean;
-  /** The time of the row's latest write; for a skipped set, the skip's time. */
+  /** The skip tap's time; null exactly when the set is not skipped (exercise_set_log.skipped_at). */
+  readonly skippedAt: string | null;
+  /** The time of the row's latest write (never the skip's time: that is skippedAt). */
   readonly updatedAt: string | null;
   /** How the set felt: -1 Lettere, 0 Som ventet, +1 Hårdere; null or absent = not rated. */
   readonly feltRpe?: number | null;
@@ -183,7 +185,7 @@ export function nextOpen(order: readonly SetRef[], log: ReadonlyMap<string, Logg
 /** When a set that follows `previous` started, by that set's tap: its end, or its skip time. */
 export function startAfter(previous: LoggedSet | undefined): string | null {
   if (previous === undefined) return null;
-  if (previous.skipped) return previous.updatedAt;
+  if (previous.skipped) return previous.skippedAt;
   return previous.endedAt;
 }
 
@@ -194,7 +196,7 @@ export function startAfter(previous: LoggedSet | undefined): string | null {
 export function startFromAnotherTap(log: ReadonlyMap<string, LoggedSet>, target: SetRef, start: string): boolean {
   for (const l of log.values()) {
     if (l.row === target.row && l.set === target.set) continue;
-    if (sameInstant(l.endedAt, start) || (l.skipped && sameInstant(l.updatedAt, start))) return true;
+    if (sameInstant(l.endedAt, start) || (l.skipped && sameInstant(l.skippedAt, start))) return true;
   }
   return false;
 }
@@ -225,8 +227,8 @@ export function lastTap(log: ReadonlyMap<string, LoggedSet>): LastTap | null {
   let latest: LastTap | null = null;
   for (const l of log.values()) {
     const tap: LastTap | null =
-      l.skipped && l.updatedAt !== null
-        ? { ref: { row: l.row, set: l.set }, kind: "skip", at: l.updatedAt }
+      l.skipped && l.skippedAt !== null
+        ? { ref: { row: l.row, set: l.set }, kind: "skip", at: l.skippedAt }
         : l.endedAt !== null
           ? { ref: { row: l.row, set: l.set }, kind: "done", at: l.endedAt }
           : null;
@@ -279,17 +281,18 @@ export function rangeTops(rows: Iterable<{ readonly repsText: string | null; rea
 
 // ---------------------------------------------------------------- the one tap transition
 
-/** The columns a tap writes (exercise_set_log: started_at, ended_at, skipped, felt_rpe, reps_done). */
+/** The columns a tap writes (exercise_set_log: started_at, ended_at, skipped, skipped_at, felt_rpe, reps_done). */
 export type LogValues = {
   readonly startedAt?: string | null;
   readonly endedAt?: string | null;
   readonly skipped?: boolean;
+  readonly skippedAt?: string | null; // always written together with skipped (the table's check)
   readonly feltRpe?: number | null;
   readonly repsDone?: number | null;
 };
 
 /** A write's condition on one column: null = "is null", false = "is false", a time = that instant. */
-export type Guard = { readonly field: "startedAt" | "endedAt" | "skipped" | "repsDone"; readonly equals: string | boolean | null };
+export type Guard = { readonly field: "startedAt" | "endedAt" | "skipped" | "skippedAt" | "repsDone"; readonly equals: string | boolean | null };
 
 /**
  * One write of a tap, in the order the server sends them (each is one request, conditional, so a
@@ -343,7 +346,7 @@ export function transition(order: readonly SetRef[], log: ReadonlyMap<string, Lo
       // one tap keeps one T everywhere (undo finds it) and the next set still gets its start.
       const t = stateOf(logged) === "done" && logged?.endedAt != null ? logged.endedAt : at;
       const out: Change[] = [];
-      if (logged?.skipped === true) out.push({ op: "patch", ref: target, when: [], values: { skipped: false }, updatedAt: at });
+      if (logged?.skipped === true) out.push({ op: "patch", ref: target, when: [], values: { skipped: false, skippedAt: null }, updatedAt: at });
       if (top !== null && logged?.repsDone == null) {
         // A range set: its reps default to the top (the stepper adjusts it).
         out.push({ op: "ensure", ref: target, values: { repsDone: top }, updatedAt: t });
@@ -354,12 +357,13 @@ export function transition(order: readonly SetRef[], log: ReadonlyMap<string, Lo
       return out;
     }
     case "skip": {
-      // As done: a retry reuses the skip's own time (its updated_at) for the next set's start.
-      const t = logged?.skipped === true && logged.updatedAt !== null ? logged.updatedAt : at;
+      // As done: a retry reuses the skip's own time (its skipped_at, never updated_at) for the
+      // next set's start.
+      const t = logged?.skipped === true && logged.skippedAt !== null ? logged.skippedAt : at;
       const out: Change[] = [];
       if (logged?.skipped !== true) {
-        out.push({ op: "ensure", ref: target, values: { skipped: true }, updatedAt: t });
-        out.push({ op: "patch", ref: target, when: [], values: { skipped: true, startedAt: null, endedAt: null }, updatedAt: t });
+        out.push({ op: "ensure", ref: target, values: { skipped: true, skippedAt: t }, updatedAt: t });
+        out.push({ op: "patch", ref: target, when: [], values: { skipped: true, skippedAt: t, startedAt: null, endedAt: null }, updatedAt: t });
       }
       if (after !== null) out.push(...setIfNull(after, ["startedAt"], t));
       return out;
@@ -379,11 +383,13 @@ export function transition(order: readonly SetRef[], log: ReadonlyMap<string, Lo
       // (the set's end, or its skip) is cleared last, so a partial undo is finished by its retry.
       const state = logged === undefined ? null : logged.skipped ? "skip" : logged.endedAt !== null ? "done" : "begin";
       const out: Change[] = [];
-      if (logged !== undefined && tap.undoes === "skip" && state === "skip") {
+      if (logged !== undefined && tap.undoes === "skip" && state === "skip" && logged.skippedAt !== null) {
         const { previous } = neighbours(order, target);
         const previousLogged = previous === null ? undefined : log.get(setKey(previous));
-        out.push({ op: "clearStarts", t: logged.updatedAt ?? at, at }); // the starts the skip wrote
-        out.push({ op: "patch", ref: target, when: [], values: { skipped: false, startedAt: startAfter(previousLogged) }, updatedAt: at });
+        const t = logged.skippedAt; // never null on a skipped row (the table's check)
+        out.push({ op: "clearStarts", t, at }); // the starts the skip wrote
+        // Only while that skip is still the one stored (a done landing in between keeps its start).
+        out.push({ op: "patch", ref: target, when: [{ field: "skippedAt", equals: t }], values: { skipped: false, skippedAt: null, startedAt: startAfter(previousLogged) }, updatedAt: at });
       } else if (logged?.endedAt != null && tap.undoes === "done" && state === "done") {
         const t = logged.endedAt;
         out.push({ op: "clearStarts", t, at }); // on sets that aren't done
@@ -417,7 +423,7 @@ export function applyChanges(log: ReadonlyMap<string, LoggedSet>, changes: reado
   for (const c of changes) {
     if (c.op === "ensure") {
       const k = setKey(c.ref);
-      if (!next.has(k)) next.set(k, { row: c.ref.row, set: c.ref.set, startedAt: null, endedAt: null, skipped: false, feltRpe: null, repsDone: null, ...c.values, updatedAt: c.updatedAt });
+      if (!next.has(k)) next.set(k, { row: c.ref.row, set: c.ref.set, startedAt: null, endedAt: null, skipped: false, skippedAt: null, feltRpe: null, repsDone: null, ...c.values, updatedAt: c.updatedAt });
     } else if (c.op === "patch") {
       const k = setKey(c.ref);
       const row = next.get(k);

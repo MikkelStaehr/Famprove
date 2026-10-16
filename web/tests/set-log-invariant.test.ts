@@ -27,7 +27,7 @@ type Row = Record<string, unknown>;
 type FakeDb = { tables: Record<string, Row[]>; writes: Row[]; failAt?: number; requests: number };
 
 const PK = ["date", "session_no", "row_no", "set_no"];
-const ALLOWED = new Set([...PK, "exercise_id", "kind", "started_at", "ended_at", "skipped", "updated_at", "felt_rpe", "reps_done"]);
+const ALLOWED = new Set([...PK, "exercise_id", "kind", "started_at", "ended_at", "skipped", "skipped_at", "updated_at", "felt_rpe", "reps_done"]);
 
 function matches(row: Row, params: URLSearchParams): boolean {
   for (const [column, expression] of params) {
@@ -45,6 +45,7 @@ function valid(r: Row): boolean {
   const started = r.started_at as string | null;
   const ended = r.ended_at as string | null;
   if (r.skipped === true && (started !== null || ended !== null)) return false;
+  if ((r.skipped === true) !== ((r.skipped_at ?? null) !== null)) return false; // exercise_set_log_skipped_at
   return started === null || ended === null || Date.parse(ended) >= Date.parse(started);
 }
 
@@ -144,6 +145,7 @@ function dbLog(db: FakeDb): Map<string, LoggedSet> {
         startedAt: (r.started_at as string | null) ?? null,
         endedAt: (r.ended_at as string | null) ?? null,
         skipped: r.skipped === true,
+        skippedAt: (r.skipped_at as string | null) ?? null,
         updatedAt: (r.updated_at as string | null) ?? null,
       };
       return [setKey(l), l];
@@ -154,7 +156,7 @@ function dbLog(db: FakeDb): Map<string, LoggedSet> {
 function shape(log: ReadonlyMap<string, LoggedSet>) {
   return ORDER.map((ref) => {
     const l = log.get(setKey(ref));
-    return [setKey(ref), stateOf(l), l?.startedAt ?? null, l?.endedAt ?? null];
+    return [setKey(ref), stateOf(l), l?.startedAt ?? null, l?.endedAt ?? null, l?.skippedAt ?? null];
   });
 }
 

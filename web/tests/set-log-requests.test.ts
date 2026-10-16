@@ -73,6 +73,11 @@ function matches(row: Row, params: URLSearchParams): boolean {
   return true;
 }
 
+/** The table's check exercise_set_log_skipped_at (migration 20261016090000): a skip time exactly on a skipped set. */
+function checked(r: Row): boolean {
+  return (r.skipped === true) === ((r.skipped_at ?? null) !== null);
+}
+
 function fetchFor(db: Db): FetchLike {
   return async (url, init) => {
     const parsed = new URL(url);
@@ -93,10 +98,14 @@ function fetchFor(db: Db): FetchLike {
     if (method === "POST") {
       const key = ["date", "session_no", "row_no", "set_no"];
       if (!rows.some((r) => key.every((k) => r[k] === item[k]))) {
-        rows.push({ started_at: null, ended_at: null, skipped: false, felt_rpe: null, reps_done: null, ...item });
+        const row = { started_at: null, ended_at: null, skipped: false, felt_rpe: null, reps_done: null, ...item };
+        if (!checked(row)) return new Response("{}", { status: 400 });
+        rows.push(row);
       }
     } else if (method === "PATCH") {
-      for (const r of rows) if (matches(r, parsed.searchParams)) Object.assign(r, item);
+      const hit = rows.filter((r) => matches(r, parsed.searchParams));
+      if (hit.some((r) => !checked({ ...r, ...item }))) return new Response("{}", { status: 400 }); // atomic, as Postgres
+      for (const r of hit) Object.assign(r, item);
     } else if (method === "DELETE") {
       db.tables[table] = rows.filter((r) => !matches(r, parsed.searchParams));
     }
@@ -188,6 +197,8 @@ const CUTS: readonly { readonly name: string; readonly pairs: readonly Row[]; re
   { name: "done 25#1", pairs: [], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2)], tap: step("done", 25, 1, 5) },
   { name: "done on a range set 27#1", pairs: [], before: [step("begin", 27, 0, 0), step("done", 27, 0, 1)], tap: step("done", 27, 1, 3) },
   { name: "skip 25#2", pairs: [], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5)], tap: step("skip", 25, 2, 6) },
+  { name: "undo skip 25#2", pairs: [], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5), step("skip", 25, 2, 6)], tap: step("undo", 25, 2, 7, { undoes: "skip" }) },
+  { name: "done on a skipped set 25#2", pairs: [], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5), step("skip", 25, 2, 6)], tap: step("done", 25, 2, 8) },
   { name: "undo done 25#1", pairs: [], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5)], tap: step("undo", 25, 1, 6, { undoes: "done" }) },
   { name: "A1's done in a pair", pairs: [PAIR], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 26, 0, 3)], tap: step("done", 25, 1, 6) },
 ];

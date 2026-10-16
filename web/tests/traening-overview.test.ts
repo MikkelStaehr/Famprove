@@ -51,7 +51,7 @@ function logOf(entries: readonly (SetRef & Partial<LoggedSet>)[]): Map<string, L
   return new Map(
     entries.map((e) => [
       setKey(e),
-      { row: e.row, set: e.set, startedAt: e.startedAt ?? null, endedAt: e.endedAt ?? null, skipped: e.skipped ?? false, updatedAt: e.updatedAt ?? AT },
+      { row: e.row, set: e.set, startedAt: e.startedAt ?? null, endedAt: e.endedAt ?? null, skipped: e.skipped ?? false, skippedAt: e.skippedAt ?? (e.skipped === true ? AT : null), updatedAt: e.updatedAt ?? AT },
     ]),
   );
 }

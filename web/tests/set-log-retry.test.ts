@@ -27,6 +27,7 @@ function valid(r: Row): boolean {
   const started = r.started_at as string | null;
   const ended = r.ended_at as string | null;
   if (r.skipped === true && (started !== null || ended !== null)) return false;
+  if ((r.skipped === true) !== ((r.skipped_at ?? null) !== null)) return false; // exercise_set_log_skipped_at
   return started === null || ended === null || Date.parse(ended) >= Date.parse(started);
 }
 
@@ -104,6 +105,7 @@ function dbLog(db: FakeDb): Map<string, LoggedSet> {
         startedAt: (r.started_at as string | null) ?? null,
         endedAt: (r.ended_at as string | null) ?? null,
         skipped: r.skipped === true,
+        skippedAt: (r.skipped_at as string | null) ?? null,
         updatedAt: (r.updated_at as string | null) ?? null,
       };
       return [setKey(l), l];

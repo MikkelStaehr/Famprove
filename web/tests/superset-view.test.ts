@@ -52,7 +52,7 @@ function logOf(done: readonly SetRef[]): Map<string, LoggedSet> {
   const log = new Map<string, LoggedSet>();
   done.forEach((ref, i) => {
     const at = new Date(T0 + i * 60_000).toISOString();
-    log.set(setKey(ref), { ...ref, startedAt: at, endedAt: at, skipped: false, updatedAt: at });
+    log.set(setKey(ref), { ...ref, startedAt: at, endedAt: at, skipped: false, skippedAt: null, updatedAt: at });
   });
   return log;
 }

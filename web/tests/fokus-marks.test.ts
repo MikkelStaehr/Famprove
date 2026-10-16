@@ -8,9 +8,9 @@ import { type LoggedSet, setKey, type SetRef } from "../src/lib/set-taps.ts";
 const T0 = Date.parse("2026-10-13T16:00:00Z");
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 const done = (row: number, set: number, endS: number, extra: Partial<LoggedSet> = {}): LoggedSet => ({
-  row, set, startedAt: at(endS - 60), endedAt: at(endS), skipped: false, updatedAt: at(endS), ...extra,
+  row, set, startedAt: at(endS - 60), endedAt: at(endS), skipped: false, skippedAt: null, updatedAt: at(endS), ...extra,
 });
-const skip = (row: number, set: number, s: number): LoggedSet => ({ row, set, startedAt: null, endedAt: null, skipped: true, updatedAt: at(s) });
+const skip = (row: number, set: number, s: number): LoggedSet => ({ row, set, startedAt: null, endedAt: null, skipped: true, skippedAt: at(s), updatedAt: at(s) });
 const logOf = (rows: LoggedSet[]) => new Map(rows.map((l) => [setKey(l), l]));
 
 const EX = [

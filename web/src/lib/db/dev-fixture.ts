@@ -227,11 +227,11 @@ export function pauseFixture(
         const end = endAgo + (upTo - 1 - k) * 180;
         const r = rowOf(ref);
         const top = r !== null && r !== undefined && RANGE.test(r.repsText ?? "") ? Number((r.repsText ?? "").split(/[-–]/)[1]) : null;
-        log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: t(end + 180), endedAt: t(end), skipped: false, updatedAt: t(end), feltRpe: null, repsDone: ref.set === 0 ? null : top });
+        log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: t(end + 180), endedAt: t(end), skipped: false, skippedAt: null, updatedAt: t(end), feltRpe: null, repsDone: ref.set === 0 ? null : top });
       }
     };
     const startOpen = (ref: SetRef, ago: number) =>
-      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: t(ago), endedAt: null, skipped: false, updatedAt: t(ago), feltRpe: null, repsDone: null });
+      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: t(ago), endedAt: null, skipped: false, skippedAt: null, updatedAt: t(ago), feltRpe: null, repsDone: null });
     // Dev only: the competition lifts by name (the screen itself reads exercises.category).
     const main = (ref: SetRef) => /^(squat|bench|bænkpres|deadlift|dødløft)\b/i.test(rowOf(ref)?.name.trim() ?? "");
     if (fixture === "warmup") {
@@ -312,7 +312,7 @@ function finishedLog(
     const start = previous;
     previous = at;
     if (skipAt.has(k)) {
-      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: null, endedAt: null, skipped: true, updatedAt: at, feltRpe: null, repsDone: null });
+      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: null, endedAt: null, skipped: true, skippedAt: at, updatedAt: at, feltRpe: null, repsDone: null });
       return;
     }
     const r = rowOf(ref);
@@ -320,7 +320,7 @@ function finishedLog(
     const repsDone = ref.set === 0 || range === null ? null : done % 2 === 0 ? range[1] : range[0] + 1;
     const feltRpe = ref.set === 0 ? null : FINISHED_FEELS[done % FINISHED_FEELS.length];
     if (ref.set > 0) done += 1;
-    log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: start, endedAt: at, skipped: false, updatedAt: at, feltRpe, repsDone });
+    log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: start, endedAt: at, skipped: false, skippedAt: null, updatedAt: at, feltRpe, repsDone });
   });
 }
 
@@ -411,11 +411,11 @@ export function midsessionLog(sets: readonly PrescribedSetRow[], today: IsoDate,
     const ordered = rows.toSorted((a, b) => a.sheetRow - b.sheetRow || a.setNo - b.setNo);
     const at = (k: number) => new Date(now.getTime() - 102_000 - (MIDSESSION_DONE - k) * 180_000).toISOString();
     ordered.slice(0, MIDSESSION_DONE).forEach((s, k) =>
-      log.push({ date: today, session, row: s.sheetRow, set: s.setNo, startedAt: at(k), endedAt: at(k + 1), skipped: false, updatedAt: at(k + 1), feltRpe: null, repsDone: null }),
+      log.push({ date: today, session, row: s.sheetRow, set: s.setNo, startedAt: at(k), endedAt: at(k + 1), skipped: false, skippedAt: null, updatedAt: at(k + 1), feltRpe: null, repsDone: null }),
     );
     const skipped = ordered[MIDSESSION_DONE];
     if (skipped !== undefined) {
-      log.push({ date: today, session, row: skipped.sheetRow, set: skipped.setNo, startedAt: null, endedAt: null, skipped: true, updatedAt: at(MIDSESSION_DONE - 0.5), feltRpe: null, repsDone: null });
+      log.push({ date: today, session, row: skipped.sheetRow, set: skipped.setNo, startedAt: null, endedAt: null, skipped: true, skippedAt: at(MIDSESSION_DONE - 0.5), updatedAt: at(MIDSESSION_DONE - 0.5), feltRpe: null, repsDone: null });
     }
   }
   return log;
@@ -468,7 +468,7 @@ export function supersetFixture(
     const upTo = order.findIndex((r) => r.row === b.row && r.set === 1) + 1; // through B1
     const t = (k: number) => new Date(now.getTime() - 102_000 - (upTo - 1 - k) * 180_000).toISOString();
     order.slice(0, upTo).forEach((ref, k) =>
-      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: new Date(Date.parse(t(k)) - 180_000).toISOString(), endedAt: t(k), skipped: false, updatedAt: t(k), feltRpe: null, repsDone: null }),
+      log.push({ date: today, session, row: ref.row, set: ref.set, startedAt: new Date(Date.parse(t(k)) - 180_000).toISOString(), endedAt: t(k), skipped: false, skippedAt: null, updatedAt: t(k), feltRpe: null, repsDone: null }),
     );
   }
   return { supersetPairs: pairs, exerciseIds, setLog: log };

@@ -185,6 +185,7 @@ const COLUMNS: Readonly<Record<keyof LogValues, string>> = {
   startedAt: "started_at",
   endedAt: "ended_at",
   skipped: "skipped",
+  skippedAt: "skipped_at",
   feltRpe: "felt_rpe",
   repsDone: "reps_done",
 };
