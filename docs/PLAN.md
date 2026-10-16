@@ -129,3 +129,5 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | button-type | Buttons on Fokus and Træning: Geist Mono 15/500, uppercase, .04em; only Udført light, the rest dark with a border | S |
 | fokus-flow | Fokus: the rest screen is the next set (timer, kg, "✓ SÆT n UDFØRT"), vibrate once at Min, wake lock for the session, no "Til næste sæt" | M |
 | supersets | Supersets chosen in the app: pair two consecutive exercises (superset_pairs, a third write path), A1 -> B1 -> rest, suggested next time, TSS unchanged | L |
+| superset-warmups | Warm-ups are not part of a superset: A's warm-up, then B's, each alone with the normal rest; the superset starts at the first working set (user, 2026-10-16) | S |
+| skip-analysis | A set skipped in the app affects nothing: out of tonnage, the rolling e1RM, last week's anchor and the progression rules, as already out of TSS (user, 2026-10-16) | M |
