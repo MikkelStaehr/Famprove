@@ -30,6 +30,7 @@ from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final, Literal
 
+from training_load.domain.e1rm import e1rm
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.strength import Block, StrengthSet, block_number, iso_week_start
 from training_load.sources.strength_sheet import E1RM_RANGE
@@ -59,7 +60,6 @@ E1RM_MIN_RPE: Final = 7.0
 """The e1RM rule's set filter (user, 2026-10-13 for the suggestions, 2026-10-14 for /analyse):
 reps <= E1RM_MAX_REPS at a prescribed RPE >= E1RM_MIN_RPE."""
 ROLLING_E1RM_WEEKS: Final = 4
-E1RM_FACTOR: Final = 0.0333
 E1RM_BOUNDS_KG: Final[tuple[float, float]] = E1RM_RANGE  # the parser's 1RM bound
 
 
@@ -151,10 +151,6 @@ def kg_statuses(
         )
         for s in sets
     }
-
-
-def e1rm(kg: float, reps: float, rpe: float) -> float:
-    return kg * (1 + E1RM_FACTOR * (reps + 10 - rpe))
 
 
 def is_competition_lift(s: StrengthSet) -> bool:

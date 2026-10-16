@@ -6,19 +6,18 @@ from datetime import date, timedelta
 
 import pytest
 
+from training_load.domain.e1rm import e1rm, pct_of_e1rm, round_to_step
 from training_load.domain.exercises import Catalog, Exercise, ExerciseVariant
 from training_load.domain.planned_sets import (
     PlannedSet,
     cap_kg,
-    pct_of_e1rm,
     planned_sets,
     rolling_e1rm,
-    round_to_step,
     weekly_cap,
 )
 from training_load.domain.set_feedback import Progression, VariantKey
 from training_load.domain.strength import StrengthSet
-from training_load.domain.strength_analysis import KgStatus, SetKey, e1rm, e1rm_point, set_key
+from training_load.domain.strength_analysis import KgStatus, SetKey, e1rm_point, set_key
 
 MakeSet = Callable[..., StrengthSet]
 RUN_WEEK = date(2026, 10, 12)  # a Monday
