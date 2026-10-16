@@ -26,6 +26,7 @@ import {
   nextOpen,
   type PairRef,
   progress,
+  rangeTops,
   restStart,
   sessionOrderWithWarmups,
   setKey,
@@ -417,7 +418,7 @@ async function run(s: Session, pick: (log: ReadonlyMap<string, LoggedSet>, i: nu
     const at = new Date(DAY0 + i * 60_000);
     const undoes: Undoes | null = tap.kind === "undo" ? (undoesOf(log, tap.ref) ?? "done") : null; // as useSetLog
     const result = await recordSetTap({ kind: tap.kind, date: DATE, session: 1, row: tap.ref.row, set: tap.ref.set, undoes, value: tap.value }, at, options(db));
-    log = applyTap(order, log, tap.kind, tap.ref, at.toISOString(), tap.value);
+    log = applyTap(order, log, tap.kind, tap.ref, at.toISOString(), tap.value, rangeTops(s.exercises));
     const rows = serverRows(db);
     steps.push({
       tap: `${tap.label} -> ${tap.kind} ${setKey(tap.ref)}${tap.value === null ? "" : ` ${tap.value}`}${undoes === null ? "" : ` undoes=${undoes}`}`,

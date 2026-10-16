@@ -259,23 +259,183 @@ export function refused(log: ReadonlyMap<string, LoggedSet>, kind: SetTapKind, t
   return false;
 }
 
-function put(log: Map<string, LoggedSet>, ref: SetRef, change: Partial<LoggedSet>, at: string): void {
-  const before = log.get(setKey(ref)) ?? { ...ref, startedAt: null, endedAt: null, skipped: false, updatedAt: null };
-  const after = { ...before, ...change, updatedAt: at };
-  if (after.startedAt === null && after.endedAt === null && !after.skipped) log.delete(setKey(ref));
-  else log.set(setKey(ref), after);
+/** The top of a range prescription ("8 - 12" -> 12); null for fixed reps ("3") or none. */
+export function rangeTop(repsText: string | null): number | null {
+  // As Python's domain.set_feedback.range_top: whole or decimal ends, comma or dot.
+  const m = repsText === null ? null : /^\s*(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*$/.exec(repsText);
+  if (m === null) return null;
+  const end = (s: string | undefined) => Number((s ?? "").replace(",", "."));
+  return Math.max(end(m[1]), end(m[2]));
 }
 
-/** Clears every start that holds `t` on a set that isn't done (what one tap wrote). */
-function clearStarts(log: Map<string, LoggedSet>, t: string, at: string): void {
-  for (const l of [...log.values()]) {
-    if (l.endedAt === null && sameInstant(l.startedAt, t)) put(log, l, { startedAt: null }, at);
+/** Each set's range top (rangeTop of its row's reps), keyed by setKey; what a done stores as reps. */
+export type RangeTops = ReadonlyMap<string, number | null>;
+
+export function rangeTops(rows: Iterable<{ readonly repsText: string | null; readonly sets: readonly SetRef[] }>): RangeTops {
+  const tops = new Map<string, number | null>();
+  for (const r of rows) for (const s of r.sets) tops.set(setKey(s), rangeTop(r.repsText));
+  return tops;
+}
+
+// ---------------------------------------------------------------- the one tap transition
+
+/** The columns a tap writes (exercise_set_log: started_at, ended_at, skipped, felt_rpe, reps_done). */
+export type LogValues = {
+  readonly startedAt?: string | null;
+  readonly endedAt?: string | null;
+  readonly skipped?: boolean;
+  readonly feltRpe?: number | null;
+  readonly repsDone?: number | null;
+};
+
+/** A write's condition on one column: null = "is null", false = "is false", a time = that instant. */
+export type Guard = { readonly field: "startedAt" | "endedAt" | "skipped" | "repsDone"; readonly equals: string | boolean | null };
+
+/**
+ * One write of a tap, in the order the server sends them (each is one request, conditional, so a
+ * retry or a half-landed tap is safe):
+ *  ensure      create the set's row with `values` if it has none; never overwrite one
+ *  patch       set `values` on the set's row where every guard holds (updatedAt null: leave it)
+ *  clearStarts every set in the session with started_at = t and no end: started_at = null
+ *  deleteEmpty delete the session's rows with no start, no end and not skipped
+ */
+export type Change =
+  | { readonly op: "ensure"; readonly ref: SetRef; readonly values: LogValues; readonly updatedAt: string }
+  | { readonly op: "patch"; readonly ref: SetRef; readonly when: readonly Guard[]; readonly values: LogValues; readonly updatedAt: string | null }
+  | { readonly op: "clearStarts"; readonly t: string; readonly at: string }
+  | { readonly op: "deleteEmpty" };
+
+/** A tap as the transition reads it (the server action's input without date and session). */
+export type Tap = { readonly kind: SetTapKind; readonly target: SetRef; readonly undoes: Undoes | null; readonly value: number | null };
+
+/** Sets `fields` to `at` where they are null (first write wins), unless the set is skipped. */
+function setIfNull(ref: SetRef, fields: readonly ("startedAt" | "endedAt")[], at: string): Change[] {
+  return [
+    { op: "ensure", ref, values: Object.fromEntries(fields.map((f) => [f, at])), updatedAt: at },
+    ...fields.map((field): Change => ({
+      op: "patch",
+      ref,
+      when: [{ field, equals: null }, { field: "skipped", equals: false }],
+      values: { [field]: at },
+      updatedAt: at,
+    })),
+  ];
+}
+
+/**
+ * The tap rules (module comment) as the writes they make, at the server's time `at`, against
+ * the session's log as read before the tap. null: the tap is refused (skip of a done set, feel or
+ * reps on a set that isn't done, reps outside 1 .. top + 10 or on a set without a range). The
+ * server sends each Change as one request (lib/db/set-log.ts); the client applies them to its log
+ * (applyChanges), so both follow one copy of the rules.
+ */
+export function transition(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, tap: Tap, at: string, tops: RangeTops): Change[] | null {
+  const { kind, target } = tap;
+  if (refused(log, kind, target)) return null;
+  const logged = log.get(setKey(target));
+  const after = nextOpen(order, log, target); // null: no open set after it
+  const top = tops.get(setKey(target)) ?? null;
+  switch (kind) {
+    case "begin":
+      return stateOf(logged) === "open" ? setIfNull(target, ["startedAt"], at) : [];
+    case "done": {
+      // A retry of a done that already landed (partly) finishes it with the tap's own time, so
+      // one tap keeps one T everywhere (undo finds it) and the next set still gets its start.
+      const t = stateOf(logged) === "done" && logged?.endedAt != null ? logged.endedAt : at;
+      const out: Change[] = [];
+      if (logged?.skipped === true) out.push({ op: "patch", ref: target, when: [], values: { skipped: false }, updatedAt: at });
+      if (top !== null && logged?.repsDone == null) {
+        // A range set: its reps default to the top (the stepper adjusts it).
+        out.push({ op: "ensure", ref: target, values: { repsDone: top }, updatedAt: t });
+        out.push({ op: "patch", ref: target, when: [{ field: "repsDone", equals: null }], values: { repsDone: top }, updatedAt: null });
+      }
+      out.push(...setIfNull(target, ["startedAt", "endedAt"], t));
+      if (after !== null) out.push(...setIfNull(after, ["startedAt"], t));
+      return out;
+    }
+    case "skip": {
+      // As done: a retry reuses the skip's own time (its updated_at) for the next set's start.
+      const t = logged?.skipped === true && logged.updatedAt !== null ? logged.updatedAt : at;
+      const out: Change[] = [];
+      if (logged?.skipped !== true) {
+        out.push({ op: "ensure", ref: target, values: { skipped: true }, updatedAt: t });
+        out.push({ op: "patch", ref: target, when: [], values: { skipped: true, startedAt: null, endedAt: null }, updatedAt: t });
+      }
+      if (after !== null) out.push(...setIfNull(after, ["startedAt"], t));
+      return out;
+    }
+    case "feel":
+      // One column on a done set: -1 / 0 / +1, or null to clear.
+      return [{ op: "patch", ref: target, when: [], values: { feltRpe: tap.value ?? null }, updatedAt: at }];
+    case "reps": {
+      // A range set only, within 1 .. top + 10 (spec fokus-pause.md).
+      const reps = tap.value ?? null;
+      if (top === null || reps === null || reps < 1 || reps > top + 10) return null;
+      return [{ op: "patch", ref: target, when: [], values: { repsDone: reps }, updatedAt: at }];
+    }
+    case "undo": {
+      // Applied only while the set is still what the client undid (tap.undoes); otherwise this is
+      // a retry of an undo that already landed, and only the cleanup is left. The tap's own mark
+      // (the set's end, or its skip) is cleared last, so a partial undo is finished by its retry.
+      const state = logged === undefined ? null : logged.skipped ? "skip" : logged.endedAt !== null ? "done" : "begin";
+      const out: Change[] = [];
+      if (logged !== undefined && tap.undoes === "skip" && state === "skip") {
+        const { previous } = neighbours(order, target);
+        const previousLogged = previous === null ? undefined : log.get(setKey(previous));
+        out.push({ op: "clearStarts", t: logged.updatedAt ?? at, at }); // the starts the skip wrote
+        out.push({ op: "patch", ref: target, when: [], values: { skipped: false, startedAt: startAfter(previousLogged) }, updatedAt: at });
+      } else if (logged?.endedAt != null && tap.undoes === "done" && state === "done") {
+        const t = logged.endedAt;
+        out.push({ op: "clearStarts", t, at }); // on sets that aren't done
+        out.push({ op: "patch", ref: target, when: [{ field: "startedAt", equals: t }, { field: "endedAt", equals: t }], values: { startedAt: null }, updatedAt: at });
+        // The set is open again: its rating and reps done go with its end (one request).
+        out.push({ op: "patch", ref: target, when: [{ field: "endedAt", equals: t }], values: { endedAt: null, feltRpe: null, repsDone: null }, updatedAt: at });
+      } else if (
+        logged?.startedAt != null &&
+        tap.undoes === "begin" &&
+        state === "begin" &&
+        !startFromAnotherTap(log, target, logged.startedAt)
+      ) {
+        out.push({ op: "clearStarts", t: logged.startedAt, at }); // a begin
+      }
+      out.push({ op: "deleteEmpty" });
+      return out;
+    }
   }
+}
+
+function holds(row: LoggedSet, guard: Guard): boolean {
+  const value = row[guard.field] ?? null;
+  if (guard.equals === null) return value === null;
+  if (typeof guard.equals === "boolean") return value === guard.equals;
+  return typeof value === "string" && sameInstant(value, guard.equals);
+}
+
+/** The Changes applied to a log, as the table applies their requests. Returns a new map. */
+export function applyChanges(log: ReadonlyMap<string, LoggedSet>, changes: readonly Change[]): Map<string, LoggedSet> {
+  const next = new Map(log);
+  for (const c of changes) {
+    if (c.op === "ensure") {
+      const k = setKey(c.ref);
+      if (!next.has(k)) next.set(k, { row: c.ref.row, set: c.ref.set, startedAt: null, endedAt: null, skipped: false, feltRpe: null, repsDone: null, ...c.values, updatedAt: c.updatedAt });
+    } else if (c.op === "patch") {
+      const k = setKey(c.ref);
+      const row = next.get(k);
+      if (row !== undefined && c.when.every((g) => holds(row, g))) next.set(k, { ...row, ...c.values, ...(c.updatedAt === null ? {} : { updatedAt: c.updatedAt }) });
+    } else if (c.op === "clearStarts") {
+      for (const [k, row] of next) if (row.endedAt === null && sameInstant(row.startedAt, c.t)) next.set(k, { ...row, startedAt: null, updatedAt: c.at });
+    } else {
+      for (const [k, row] of next) if (row.startedAt === null && row.endedAt === null && !row.skipped) next.delete(k);
+    }
+  }
+  return next;
 }
 
 /**
  * The server's rules applied locally at `at`, for an instant screen (the server's own write is
- * the truth; the page re-reads it). Returns a new map; `log` is not changed.
+ * the truth; the page re-reads it): transition's Changes applied to the log. An undo undoes what
+ * undoesOf reads (as useSetLog sends). `tops`: the range tops (rangeTops), so a done stores the
+ * top as reps done as the server does. Returns a new map; `log` is not changed.
  */
 export function applyTap(
   order: readonly SetRef[],
@@ -284,51 +444,11 @@ export function applyTap(
   target: SetRef,
   at: string,
   value: number | null = null,
+  tops: RangeTops = new Map(),
 ): Map<string, LoggedSet> {
-  const next = new Map(log);
-  if (refused(log, kind, target)) return next;
-  const own = log.get(setKey(target));
-  const following = nextOpen(order, log, target);
-  switch (kind) {
-    case "begin":
-      if (stateOf(own) === "open" && own?.startedAt == null) put(next, target, { startedAt: at }, at);
-      break;
-    case "done": {
-      const t = stateOf(own) === "done" && own?.endedAt != null ? own.endedAt : at; // a retry keeps T
-      if (stateOf(own) !== "done") put(next, target, { skipped: false, startedAt: own?.startedAt ?? t, endedAt: t }, at);
-      if (following !== null && log.get(setKey(following))?.startedAt == null) put(next, following, { startedAt: t }, at);
-      break;
-    }
-    case "skip": {
-      const t = own?.skipped === true && own.updatedAt !== null ? own.updatedAt : at; // a retry keeps T
-      if (own?.skipped !== true) put(next, target, { skipped: true, startedAt: null, endedAt: null }, t);
-      if (following !== null && log.get(setKey(following))?.startedAt == null) put(next, following, { startedAt: t }, at);
-      break;
-    }
-    case "feel":
-      if (own !== undefined) put(next, target, { feltRpe: value ?? null }, at);
-      break;
-    case "reps":
-      if (own !== undefined && value != null) put(next, target, { repsDone: value }, at);
-      break;
-    case "undo": {
-      if (own === undefined) break;
-      const { previous } = neighbours(order, target);
-      if (own.skipped) {
-        const t = own.updatedAt;
-        put(next, target, { skipped: false, startedAt: startAfter(previous === null ? undefined : log.get(setKey(previous))) }, at);
-        if (t !== null) clearStarts(next, t, at);
-      } else if (own.endedAt !== null) {
-        const t = own.endedAt;
-        put(next, target, { endedAt: null, feltRpe: null, repsDone: null }, at); // open again: no rating
-        clearStarts(next, t, at);
-      } else if (own.startedAt !== null && !startFromAnotherTap(log, target, own.startedAt)) {
-        put(next, target, { startedAt: null }, at); // a begin
-      }
-      break;
-    }
-  }
-  return next;
+  const undoes = kind === "undo" ? (undoesOf(log, target) ?? "done") : null;
+  const changes = transition(order, log, { kind, target, undoes, value }, at, tops);
+  return changes === null ? new Map(log) : applyChanges(log, changes);
 }
 
 const KINDS: readonly SetTapKind[] = ["begin", "done", "skip", "undo", "feel", "reps"];

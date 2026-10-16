@@ -2,18 +2,17 @@ import "server-only";
 
 import { isoWeekStart } from "../dates.ts";
 import {
+  type Change,
+  type Guard,
   type LoggedSet,
-  neighbours,
-  nextOpen,
   isWarmup,
-  refused,
+  type LogValues,
+  rangeTop,
   sessionOrderWithWarmups,
   setKey,
   type SetRef,
   type SetTapInput,
-  startAfter,
-  startFromAnotherTap,
-  stateOf,
+  transition,
 } from "../set-taps.ts";
 import { effectivePairs, exerciseIdMap, type SessionRun, sessionRuns } from "../supersets.ts";
 import { localToday } from "../training-view.ts";
@@ -58,7 +57,6 @@ export type SetTapResult =
   | { readonly ok: false; readonly reason: "dev" | "invalid" | "failed" };
 
 const LOG = "exercise_set_log";
-type Field = "started_at" | "ended_at";
 type Key = { readonly date: string; readonly session: number; readonly ref: SetRef; readonly exerciseId: number };
 
 function client(): PostgrestClient {
@@ -75,14 +73,7 @@ function nameKey(name: string): string {
   return name.trim().toLowerCase(); // as public.exercises' lower(btrim(name))
 }
 
-/** The top of a range prescription ("8 - 12" -> 12); null for fixed reps ("3") or none. */
-export function rangeTop(repsText: string | null): number | null {
-  // As Python's domain.set_feedback.range_top: whole or decimal ends, comma or dot.
-  const m = repsText === null ? null : /^\s*(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*$/.exec(repsText);
-  if (m === null) return null;
-  const end = (s: string | undefined) => Number((s ?? "").replace(",", "."));
-  return Math.max(end(m[1]), end(m[2]));
-}
+export { rangeTop }; // moved to lib/set-taps.ts (the client needs it too)
 
 /** The session's sets in the sheet (row, set, exercise name, variant, reps as written). */
 export async function sessionSets(c: PostgrestClient, weekStart: string, session: number) {
@@ -192,11 +183,41 @@ async function patch(c: PostgrestClient, k: Key, only: readonly Filter[], body: 
   await write(c, LOG, "PATCH", { params: [...keyParams(k), ...only], body });
 }
 
-/** Sets `fields` to `at` where they are null (first write wins), unless the set is skipped. */
-async function setIfNull(c: PostgrestClient, k: Key, fields: readonly Field[], at: string): Promise<void> {
-  await ensure(c, k, Object.fromEntries(fields.map((f) => [f, at])), at);
-  for (const field of fields) {
-    await patch(c, k, [[field, "is.null"], ["skipped", "is.false"]], { [field]: at, updated_at: at });
+const COLUMNS: Readonly<Record<keyof LogValues, string>> = {
+  startedAt: "started_at",
+  endedAt: "ended_at",
+  skipped: "skipped",
+  feltRpe: "felt_rpe",
+  repsDone: "reps_done",
+};
+
+function columns(values: LogValues): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(values).map(([field, value]) => [COLUMNS[field as keyof LogValues], value]));
+}
+
+function filterOf(g: Guard): Filter {
+  const value = g.equals === null ? "is.null" : typeof g.equals === "boolean" ? `is.${String(g.equals)}` : `eq.${g.equals}`;
+  return [COLUMNS[g.field], value];
+}
+
+/** One Change as one request (a ref whose exercise isn't in public.exercises is left alone). */
+async function send(c: PostgrestClient, date: string, session: number, change: Change, keyOf: (ref: SetRef) => Key | null) {
+  switch (change.op) {
+    case "ensure": {
+      const k = keyOf(change.ref);
+      if (k !== null) await ensure(c, k, columns(change.values), change.updatedAt);
+      return;
+    }
+    case "patch": {
+      const k = keyOf(change.ref);
+      const body = { ...columns(change.values), ...(change.updatedAt === null ? {} : { updated_at: change.updatedAt }) };
+      if (k !== null) await patch(c, k, change.when.map(filterOf), body);
+      return;
+    }
+    case "clearStarts":
+      return clearStarts(c, date, session, change.t, change.at);
+    case "deleteEmpty":
+      return deleteEmpty(c, date, session);
   }
 }
 
@@ -253,85 +274,20 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
     const nameOf = (ref: SetRef) => names.get(setKey(isWarmup(ref) ? { row: ref.row, set: 1 } : ref)) ?? "";
     const target = { row: input.row, set: input.set };
     const keyOf = (ref: SetRef | null): Key | null => {
-      if (ref === null) return null;
+      if (ref === null || !inOrder.has(setKey(ref))) return null;
       const id = ids.get(nameKey(nameOf(ref)));
       return id === undefined ? null : { date: input.date, session: input.session, ref, exerciseId: id };
     };
-    const own = keyOf(inOrder.has(setKey(target)) ? target : null);
+    const own = keyOf(target);
     if (own === null) return { ok: false, reason: "invalid" }; // not in the session, or unknown
     const log = await sessionLog(c, input.date, input.session);
-    if (refused(log, input.kind, target)) return { ok: false, reason: "invalid" }; // skip a done set
-    const logged = log.get(setKey(target));
-    const { previous } = neighbours(order, target);
-    const after = keyOf(nextOpen(order, log, target)); // null: no open set after it
     const at = now.toISOString();
-    switch (input.kind) {
-      case "begin":
-        if (stateOf(logged) === "open") await setIfNull(c, own, ["started_at"], at);
-        break;
-      case "done": {
-        // A retry of a done that already landed (partly) finishes it with the tap's own time, so
-        // one tap keeps one T everywhere (undo finds it) and the next set still gets its start.
-        const t = stateOf(logged) === "done" && logged?.endedAt != null ? logged.endedAt : at;
-        if (logged?.skipped === true) await patch(c, own, [], { skipped: false, updated_at: at });
-        const top = tops.get(setKey(target)) ?? null; // a range set: its reps default to the top
-        if (top !== null && logged?.repsDone == null) {
-          await ensure(c, own, { reps_done: top }, t);
-          await patch(c, own, [["reps_done", "is.null"]], { reps_done: top });
-        }
-        await setIfNull(c, own, ["started_at", "ended_at"], t);
-        if (after !== null) await setIfNull(c, after, ["started_at"], t);
-        break;
-      }
-      case "skip": {
-        // As done: a retry reuses the skip's own time (its updated_at) for the next set's start.
-        const t = logged?.skipped === true && logged.updatedAt !== null ? logged.updatedAt : at;
-        if (logged?.skipped !== true) {
-          await ensure(c, own, { skipped: true }, t);
-          await patch(c, own, [], { skipped: true, started_at: null, ended_at: null, updated_at: t });
-        }
-        if (after !== null) await setIfNull(c, after, ["started_at"], t);
-        break;
-      }
-      case "feel":
-        // One column on a done set (refused above otherwise): -1 / 0 / +1, or null to clear.
-        await patch(c, own, [], { felt_rpe: input.value ?? null, updated_at: at });
-        break;
-      case "reps": {
-        // A range set only, within 1 .. top + 10 (spec fokus-pause.md).
-        const top = tops.get(setKey(target)) ?? null;
-        const reps = input.value ?? null;
-        if (top === null || reps === null || reps < 1 || reps > top + 10) return { ok: false, reason: "invalid" };
-        await patch(c, own, [], { reps_done: reps, updated_at: at });
-        break;
-      }
-      case "undo": {
-        // Applied only while the set is still what the client undid (input.undoes); otherwise this
-        // is a retry of an undo that already landed, and only the cleanup is left. The tap's own
-        // mark (the set's end, or its skip) is cleared last, so a partial undo is finished by its retry.
-        const state = logged === undefined ? null : logged.skipped ? "skip" : logged.endedAt !== null ? "done" : "begin";
-        if (logged !== undefined && input.undoes === "skip" && state === "skip") {
-          const previousLogged = previous === null ? undefined : log.get(setKey(previous));
-          await clearStarts(c, input.date, input.session, logged.updatedAt ?? at, at); // the starts the skip wrote
-          await patch(c, own, [], { skipped: false, started_at: startAfter(previousLogged), updated_at: at });
-        } else if (logged?.endedAt != null && input.undoes === "done" && state === "done") {
-          const t = logged.endedAt;
-          await clearStarts(c, input.date, input.session, t, at); // on sets that aren't done
-          await patch(c, own, [["started_at", `eq.${t}`], ["ended_at", `eq.${t}`]], { started_at: null, updated_at: at });
-          // The set is open again: its rating and reps done go with its end (one request).
-          await patch(c, own, [["ended_at", `eq.${t}`]], { ended_at: null, felt_rpe: null, reps_done: null, updated_at: at });
-        } else if (
-          logged?.startedAt != null &&
-          input.undoes === "begin" &&
-          state === "begin" &&
-          !startFromAnotherTap(log, target, logged.startedAt)
-        ) {
-          await clearStarts(c, input.date, input.session, logged.startedAt, at); // a begin
-        }
-        await deleteEmpty(c, input.date, input.session);
-        break;
-      }
-    }
+    // The rules are lib/set-taps.ts transition's (the client applies the same Changes); each
+    // Change is one conditional request, sent in order, so a retry finishes a partly landed tap.
+    const tap = { kind: input.kind, target, undoes: input.undoes, value: input.value ?? null };
+    const changes = transition(order, log, tap, at, tops);
+    if (changes === null) return { ok: false, reason: "invalid" }; // e.g. skip a done set
+    for (const change of changes) await send(c, input.date, input.session, change, keyOf);
     return { ok: true, at };
   } catch (error) {
     if (error instanceof PostgrestError || error instanceof EnvError || error instanceof RowError) {

@@ -66,7 +66,7 @@ export function SetLogProvider({ session, date, devSwitches, children }: Provide
     () => (saves.size === 0 ? session.order : clientOrder(session.exercises, ordered)),
     [saves.size, session.order, session.exercises, ordered],
   );
-  const setLog = useSetLog(session.log, order, date, session.session);
+  const setLog = useSetLog(session.log, order, date, session.session, session.exercises);
   const view = useMemo(() => checklistView(session.exercises, order, setLog.log), [session.exercises, order, setLog.log]);
   const views = useMemo(
     () => seamViews(session.exercises, session.pairSlots, pairs, setLog.log.values()),

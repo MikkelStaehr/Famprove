@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { logExerciseTap } from "@/app/actions";
 import { freshAfterTap, type FreshTicks, initialFresh } from "@/lib/fresh-ticks";
 import {
   applyTap,
   type LoggedSet,
+  rangeTops,
   refused,
   setKey,
   type SetRef,
@@ -57,7 +58,10 @@ export function useSetLog(
   order: readonly SetRef[],
   date: string,
   session: number,
+  /** The session's rows (reps as written, sets): a done on a range set stores its top, as the server. */
+  rows: readonly { readonly repsText: string | null; readonly sets: readonly SetRef[] }[],
 ): SetLog {
+  const tops = useMemo(() => rangeTops(rows), [rows]);
   const [log, setLog] = useState<ReadonlyMap<string, LoggedSet>>(
     () => new Map(initial.map((l) => [setKey(l), l])),
   );
@@ -104,13 +108,13 @@ export function useSetLog(
         failed.current = failed.current.filter((f) => setKey(f) !== setKey(ref));
         countFailed();
       }
-      setLog((previous) => applyTap(order, previous, kind, ref, new Date().toISOString(), value));
+      setLog((previous) => applyTap(order, previous, kind, ref, new Date().toISOString(), value, tops));
       setFresh((previous) => freshAfterTap(previous, kind, setKey(ref)));
       const withValue = kind === "feel" || kind === "reps";
       const input: SetTapInput = { kind, date, session, row: ref.row, set: ref.set, undoes, ...(withValue ? { value } : {}) };
       queue.current = queue.current.then(() => send(input));
     },
-    [log, order, date, session, send, countFailed],
+    [log, order, date, session, send, countFailed, tops],
   );
 
   const retry = useCallback(() => {

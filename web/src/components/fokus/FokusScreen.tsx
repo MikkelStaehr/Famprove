@@ -91,7 +91,7 @@ const FADE_IN = "transition-opacity duration-120 ease-out starting:opacity-0 mot
  * saved in order).
  */
 export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts }: FokusScreenProps) {
-  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow } = useSetLog(session.log, session.order, date, session.session);
+  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow } = useSetLog(session.log, session.order, date, session.session, session.exercises);
   const [announcement, setAnnouncement] = useState("");
   const [focusRequest, setFocusRequest] = useState(0);
   const primary = useRef<HTMLButtonElement & HTMLAnchorElement>(null);
