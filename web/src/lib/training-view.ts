@@ -527,10 +527,6 @@ export function formSentence(tsb: number, zone: ZoneKey | null, fromDate?: strin
   return parts.join(" ");
 }
 
-/** Python's suggested kg ("142,5 kg"), or null when there is none. "0 kg" never shows.
- * `capped`: the weekly cap changed it, shown as "(begrænset)" (CAPPED_WORD). */
-export type SuggestionView = { readonly kg: string; readonly capped: boolean } | { readonly kg: null };
-
 /** After a suggestion the weekly cap changed (planned_sets.uncapped_kg, user 2026-10-13). */
 export const CAPPED_WORD = "(begrænset)";
 

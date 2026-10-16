@@ -238,7 +238,7 @@ All writes go through the one server action (set log); nothing else is written, 
 |---|---|---|
 | Begynd træning | `begin` = `started_at` on the first open set | navigate to `/fokus` (does not wait for the save) |
 | Fortsæt træning | `begin` only if the first open set has no `started_at` | navigate to `/fokus` |
-| Udført (Fokus) | `ended_at` on this set, `started_at` on the next open set | rest view (or finished view) |
+| Udført (Fokus) | `ended_at` on this set, `started_at` on the next open set | ~~rest view (or finished view)~~ **Superseded 2026-10-15 by `fokus-flow.md` §1:** the pause view, which is the next set (or the finished view). |
 | ~~Til næste sæt~~ | ~~none~~ | ~~set view~~ **Superseded 2026-10-15 by `fokus-flow.md` §1:** no rest step; the pause view is the next set, its primary `✓ Sæt n udført`. |
 | Spring over | the set is `skipped`, no timestamps on it; `started_at` on the next open set (§10 D7) | set view of the next set (no rest) |
 | Fortryd | undo the latest done/skip tap (only what that tap wrote) | set view of the reopened set |
