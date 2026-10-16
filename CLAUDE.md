@@ -164,6 +164,7 @@ If a budget is exceeded, **stop and ask**. Never keep running.
 ## Status to the user
 - Before each step: what, which agent, and an estimated time.
 - Agents over ~10 min: give a short status when they return. Run long agents in the background where possible.
+- **A report has one line per item in the request** (retro 2026-10-16, user-approved), with its status (lavet / delvist / ikke lavet), also when the item was done in an earlier round. (The supersets report left out three items that were done and live: the kg bug, the rest window and today's data.)
 
 ## Definition of done
 - **S:** it works, the screenshot looks right, lint and typecheck pass.
