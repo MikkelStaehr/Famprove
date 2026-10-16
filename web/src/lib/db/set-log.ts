@@ -7,7 +7,7 @@ import {
   type LoggedSet,
   isWarmup,
   type LogValues,
-  rangeTop,
+  rangeTops,
   sessionOrderWithWarmups,
   setKey,
   type SetRef,
@@ -72,8 +72,6 @@ function record(raw: unknown, table: string): Record<string, unknown> {
 function nameKey(name: string): string {
   return name.trim().toLowerCase(); // as public.exercises' lower(btrim(name))
 }
-
-export { rangeTop }; // moved to lib/set-taps.ts (the client needs it too)
 
 /** The session's sets in the sheet (row, set, exercise name, variant, reps as written). */
 export async function sessionSets(c: PostgrestClient, weekStart: string, session: number) {
@@ -191,6 +189,7 @@ const COLUMNS: Readonly<Record<keyof LogValues, string>> = {
   repsDone: "reps_done",
 };
 
+// A PostgREST body: each LogValues field under its column name (values are already JSON).
 function columns(values: LogValues): Record<string, unknown> {
   return Object.fromEntries(Object.entries(values).map(([field, value]) => [COLUMNS[field as keyof LogValues], value]));
 }
@@ -270,7 +269,7 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
     const order = sessionOrderWithWarmups(sets, effectivePairs(runs, pairRows.today, pairRows.history));
     const inOrder = new Set(order.map(setKey)); // the sheet's sets and their exercises' warm-ups
     const names = new Map(sets.map((s) => [setKey(s.ref), s.name]));
-    const tops = new Map(sets.map((s) => [setKey(s.ref), rangeTop(s.repsText)]));
+    const tops = rangeTops(sets.map((s) => ({ repsText: s.repsText, sets: [s.ref] })));
     const nameOf = (ref: SetRef) => names.get(setKey(isWarmup(ref) ? { row: ref.row, set: 1 } : ref)) ?? "";
     const target = { row: input.row, set: input.set };
     const keyOf = (ref: SetRef | null): Key | null => {
