@@ -12,16 +12,19 @@ fokus-kg). Pure: no I/O. The first rule that applies, per set:
    rounded to the nearest 2.5 (halves up, like the sheet's MROUND).
 3. ``e1rm``: Python's suggestion (planned_sets.suggested_kg from the rolling e1RM), shown "~".
 4. ``last``: last week's kg for the same row and set ("samme som sidst"), unless that set was
-   skipped in the app (user, 2026-10-16: a set not done affects nothing).
+   skipped in the app (user, 2026-10-16: a set not done affects nothing); the rule is
+   domain.last_week.same_set_last_week.
 Otherwise None: Fokus shows no kg block. Never 0 where the sheet has no 0.
 """
 
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from typing import Final, Literal
 
+from training_load.domain.last_week import same_exercise as _same_exercise
+from training_load.domain.last_week import same_set_last_week
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.strength import StrengthSet
 from training_load.domain.strength_analysis import E1RM_FACTOR, KgStatus, SetKey, set_key
@@ -62,10 +65,6 @@ def percent(prescribed: str | None) -> float | None:
 
 def _e1rm_ratio(reps: float, rpe: float) -> float:
     return 1 + E1RM_FACTOR * (reps + 10 - rpe)
-
-
-def _same_exercise(a: StrengthSet, b: StrengthSet) -> bool:
-    return a.name.strip().lower() == b.name.strip().lower() and a.variant_id == b.variant_id
 
 
 def today_kgs(
@@ -122,18 +121,10 @@ def today_kgs(
         for s in session_sets:
             if ref(s) in out:
                 continue
-            before = by_ref.get(
-                (s.sheet_id, s.block, s.sheet_row, s.set_no, s.week_start - timedelta(days=7))
+            before = same_set_last_week(
+                s, by_ref, skipped=lambda b: statuses.get(set_key(b)) == "skipped"
             )
-            # The same exercise, variant (null only matches null) and reps, as planned_sets' anchor.
-            if (
-                before is not None
-                and statuses.get(set_key(before)) != "skipped"  # planned / pre_log: as the sheet
-                and _same_exercise(before, s)
-                and before.reps == s.reps
-                and before.logged_kg is not None
-                and (before.logged_kg > 0 or before.bodyweight)
-            ):
+            if before is not None and before.logged_kg is not None:
                 out[ref(s)] = TodayKg(before.logged_kg, "last")
     return out
 

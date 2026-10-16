@@ -38,6 +38,7 @@ from datetime import date, timedelta
 from typing import Final, Literal
 
 from training_load.domain.exercises import Catalog, Exercise
+from training_load.domain.last_week import anchor_kg, first_counted_by_row
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.set_feedback import Progression
 from training_load.domain.strength import StrengthSet, iso_week_start
@@ -167,18 +168,6 @@ def weekly_cap(suggested: float, last_kg: float | None, up_kg: float) -> tuple[f
     return (capped, suggested) if capped != suggested else (suggested, None)
 
 
-def _same_exercise(a: str, b: str) -> bool:
-    return a.strip().casefold() == b.strip().casefold()
-
-
-def _same_reps(a: StrengthSet, b: StrengthSet) -> bool:
-    """The same prescribed reps: the sheet's text ("8 - 12"), since a done range set's reps are
-    the reps done (domain.set_feedback)."""
-    if a.reps_text is not None and b.reps_text is not None:
-        return a.reps_text.strip() == b.reps_text.strip()
-    return a.reps == b.reps
-
-
 def is_main_lift(exercise: Exercise | None) -> bool:
     """A main lift or one of its variants: category main, or a parent lift (tempo variants are
     category accessory with a parent lift)."""
@@ -206,17 +195,13 @@ def ramp_of(base_kg: float) -> tuple[RampStep, ...] | None:
 def last_week_kg(
     sets: Iterable[StrengthSet], statuses: Mapping[SetKey, KgStatus]
 ) -> dict[tuple[str, int, date], StrengthSet]:
-    """(block, sheet_row, week_start) -> the first set with logged kg of each lifted RPE row, as
-    Træning's "Sidste uge" shows it. A session that wasn't lifted (pre-filled kg of a missed
-    session) anchors nothing."""
-    first: dict[tuple[str, int, date], StrengthSet] = {}
-    for s in sets:
-        if not counts(statuses[set_key(s)]) or s.logged_kg is None or s.logged_kg <= 0:
-            continue
-        key = (s.block, s.sheet_row, s.week_start)
-        if key not in first or s.set_no < first[key].set_no:
-            first[key] = s
-    return {key: s for key, s in first.items() if prescribed_rpe(s.prescribed) is not None}
+    """(block, sheet_row, week_start) -> the first set with logged kg of each lifted RPE row
+    (domain.last_week.first_counted_by_row, with this module's kg statuses)."""
+    return first_counted_by_row(
+        sets,
+        counted=lambda s: counts(statuses[set_key(s)]),
+        rpe_row=lambda s: prescribed_rpe(s.prescribed) is not None,
+    )
 
 
 def planned_sets(
@@ -268,14 +253,7 @@ def planned_sets(
         if suggested is not None and suggested <= 0:
             suggested = None
         rpe_kg = suggested
-        before = logged.get((s.block, s.sheet_row, s.week_start - timedelta(days=7)))
-        same = (
-            before is not None
-            and _same_exercise(before.name, s.name)
-            and _same_reps(before, s)
-            and before.variant_id == s.variant_id  # None matches only None
-        )
-        anchor = before.logged_kg if same and before is not None else None
+        anchor = anchor_kg(s, logged)  # domain.last_week
         if anchor is not None:
             anchors[set_key(s)] = anchor
         step = cap_kg(s.type)

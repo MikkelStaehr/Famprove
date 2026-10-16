@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from training_load.domain.exercises import UNKNOWN_FACTOR
+from training_load.domain.last_week import latest_logged_kg
 from training_load.domain.strength import StrengthSet
 from training_load.sources.strength_sheet import (
     decimal_dots,
@@ -89,29 +90,6 @@ def _main_lift_kg(s: StrengthSet) -> tuple[float, str] | None:
     return None
 
 
-def _logged(s: StrengthSet) -> float:
-    """The logged kg of a set already filtered to logged_kg > 0."""
-    if s.logged_kg is None:
-        raise ValueError("expected a set with logged kg")
-    return s.logged_kg
-
-
-def _accessory_kg(s: StrengthSet, history: Sequence[StrengthSet]) -> tuple[float, str] | None:
-    logged = [h for h in history if h.logged_kg is not None and h.logged_kg > 0]
-    same_row = [
-        h for h in logged if h.block == s.block and h.sheet_row == s.sheet_row and h.week < s.week
-    ]
-    if same_row:
-        return _logged(max(same_row, key=lambda h: h.week)), "same_row"
-    name = s.name.strip().lower()
-    same_name = [
-        h for h in logged if h.name.strip().lower() == name and h.week_start < s.week_start
-    ]
-    if same_name:
-        return _logged(max(same_name, key=lambda h: h.week_start)), "same_name"
-    return None
-
-
 def _raw_score(s: StrengthSet, kg: float) -> float:
     return _legacy_score(s, kg, {s.type: s.e1rm} if s.e1rm is not None else {})
 
@@ -147,7 +125,7 @@ def planned_session_score(
         if pct is not None and pct < 0:
             backoffs.append(s)
             continue
-        found = _main_lift_kg(s) or _accessory_kg(s, history)
+        found = _main_lift_kg(s) or latest_logged_kg(s, history)
         if found is None:
             unscored += 1
             continue
