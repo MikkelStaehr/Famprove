@@ -454,11 +454,6 @@ export function eftpDots(chart: LineChartView): readonly ({ readonly r: number; 
 /** A week slot's centre (day number): where its 2px bar and the today tick sit. */
 export const slotCentre = (w: { readonly x0: number; readonly x1: number }): number => (w.x0 + w.x1) / 2;
 
-/** Every mark at an x, for the tooltip (two rides on one day are both listed). */
-export function marksAt(rows: readonly ChartRow[], x: number): readonly Mark[] {
-  return rows.filter((r) => r.x === x).flatMap((r) => r.marks);
-}
-
 // --- weeks (spec §5d) ----------------------------------------------------------------------
 
 export function weekBars(weeks: readonly CyclingWeekRow[], today: IsoDate, lo: number): WeekBar[] {

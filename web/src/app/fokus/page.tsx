@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { FokusError, NoSessionNote } from "@/components/fokus/FokusNotes";
 import { FokusScreen } from "@/components/fokus/FokusScreen";
 import { type DataError, isDataError } from "@/lib/data-error";
-import { devFixture } from "@/lib/db/dev-fixture";
+import { devSwitchOn } from "@/lib/db/dev-fixture";
 import { loadExerciseCategories, loadTrainingForm, loadTrainingPlan } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { fokusStaleNote, mainLiftKeys, noSessionSentence } from "@/lib/fokus-view";
@@ -46,11 +46,6 @@ async function planState(today: IsoDate): Promise<PlanState> {
   }
 }
 
-/** Under `next dev` with DEV_TODAY or DEV_FIXTURE nothing is written (lib/db/set-log.ts): say so before the first tap. */
-function devSwitchesOn(): boolean {
-  return process.env.NODE_ENV === "development" && (Boolean(process.env.DEV_TODAY) || devFixture() !== null);
-}
-
 /** `/fokus`: "What do I lift now?" (design/specs/traening.md §4). The session is the one Træning shows. */
 export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
   await connection(); // request time: "today" is the Copenhagen date now, never the build's
@@ -70,7 +65,7 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
     );
   }
   const { strength } = state.plan;
-  const devSwitches = devSwitchesOn();
+  const devSwitches = devSwitchOn();
   if (strength.state !== "next" || strength.next === null) {
     return (
       <FokusColumn>

@@ -442,7 +442,7 @@ function StrengthSession({ session: s }: { readonly session: SessionDetail }) {
 
 function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
   const load = formatSetLoad(e.loggedKg, e.bodyweight);
-  const score = formatScore(e.scorePerSet);
+  const score = e.scorePerSet === null ? null : formatScore(e.scorePerSet);
   return (
     <li className="flex flex-col border-t border-border py-2 first:border-t-0">
       <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-13">
@@ -475,8 +475,8 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
           )}
         </span>
         <span className="text-13 text-text-muted">
-          <span aria-hidden="true">{score} score/sæt</span>
-          <span className="sr-only">rå score {score} pr. sæt</span>
+          <span aria-hidden="true">{score ?? "–"} score/sæt</span>
+          <span className="sr-only">{score === null ? "rå score ikke registreret" : `rå score ${score} pr. sæt`}</span>
         </span>
       </p>
     </li>

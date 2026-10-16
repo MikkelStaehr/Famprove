@@ -25,14 +25,7 @@ export type Readout = {
   readonly factTone?: "text"; // Styrke: the lift lines are lines 2+ in --text, not muted facts
 };
 
-export const REST_PREFIX = "Seneste · ";
 export const MISSING = "–";
-
-/** At rest: the latest point with "Seneste · " in front; never blank. */
-export function restingReadout(latest: Readout | null, empty: string): Readout {
-  if (latest === null) return { head: empty, cells: [], facts: [], muted: true };
-  return { ...latest, head: `${REST_PREFIX}${latest.head}` };
-}
 
 /** Index of the x nearest to `x` in an ascending list; ties go left; -1 when empty. */
 export function nearestIndex(xs: readonly number[], x: number): number {

@@ -8,7 +8,6 @@ import {
   shortDay,
   updatedCaption,
   weekdayLabel,
-  weekRange,
 } from "../src/lib/training-view.ts";
 
 const names = (...n: string[]) => n.map((name) => ({ name }));
@@ -42,10 +41,6 @@ test("shortDay and weekdayLabel: the InverseCard day and the ListRow day", () =>
   assert.equal(weekdayLabel("2026-10-13"), "Tir");
   assert.equal(weekdayLabel("2026-10-14"), "Ons");
   assert.equal(weekdayLabel("2026-10-18"), "Søn");
-});
-
-test("weekRange: the ISO week of today", () => {
-  assert.equal(weekRange("2026-10-14"), "12.–18. okt.");
 });
 
 test("updatedCaption: time only today, the date otherwise, 'forældet' when stale", () => {

@@ -239,22 +239,6 @@ export function formatSetsReps(sets: string | null, reps: string | null): string
   return null;
 }
 
-/** Spoken sets and reps: ("1", "3") -> "1 sæt af 3 reps", ("2", "8 - 12") -> "2 sæt af 8 til 12 reps". */
-export function spokenSetsReps(sets: string | null, reps: string | null): string | null {
-  const spokenReps = reps === null ? null : counted(spokenRange(reps), "rep", "reps");
-  if (sets !== null && spokenReps !== null) return `${counted(sets, "sæt", "sæt")} af ${spokenReps}`;
-  if (spokenReps !== null) return spokenReps;
-  if (sets !== null) return counted(sets, "sæt", "sæt");
-  return null;
-}
-
-export type ExerciseWords = {
-  readonly name: string;
-  readonly setsText: string | null;
-  readonly repsText: string | null;
-  readonly prescribed: string | null;
-};
-
 /**
  * The full stop that ends a sentence after `text`: none when `text` already ends with one.
  * Danish short months carry their own ("5. okt."), "maj" does not.

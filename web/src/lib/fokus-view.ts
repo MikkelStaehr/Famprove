@@ -516,11 +516,6 @@ export function restBandLine(band: RestBand, minS: number | null, maxS: number |
   return null;
 }
 
-/** "Squat, sæt 1 udført. Pause." */
-export function doneSentence(s: SetInContext): string {
-  return `${spokenName(s.exercise)}, sæt ${s.number} udført. Pause.`;
-}
-
 /** "Sæt 2 sprunget over." */
 export function skipSentence(s: SetInContext): string {
   return `Sæt ${s.number} sprunget over.`;
@@ -630,16 +625,18 @@ export function mainLiftKeys(rows: readonly Pick<ExerciseCategoryRow, "name" | "
 }
 
 /**
- * A main lift: a ramp is present, else the catalogue says category "main". An unknown name, or
- * an unread catalogue (null), is not a main lift, so its warm-up shows the timer only.
+ * The warm-up shows a main lift's ramp screen: a ramp is present, else the catalogue says category
+ * "main". Anything else (an unknown name, an unread catalogue = null) gets the timer only.
+ * Not Python's `planned_sets.is_main_lift`, which means category main or a parent lift (e.g. tempo
+ * squat) and picks the rest window.
  */
-export function isMainLift(e: Pick<FokusExercise, "name" | "ramp">, mainKeys: readonly string[] | null): boolean {
+export function hasMainLiftWarmup(e: Pick<FokusExercise, "name" | "ramp">, mainKeys: readonly string[] | null): boolean {
   if (e.ramp !== null) return true;
   return mainKeys !== null && mainKeys.includes(catalogueKey(e.name));
 }
 
 /** Fortryd of "Begynd træning" goes back to Træning with this query (fokus-pause.md §6). */
-export const BEGIN_UNDONE_HREF = "/?fortrudt=begin";
+export const BEGIN_UNDONE_HREF = "/train?fortrudt=begin";
 export const BEGIN_UNDONE_TEXT = "Fortrudt: træningen er ikke begyndt.";
 
 /** Træning was opened by Fortryd of "Begynd træning" (`location.search`). */

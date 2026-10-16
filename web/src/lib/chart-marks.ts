@@ -75,11 +75,6 @@ export function prognoseEvery(wide: boolean): number {
   return wide ? MARKS.prognoseEvery.wide : MARKS.prognoseEvery.narrow;
 }
 
-/** Whether the k-th day (0-based, counted from the first band day) gets a range-comb tick. */
-export function isCombDay(k: number): boolean {
-  return Number.isInteger(k) && k >= 0 && k % MARKS.rangeComb.everyDays === 0;
-}
-
 export type EftpDot = { readonly r: number; readonly hollow: boolean };
 
 /**

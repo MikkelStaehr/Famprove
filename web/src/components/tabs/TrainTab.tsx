@@ -13,7 +13,7 @@ import { WarningLine } from "@/components/WarningLine";
 import { type WeekBody, WeekCard } from "@/components/WeekCard";
 import { dayDetails, weekView } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
-import { devFixture } from "@/lib/db/dev-fixture";
+import { devSwitchOn } from "@/lib/db/dev-fixture";
 import { loadDashboardData, loadTrainingForm, loadTrainingPlan, loadWeekDetail, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { addDays, isoWeek, isoWeekStart } from "@/lib/dates";
@@ -108,11 +108,6 @@ async function TrainingWeek({ today, strength, sentence }: { readonly today: Iso
   return <WeekCard variant="compact" head={weekHead(today)} body={await loadWeekBody(today, strength)} sentence={sentence} className={RIGHT_1} />;
 }
 
-/** Under `next dev` with DEV_TODAY or DEV_FIXTURE taps are not saved (lib/db/set-log.ts says so too). */
-function devSwitchesOn(): boolean {
-  return process.env.NODE_ENV === "development" && (Boolean(process.env.DEV_TODAY) || devFixture() !== null);
-}
-
 /** Træning (/train): "What is my session, and how fresh am I for it?" (design/specs/traening.md §3). */
 export async function TrainTab() {
   await connection(); // request time: "today" is the Copenhagen date now, never the build's
@@ -189,7 +184,7 @@ export async function TrainTab() {
       {session === null ? (
         page
       ) : (
-        <SetLogProvider session={session} date={today} devSwitches={devSwitchesOn()}>
+        <SetLogProvider session={session} date={today} devSwitches={devSwitchOn()}>
           {page}
         </SetLogProvider>
       )}

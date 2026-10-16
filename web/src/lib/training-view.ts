@@ -21,7 +21,6 @@ import type {
 } from "./db/rows.ts";
 import {
   formatClock,
-  formatDateRange,
   formatDay,
   formatKg,
   formatSetLoad,
@@ -535,13 +534,6 @@ export type SuggestionView = { readonly kg: string; readonly capped: boolean } |
 /** After a suggestion the weekly cap changed (planned_sets.uncapped_kg, user 2026-10-13). */
 export const CAPPED_WORD = "(begrænset)";
 
-export function suggestionView(e: Pick<ExerciseView, "suggestedKg" | "suggestionCapped">): SuggestionView {
-  if (e.suggestedKg !== null && e.suggestedKg > 0) {
-    return { kg: `${formatKg(e.suggestedKg)} kg`, capped: e.suggestionCapped };
-  }
-  return { kg: null };
-}
-
 type AdjustmentFields = Pick<ExerciseView, "suggestedKg" | "suggestionCapped" | "adjustmentKg" | "adjustmentReason">;
 
 /** "+2,5" / "−2,5" (U+2212); null for a hold (0) or no rule. */
@@ -605,12 +597,6 @@ export function titleName(e: Pick<ExerciseView, "name" | "variant">): string {
 /** The spoken name: "DB Preacher Curl, Bicep of choice"; without a variant the exercise alone. */
 export function spokenName(e: Pick<ExerciseView, "name" | "variant">): string {
   return e.variant === null ? e.name.trim() : `${e.variant}, ${e.name.trim()}`;
-}
-
-/** Last week's logged load: undefined in week 1 (no item), null when nothing was logged. */
-export function lastWeekText(e: Pick<ExerciseView, "reference">, week: number): string | null | undefined {
-  if (week < 2) return undefined;
-  return e.reference === null ? null : formatSetLoad(e.reference.kg, e.reference.bodyweight);
 }
 
 /**
@@ -837,12 +823,6 @@ export function updatedCaption(freshness: Freshness, today: IsoDate): string {
   const at = updatedText(freshness.computedAt, today);
   const when = at.sameDay === true ? at.time : `${at.date} ${at.time}`;
   return `${freshness.kind === "stale" ? "forældet · " : ""}opdateret ${when}`;
-}
-
-/** The ISO week of `today` as a caption: "12.–18. okt.". */
-export function weekRange(today: IsoDate): string {
-  const monday = isoWeekStart(today);
-  return formatDateRange(monday, addDays(monday, 6));
 }
 
 // --- Træning's Sæt card per exercise (user 2026-10-14, slice exercise-collapse) ---------------

@@ -170,7 +170,7 @@ export type ExerciseDetail = {
    * the logged kg, i.e. on a bodyweight exercise; null when they are the same. */
   readonly effectiveKg: number | null;
   readonly prescribed: string | null; // the coach's load cell, e.g. "RPE 7 - 8"
-  readonly scorePerSet: number; // raw set score (before STRENGTH_K), from Python
+  readonly scorePerSet: number | null; // raw set score (before STRENGTH_K), Python's score_final; null: not scored
 };
 
 /** One strength activity of the day and the sheet session it did (if any). */
@@ -367,8 +367,8 @@ function exerciseDetails(sets: readonly StrengthSetRow[]): ExerciseDetail[] {
     bodyweight: first.bodyweight,
     effectiveKg: first.bodyweight && first.kg !== (first.loggedKg ?? 0) ? first.kg : null,
     prescribed: first.prescribed,
-    // The score that feeds the session's TSS; a row from before 2026-10-13 has only the parser's.
-    scorePerSet: first.scoreFinal ?? first.score,
+    // The score that feeds the session's TSS (score_final). Null shows as missing, never the parser's score.
+    scorePerSet: first.scoreFinal,
   }));
 }
 

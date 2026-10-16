@@ -495,7 +495,6 @@ export function devFixture(
   return null;
 }
 
-/** The error DEV_FIXTURE=error throws in place of reading `table`. */
 /**
  * Under `next dev` with DEV_TODAY or DEV_FIXTURE the screen is not today's or not real: every write
  * path (set taps, the FTP answer) and the refresh route start nothing. The one copy of this guard.
@@ -507,11 +506,11 @@ export function devSwitchOn(
   return nodeEnv === "development" && (Boolean(env.DEV_TODAY) || devFixture(env, nodeEnv) !== null);
 }
 
+/** The error DEV_FIXTURE=error throws in place of reading `table`. */
 export function fixtureError(table: string): PostgrestError {
   return new PostgrestError(table, null, `DEV_FIXTURE=error: ${table} was not read`);
 }
 
-/** computed_at for DEV_FIXTURE=stale: STALE_AGE_MS before `now`. */
 /**
  * DEV_FIXTURE=ftp-warning / ftp-quiet (ftp-confirm.md §4): /load's FTP line without the real
  * ftp_status (illustrative, never written; a tap under a fixture writes nothing).
@@ -536,6 +535,7 @@ export function illustrativeFtp(
   return { status, notice };
 }
 
+/** computed_at for DEV_FIXTURE=stale: STALE_AGE_MS before `now`. */
 export function staleComputedAt(now: Date): string {
   return new Date(now.getTime() - STALE_AGE_MS).toISOString();
 }

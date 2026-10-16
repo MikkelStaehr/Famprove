@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { dotField, dotRow, drawingReps, FIELD_DOTS, showsKgReminder, signature } from "../src/lib/fokus-marks.ts";
+import { dotField, drawingReps, FIELD_DOTS, showsKgReminder, signature } from "../src/lib/fokus-marks.ts";
 import { prescribedCell, rangeFigure } from "../src/lib/fokus-view.ts";
 import { type LoggedSet, setKey, type SetRef } from "../src/lib/set-taps.ts";
 
@@ -52,18 +52,6 @@ test("dot field: filled = floor(elapsed / scale × 360), column-major, ticks and
   assert.ok(!warm.dots.some((d) => d.kind === "over"));
   // Deterministic.
   assert.deepEqual(dotField(220, scale, 180, 300), f);
-});
-
-test("dot row: one dot per tapped set, rings for skips, warm-ups never, grouped per exercise", () => {
-  const empty = dotRow(EX, ORDER, logOf([]));
-  assert.deepEqual(empty.groups, []);
-  assert.equal(empty.sentence, "I dag: 0 sæt udført, 0 sprunget over.");
-  const row = dotRow(EX, ORDER, logOf([done(4, 0, 100), done(4, 1, 200), skip(4, 2, 250), done(4, 3, 400), done(6, 0, 500), done(6, 1, 600)]));
-  assert.deepEqual(row.groups.map((g) => g.dots.map((d) => d.kind)), [["done", "skipped", "done"], ["done"]]);
-  // 8px dots with 8px gaps: centres 16px apart, the group as wide as its dots and gaps.
-  assert.deepEqual(row.groups[0].dots.map((d) => d.cx), [4, 20, 36]);
-  assert.equal(row.groups[0].width, 40);
-  assert.equal(row.sentence, "I dag: 3 sæt udført, 1 sprunget over.");
 });
 
 test("signature: a bar per done set, hollow exactly where kg is unknown, warm-ups as gaps, deterministic", () => {
@@ -158,7 +146,4 @@ test("all skipped: stubs and rings only, finite geometry, counts in the sentence
     sig.sentence,
     "Sessionens forløb, et sæt pr. søjle: 0 udført, 3 sprunget over. Kg kendt for 0 sæt; resten er tegnet efter reps. 0 lettere, 0 som ventet, 0 hårdere, 0 uden vurdering.",
   );
-  const row = dotRow(EX, ORDER, log);
-  assert.deepEqual(row.groups.map((g) => g.dots.map((d) => d.kind)), [["skipped", "skipped", "skipped"]]);
-  assert.equal(row.sentence, "I dag: 0 sæt udført, 3 sprunget over.");
 });

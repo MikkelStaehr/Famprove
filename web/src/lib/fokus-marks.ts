@@ -58,54 +58,6 @@ export function dotField(elapsedS: number, scaleS: number, minS: number | null, 
   };
 }
 
-/* ── §3.2 The dot row (set view) ────────────────────────────────────────────────────────── */
-
-export type RowDot = { readonly cx: number; readonly kind: "done" | "skipped" };
-export type DotRowGroup = { readonly key: string; readonly width: number; readonly dots: readonly RowDot[] };
-export type DotRow = { readonly groups: readonly DotRowGroup[]; readonly done: number; readonly skipped: number; readonly sentence: string };
-
-/** Dot row geometry (user, 2026-10-13): 8px dots with 8px gaps. */
-const DOT_PITCH = 16;
-
-type Named = Pick<FokusExercise, "name" | "row">;
-const nameOf = (exercises: readonly Named[], ref: SetRef): string =>
-  exercises.find((e) => e.row === ref.row)?.name.trim().toLowerCase() ?? `#${ref.row}`;
-
-/**
- * One dot per set tapped today in this session, in sheet order (warm-ups never): done = filled,
- * skipped = ring; open sets draw nothing. Grouped per exercise run (8px dots, pitch 16px = 8px gaps;
- * the gap between groups is the layout's).
- */
-export function dotRow(exercises: readonly Named[], order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): DotRow {
-  const groups: { key: string; name: string; dots: RowDot[] }[] = [];
-  let done = 0;
-  let skipped = 0;
-  for (const ref of order) {
-    if (isWarmup(ref)) continue;
-    const state = stateOf(log.get(setKey(ref)));
-    if (state === "open") continue;
-    if (state === "done") done += 1;
-    else skipped += 1;
-    const name = nameOf(exercises, ref);
-    let g = groups.at(-1);
-    if (g === undefined || g.name !== name) {
-      g = { key: setKey(ref), name, dots: [] };
-      groups.push(g);
-    }
-    g.dots.push({ cx: 4 + DOT_PITCH * g.dots.length, kind: state === "done" ? "done" : "skipped" });
-  }
-  return {
-    groups: groups.map((g) => ({ key: g.key, width: DOT_PITCH * g.dots.length - 8, dots: g.dots })),
-    done,
-    skipped,
-    sentence: dotRowSentence(done, skipped),
-  };
-}
-
-export function dotRowSentence(done: number, skipped: number): string {
-  return `I dag: ${done} sæt udført, ${skipped} sprunget over.`;
-}
-
 /* ── §3.3 The session signature (finished view) ─────────────────────────────────────────── */
 
 export const SIG_WIDTH = 360;

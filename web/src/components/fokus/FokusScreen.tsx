@@ -19,7 +19,7 @@ import {
   prescribedCell,
   rangeFigure,
   unsavedText,
-  isMainLift,
+  hasMainLiftWarmup,
   rampState,
 } from "@/lib/fokus-view";
 import { adjustmentLine, CAPPED_WORD } from "@/lib/training-view";
@@ -125,7 +125,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       // Fortryd of "Begynd træning" (§6): the warm-up row goes, and Træning shows Begynd again.
       tap("undo", undo.ref);
       // Træning says "not begun" and focuses Begynd only when the undo was saved; else it shows the truth.
-      void settle(flush).then((sent) => router.push(sent && failedNow() === 0 ? BEGIN_UNDONE_HREF : "/"));
+      void settle(flush).then((sent) => router.push(sent && failedNow() === 0 ? BEGIN_UNDONE_HREF : "/train"));
       return;
     }
     // The reopened set shows in the set layout, the timer counting from the tap before it (F8).
@@ -373,7 +373,7 @@ function WarmupView({
 }) {
   const setOne = view.shown;
   if (setOne === null || view.label === null) return null; // the order and the rows come from the same sets: not reached
-  const mainLift = isMainLift(setOne.exercise, mainLifts);
+  const mainLift = hasMainLiftWarmup(setOne.exercise, mainLifts);
   const feel = view.feel;
   // view.since null: no recorded start (§2.2), a static 0:00.
   const since = view.since;

@@ -329,7 +329,7 @@ test("contract: the power-check rows Python writes parse (fixtures/power_checks.
   });
 });
 
-test("week view: the score per set is the final one that feeds the TSS; an old row falls back", () => {
+test("week view: the score per set is the final one that feeds the TSS; a null score_final is missing", () => {
   const w = weekView(
     { daily: [day("2026-09-28"), day("2026-09-29", 0, 7.0)], blocks: [], weeks: [], projection: [], weeklyPlan: [] },
     week(40, "2026-09-28"),
@@ -344,5 +344,6 @@ test("week view: the score per set is the final one that feeds the TSS; an old r
     ],
   });
   const [s1] = detail[1]?.strength?.sessions ?? [];
-  assert.deepEqual(s1?.exercises.map((e) => [e.name, e.scorePerSet]), [["Bænk", 223.2], ["Dips", 128.6]]);
+  // score_final null is missing (null), never the parser's score and never 0
+  assert.deepEqual(s1?.exercises.map((e) => [e.name, e.scorePerSet]), [["Bænk", 223.2], ["Dips", null]]);
 });

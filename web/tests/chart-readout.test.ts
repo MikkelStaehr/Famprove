@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import * as readoutLib from "../src/lib/chart-readout.ts";
-import { gapSeam, highestAt, nearestIndex, readoutText, restingReadout, tipLeft, viCell, xAtPointer } from "../src/lib/chart-readout.ts";
+import { gapSeam, highestAt, nearestIndex, readoutText, tipLeft, viCell, xAtPointer } from "../src/lib/chart-readout.ts";
 
 test("nearestIndex snaps to the nearest x, ties left, -1 when empty", () => {
   assert.equal(nearestIndex([], 5), -1);
@@ -28,15 +28,6 @@ test("tipLeft sits 12px right of the marker, flips left at the plot's right edge
   assert.equal(tipLeft(100, 150, 374), 112);
   assert.equal(tipLeft(300, 150, 374), 138); // 300 + 12 + 150 > 374: 300 - 12 - 150
   assert.equal(tipLeft(50, 300, 200), 0); // never past the left edge
-});
-
-test("restingReadout prefixes the latest point and is never blank", () => {
-  const latest = { head: "ons. 30. sep.", cells: [{ key: "ctl", label: "Fitness", value: "45" }], facts: [] };
-  assert.equal(restingReadout(latest, "x").head, "Seneste · ons. 30. sep.");
-  assert.deepEqual(restingReadout(latest, "x").cells, latest.cells);
-  const empty = restingReadout(null, "Tryk på grafen for at se en dag");
-  assert.equal(empty.head, "Tryk på grafen for at se en dag");
-  assert.equal(empty.muted, true);
 });
 
 test("viCell: decimal comma, flagged in warning, '–' kept when missing", () => {

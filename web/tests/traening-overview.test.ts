@@ -9,12 +9,10 @@ import {
   type ExerciseView,
   exerciseRuns,
   formSentence,
-  lastWeekText,
   runCountText,
   runPositions,
   setStatus,
   spokenSetLine,
-  suggestionView,
   TSB_HINT,
 } from "../src/lib/training-view.ts";
 
@@ -73,20 +71,6 @@ test("form sentence: zone, no zone, an old row", () => {
     "Form minus 24 TSS per dag, optimal. Forvent at ligge lidt under. Tallet er fra søndag 11. oktober.",
   );
   assert.equal(TSB_HINT.high_risk, "Meget træt: forvent at ligge klart under");
-});
-
-test("suggestion: kg, never 0 kg", () => {
-  assert.deepEqual(suggestionView(row(1)), { kg: "142,5 kg", capped: false });
-  assert.deepEqual(suggestionView(row(1, { suggestedKg: 75, suggestionCapped: true })), { kg: "75 kg", capped: true });
-  assert.deepEqual(suggestionView(row(1, { suggestedKg: null, suggestionBasis: "not_rpe" })), { kg: null });
-  assert.deepEqual(suggestionView(row(1, { suggestedKg: 0 })), { kg: null });
-});
-
-test("last week", () => {
-  assert.equal(lastWeekText(row(1), 1), undefined);
-  assert.equal(lastWeekText(row(1), 3), "140 kg");
-  assert.equal(lastWeekText(row(1, { reference: null }), 3), null);
-  assert.equal(lastWeekText(row(1, { reference: { kg: 10, bodyweight: true } }), 3), "kropsvægt + 10 kg");
 });
 
 test("checklist: Begynd begins the open warm-up (set 0); the highlight stays on set 1", () => {

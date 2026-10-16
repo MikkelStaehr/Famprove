@@ -7,7 +7,6 @@ import {
   bracketLabel,
   eftpDot,
   eftpDotRadius,
-  isCombDay,
   MARKS,
   maxLoadOf,
   monoLabelWidth,
@@ -23,11 +22,6 @@ test("series: CTL a 1px solid line, ATL a 1px dashed line, TSB a 1px needle; pro
   assert.equal(MARKS.tsb.prognoseDash, "1 2");
   assert.equal(prognoseEvery(false), 2);
   assert.equal(prognoseEvery(true), 1);
-});
-
-test("range comb every 4th day", () => {
-  assert.deepEqual([0, 1, 2, 3, 4, 5, 8].map(isCombDay), [true, false, false, false, true, false, true]);
-  assert.equal(isCombDay(-4), false);
 });
 
 test("eFTP dot: r = 1.5 + 4.5 √(load/max), clamped 1.5–6; null load = hollow ring r 3", () => {

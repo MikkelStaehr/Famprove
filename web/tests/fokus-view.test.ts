@@ -5,7 +5,6 @@ import { test } from "node:test";
 
 import {
   clockTime,
-  doneSentence,
   elapsedSeconds,
   finishCard,
   type FokusExercise,
@@ -28,7 +27,7 @@ import {
   BEGIN_UNDONE_HREF,
   BEGIN_UNDONE_TEXT,
   beginUndone,
-  isMainLift,
+  hasMainLiftWarmup,
   mainLiftKeys,
 } from "../src/lib/fokus-view.ts";
 import { applyTap, type LoggedSet, progress, setKey, type SetRef } from "../src/lib/set-taps.ts";
@@ -388,7 +387,6 @@ test("D11: Fokus numbers sets across the run, in every text that shows the numbe
   assert.equal(setTitle(last), "Sæt 4 af 4");
   assert.equal(nextSetSummary(second, false, 2).title, "Bænk · sæt 2 af 4");
   assert.match(setSentence(second, 3), /^Bænk, sæt 2 af 4: /);
-  assert.equal(doneSentence(first), "Bænk, sæt 1 udført. Pause.");
   assert.equal(skipSentence(last), "Sæt 4 sprunget over.");
   assert.equal(undoSentence(second), "Fortrudt: Bænk, sæt 2 er åben igen.");
   assert.equal(
@@ -545,22 +543,22 @@ const ex = (name: string, ramp: FokusExercise["ramp"] = null) => ({ name, ramp }
 
 test("polish: finds main lifts by name or alias, trimmed and case-insensitive", () => {
   const keys = mainLiftKeys(rows);
-  assert.equal(isMainLift(ex("  squat "), keys), true);
-  assert.equal(isMainLift(ex("BACK SQUAT"), keys), true);
-  assert.equal(isMainLift(ex("Bench press"), keys), true);
-  assert.equal(isMainLift(ex("Lat pulldowns"), keys), false);
-  assert.equal(isMainLift(ex("bænkpres"), keys), false); // alias of an accessory
+  assert.equal(hasMainLiftWarmup(ex("  squat "), keys), true);
+  assert.equal(hasMainLiftWarmup(ex("BACK SQUAT"), keys), true);
+  assert.equal(hasMainLiftWarmup(ex("Bench press"), keys), true);
+  assert.equal(hasMainLiftWarmup(ex("Lat pulldowns"), keys), false);
+  assert.equal(hasMainLiftWarmup(ex("bænkpres"), keys), false); // alias of an accessory
 });
 
 test("polish: an unknown name or an unread catalogue is not a main lift; a ramp always is", () => {
-  assert.equal(isMainLift(ex("Deadlift"), mainLiftKeys(rows)), false);
-  assert.equal(isMainLift(ex("Squat"), mainLiftKeys(null)), false);
+  assert.equal(hasMainLiftWarmup(ex("Deadlift"), mainLiftKeys(rows)), false);
+  assert.equal(hasMainLiftWarmup(ex("Squat"), mainLiftKeys(null)), false);
   assert.equal(mainLiftKeys(null), null);
-  assert.equal(isMainLift(ex("Lat pulldowns", [{ pct: 40, reps: 5, kg: 20 }]), null), true);
+  assert.equal(hasMainLiftWarmup(ex("Lat pulldowns", [{ pct: 40, reps: 5, kg: 20 }]), null), true);
 });
 
 test("polish: Fortryd of Begynd goes to Træning with the query it reads", () => {
-  assert.equal(BEGIN_UNDONE_HREF, "/?fortrudt=begin");
+  assert.equal(BEGIN_UNDONE_HREF, "/train?fortrudt=begin");
   assert.equal(beginUndone(new URL(BEGIN_UNDONE_HREF, "http://x").search), true);
   assert.equal(beginUndone(""), false);
   assert.equal(beginUndone("?fortrudt=other"), false);

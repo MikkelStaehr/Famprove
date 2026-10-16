@@ -18,7 +18,6 @@ import {
   type DailyProjectionRow,
   type DashboardData,
   parseProjectionRow,
-  type ProjectedSession,
 } from "../src/lib/db/rows.ts";
 import { formatLoad, formatSigned } from "../src/lib/format.ts";
 import {
@@ -26,9 +25,7 @@ import {
   BAND_TEXT,
   PROGNOSE_TEXT,
   prognoseSentence,
-  prognoseStatus,
   rangeText,
-  strengthLine,
   strengthUnknownNote,
 } from "../src/lib/prognose-text.ts";
 
@@ -46,20 +43,6 @@ function day(date: string): DailyLoadRow {
     ctlRamp7d: 1,
     formZone: "grey_zone",
     computedAt: "2026-10-01T03:05:00Z",
-  };
-}
-
-function session(overrides: Partial<ProjectedSession> = {}): ProjectedSession {
-  return {
-    session: 2,
-    tss: 45.2,
-    dayEstimated: false,
-    reason: null,
-    method: "plan",
-    tssBand: null,
-    recentWeeks: null,
-    unscored: 0,
-    ...overrides,
   };
 }
 
@@ -148,54 +131,6 @@ test("§10c: value ranges, incl. a negative TSB with U+2212 and 'til'", () => {
   assert.equal(rangeText({ low: -6.2, high: 3.1 }, formatSigned), " (−6 til +3)");
   assert.equal(rangeText({ low: 5.6, high: 5.7 }, formatLoad), "");
   assert.equal(rangeText(null, formatLoad), "");
-});
-
-test("§10c: tooltip status", () => {
-  const estimate = (method: "plan" | "recent", dayEstimated: boolean): ChartPoint["estimate"] => ({
-    cyclingTss: 0,
-    cyclingSource: "typical_week",
-    events: [],
-    typicalFallback: false,
-    strengthTss: 0,
-    rides: [],
-    sessions: [session({ dayEstimated })],
-    strengthMethod: method,
-  });
-  assert.equal(prognoseStatus(estimate("plan", false)), "Prognose");
-  assert.equal(prognoseStatus(estimate("plan", true)), "Prognose · dag anslået");
-  assert.equal(prognoseStatus(estimate("recent", false)), "Prognose · efter blokken");
-  assert.equal(prognoseStatus(estimate("recent", true)), "Prognose · efter blokken · dag anslået");
-  assert.equal(prognoseStatus(null), "Prognose");
-});
-
-test("§10f.4: strength lines verbatim", () => {
-  assert.equal(strengthLine(session()), "Styrke ≈ 45 TSS · session 2 · fra trænerens plan");
-  assert.equal(
-    strengthLine(session({ dayEstimated: true, unscored: 2 })),
-    "Styrke ≈ 45 TSS · session 2 · fra trænerens plan · dag anslået · 2 sæt uden kg ikke talt med",
-  );
-  assert.equal(
-    strengthLine(session({ unscored: 1 })),
-    "Styrke ≈ 45 TSS · session 2 · fra trænerens plan · 1 sæt uden kg ikke talt med",
-  );
-  const recent = { method: "recent", tss: 40.4, unscored: null, recentWeeks: 4, tssBand: { low: 29.8, high: 52.1 } } as const;
-  assert.equal(
-    strengthLine(session(recent)),
-    "Styrke ≈ 40 TSS (30 til 52) · session 2 · gennemsnit af de seneste 4 uger",
-  );
-  assert.equal(
-    strengthLine(session({ ...recent, recentWeeks: 1, tssBand: { low: 40, high: 40 }, dayEstimated: true })),
-    "Styrke ≈ 40 TSS · session 2 · gennemsnit af den seneste uge · dag anslået",
-  );
-  const skipped = (reason: string | null) => strengthLine(session({ tss: null, reason, unscored: null }));
-  assert.equal(skipped("no day left this week"), "Styrke · session 2 · ikke talt med (ingen dag tilbage i ugen)");
-  assert.equal(
-    skipped("no recent weeks to average"),
-    "Styrke · session 2 · ikke talt med (endnu ingen hele uger at regne gennemsnit af)",
-  );
-  assert.equal(skipped("no kg for any set in the plan"), "Styrke · session 2 · ikke talt med (ingen kg i trænerens plan)");
-  assert.equal(skipped("something new"), "Styrke · session 2 · ikke talt med");
-  assert.equal(skipped(null), "Styrke · session 2 · ikke talt med");
 });
 
 test("§10b: the note names the first 'recent' date only when strength after the block is unknown", () => {

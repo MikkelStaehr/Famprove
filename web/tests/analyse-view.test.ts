@@ -10,7 +10,6 @@ import {
   efWindowRides,
   isEfRow,
   shownEfTrend,
-  marksAt,
   buildAnalyseView,
   efTooFew,
   exclusionFacts,
@@ -21,7 +20,7 @@ import {
   seams,
   weekBars,
 } from "../src/lib/analyse-view.ts";
-import { highestAt, nearestIndex, restingReadout, restingWeekIndex } from "../src/lib/chart-readout.ts";
+import { highestAt, nearestIndex, restingWeekIndex } from "../src/lib/chart-readout.ts";
 import { dayNumber } from "../src/lib/dates.ts";
 import type { CyclingWeekRow, RideMetricsRow } from "../src/lib/db/rows.ts";
 import { parseRideMetricsRow } from "../src/lib/db/rows.ts";
@@ -106,9 +105,9 @@ test("week strips at rest: the latest week with rides, the current one once it h
   const empty = weekBars([week("2026-09-28", 2), week("2026-10-05", 1), week("2026-10-12", 0)], "2026-10-13", 0);
   const i = restingWeekIndex(empty, (w) => !w.zero);
   assert.equal(i, 1);
-  assert.equal(restingReadout(empty[i]?.readout ?? null, "x").head, "Seneste · Uge 41 · 5.–11. okt.");
+  assert.equal(empty[i]?.readout.head, "Uge 41 · 5.–11. okt.");
   const ridden = weekBars([week("2026-10-05", 1), week("2026-10-12", 1)], "2026-10-13", 0);
-  assert.equal(restingReadout(ridden[restingWeekIndex(ridden, (w) => !w.zero)]?.readout ?? null, "x").head, "Seneste · Uge 42 · 12.–18. okt. · indtil videre");
+  assert.equal(ridden[restingWeekIndex(ridden, (w) => !w.zero)]?.readout.head, "Uge 42 · 12.–18. okt. · indtil videre");
   const none = weekBars([week("2026-10-05", 0), week("2026-10-12", 0)], "2026-10-13", 0);
   assert.equal(restingWeekIndex(none, (w) => !w.zero), 1); // no ride at all: the current week ("Ingen ture")
   assert.equal(restingWeekIndex(empty), 2); // without a data rule (Styrke): the current week
@@ -169,7 +168,6 @@ test("two rides on one day keep two marks, and the tooltip lists both", () => {
   assert.equal(rows.length, 3);
   assert.deepEqual(rows.filter((r) => r.x === 100).map((r) => r.dots), [1.2, 1.3]);
   assert.deepEqual(rows.filter((r) => r.x === 100).map((r) => r.s0), [1.15, 1.16]);
-  assert.deepEqual(marksAt(rows, 100).flatMap((m) => m.tip), ["a", "b"]);
   const excluded = rows.find((r) => r.x === 104);
   assert.ok(excluded !== undefined && excluded.excl === 1 && excluded.dots === null && excluded.s0 === undefined);
   assert.deepEqual(chartRows({ ...chart, marks: chart.marks.slice(0, 1) }, "eftp")[0]?.s0, 1.2);
