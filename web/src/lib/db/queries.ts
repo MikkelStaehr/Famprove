@@ -27,6 +27,7 @@ import {
 import { readSupabaseEnv } from "./env.ts";
 import { createClient, selectAll, selectFirst } from "./postgrest.ts";
 import { addDays, isoWeekStart } from "../dates.ts";
+import { withoutSkipped } from "../training-view.ts";
 import {
   ANALYSIS_SUMMARY_SELECT,
   parseAnalysisSummaryRow,
@@ -392,21 +393,41 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
       previousKeys.set(`${s.block}#${s.week - 1}`, { block: s.block, week: s.week - 1 });
     }
   }
-  const previous = await Promise.all(
-    [...previousKeys.values()].map(({ block, week }) =>
-      selectAll(
-        db,
-        PRESCRIBED_SETS_SELECT.table,
-        { ...PRESCRIBED_SETS_SELECT, filters: [["block", `eq.${block}`], ["week", `eq.${week}`]] },
-        parsePrescribedSetRow,
+  const [previous, lastWeekSkips] = await Promise.all([
+    Promise.all(
+      [...previousKeys.values()].map(({ block, week }) =>
+        selectAll(
+          db,
+          PRESCRIBED_SETS_SELECT.table,
+          { ...PRESCRIBED_SETS_SELECT, filters: [["block", `eq.${block}`], ["week", `eq.${week}`]] },
+          parsePrescribedSetRow,
+        ),
       ),
     ),
-  );
+    // Last week's sets skipped in the app are no reference (withoutSkipped). If this read fails,
+    // the references stay as the sheet has them and the failure is logged.
+    selectAll(
+      db,
+      SET_LOG_SELECT.table,
+      {
+        ...SET_LOG_SELECT,
+        filters: [["date", `gte.${addDays(weekStart, -7)}`], ["date", `lt.${weekStart}`], ["skipped", "eq.true"]],
+      },
+      parseSetLogRow,
+    ).then(
+      (rows): readonly SetLogRow[] => rows,
+      (error: unknown) => {
+        if (!isDataError(error)) throw error;
+        console.error("training: reading last week's skipped sets failed", error);
+        return [];
+      },
+    ),
+  ]);
   const base = {
     weekStart,
     sessions,
     sets,
-    previousWeek: previous.flat(),
+    previousWeek: withoutSkipped(previous.flat(), lastWeekSkips),
     rides,
     upcomingRides,
     plannedSets,

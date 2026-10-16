@@ -200,11 +200,13 @@ def _session_load(
     sets: Sequence[StrengthSet],
     recent: RecentWeeks | None,
     strength_k: float,
+    history: Sequence[StrengthSet],
 ) -> Basis:
-    """The strength TSS of session ``n`` in ``week``: from the plan, or the recent weeks."""
+    """The strength TSS of session ``n`` in ``week``: from the plan, or the recent weeks.
+    ``history``: the sets the planned kg is looked up in (planned_load's accessory rule)."""
     if week in counts:
         session_sets = [s for s in sets if s.week_start == week and s.session == n]
-        planned = planned_session_score(session_sets, sets)
+        planned = planned_session_score(session_sets, history)
         scored = planned.sets - planned.unscored
         entry: Basis = {
             "method": "plan",
@@ -233,6 +235,7 @@ def _strength_plan(
     last: date,
     strength_k: float,
     deload_weeks: Iterable[date],
+    history: Sequence[StrengthSet],
 ) -> dict[date, list[Basis]]:
     """Per future day: the strength sessions placed on it (see the module docstring)."""
     counts = planned_counts(sets)
@@ -283,7 +286,9 @@ def _strength_plan(
                     "moved": moved,
                     "day_estimated": moved or not learnt,
                     "planned_in_sheet": week in counts,
-                    **_session_load(week, n, latest_count, counts, sets, recent, strength_k),
+                    **_session_load(
+                        week, n, latest_count, counts, sets, recent, strength_k, history
+                    ),
                 }
                 placed.setdefault(day, []).append(entry)
         week += timedelta(weeks=1)
@@ -302,6 +307,7 @@ def project(
     decay: Decay = DECAY,
     typical_rides: int | None = None,
     calendar: Sequence[CalendarRide] = (),
+    history: Sequence[StrengthSet] | None = None,
 ) -> list[ProjectedDay]:
     """HORIZON_DAYS projected days, tomorrow .. today + HORIZON_DAYS, seeded from today's row.
 
@@ -309,13 +315,17 @@ def project(
     ``deload_weeks`` (ISO week starts) are left out of the "recent" average.
     ``typical_rides`` (typical_ride_count) goes into the basis of every typical-week day.
     ``calendar``: planned rides from intervals.icu; an ISO week holding one uses only them.
+    ``history``: where a planned accessory's kg is looked up; compute passes ``sets`` without the
+    sets skipped in the app (user, 2026-10-16: a set not done affects nothing). None = ``sets``.
     """
     if not days or days[-1].date != today:
         raise ValueError("the projection starts from today's daily_load row")
     last = today + timedelta(days=HORIZON_DAYS)
     typical = typical_cycling(days, today)
     counts = planned_counts(sets)
-    strength = _strength_plan(sessions, sets, today, last, strength_k, deload_weeks)
+    strength = _strength_plan(
+        sessions, sets, today, last, strength_k, deload_weeks, sets if history is None else history
+    )
 
     rides_by_day: dict[date, list[Basis]] = {}
     for ride in rides:

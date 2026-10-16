@@ -257,6 +257,8 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         decay=DECAY,
         typical_rides=typical_ride_count(activities, today),
         calendar=calendar,
+        # A set skipped in the app is no kg source for a planned set (user, 2026-10-16).
+        history=[s for s in sets if statuses[set_key(s)] != "skipped"],
     )
     sync_projection(db, projection, computed_at=computed_at)
     logged = log_forecast(

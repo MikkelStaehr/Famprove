@@ -192,3 +192,46 @@ def test_typical_rides_goes_into_typical_week_days_only() -> None:
     assert "typical_rides" not in by_source["planned"]
     without = project(history, [], [], planned, strength_k=0.1, today=today)
     assert all("typical_rides" not in d.basis for d in without)
+
+
+def test_a_planned_accessory_looks_its_kg_up_in_the_history_compute_passes(
+    make_set: MakeSet,
+) -> None:
+    """skip-analysis (user, 2026-10-16): compute passes the sets without those skipped in the app
+    as ``history``, so a skipped set's kg never becomes a planned set's kg."""
+    earlier = make_set(
+        type="BACK",
+        name="Lat pulldowns",
+        week=1,
+        week_start=WEEK_40 - timedelta(days=7),
+        logged_kg=48.0,
+        sheet_row=33,
+    )
+    planned_set = make_set(
+        type="BACK",
+        name="Lat pulldowns",
+        week=2,
+        week_start=WEEK_40,
+        session=1,
+        logged_kg=None,
+        kg=None,
+        reps=8.0,
+        prescribed="RPE 7",
+        sheet_row=33,
+    )
+    sets = [earlier, planned_set]
+    sessions = [planned(WEEK_40, 1)]
+    history_rows = history  # the module's daily_load helper; `history` is project's argument below
+
+    def session_1(history: list[StrengthSet] | None) -> dict[str, object]:
+        days = project(
+            history_rows(), sessions, sets, [], strength_k=0.1, today=TODAY, history=history
+        )
+        # The first placement is this week's, scored from the plan (later weeks repeat it).
+        first = next(e for d in days for e in entries(d, "strength") if e["session"] == 1)
+        assert first["method"] == "plan"
+        return first
+
+    assert session_1(None)["kg_sources"] == {"same_row": 1}  # default: every set
+    without = session_1([planned_set])  # the earlier set skipped in the app
+    assert (without["tss"], without["unscored"]) == (None, 1)

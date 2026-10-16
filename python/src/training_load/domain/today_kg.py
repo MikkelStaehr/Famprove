@@ -73,12 +73,11 @@ def today_kgs(
     suggested: Mapping[SetRef, float | None],
     *,
     run_week: date,
-    statuses: Mapping[SetKey, KgStatus] | None = None,
+    statuses: Mapping[SetKey, KgStatus],
 ) -> dict[SetRef, TodayKg]:
     """Today's kg for every set of ``run_week`` and later. ``suggested``: Python's suggestion per
     set (planned_sets.suggested_kg). Last week's kg comes from ``sets`` itself (same block, row
     and set number, the week before, with a kg; not a set skipped in the app, per ``statuses``)."""
-    kg_status = statuses or {}
     by_ref = {ref(s): s for s in sets}
     out: dict[SetRef, TodayKg] = {}
     sessions: dict[tuple[str, str, date, int], list[StrengthSet]] = {}
@@ -129,7 +128,7 @@ def today_kgs(
             # The same exercise, variant (null only matches null) and reps, as planned_sets' anchor.
             if (
                 before is not None
-                and kg_status.get(set_key(before)) != "skipped"
+                and statuses.get(set_key(before)) != "skipped"  # planned / pre_log: as the sheet
                 and _same_exercise(before, s)
                 and before.reps == s.reps
                 and before.logged_kg is not None

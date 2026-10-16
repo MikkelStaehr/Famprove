@@ -119,6 +119,18 @@ def test_compute_leaves_a_set_skipped_in_the_app_out_of_the_analysis(
     )
     sets_before = cast(int, before["SQUAT"]["sets_lifted"])
     assert sets_before > 0
+
+    def kg_row() -> dict[str, object]:
+        return next(
+            r
+            for r in db.tables["strength_set_kg"]
+            if r["week_start"] == week
+            and r["sheet_row"] == squat["sheet_row"]
+            and r["set_no"] == squat["set_no"]
+            and r["session"] == squat["session"]
+        )
+
+    assert kg_row()["lifted_kg"] == squat["logged_kg"]  # recorded as lifted before the skip
     db.tables.setdefault("exercise_set_log", []).append(
         {
             "date": "2026-03-10",
@@ -142,15 +154,7 @@ def test_compute_leaves_a_set_skipped_in_the_app_out_of_the_analysis(
     assert after["SQUAT"]["sets_lifted"] == sets_before - 1
     tonnage_before = cast(float, before["SQUAT"]["tonnage_kg"])
     assert after["SQUAT"]["tonnage_kg"] == pytest.approx(tonnage_before - lifted)
-    kg_row = next(
-        r
-        for r in db.tables["strength_set_kg"]
-        if r["week_start"] == week
-        and r["sheet_row"] == squat["sheet_row"]
-        and r["set_no"] == squat["set_no"]
-        and r["session"] == squat["session"]
-    )
-    assert kg_row["lifted_kg"] is None
+    assert kg_row()["lifted_kg"] is None  # withdrawn
     final = next(
         r
         for r in db.tables["strength_sets"]
@@ -158,3 +162,11 @@ def test_compute_leaves_a_set_skipped_in_the_app_out_of_the_analysis(
         == (week, squat["sheet_row"], squat["set_no"])
     )
     assert final["score_final"] == 0  # and no TSS, as since skip-tss
+
+    # Fortryd of the skip (the row goes): the next run counts the set again.
+    db.tables["exercise_set_log"].clear()
+    compute.run(db, strength_k=0.02, today=TODAY, computed_at=datetime(2026, 3, 15, 4, tzinfo=UTC))
+    back = {r["lift"]: r for r in db.tables["strength_weeks"] if r["week_start"] == week}
+    assert back["SQUAT"]["sets_lifted"] == sets_before
+    assert back["SQUAT"]["tonnage_kg"] == pytest.approx(tonnage_before)
+    assert kg_row()["lifted_kg"] == squat["logged_kg"]

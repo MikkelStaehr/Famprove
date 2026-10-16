@@ -14,6 +14,7 @@ import type {
   PlannedSetRow,
   PrescribedSetRow,
   RampStep,
+  SetLogRow,
   StrengthSessionRow,
   SuggestionBasis,
   TodayBasis,
@@ -289,6 +290,21 @@ function rowKey(s: { readonly block: string; readonly sheetRow: number }): strin
 /** Last week's key: the sheet row and the variant (variants.md: null matches only null). */
 function refKey(s: { readonly block: string; readonly sheetRow: number; readonly variantId: number | null }): string {
   return `${rowKey(s)}#${s.variantId ?? "ukendt"}`;
+}
+
+/**
+ * Last week's sets without those skipped in the app (user, 2026-10-16: a set not done affects
+ * nothing; Python's anchor, cap and "samme som sidst" leave them out too). `skips`: last week's
+ * exercise_set_log rows with skipped; a warm-up (set 0) is no sheet set.
+ */
+export function withoutSkipped<S extends Pick<PrescribedSetRow, "weekStart" | "session" | "sheetRow" | "setNo">>(
+  previous: readonly S[],
+  skips: readonly Pick<SetLogRow, "date" | "session" | "row" | "set" | "skipped">[],
+): S[] {
+  const skipped = new Set(
+    skips.filter((r) => r.skipped && r.set >= 1).map((r) => `${isoWeekStart(r.date)}#${r.session}#${r.row}#${r.set}`),
+  );
+  return previous.filter((s) => !skipped.has(`${s.weekStart}#${s.session}#${s.sheetRow}#${s.setNo}`));
 }
 
 /** Last week's logged kg per sheet row and variant. Nothing logged (null) is no reference; on a bodyweight

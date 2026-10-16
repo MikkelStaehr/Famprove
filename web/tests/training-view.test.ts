@@ -17,7 +17,7 @@ import type {
   PrescribedSetRow,
   StrengthSessionRow,
 } from "../src/lib/db/rows.ts";
-import { buildTrainingPlan, localToday, resolveToday, trainingHeader } from "../src/lib/training-view.ts";
+import { buildTrainingPlan, localToday, resolveToday, trainingHeader, withoutSkipped } from "../src/lib/training-view.ts";
 
 const BLOK = "Program - blok 12 (offseason)";
 const WEEK_40 = "2026-09-28";
@@ -418,4 +418,19 @@ test("fokus-kg §3: the footnote's first sentence only when a shown set is deriv
   assert.equal(hasEstimate({ exercises: [ex(null), ex("sheet"), ex("last")] }), false);
   assert.equal(hasEstimate({ exercises: [ex("sheet"), ex("derived")] }), true);
   assert.equal(hasEstimate({ exercises: [ex(null), ex("e1rm")] }), true);
+});
+
+test("skip-analysis: last week's set skipped in the app is no reference; its warm-up and other sets stay", () => {
+  const set = (row: number, setNo: number) => ({ weekStart: "2026-10-05" as const, session: 2, sheetRow: row, setNo });
+  const previous = [set(84, 1), set(84, 2), set(84, 3), set(85, 1)];
+  const skips = [
+    { date: "2026-10-08" as const, session: 2, row: 84, set: 3, skipped: true },
+    { date: "2026-10-08" as const, session: 2, row: 85, set: 0, skipped: true }, // a warm-up: no sheet set
+    { date: "2026-10-08" as const, session: 1, row: 85, set: 1, skipped: true }, // another session
+  ];
+  assert.deepEqual(
+    withoutSkipped(previous, skips).map((s) => `${s.sheetRow}.${s.setNo}`),
+    ["84.1", "84.2", "85.1"],
+  );
+  assert.equal(withoutSkipped(previous, []).length, 4);
 });
