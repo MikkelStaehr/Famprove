@@ -15,7 +15,7 @@ Cut below the fold if needed: item 4's stepper, then the footer `Tid brugt …` 
 With no rest start (first load after a skip with no prior done, or after Fortryd to that state) items 2 and 4 are absent; the layout is otherwise identical.
 
 ## 2. Warm-up (A) and after-last-set (C)
-Unchanged content (ramp, `Opvarmning · <name>`, clock), with C's feel row as §1.4 for the set just done. Primary: **✓ Opvarmning udført** (light; writes `warmup_end`). It leads to §1 for set 1, the timer counting from that tap. Finished view: unchanged, feel row for the last set, **Til Træning** dark.
+Unchanged content (ramp, `Opvarmning · <name>`, clock), with C's feel row as §1.4 for the set just done. Primary: **✓ Opvarmning udført** (light; writes `warmup_end`). It leads to §1 for set 1, the timer counting from that tap. Finished view: unchanged, feel row for the last set, **Tilbage til Træning** dark.
 
 ## 3. Vibration
 Once per rest, when the shown timer crosses `rest_min_s` while the page is visible: `navigator.vibrate?.(200)` (feature-detected; a no-op on iOS, nothing shown). Not on load when already past the minimum, not at the maximum, not in the warm-up clock, not when `rest_min_s` is null. Haptics are not motion: it fires under `prefers-reduced-motion` too. Under DEV_FIXTURE it still fires (it writes nothing).

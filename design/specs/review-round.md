@@ -24,7 +24,7 @@ Acceptance:
 - Desktop Træning: the right column holds the week card, then the form card, then the ride card(s). The left column holds the InverseCard, then the Sæt card.
 
 **Fold check (390 × 844):** I measured this on the current screenshots, not on a live render. Header to first card = 88px. InverseCard = 224px (summary on 2 lines). Card gap = 12. `--bottom-bar` = 72px plus the safe area: 106 on an iPhone (34), 72 headless. The InverseCard's bottom must therefore stay ≤ 738 (iPhone) or ≤ 772 (headless), which leaves at most **414px** for the week card (iPhone).
-| Week card | Rows (incl. `I alt`) | Height at 44px rows | Height at 36px rows | Fits (iPhone)? |
+| Week card | Rows (incl. `I alt`) | Height at 44px rows | Height at 36px rows | Fits (~~iPhone~~ phone; **Superseded 2026-10-15 (user):** the phone is Android Chrome.)? |
 |---|---|---|---|---|
 | Wed 14 Oct, real data and `midsession` | 5 | 302 | 262 | yes, 112 / 152px spare |
 | Sunday, all 7 days + 1 undated | 9 | 478 | 406 | only at 36px (8px spare) |

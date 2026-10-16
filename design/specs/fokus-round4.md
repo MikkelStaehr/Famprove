@@ -1,5 +1,7 @@
 Superseded (visual) by the reset-*.md specs, 2026-10-14.
 
+> **Superseded in part (bookkeeping 2026-10-16):** `Til næste sæt` and the separate rest view by `fokus-flow.md` §1 (2026-10-15: the pause view is the next set); the `Forslag` / `FORSLAG` label by `fokus-kg.md` (today's kg under `I DAG`); a text-link Spring over by `button-type.md` B4 (bordered button); a Fokus note line (NOTES not shown since 2026-10-15); the rest windows by type only (main lift or variant 3–5 min, isolation and abs 1–2, the rest 1.5–3; slice `rest-by-type`). Mentions below are history.
+
 # Spec – Fokus round 4: red only as a tick, real buttons, one living element (2026-10-13)
 
 Overrides `fokus-instrument.md` and DESIGN.md Part B Revisions 2–3 where they differ (recorded as **Revision 4**). Flow, writes, copy not named here, focus and sr text stay as `traening.md` §4 + `fokus-pause.md`. **Nothing new is stored or fetched.** The three generative elements are drawing scales computed in the browser from the set log and sheet rows Fokus already has (like the rest tick's position): no number is derived, shown or stored by them. Reps for drawing = `reps_done` when present, else the prescribed reps (a range's stored midpoint). A warm-up (set 0) is never a set.
@@ -8,7 +10,7 @@ Overrides `fokus-instrument.md` and DESIGN.md Part B Revisions 2–3 where they 
 - **Red** (`--accent`) is only the moving tick on the rest/warm-up scale (and later the charts' "today" mark). No red text, rule, box, lamp or fill anywhere on Fokus.
 - **Primary** (Udført, Til sæt 1, Til næste sæt, Tilbage til Træning): full width, `min-h-14` (56px), radius 0, no border, fill `--text`, label `--bg` Inter 500 `text-24`, ✓/→ SVG in `currentColor`. `:active` opacity 0.8 (both themes). Focus: 3px `--focus` ring, offset 3px (reads as a second ring after a bg gap). Pinned dock unchanged. Contrast ink/bg: computed at render (≈ 14:1 dark, ≈ 10:1 light).
 - **Rating**: `role="group"` labelled by the question; one box with a 1px `--text-muted` outline (≥ 3:1, [A5]), `grid-cols-3`, three equal `<button aria-pressed>` segments, `min-h-14`, separated by 1px `--border` hairlines inside only. Labels Inter 500 `text-16`, mixed case: `Lettere` · `Som ventet` · `Hårdere`. No lamp, no checkbox. Selected: segment fill `--text`, label `--bg` (0ms). Focus: 3px `--focus` outline, offset 2px, `relative z-10` so it draws over neighbours. Tap the selected one to clear (as today).
-- **Spring over**: centred text link, Inter 400 `text-16` `--text-muted`, underline 1px offset 4px, `min-h-11 px-4`, no box.
+- **Spring over**: **Superseded 2026-10-15 by `button-type.md` B4:** a bordered button ≥ 44px, not a link. ~~centred text link, Inter 400 `text-16` `--text-muted`, underline 1px offset 4px, `min-h-11 px-4`, no box.~~
 
 ## 2. Set view value row
 One row, `grid-cols-[auto_auto_1fr]`, gap-x 24, captions (`caption`, 14px) directly above Inter tabular `text-44` values (existing token). Unit once, small: `kg` Inter `text-20` `--text-muted` after the kg only.
@@ -49,7 +51,7 @@ Below 21rem container width the kg column wraps to its own line. Under it, in or
 1. No `--accent` on Fokus except the scale's tick (computed styles of every element; screenshot pixel check for red).
 2. Every primary: ink fill, bg label 24px, 56px tall, full width; contrast ≥ 4.5:1 computed.
 3. Rating: group outline ≥ 3:1, hairlines inside only, equal widths, selected = ink fill + inverted label + `aria-pressed`; all segments ≥ 44px; focus ring visible on each.
-4. Spring over: no border/background, ≥ 44px target, muted ≥ 4.5:1.
+4. **Superseded 2026-10-15 by `button-type.md` B4:** a bordered button ≥ 44px, not a link. ~~Spring over: no border/background, ≥ 44px target, muted ≥ 4.5:1.
 5. Value row captions per §2 (no `ARKET`); kg unit appears once.
 6. Dot field: `data-filled` = floor(elapsed/scale × 360); MIN/MAX/tick x per §3.1; past MAX dots are rings; steps once a second; no transition or animation (also under reduced motion).
 7. Dot row: count = tapped sets; skipped are rings; reserved height with 0 sets; sr sentence matches.

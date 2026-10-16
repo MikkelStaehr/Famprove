@@ -1,5 +1,7 @@
 # Spec – Træning (`/`) and Fokus (`/fokus`)
 
+> **Superseded in part (bookkeeping 2026-10-16):** `Til næste sæt` and the separate rest view by `fokus-flow.md` §1 (2026-10-15: the pause view is the next set); the `Forslag` / `FORSLAG` label by `fokus-kg.md` (today's kg under `I DAG`); a text-link Spring over by `button-type.md` B4 (bordered button); a Fokus note line (NOTES not shown since 2026-10-15); the rest windows by type only (main lift or variant 3–5 min, isolation and abs 1–2, the rest 1.5–3; slice `rest-by-type`). Mentions below are history.
+
 Owner: design-lead · 2026-10-12, replaces `today.md` (Today / "I dag", 2026-09-28 → 2026-10-12; ride card, rest card, §3a sessions, freshness and states carried over) · for `ui`. Contract: `DESIGN.md` Part A (guardrails) and Part B (Spurt: tokens, type, NÆSTE slab, segmented progress, zone flag). `/load` has its own spec-lite: `design/specs/load.md`.
 
 **Language:** all UI copy is Danish (§6). Never translate exercise names, sheet cells, block tab names, activity/ride names, step labels from `planned_sessions`, Python `problem` strings, or TSS / W / FTP / CTL / ATL / TSB / RPE / e1RM. Formats: dates `ons. 30. sep.` (Intl `da-DK` weekday abbreviations `man. tirs. ons. tors. fre. lør. søn.`, no override), times `kl. 05.03`, decimal comma (`142,5 kg`), U+2212 minus, en-dash ranges without spaces (`225–250 W`). `<html lang="da">`. "Today", "I dag" and "today" disappear from every visible string and title (the code may keep its names).
@@ -10,7 +12,7 @@ Owner: design-lead · 2026-10-12, replaces `today.md` (Today / "I dag", 2026-09-
 | Screen | Question | One primary action |
 |---|---|---|
 | `/` Træning | "What is my session, and how fresh am I for it?" | **Begynd træning** (or **Fortsæt træning**), one ink pill above the fold. The per-set ticks are a secondary, direct way to record a set. Ride and rest days have no action. |
-| `/fokus` Fokus | "What do I lift now?" | **Udført** in the set view, **Til næste sæt** in the rest view, **Tilbage til Træning** when finished. Exactly one per view state, so Fokus needs no override of Part A's "one primary action per screen". |
+| `/fokus` Fokus | "What do I lift now?" | **Udført** in the set view, ~~**Til næste sæt** in the rest view,~~ **Superseded 2026-10-15 by `fokus-flow.md` §1:** no rest step; the pause view is the next set, its primary `✓ Sæt n udført`. **Tilbage til Træning** when finished. Exactly one per view state, so Fokus needs no override of Part A's "one primary action per screen". |
 
 **Cut from both:** writing kg (kg is logged in the sheet), charts, CTL/ATL, history, muscle-group `type`, ticking ride steps, the zone bar's bands on Træning (the zone flag stays, §3.1), and the sheet's own kg on the set (§10 D3).
 
@@ -78,7 +80,7 @@ Ride card(s) planned for today, then the Strength card (always), then the Rest c
 ### 3.4 Ride card, Rest card
 Unchanged from `today.md` (moved here verbatim in §8).
 
-### 3.5 Above the fold at 390 × 844 (and 390 × 660, real iPhone Safari)
+### 3.5 Above the fold at 390 × 844 (and 390 × 660, ~~real iPhone Safari~~ **Superseded 2026-10-15 (user):** the phone is Android Chrome.)
 Nav ends ≈ 56 · title ≈ 72–116 · updated line ≈ 120–140 · form row ≈ 152–208 (flag 32 + wrapped hint 24) · session block ≈ 224–274 · **button ≈ 286–342** · first card ≈ 358.
 - **Guarantee:** the primary button is fully visible at 390 × 660 on every day with an open session, including ride days (it is above the ride card). Since the bottom bar (2026-10-13) the limit is 660 − `--bottom-bar` = 592px; the top strip's 68px is gone, so the button ends ≈ 274px.
 - **Desktop (from `lg`):** the page is one column of `max-w-phone` (560px), left-aligned with the top bar; Fokus is the same width, centred. Nothing else changes.
@@ -89,7 +91,7 @@ Nav ends ≈ 56 · title ≈ 72–116 · updated line ≈ 120–140 · form row 
 > **2026-10-13: the pause screen is rebuilt in [`fokus-pause.md`](fokus-pause.md)** (warm-up, felt-RPE and reps, recommended rest, next-set card, footer). It replaces §4.3 and amends §4.1, §4.2's suggestion line, §4.4, §4.7, §6 and §7. Where they differ, `fokus-pause.md` wins.
 > **2026-10-13: Fokus is the pilot of the Instrument direction** ([`fokus-instrument.md`](fokus-instrument.md)). It replaces every visual rule here (slab, Condensed italic, pills, segments); structure, copy and behaviour stay as written.
 
-Full-screen: no ScreenNav, no page title text, no zone flag. Page gutter 12px. `h1` is `sr-only` "Fokus". Readable at 60–80 cm: **reps and kg are `text-56`, the largest things on the screen** (≈ 6.4mm cap height on a 390pt iPhone, ≈ 30 arc-minutes at 70 cm; text-32 is ≈ 18').
+Full-screen: no ScreenNav, no page title text, no zone flag. Page gutter 12px. `h1` is `sr-only` "Fokus". Readable at 60–80 cm: **reps and kg are `text-56`, the largest things on the screen** (≈ 6.4mm cap height on a 390pt ~~iPhone~~ phone (**Superseded 2026-10-15 (user):** the phone is Android Chrome.), ≈ 30 arc-minutes at 70 cm; text-32 is ≈ 18').
 
 ### 4.1 Top bar (every view state; fixed layout so nothing jumps)
 1. Row, 12px from the top, `justify-between`, items centred:
@@ -115,7 +117,8 @@ Full-screen: no ScreenNav, no page title text, no zone flag. Page gutter 12px. `
 
 Height check (390 × 660): top bar to last-tap row ends ≈ 132; card ≈ 140–540; Spring over ≈ 556–604. Everything fits without scrolling.
 
-### 4.3 Rest view (after Udført, until "Til næste sæt")
+### 4.3 ~~Rest view (after Udført, until "Til næste sæt")~~
+> **Superseded 2026-10-15 by `fokus-flow.md` §1:** no rest step; the pause view is the next set, its primary `✓ Sæt n udført`. (`fokus-pause.md` replaced this section 2026-10-13; `fokus-flow.md` replaced that.) The rest of §4.3 is history.
 Same top bar; the last-tap line reads `Squat · sæt 1 udført kl. 18.42` + Fortryd.
 **Rest card** in place of the set card: `--surface` (not slab: you are between sets), `rounded-card`, padding 24px 16px 16px.
 1. `Pause` (`text-14` 700 uppercase `--text-muted`).
@@ -236,7 +239,7 @@ All writes go through the one server action (set log); nothing else is written, 
 | Begynd træning | `begin` = `started_at` on the first open set | navigate to `/fokus` (does not wait for the save) |
 | Fortsæt træning | `begin` only if the first open set has no `started_at` | navigate to `/fokus` |
 | Udført (Fokus) | `ended_at` on this set, `started_at` on the next open set | rest view (or finished view) |
-| Til næste sæt | none | set view |
+| ~~Til næste sæt~~ | ~~none~~ | ~~set view~~ **Superseded 2026-10-15 by `fokus-flow.md` §1:** no rest step; the pause view is the next set, its primary `✓ Sæt n udført`. |
 | Spring over | the set is `skipped`, no timestamps on it; `started_at` on the next open set (§10 D7) | set view of the next set (no rest) |
 | Fortryd | undo the latest done/skip tap (only what that tap wrote) | set view of the reopened set |
 | Afslut | none | `/`, progress kept, button reads Fortsæt |
@@ -244,7 +247,7 @@ All writes go through the one server action (set log); nothing else is written, 
 | Overview tick, done → open | undo of that set's done | |
 | Overview tick, skipped → done | `done` | |
 
-Minimum gym flow: open `/` → **Begynd træning** → per set: lift → **Udført** → rest → **Til næste sæt** → … → **Tilbage til Træning**. Two taps per set, both on 64px targets in the same thumb zone.
+Minimum gym flow: open `/` → **Begynd træning** → per set: lift → **Udført** → ~~rest → **Til næste sæt**~~ (**Superseded 2026-10-15 by `fokus-flow.md` §1:** no rest step; the pause view is the next set, its primary `✓ Sæt n udført`.) → … → **Tilbage til Træning**. Two taps per set, both on 64px targets in the same thumb zone.
 
 ## 8. Carried over unchanged from `today.md`
 **Ride card** (`Card id="ride-{n}"`, one per planned session, in table order): title "Cykel" (`text-32` display), action "I alt 1:15 t" (`text-16` 600 tabular); name `text-20` 700 as written (null: "Tur uden navn"); notes `text-16`; FTP line `text-14` muted "Mål ud fra FTP 250 W". Steps `<ol aria-label="Trin">`, 1px `--border` dividers, `py-3`: left label (`text-20` 700) and duration (`text-20` 400; no label: duration in 700); right watts `text-32` Condensed 700 tabular with " W" the same size ("263 W", "225–250 W"), % FTP below in `text-16` muted. Repeat group: "Gentag 4 gange" (`text-16` 600), steps indented 16px behind a 2px `--chart-mark` rule, durations per repetition. Formats: whole W and %, "8 min", "30 s", "1 min 30 s", "Gentag 1 gang". No FTP: % FTP in `text-32` (" FTP" in `text-20`) and `Ingen FTP fra intervals.icu, så målene står kun i % FTP.` Unreadable steps: no total, FTP line or steps; `WarningLine` `Kunne ikke læse trinene, så der vises ingen mål. Ret dem i planned_sessions ({problem}).` No steps: `EmptyState` `Der er ikke indtastet trin for denne tur.`
@@ -266,7 +269,7 @@ Run with `serve.ps1` on port 3100; states via `DEV_FIXTURE` / `DEV_TODAY` where 
 7. Ticking an open set shows ✓ within 100ms and sends one write; reloading `/` keeps it ticked and shows `kl. hh.mm`; unticking reopens it and survives reload. A skipped set shows the minus mark and `sprunget over`.
 8. With the save forced to fail (offline), the tick stays and `1 sæt er ikke gemt.` + `Gem igen` appears; `Gem igen` back online saves it and the warning goes.
 9. Begynd træning writes `begin` and opens `/fokus` on the first open set. Fokus shows only: Afslut, the count, the progress bar, the last-tap row, the set card (name, `Sæt n af m`, reps, prescription, kg block, last-week line, Udført) and Spring over. Reps and the kg figure are the two largest computed font sizes (56px); the suggestion is italic, the reps upright.
-10. Udført → rest view: `Pause`, a timer counting up from the tap (m:ss), the next set in a small slab, `Til næste sæt`. Reloading in the rest view shows the rest view with the timer still counting from the original tap. Til næste sæt writes nothing and shows the next set.
+10. **Superseded 2026-10-15 by `fokus-flow.md` §1:** no rest step; the pause view is the next set, its primary `✓ Sæt n udført`. ~~Udført → rest view: `Pause`, a timer counting up from the tap (m:ss), the next set in a small slab, `Til næste sæt`. Reloading in the rest view shows the rest view with the timer still counting from the original tap. Til næste sæt writes nothing and shows the next set.~~
 11. Spring over marks the set skipped (no timestamps), shows the next set directly, adds a dash segment and `· 1 sprunget over`. Fortryd undoes the latest done/skip and the set becomes current again; a second Fortryd walks one tap further.
 12. Afslut returns to `/` with progress kept and the button reading `Fortsæt træning`; reloading `/fokus` mid-session returns to the same set.
 13. With every set done or skipped, Fokus shows the finished view (`Session n er klaret`, counts, start and last-set times, `Husk at logge kg i arket.`, `Tilbage til Træning`); `/` shows the (a′) header note and no button.

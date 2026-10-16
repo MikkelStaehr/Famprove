@@ -1,5 +1,7 @@
 Superseded (visual) by the reset-*.md specs, 2026-10-14.
 
+> **Superseded in part (bookkeeping 2026-10-16):** `Til næste sæt` and the separate rest view by `fokus-flow.md` §1 (2026-10-15: the pause view is the next set); the `Forslag` / `FORSLAG` label by `fokus-kg.md` (today's kg under `I DAG`); a text-link Spring over by `button-type.md` B4 (bordered button); a Fokus note line (NOTES not shown since 2026-10-15); the rest windows by type only (main lift or variant 3–5 min, isolation and abs 1–2, the rest 1.5–3; slice `rest-by-type`). Mentions below are history.
+
 # Spec – Instrument restyle: Træning (`/`) (slice `instrument-rest`, 2026-10-13)
 
 Restyles `traening.md` §3 and §5 to DESIGN.md Part B Revision 5. **Same data, flow, writes, copy, sr text and states** as `traening.md`; only the look changes, plus the living element (§2), which is a drawing scale over data the page already has. Fokus is the reference and is not touched.

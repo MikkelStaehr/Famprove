@@ -4,7 +4,7 @@
 
 - **Label:** `font-mono` 15px 500, `text-transform: uppercase`, `letter-spacing: 0.04em`, line-height 1.2. Source text stays sentence case ("Sæt 2 udført"), so screen readers do not spell it.
 - **Light (one):** `--inverse-bg` fill, `--inverse-text` label, no border, 56px, `--radius-button`. Only Fokus's done (`✓ Sæt n udført`, `✓ Opvarmning udført`); the check is the `check` icon, 18px.
-- **Dark (all others):** `--card` fill (`--inverse-text` inside the `InverseCard`), 1px `--text-muted` border, `--text` label, `--radius-button`, ≥ 44px (48 in a card, 56 stepper and feel choices). Begynd/Fortsæt træning, Afslut, Fortryd, Spring over, Til Træning, Lettere/Som ventet/Hårdere, stepper − / +, Gem igen, Prøv igen.
+- **Dark (all others):** `--card` fill (`--inverse-text` inside the `InverseCard`), 1px `--text-muted` border, `--text` label, `--radius-button`, ≥ 44px (48 in a card, 56 stepper and feel choices). Begynd/Fortsæt træning, Afslut, Fortryd, Spring over, Tilbage til Træning, Lettere/Som ventet/Hårdere, stepper − / +, Gem igen, Prøv igen.
 - Pressed: opacity 0.85, no scale (Motion). Focus: 2px `--focus` ring at 2px offset (on the `InverseCard`: `--inverse-text`).
 - Nothing else changes: positions, sizes of the dock, copy and logic stay.
 

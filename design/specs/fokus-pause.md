@@ -1,5 +1,7 @@
 # Spec – Fokus pause screen rebuild (2026-10-13)
 
+> **Superseded in part (bookkeeping 2026-10-16):** `Til næste sæt` and the separate rest view by `fokus-flow.md` §1 (2026-10-15: the pause view is the next set); the `Forslag` / `FORSLAG` label by `fokus-kg.md` (today's kg under `I DAG`); a text-link Spring over by `button-type.md` B4 (bordered button); a Fokus note line (NOTES not shown since 2026-10-15); the rest windows by type only (main lift or variant 3–5 min, isolation and abs 1–2, the rest 1.5–3; slice `rest-by-type`). Mentions below are history.
+
 Extends `traening.md` §4 (Fokus). Replaces §4.3 (rest view); amends §4.1 (last-tap line), §4.2 (suggestion line), §4.4 (finished view), §4.7, §6, §7. Everything not named here is unchanged. Data model: main session's brief of 2026-10-13 (exercise_set_log `kind`, `derived`, `felt_rpe`, `reps_done`; planned_sets `adjustment_kg`, `adjustment_reason`, `rest_min_s`, `rest_max_s`, `ramp`; `strength_sets.notes`; `exercise_feel`).
 
 **Readings taken (user away, "most reasonable reading"):**
@@ -41,7 +43,7 @@ Top bar §4.1 unchanged (0–128px at 390). The last-tap line gains two tap kind
 1. `Næste` tag + `Squat · sæt 2 af 4` (`text-20` 700). In warm-up variants, `Sæt 1 af 4`, because the card heading already names the exercise.
 2. `5 reps · RPE 7 · forslag 142,5 kg` (`text-16` 500). With an adjustment, short form: `· forslag 87,5 kg (+2,5)`. Null: `· intet forslag`.
 3. **New:** `Sidste uge` (`--on-slab-muted`) + `140 kg` (600). Null: `Intet logget sidste uge`. Week 1: `Uge 1 i blokken: ingen sidste uge`.
-4. **New, only when `strength_sets.notes` is present:** `Note: Palloff + GHD` (`text-16` 400, as written, upright). Up to 2 lines show in full. A longer note gets `line-clamp-2` plus a `Hele noten` text button (`min-h-11`, underline) that expands it in place.
+4. **Superseded 2026-10-15 (user, slice `variants-notes`):** Fokus shows no NOTES. ~~**New, only when `strength_sets.notes` is present:** `Note: Palloff + GHD` (`text-16` 400, as written, upright). Up to 2 lines show in full. A longer note gets `line-clamp-2` plus a `Hele noten` text button (`min-h-11`, underline) that expands it in place.~~
 
 ### 1.3 Footer
 `Tid brugt 42 min · ca. 31 min tilbage`.
@@ -78,7 +80,7 @@ Feel block (after a done; never after a skip, which goes straight to the set vie
    - at or after the minimum: ✓ (16px) + `Klar til næste sæt` (`--positive`), with the timer digits in `--positive`.
    - after the maximum: ✓ + `Klar · over 5 min pause` (`--positive`).
    - with `rest_min_s` null: neither band line nor rail, and the label row shows `Pause` only.
-Next-set card, then **Til næste sæt** (no write, apart from R2's reps), then the footer.
+Next-set card, then ~~**Til næste sæt**~~ (**Superseded 2026-10-15 by `fokus-flow.md` §1:** no rest step; the pause view is the next set, its primary `✓ Sæt n udført`.) (no write, apart from R2's reps), then the footer.
 
 ## 4. Variant C – After the last set of an exercise (= the next exercise's warm-up)
 The two jobs are stacked in time order, each in its own group:
@@ -178,7 +180,7 @@ Existing states (§5 of `traening.md`) apply. New and changed:
 6. Tapping a feel option shows it selected (fill + ✓, `aria-pressed`) within 100ms and sends one `feel`. Another option overwrites; the same option clears.
 7. The stepper defaults to the range top, ±1 per tap within 1…top + 10, and sends `reps`. Leaving with an untouched stepper writes the top once (R2). Afslut writes nothing.
 8. Variant C shows the feel block for the finished set (`… i Squat?`) above `Opvarmning · <next>`. The finished view shows the feel block for the session's last done set.
-9. The next-set card shows `Sidste uge <kg>` (or its null / week-1 text) and `Note: …` when notes exist.
+9. The next-set card shows `Sidste uge <kg>` (or its null / week-1 text) ~~and `Note: …` when notes exist~~ (NOTES not shown since 2026-10-15).
 10. Fortryd per §6: it undoes begin (back to `/`, `Begynd træning`), warmup_end (Variant A, original start), and a done that ended an exercise (the warm-up row is gone). Feel and reps survive a Fortryd of their done.
 11. The suggestion line matches §5 for added / range / hold / capped+added / cap-only / `progression`. "0 kg" never appears.
 12. Footer: `Tid brugt n min`, plus `ca. n min tilbage` from 2 done sets.
