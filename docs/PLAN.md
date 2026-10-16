@@ -131,3 +131,10 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | supersets | Supersets chosen in the app: pair two consecutive exercises (superset_pairs, a third write path), A1 -> B1 -> rest, suggested next time, TSS unchanged | L |
 | superset-warmups | Warm-ups are not part of a superset: A's warm-up, then B's, each alone with the normal rest; the superset starts at the first working set (user, 2026-10-16) | S |
 | skip-analysis | A set skipped in the app affects nothing: out of tonnage, the rolling e1RM, last week's anchor and the progression rules, as already out of TSS (user, 2026-10-16) | M |
+| golden-test | Cleanup step 2 guard: a git-ignored snapshot of the real tables, compute for today and 4 weeks back with identical output tables (daily_load TSS/CTL/ATL/TSB, planned_sets, ...); Fokus/Træning view-model snapshots | M |
+| tap-transition | One pure transition function for set taps, shared by the client (applyTap) and the server (recordSetTap); random tap sequences agree (audit #1) | M |
+| fokus-view-fields | One fokusView with every derived field (rest window, done label, pair line, feel target, announcement); FokusScreen only renders (audit #3) | M |
+| last-week-kg | "Last week's kg" as one Python function for the anchor, today_kg's "last" and the prognose's accessory kg; no behaviour change (audit #2) | M |
+| cleanup-small | The e1RM factor and the 2.5 rounding in one place, the web's isMainLift renamed, superseded rules marked in DESIGN.md and specs, dead code removed, no scoreFinal -> score fallback (audit #6-#8) | S |
+| recharts-pin | recharts pinned to an exact version (audit #5) | S |
+| skipped-at | exercise_set_log.skipped_at, so Fortryd always hits the right set (audit, behaviour fix after step 2) | M |
