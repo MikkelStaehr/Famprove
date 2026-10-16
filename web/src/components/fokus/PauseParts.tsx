@@ -82,7 +82,7 @@ export function FeelBlock({
   onTap,
 }: {
   readonly set: SetInContext;
-  readonly logged: LoggedSet | undefined;
+  readonly logged: LoggedSet | null;
   readonly named: boolean;
   readonly onTap: (kind: "feel" | "reps", ref: SetRef, value: number | null) => void;
 }) {
@@ -202,12 +202,12 @@ function RepsStepper({
  */
 export function RestStrip({
   since,
-  window: { minS, maxS, superset },
+  rest: { minS, maxS, superset },
   onAnnounce,
 }: {
   readonly since: string;
   /** fokusView's restWindow; `superset`: the rest after a superset's B (supersets.md S14), the label says so. */
-  readonly window: RestWindow;
+  readonly rest: RestWindow;
   readonly onAnnounce: (s: string) => void;
 }) {
   const seconds = useElapsed(since);

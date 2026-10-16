@@ -9,7 +9,7 @@ import {
   BEGIN_UNDONE_HREF,
   displayName,
   exerciseUnder,
-  finishCard,
+  type FinishCard,
   type FokusExercise,
   type FokusView,
   fokusView,
@@ -84,7 +84,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   }, [focusRequest]);
 
   // Every superset rule, label and sentence comes from the view; the screen renders and dispatches taps.
-  const view = fokusView({ exercises: session.exercises, pairs: session.pairs ?? [], order: session.order, week: session.week }, log);
+  const view = fokusView({ exercises: session.exercises, pairs: session.pairs ?? [], order: session.order, week: session.week, session: session.session }, log);
   // fokus-flow.md §4: the screen stays on from an open, begun session until it is finished.
   useWakeLock(log.size > 0 && view.kind !== "finished");
   const p = view.progress;
@@ -219,7 +219,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       {view.kind === "finished" && (
         <FinishedView
           session={session.session}
-          card={finishCard(session.session, p, log)}
+          card={view.card}
           marks={signature(session.exercises, session.order, log)}
           primary={primary}
           flush={flush}
@@ -272,7 +272,7 @@ function SetView({
   return (
     <div className={`mt-2 flex flex-1 flex-col gap-3 ${FADE_IN}`}>
       {view.showRest && view.rest !== null && view.restWindow !== null && (
-        <RestStrip key={view.rest.since} since={view.rest.since} window={view.restWindow} onAnnounce={onAnnounce} />
+        <RestStrip key={view.rest.since} since={view.rest.since} rest={view.restWindow} onAnnounce={onAnnounce} />
       )}
       {/* §1.3: the next set in a hero Card (26, padding 20). */}
       <section aria-labelledby="fokus-set" className="flex flex-col rounded-hero border border-border bg-card p-5">
@@ -410,7 +410,7 @@ function FinishedView({
   footer,
 }: {
   readonly session: number;
-  readonly card: ReturnType<typeof finishCard>;
+  readonly card: FinishCard;
   readonly marks: Signature;
   readonly primary: PrimaryRef;
   readonly flush: () => Promise<void>;

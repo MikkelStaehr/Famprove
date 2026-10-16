@@ -84,10 +84,11 @@ const RAMP = [
   { pct: 80, reps: 2, kg: 80 },
 ];
 
-type Session = { readonly name: string; readonly exercises: readonly ExerciseView[]; readonly pairs: readonly PairRef[] };
+type Session = { readonly name: string; readonly exercises: readonly ExerciseView[]; readonly pairs: readonly PairRef[]; readonly week?: number };
 
 const PLAIN: Session = {
   name: "plain",
+  week: 2, // week ≠ 1, so setSentence says "sidste uge …"
   pairs: [],
   exercises: [
     ex(10, "Squat", 3, { type: "SQUAT", prescribed: "RPE 7", restMinS: 180, restMaxS: 300, ramp: RAMP, todayKg: 100, todayBasis: "sheet", reference: { kg: 97.5, bodyweight: false } }),
@@ -145,18 +146,13 @@ const ref = (r: SetRef | null | undefined) => (r == null ? null : setKey(r));
  */
 function screenFacts(s: Session, order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>) {
   const exercises = s.exercises;
-  const view = fokusView({ exercises, pairs: s.pairs, order, week: 1 }, log);
+  const view = fokusView({ exercises, pairs: s.pairs, order, week: s.week ?? 1, session: 1 }, log);
   const latest = lastTap(log);
   const shown = view.kind === "set" ? view.next : view.kind === "warmup" ? view.warmup : null;
   const following = view.kind === "finished" ? null : view.following;
   const win = (w: RestWindow | null) => (w === null ? null : [w.minS, w.maxS, w.superset]);
-  // The pre-refactor FokusState, projected from the view.
-  const state =
-    view.kind === "set"
-      ? { kind: view.kind, next: view.next, rest: view.rest, showRest: view.showRest, feel: view.feel?.ref ?? null }
-      : view.kind === "warmup"
-        ? { kind: view.kind, warmup: view.warmup, since: view.since, feel: view.feel?.ref ?? null }
-        : { kind: view.kind, feel: view.feel?.ref ?? null };
+  // The pre-refactor FokusState, straight from fokusState (not through fokusView's feel).
+  const state = fokusState(order, log, (after, next) => pairHandOff(exercises, s.pairs, after, next));
   let restWindow: unknown = null;
   if (view.kind === "set" && view.rest !== null) restWindow = view.restWindow === null ? [null, null, false] : win(view.restWindow);
   let feel: unknown = null;
@@ -195,6 +191,11 @@ function screenFacts(s: Session, order: readonly SetRef[], log: ReadonlyMap<stri
       beginAt: ref(cl.beginAt),
       primary: cl.primary,
     },
+    // Added after the refactor (reviewer, 2026-10-16): the polite sentences, Fortryd, the skipped tail, the tick.
+    announce: view.kind === "finished" ? null : { done: view.announce.done, skip: view.kind === "set" ? view.announce.skip : null },
+    undo: view.undo === null ? null : { kind: view.undo.kind, ref: setKey(view.undo.ref), line: view.undo.line, announce: view.undo.kind === "tap" ? view.undo.announce : null },
+    skipped: view.skipped,
+    tick: ref(view.tick),
   };
 }
 

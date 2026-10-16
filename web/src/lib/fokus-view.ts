@@ -113,6 +113,8 @@ export type FokusInput = {
   readonly pairs: readonly PairRef[];
   readonly order: readonly SetRef[];
   readonly week: number;
+  /** The session's number (the finished card's title). */
+  readonly session: number;
 };
 
 /** A rest window: the recommended span in seconds (null = none) and whether it is a superset's (R3, S14). */
@@ -124,7 +126,7 @@ export type DoneLabel = { readonly visible: string; readonly spoken: string };
 export type FeelTarget = {
   readonly ref: SetRef;
   readonly set: SetInContext;
-  readonly logged: LoggedSet | undefined;
+  readonly logged: LoggedSet | null;
   readonly named: boolean;
 };
 
@@ -174,7 +176,7 @@ export type FokusView =
       readonly label: DoneLabel | null;
       readonly announce: { readonly done: string };
     })
-  | (Common & { readonly kind: "finished" });
+  | (Common & { readonly kind: "finished"; readonly card: FinishCard });
 
 function windowOf(w: { readonly row: FokusExercise; readonly superset: boolean } | null): RestWindow | null {
   return w === null ? null : { minS: w.row.restMinS, maxS: w.row.restMaxS, superset: w.superset };
@@ -182,7 +184,7 @@ function windowOf(w: { readonly row: FokusExercise; readonly superset: boolean }
 
 /** One view of the session from its log: every superset rule and sentence applied here, never in the screen. */
 export function fokusView(input: FokusInput, log: ReadonlyMap<string, LoggedSet>): FokusView {
-  const { exercises, pairs, order, week } = input;
+  const { exercises, pairs, order, week, session } = input;
   const at = (r: SetRef) => setInContext(exercises, r);
   // supersets.md S13: A → B shows B at once, with no rest strip, timer or vibration.
   const state = fokusState(order, log, (after, next) => pairHandOff(exercises, pairs, after, next));
@@ -200,10 +202,10 @@ export function fokusView(input: FokusInput, log: ReadonlyMap<string, LoggedSet>
     const set = at(state.feel);
     if (set === null) return null;
     const named = state.kind === "set" && shown !== null ? displayName(set.exercise) !== displayName(shown.exercise) : true;
-    return { ref: state.feel, set, logged: log.get(setKey(state.feel)), named };
+    return { ref: state.feel, set, logged: log.get(setKey(state.feel)) ?? null, named };
   };
   const common = { progress: p, skipped: skippedText(p), undo };
-  if (state.kind === "finished") return { ...common, kind: "finished", feel: feelOf(null), tick: null };
+  if (state.kind === "finished") return { ...common, kind: "finished", feel: feelOf(null), tick: null, card: finishCard(session, p, log) };
   if (state.kind === "warmup") {
     const shown = at(setOneOf(state.warmup));
     const following = nextOpen(order, log, state.warmup);
