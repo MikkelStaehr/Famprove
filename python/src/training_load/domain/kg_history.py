@@ -102,6 +102,12 @@ def next_kg_state(
             variant_id=s.variant_id,
         )
     kg = s.logged_kg
+    if status == "skipped":
+        # Skipped in the app (user, 2026-10-16): not lifted. The plan stays as last seen; a lifted
+        # kg recorded before the skip is withdrawn.
+        if state.lifted_kg is not None:
+            return replace(state, lifted_kg=None, lifted_changed_at=now)
+        return state
     if status == "planned":
         if state.lifted_kg is not None:  # un-matched after being done: the plan stays frozen
             return replace(state, lifted_kg=None, lifted_changed_at=now)

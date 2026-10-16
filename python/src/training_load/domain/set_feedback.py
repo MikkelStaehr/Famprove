@@ -103,13 +103,22 @@ def with_reps_done(
     return out, applied
 
 
+type SetOfWeek = tuple[date, int, int, int]  # (ISO week, session, sheet row, set number)
+
+
+def skipped_sets(logged: Iterable[LoggedSet]) -> frozenset[SetOfWeek]:
+    """Every working set (set_no >= 1) the user skipped in the app (exercise_set_log.skipped)."""
+    return frozenset(_set_of(e) for e in logged if e.skipped and e.set_no >= 1)
+
+
 def without_skipped(
     sets: Sequence[StrengthSet], logged: Iterable[LoggedSet]
 ) -> tuple[list[StrengthSet], int]:
     """``sets`` with every set the user skipped in the app (exercise_set_log.skipped, a working
     set, set_no >= 1) scored 0, so it adds no TSS (user, 2026-10-15, slice skip-tss); and how
-    many. Reps, kg and RPE stay as the sheet has them; only the score is 0."""
-    skipped = {_set_of(e) for e in logged if e.skipped and e.set_no >= 1}
+    many. Reps, kg and RPE stay as the sheet has them; only the score is 0. Its kg status is
+    "skipped" (strength_analysis.kg_statuses), so it is out of everything else too."""
+    skipped = skipped_sets(logged)
     out: list[StrengthSet] = []
     applied = 0
     for s in sets:

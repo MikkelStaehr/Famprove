@@ -47,6 +47,7 @@ from training_load.domain.strength_analysis import (
     KgStatus,
     SetKey,
     best_e1rm,
+    counts,
     set_key,
 )
 from training_load.domain.today_kg import TodayBasis, today_kgs
@@ -210,7 +211,7 @@ def last_week_kg(
     session) anchors nothing."""
     first: dict[tuple[str, int, date], StrengthSet] = {}
     for s in sets:
-        if statuses[set_key(s)] == "planned" or s.logged_kg is None or s.logged_kg <= 0:
+        if not counts(statuses[set_key(s)]) or s.logged_kg is None or s.logged_kg <= 0:
             continue
         key = (s.block, s.sheet_row, s.week_start)
         if key not in first or s.set_no < first[key].set_no:
@@ -338,6 +339,7 @@ def planned_sets(
         sets,
         {(p.sheet_id, p.block, p.sheet_row, p.set_no, p.week_start): p.suggested_kg for p in out},
         run_week=run_week,
+        statuses=statuses,
     )
     out = [
         replace(p, today_kg=t.kg, today_basis=t.basis)

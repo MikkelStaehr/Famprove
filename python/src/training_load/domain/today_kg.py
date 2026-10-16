@@ -11,7 +11,8 @@ fokus-kg). Pure: no I/O. The first rule that applies, per set:
      rule; the sheet's own -12.5 % row: 0.875 x 145 = 126.875 -> 127.5);
    rounded to the nearest 2.5 (halves up, like the sheet's MROUND).
 3. ``e1rm``: Python's suggestion (planned_sets.suggested_kg from the rolling e1RM), shown "~".
-4. ``last``: last week's kg for the same row and set ("samme som sidst").
+4. ``last``: last week's kg for the same row and set ("samme som sidst"), unless that set was
+   skipped in the app (user, 2026-10-16: a set not done affects nothing).
 Otherwise None: Fokus shows no kg block. Never 0 where the sheet has no 0.
 """
 
@@ -23,7 +24,7 @@ from typing import Final, Literal
 
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.strength import StrengthSet
-from training_load.domain.strength_analysis import E1RM_FACTOR
+from training_load.domain.strength_analysis import E1RM_FACTOR, KgStatus, SetKey, set_key
 
 type TodayBasis = Literal["sheet", "derived", "e1rm", "last"]
 TODAY_BASES: Final = ("sheet", "derived", "e1rm", "last")
@@ -72,10 +73,12 @@ def today_kgs(
     suggested: Mapping[SetRef, float | None],
     *,
     run_week: date,
+    statuses: Mapping[SetKey, KgStatus] | None = None,
 ) -> dict[SetRef, TodayKg]:
     """Today's kg for every set of ``run_week`` and later. ``suggested``: Python's suggestion per
     set (planned_sets.suggested_kg). Last week's kg comes from ``sets`` itself (same block, row
-    and set number, the week before, with a kg)."""
+    and set number, the week before, with a kg; not a set skipped in the app, per ``statuses``)."""
+    kg_status = statuses or {}
     by_ref = {ref(s): s for s in sets}
     out: dict[SetRef, TodayKg] = {}
     sessions: dict[tuple[str, str, date, int], list[StrengthSet]] = {}
@@ -126,6 +129,7 @@ def today_kgs(
             # The same exercise, variant (null only matches null) and reps, as planned_sets' anchor.
             if (
                 before is not None
+                and kg_status.get(set_key(before)) != "skipped"
                 and _same_exercise(before, s)
                 and before.reps == s.reps
                 and before.logged_kg is not None

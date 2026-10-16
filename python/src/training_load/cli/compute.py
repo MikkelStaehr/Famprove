@@ -65,6 +65,7 @@ from training_load.domain.sessions import daily_strength_tss, match_sessions
 from training_load.domain.set_feedback import (
     exercise_feel,
     progressions,
+    skipped_sets,
     with_reps_done,
     with_rolling_e1rm_rpe,
     without_skipped,
@@ -152,7 +153,8 @@ def run(db: Postgrest, *, strength_k: float, today: date, computed_at: datetime)
         for s in match_sessions(sets, lifts, strength_k)
         if s.block is not None and s.activity_id is not None
     }
-    statuses = kg_statuses(sets, done, today)
+    # A set skipped in the app counts nowhere (user, 2026-10-16): its kg status is "skipped".
+    statuses = kg_statuses(sets, done, today, skipped_sets(logged_sets))
     blocks = derive_blocks(sets, today)
     analysis = strength_weeks(sets, statuses, blocks, today=today)
     sets, pct_rescored = with_rolling_e1rm_rpe(sets, analysis.weeks)

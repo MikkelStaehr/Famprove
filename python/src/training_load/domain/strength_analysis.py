@@ -4,7 +4,9 @@ Rules agreed with the user (2026-10-01):
 - Lifted: a set's kg counts once its session is matched to an intervals.icu activity
   ("lifted"), or, in a block before the activity log (blok <= PRE_LOG_LAST_BLOCK), once its ISO
   week has ended ("pre_log"; a skipped session with pre-filled kg can't be told apart).
-  Everything else is the plan ("planned") and never counts.
+  Everything else is the plan ("planned") and never counts. A set skipped in the app
+  ("skipped"; user, 2026-10-16, slice skip-analysis) counts nowhere: not in tonnage, the e1RM,
+  the rolling e1RM, last week's anchor or the kg history's lifted kg (and it scores 0 TSS).
 - Phase: PHASES names the first block of each phase; a later block inherits the latest phase
   (compute logs blocks past PHASES_CONFIRMED_TO, so the user can confirm or add a phase).
 - e1RM, one rule for Analyse > Styrke and the suggestions (user, 2026-10-14; e1rm_point owns
@@ -23,7 +25,7 @@ Rules agreed with the user (2026-10-01):
   nothing lifted is a real 0.
 """
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final, Literal
@@ -32,7 +34,7 @@ from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.strength import Block, StrengthSet, block_number, iso_week_start
 from training_load.sources.strength_sheet import E1RM_RANGE
 
-type KgStatus = Literal["lifted", "pre_log", "planned"]
+type KgStatus = Literal["lifted", "pre_log", "planned", "skipped"]
 type Phase = Literal["in_season", "off_season"]
 type RpeSource = Literal["logged", "prescribed"]
 type SetKey = tuple[str, str, int, int, int]  # strength_sets' primary key
@@ -113,8 +115,16 @@ def phase_of(block_no: int) -> Phase:
     return phase
 
 
-def kg_status(s: StrengthSet, *, done: bool, today: date) -> KgStatus:
-    """``done``: the set's session is matched to an activity."""
+def counts(status: KgStatus) -> bool:
+    """Whether a set's kg counts as lifted (tonnage, e1RM, last week's anchor)."""
+    return status in ("lifted", "pre_log")
+
+
+def kg_status(s: StrengthSet, *, done: bool, today: date, skipped: bool = False) -> KgStatus:
+    """``done``: the set's session is matched to an activity. ``skipped``: the user skipped the
+    set in the app, which wins over everything (the set was not lifted)."""
+    if skipped:
+        return "skipped"
     if done:
         return "lifted"
     week_ended = s.week_start + timedelta(days=6) < today
@@ -124,11 +134,22 @@ def kg_status(s: StrengthSet, *, done: bool, today: date) -> KgStatus:
 
 
 def kg_statuses(
-    sets: Iterable[StrengthSet], done: set[tuple[date, int]], today: date
+    sets: Iterable[StrengthSet],
+    done: set[tuple[date, int]],
+    today: date,
+    skipped: Collection[tuple[date, int, int, int]] = frozenset(),
 ) -> dict[SetKey, KgStatus]:
-    """``done``: (week_start, session) of every session matched to an activity."""
+    """``done``: (week_start, session) of every session matched to an activity. ``skipped``:
+    (week_start, session, sheet_row, set_no) of every set skipped in the app
+    (set_feedback.skipped_sets)."""
     return {
-        set_key(s): kg_status(s, done=(s.week_start, s.session) in done, today=today) for s in sets
+        set_key(s): kg_status(
+            s,
+            done=(s.week_start, s.session) in done,
+            today=today,
+            skipped=(s.week_start, s.session, s.sheet_row, s.set_no) in skipped,
+        )
+        for s in sets
     }
 
 
@@ -145,7 +166,7 @@ def e1rm_point(s: StrengthSet, status: KgStatus) -> E1rmPoint | None:
     are checked by best_e1rm, which counts what they leave out."""
     prescribed = prescribed_rpe(s.prescribed)  # None: no RPE cell (a % row, a -x% back-off)
     if (
-        status == "planned"
+        not counts(status)
         or not is_competition_lift(s)
         or s.variant_id is not None  # a named variant is not the competition lift (2026-10-14)
         or s.reps > E1RM_MAX_REPS
@@ -228,7 +249,7 @@ def strength_weeks(
     counted: dict[tuple[date, str], list[tuple[StrengthSet, KgStatus]]] = {}
     for s in sets:
         status = statuses[set_key(s)]
-        if s.type in LIFTS and status != "planned" and s.logged_kg is not None:
+        if s.type in LIFTS and counts(status) and s.logged_kg is not None:
             counted.setdefault((s.week_start, s.type), []).append((s, status))
 
     out_of_bounds = 0
