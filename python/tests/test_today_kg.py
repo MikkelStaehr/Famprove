@@ -5,8 +5,9 @@ sets); week 2: 140, 145, 130."""
 from dataclasses import replace
 from datetime import date
 
+from training_load.domain.e1rm import round_to_step
 from training_load.domain.strength import StrengthSet
-from training_load.domain.today_kg import TodayKg, percent, ref, round_step, today_kgs
+from training_load.domain.today_kg import TodayKg, percent, ref, today_kgs
 
 W2, W3 = date(2026, 10, 5), date(2026, 10, 12)
 
@@ -70,7 +71,7 @@ def test_with_nothing_else_it_is_last_weeks_kg() -> None:
 def test_bodyweight_zero_is_a_kg_and_helpers() -> None:
     dips = replace(_set(80, 1, W3, "RPE 8", 8, 0.0), name="Dips", bodyweight=True)
     assert today_kgs([dips], {}, run_week=W3, statuses={})[ref(dips)] == TodayKg(0.0, "sheet")
-    assert round_step(126.875) == 127.5 and round_step(141.08) == 140.0
+    assert round_to_step(126.875) == 127.5 and round_to_step(141.08) == 140.0
     assert percent("-12.5%") == -0.125 and percent("-10 %") == -0.10
     assert percent("75%") is None and percent("RPE 7") is None
 

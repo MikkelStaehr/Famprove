@@ -24,6 +24,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from training_load.domain.e1rm import e1rm_ratio
 from training_load.domain.exercises import UNKNOWN_FACTOR
 from training_load.domain.last_week import latest_logged_kg
 from training_load.domain.strength import StrengthSet
@@ -83,7 +84,7 @@ def _main_lift_kg(s: StrengthSet) -> tuple[float, str] | None:
         return None
     rpe = prescribed_rpe(s.prescribed)
     if rpe is not None:
-        return s.e1rm / (1 + 0.0333 * (s.reps + 10 - rpe)), "rpe_e1rm"
+        return s.e1rm / e1rm_ratio(s.reps, rpe), "rpe_e1rm"
     pct = _percent(s.prescribed)
     if pct is not None and pct > 0:
         return s.e1rm * pct, "pct_e1rm"

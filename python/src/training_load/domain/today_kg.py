@@ -23,15 +23,15 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Final, Literal
 
+from training_load.domain.e1rm import e1rm_ratio, round_to_step
 from training_load.domain.last_week import same_exercise as _same_exercise
 from training_load.domain.last_week import same_set_last_week
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.strength import StrengthSet
-from training_load.domain.strength_analysis import E1RM_FACTOR, KgStatus, SetKey, set_key
+from training_load.domain.strength_analysis import KgStatus, SetKey, set_key
 
 type TodayBasis = Literal["sheet", "derived", "e1rm", "last"]
 TODAY_BASES: Final = ("sheet", "derived", "e1rm", "last")
-STEP_KG: Final = 2.5
 _BACKOFF: Final = re.compile(r"^\s*-\s*(\d+(?:[.,]\d+)?)\s*%\s*$")
 
 
@@ -48,11 +48,6 @@ def ref(s: StrengthSet) -> SetRef:
     return (s.sheet_id, s.block, s.sheet_row, s.set_no, s.week_start)
 
 
-def round_step(kg: float) -> float:
-    """Nearest multiple of 2.5, halves up (126.875 -> 127.5), like the sheet's MROUND."""
-    return int(kg / STEP_KG + 0.5) * STEP_KG
-
-
 def percent(prescribed: str | None) -> float | None:
     """ "-12.5%" -> -0.125, "-10 %" -> -0.10; anything else None (an RPE row, a %1RM row "75%", a
     share outside (-100 %, 0), nan or inf)."""
@@ -61,10 +56,6 @@ def percent(prescribed: str | None) -> float | None:
         return None
     share = -float(m.group(1).replace(",", ".")) / 100
     return share if -1 < share < 0 else None
-
-
-def _e1rm_ratio(reps: float, rpe: float) -> float:
-    return 1 + E1RM_FACTOR * (reps + 10 - rpe)
 
 
 def today_kgs(
@@ -106,8 +97,8 @@ def today_kgs(
                 continue
             a_rpe, _, a = max(anchors, key=lambda t: (t[0] or 0.0, t[1]))
             assert a_rpe is not None
-            kg = out[ref(a)].kg * _e1rm_ratio(a.reps, a_rpe) / _e1rm_ratio(s.reps, rpe)
-            out[ref(s)] = TodayKg(round_step(kg), "derived")
+            kg = out[ref(a)].kg * e1rm_ratio(a.reps, a_rpe) / e1rm_ratio(s.reps, rpe)
+            out[ref(s)] = TodayKg(round_to_step(kg), "derived")
         # 2b. "-x %" rows from the heaviest sheet or derived kg of the exercise that session
         _backoffs(session_sets, out, kinds=("sheet", "derived"), basis="derived")
         # 3. the e1RM suggestion (not on a "-x %" row: those follow their top set below)
@@ -152,4 +143,4 @@ def _backoffs(
             and out[ref(a)].basis in kinds
         ]
         if tops and max(tops) > 0:
-            out[ref(s)] = TodayKg(round_step(max(tops) * (1 + pct)), basis)
+            out[ref(s)] = TodayKg(round_to_step(max(tops) * (1 + pct)), basis)

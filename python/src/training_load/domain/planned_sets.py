@@ -37,13 +37,13 @@ from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final, Literal
 
+from training_load.domain.e1rm import ROUND_TO_KG, pct_of_e1rm, round_to_step
 from training_load.domain.exercises import Catalog, Exercise
 from training_load.domain.last_week import anchor_kg, first_counted_by_row
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.set_feedback import Progression
 from training_load.domain.strength import StrengthSet, iso_week_start
 from training_load.domain.strength_analysis import (
-    E1RM_FACTOR,
     ROLLING_E1RM_WEEKS,
     KgStatus,
     SetKey,
@@ -66,7 +66,6 @@ LOWER_BODY_WORDS: Final = (
 )
 """A sheet TYPE (e.g. "QUADS/ADDUCTORS", "HAMSTRINGS") with any of these words is lower body;
 every other type (BENCH, CHEST/SHOULDERS, LATS/MIDDLE BACK, ...) is upper body."""
-ROUND_TO_KG: Final = 2.5
 
 type Basis = Literal["rpe_e1rm", "not_rpe", "no_e1rm", "no_lift", "progression", "new_variant"]
 
@@ -118,16 +117,6 @@ class PlannedSet:
     # Fokus's "I DAG" figure (domain.today_kg, slice fokus-kg); both None: no kg to show.
     today_kg: float | None = None
     today_basis: TodayBasis | None = None
-
-
-def pct_of_e1rm(reps: float, rpe: float) -> float:
-    """The share of e1RM that reps at RPE take: the inverse of strength_analysis.e1rm."""
-    return 1 / (1 + E1RM_FACTOR * (reps + 10 - rpe))
-
-
-def round_to_step(kg: float, step: float = ROUND_TO_KG) -> float:
-    """Nearest multiple of ``step``, halves up (141.25 -> 142.5), like the sheet's MROUND."""
-    return math.floor(kg / step + 0.5) * step
 
 
 def rolling_e1rm(

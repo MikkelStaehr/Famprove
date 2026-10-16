@@ -10,17 +10,16 @@ import openpyxl
 import pytest
 
 from conftest import legacy_scoring
+from training_load.domain.e1rm import E1RM_FACTOR, e1rm
 from training_load.domain.kg_history import KgState, gone_states, kg_keys, next_kg_state
 from training_load.domain.planned_sets import rolling_e1rm
 from training_load.domain.strength import Block, StrengthSet
 from training_load.domain.strength_analysis import (
-    E1RM_FACTOR,
     ROLLING_E1RM_WEEKS,
     E1rmPoint,
     KgStatus,
     SetKey,
     StrengthWeek,
-    e1rm,
     e1rm_point,
     kg_status,
     kg_statuses,
