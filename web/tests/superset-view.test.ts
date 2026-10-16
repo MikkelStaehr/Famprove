@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { doneLabel, fokusView, type SetInContext } from "../src/lib/fokus-view.ts";
+import { doneLabel, fokusState, type SetInContext } from "../src/lib/fokus-view.ts";
 import { type LoggedSet, sessionOrderWithWarmups, setKey, type SetRef } from "../src/lib/set-taps.ts";
 import {
   clientOrder,
@@ -94,13 +94,13 @@ test("S13/S14: showRest is false after A and true after B", () => {
   const rows = session(3, 3);
   const order = orderOf(rows);
   const handOff = (a: SetRef, n: SetRef) => pairHandOff(rows, PAIRS, a, n);
-  const afterA = fokusView(order, logOf([{ row: 10, set: 0 }, { row: 11, set: 0 }, { row: 10, set: 1 }]), handOff);
+  const afterA = fokusState(order, logOf([{ row: 10, set: 0 }, { row: 11, set: 0 }, { row: 10, set: 1 }]), handOff);
   assert.equal(afterA.kind, "set");
   if (afterA.kind === "set") {
     assert.deepEqual(afterA.next, { row: 11, set: 1 });
     assert.equal(afterA.showRest, false);
   }
-  const afterB = fokusView(order, logOf([{ row: 10, set: 0 }, { row: 11, set: 0 }, { row: 10, set: 1 }, { row: 11, set: 1 }]), handOff);
+  const afterB = fokusState(order, logOf([{ row: 10, set: 0 }, { row: 11, set: 0 }, { row: 10, set: 1 }, { row: 11, set: 1 }]), handOff);
   assert.equal(afterB.kind, "set");
   if (afterB.kind === "set") {
     assert.deepEqual(afterB.next, { row: 10, set: 2 });

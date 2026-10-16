@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
 import { recordSetTap } from "../src/lib/db/set-log.ts";
 import { recordSupersetPair, type SupersetOptions } from "../src/lib/db/superset-pairs.ts";
-import { fokusView } from "../src/lib/fokus-view.ts";
+import { fokusState } from "../src/lib/fokus-view.ts";
 import { type LoggedSet, sessionOrderWithWarmups, setKey, type SetRef, type SetTapInput } from "../src/lib/set-taps.ts";
 import { clientOrder, pairHandOff } from "../src/lib/superset-view.ts";
 import { effectivePairs, type PairDecision, type SessionRun, type SupersetInput } from "../src/lib/supersets.ts";
@@ -210,8 +210,8 @@ test("F-e: the same log gives the same Fokus view (a reload), also with a pair h
       log.set(setKey(ref), { ...ref, startedAt: t, endedAt: t, skipped: false, updatedAt: t });
     });
     const reloaded = new Map(JSON.parse(JSON.stringify([...log])) as [string, LoggedSet][]);
-    assert.deepEqual(fokusView(order, reloaded, handOff), fokusView(order, log, handOff), `after ${n}`);
-    const v = fokusView(order, log, handOff);
+    assert.deepEqual(fokusState(order, reloaded, handOff), fokusState(order, log, handOff), `after ${n}`);
+    const v = fokusState(order, log, handOff);
     if (v.kind === "set" && v.rest !== null) assert.equal(v.showRest, !(v.rest.after.row === 10 && v.next.row === 11), `rest strip after ${n}`);
   }
 });

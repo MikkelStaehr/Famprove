@@ -13,7 +13,10 @@ import {
   type LastTap,
   lastTap,
   type LoggedSet,
+  nextOpen,
+  type PairRef,
   type Progress,
+  progress,
   restStart,
   setKey,
   type SetRef,
@@ -31,6 +34,7 @@ import {
   spokenName,
   titleName,
 } from "./training-view.ts";
+import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf } from "./superset-view.ts";
 
 /** What Fokus needs of one sheet row (a subset of ExerciseView, so fixtures stay small). */
 export type FokusExercise = Pick<
@@ -64,14 +68,16 @@ export type FokusExercise = Pick<
  *   set       the first open set, with its done as the primary. `rest`: the timer counts from the
  *             latest tap when it was a done (a warm-up's done too: F5), `after` the item it ended;
  *             null after a skip, before any done, or after Fortryd back to such a state. `showRest`
- *             is the one switch for the rest strip (today: rest !== null). `feel`: the set whose
- *             done is the latest tap (never a warm-up), rated optionally under the next set
- *   warmup    Variants A and C: the first open item is a warm-up. `feel` is the set whose done
- *             ended the previous exercise (C), null after a begin or a skip (A)
+ *             is false when that done was a superset's A and this set is its B (supersets.md S13).
+ *             `feel`: the set whose done is the latest tap (never a warm-up), rated optionally
+ *             under the next set
+ *   warmup    Variants A and C: the first open item is a warm-up (never part of a superset, so
+ *             never a hand-off). `feel` is the set whose done ended the previous exercise (C),
+ *             null after a begin or a skip (A)
  *   finished  no open set; `feel` is the session's last set when the latest tap was its done
  * The same log always gives the same view, so a reload shows what the tap showed.
  */
-export type FokusView =
+export type FokusState =
   | {
       readonly kind: "set";
       readonly next: SetRef;
@@ -83,11 +89,11 @@ export type FokusView =
   | { readonly kind: "finished"; readonly feel: SetRef | null };
 
 /** `handOff(after, next)`: true when `next` is `after`'s paired B straight after it (supersets.md S13): no rest strip. */
-export function fokusView(
+export function fokusState(
   order: readonly SetRef[],
   log: ReadonlyMap<string, LoggedSet>,
   handOff: (after: SetRef, next: SetRef) => boolean = () => false,
-): FokusView {
+): FokusState {
   const open = firstOpen(order, log);
   const latest = lastTap(log);
   // restStart excludes a warm-up's done; the feel row never rates a warm-up.
@@ -98,6 +104,171 @@ export function fokusView(
   }
   const rest = latest !== null && latest.kind === "done" ? { since: latest.at, after: latest.ref } : null;
   return { kind: "set", next: open, rest, showRest: rest !== null && !handOff(rest.after, open), feel };
+}
+
+/** What fokusView reads of the session (FokusScreen's FokusSession). */
+export type FokusInput = {
+  readonly exercises: readonly FokusExercise[];
+  /** The supersets in force (supersets.md S10–S17); `order` is already interleaved by them. */
+  readonly pairs: readonly PairRef[];
+  readonly order: readonly SetRef[];
+  readonly week: number;
+};
+
+/** A rest window: the recommended span in seconds (null = none) and whether it is a superset's (R3, S14). */
+export type RestWindow = { readonly minS: number | null; readonly maxS: number | null; readonly superset: boolean };
+
+export type DoneLabel = { readonly visible: string; readonly spoken: string };
+
+/** The feel row (fokus-pause.md §1): the set it rates, its log row, and whether its question names it. */
+export type FeelTarget = {
+  readonly ref: SetRef;
+  readonly set: SetInContext;
+  readonly logged: LoggedSet | undefined;
+  readonly named: boolean;
+};
+
+/** Fortryd (§6): what it undoes, its sr-only line, and the polite sentence after it. */
+export type UndoTarget =
+  | { readonly kind: "tap"; readonly ref: SetRef; readonly line: string | null; readonly announce: string }
+  | { readonly kind: "begin"; readonly ref: SetRef; readonly line: string };
+
+type Common = {
+  readonly feel: FeelTarget | null;
+  /** Progress in tap order; `skipped` is the count's spoken tail (skippedText). */
+  readonly progress: Progress;
+  readonly skipped: string | null;
+  /** The barcode's "now" tick: the set the view is about (none when finished). */
+  readonly tick: SetRef | null;
+  readonly undo: UndoTarget | null;
+};
+
+/**
+ * Everything Fokus shows, per view (FokusState plus every derived field). `shown` is the set (or,
+ * in a warm-up, its set 1) in context, null only when the order names a row the sheet lacks (not
+ * reached); `following` the item after the shown one; `restWindow` the window the strip shows
+ * after `rest.after` (null without a rest); `restAfter` the window after this item's done (the done
+ * sentence's "Pause, anbefalet …"); `announce` the polite sentence after a done or skip of it.
+ */
+export type FokusView =
+  | (Common & {
+      readonly kind: "set";
+      readonly next: SetRef;
+      readonly shown: SetInContext | null;
+      readonly following: SetRef | null;
+      readonly rest: { readonly since: string; readonly after: SetRef } | null;
+      readonly showRest: boolean;
+      readonly restWindow: RestWindow | null;
+      readonly restAfter: RestWindow | null;
+      readonly label: DoneLabel | null;
+      readonly pairLine: string | null;
+      readonly announce: { readonly done: string; readonly skip: string };
+    })
+  | (Common & {
+      readonly kind: "warmup";
+      readonly warmup: SetRef;
+      readonly shown: SetInContext | null;
+      readonly following: SetRef | null;
+      readonly since: string | null;
+      readonly restAfter: RestWindow | null;
+      readonly label: DoneLabel | null;
+      readonly announce: { readonly done: string };
+    })
+  | (Common & { readonly kind: "finished" });
+
+function windowOf(w: { readonly row: FokusExercise; readonly superset: boolean } | null): RestWindow | null {
+  return w === null ? null : { minS: w.row.restMinS, maxS: w.row.restMaxS, superset: w.superset };
+}
+
+/** One view of the session from its log: every superset rule and sentence applied here, never in the screen. */
+export function fokusView(input: FokusInput, log: ReadonlyMap<string, LoggedSet>): FokusView {
+  const { exercises, pairs, order, week } = input;
+  const at = (r: SetRef) => setInContext(exercises, r);
+  // supersets.md S13: A → B shows B at once, with no rest strip, timer or vibration.
+  const state = fokusState(order, log, (after, next) => pairHandOff(exercises, pairs, after, next));
+  const latest = lastTap(log);
+  const begun = begunWarmup(order, log);
+  const p = progress(order, log);
+  const undo: UndoTarget | null =
+    latest !== null
+      ? { kind: "tap", ref: latest.ref, line: lastTapText(exercises, latest), announce: undoAnnounce(at(latest.ref), latest.ref) }
+      : begun !== null
+        ? { kind: "begin", ref: begun.ref, line: begunText(begun.at) }
+        : null;
+  const feelOf = (shown: SetInContext | null): FeelTarget | null => {
+    if (state.feel === null) return null;
+    const set = at(state.feel);
+    if (set === null) return null;
+    const named = state.kind === "set" && shown !== null ? displayName(set.exercise) !== displayName(shown.exercise) : true;
+    return { ref: state.feel, set, logged: log.get(setKey(state.feel)), named };
+  };
+  const common = { progress: p, skipped: skippedText(p), undo };
+  if (state.kind === "finished") return { ...common, kind: "finished", feel: feelOf(null), tick: null };
+  if (state.kind === "warmup") {
+    const shown = at(setOneOf(state.warmup));
+    const following = nextOpen(order, log, state.warmup);
+    const one = following === null ? null : at(isWarmup(following) ? setOneOf(following) : following);
+    const restRow = restWindowOf(exercises, pairs, state.warmup)?.row ?? null;
+    return {
+      ...common,
+      kind: "warmup",
+      warmup: state.warmup,
+      shown,
+      following,
+      since: state.since,
+      restAfter: windowOf(restWindowOf(exercises, pairs, state.warmup)),
+      label: shown === null ? null : { visible: "Opvarmning udført", spoken: `Opvarmning udført, ${spokenName(shown.exercise)}` },
+      feel: feelOf(null),
+      tick: setOneOf(state.warmup),
+      announce: { done: one === null ? "" : nextSentence(null, one, restRow ?? one.exercise) },
+    };
+  }
+  const shown = at(state.next);
+  const following = nextOpen(order, log, state.next);
+  const next = following === null ? null : at(following);
+  const handOff = handOffName(exercises, pairs, state.next, following);
+  let restWindow: RestWindow | null = null;
+  if (state.rest !== null) {
+    // R3's pair window after B, else the done set's own (a warm-up's done: the set it opens).
+    const win = restWindowOf(exercises, pairs, state.rest.after);
+    const restOf = win?.superset === true ? win.row : (at(isWarmup(state.rest.after) ? state.next : state.rest.after)?.exercise ?? null);
+    restWindow = restOf === null ? null : { minS: restOf.restMinS, maxS: restOf.restMaxS, superset: win?.superset === true };
+  }
+  const restRow = restWindowOf(exercises, pairs, state.next)?.row ?? null;
+  const done =
+    shown === null
+      ? ""
+      : following === null
+        ? FINISHED_SENTENCE
+        : isWarmup(following) && next !== null
+          ? warmupSentence(shown, next.exercise)
+          : next === null
+            ? ""
+            : nextSentence(shown, next, handOff !== null ? null : restRow);
+  const then =
+    next === null ? FINISHED_SENTENCE : isWarmup(next.ref) ? warmupSentence(null, next.exercise) : setSentence(next, week);
+  return {
+    ...common,
+    kind: "set",
+    next: state.next,
+    shown,
+    following,
+    rest: state.rest,
+    showRest: state.showRest,
+    restWindow,
+    restAfter: windowOf(restWindowOf(exercises, pairs, state.next)),
+    label: shown === null ? null : handOff === null ? doneLabel(shown) : handOffLabel(handOff, shown, spokenName(shown.exercise)),
+    pairLine: pairLine(exercises, pairs, state.next),
+    feel: feelOf(shown),
+    tick: state.next,
+    announce: { done, skip: shown === null ? "" : `${skipSentence(shown)} ${then}` },
+  };
+}
+
+/** "Fortrudt: Squat, sæt 1 er åben igen." / "Fortrudt: Squat, opvarmning er i gang igen." */
+function undoAnnounce(undone: SetInContext | null, ref: SetRef): string {
+  if (undone === null) return "";
+  return isWarmup(ref) ? `Fortrudt: ${spokenName(undone.exercise)}, opvarmning er i gang igen.` : undoSentence(undone);
 }
 
 /** One set in context: its sheet row, "Sæt n af m" numbered across the run (spec §10 D11). */

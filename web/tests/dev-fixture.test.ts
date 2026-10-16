@@ -13,7 +13,7 @@ import {
   STALE_AGE_MS,
   staleComputedAt,
 } from "../src/lib/db/dev-fixture.ts";
-import { fokusView } from "../src/lib/fokus-view.ts";
+import { fokusState } from "../src/lib/fokus-view.ts";
 import { type LoggedSet, sessionOrderWithWarmups, setKey } from "../src/lib/set-taps.ts";
 import { PostgrestError } from "../src/lib/db/postgrest.ts";
 import { freshness } from "../src/lib/dashboard-view.ts";
@@ -95,7 +95,7 @@ test("DEV_FIXTURE warmup / pause / exercise-end: each gives its Fokus view (pure
   const viewOf = (f: "warmup" | "pause" | "exercise-end") => {
     const out = pauseFixture(f, sets, [], "2026-10-12", now);
     const log = new Map<string, LoggedSet>(out.setLog.map((l) => [setKey(l), l]));
-    return { out, view: fokusView(order, log) };
+    return { out, view: fokusState(order, log) };
   };
   assert.equal(viewOf("warmup").view.kind, "warmup");
   // A ramp only ever on a main lift: Dips (first here) warms up on the timer only.
@@ -157,7 +157,7 @@ test("DEV_FIXTURE pause-rated / finished (fokus-round4.md §5): pure, nothing is
   const now = new Date("2026-10-12T16:00:00Z");
   const viewOf = (f: "pause-rated" | "finished") => {
     const out = pauseFixture(f, sets, [], "2026-10-12", now);
-    return { out, view: fokusView(order, new Map<string, LoggedSet>(out.setLog.map((l) => [setKey(l), l]))) };
+    return { out, view: fokusState(order, new Map<string, LoggedSet>(out.setLog.map((l) => [setKey(l), l]))) };
   };
   const rated = viewOf("pause-rated");
   assert.equal(rated.view.kind, "set");

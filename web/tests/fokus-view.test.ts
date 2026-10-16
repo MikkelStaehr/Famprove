@@ -10,7 +10,7 @@ import {
   finishCard,
   type FokusExercise,
   fokusStaleNote,
-  fokusView,
+  fokusState,
   formatTimer,
   kgBlock,
   lastTapText,
@@ -97,13 +97,13 @@ function tapAll(taps: readonly ["begin" | "done" | "skip" | "undo", SetRef, stri
   return log;
 }
 
-test("fokusView: set view at the first open set before any tap", () => {
-  assert.deepEqual(fokusView(ORDER, new Map()), { kind: "set", next: ORDER[0], rest: null, showRest: false, feel: null });
+test("fokusState: set view at the first open set before any tap", () => {
+  assert.deepEqual(fokusState(ORDER, new Map()), { kind: "set", next: ORDER[0], rest: null, showRest: false, feel: null });
 });
 
-test("fokusView: after a done the view is the next set, the rest counting from that tap (no start step)", () => {
+test("fokusState: after a done the view is the next set, the rest counting from that tap (no start step)", () => {
   const log = tapAll([["done", ORDER[0], T0]]);
-  assert.deepEqual(fokusView(ORDER, log), {
+  assert.deepEqual(fokusState(ORDER, log), {
     kind: "set",
     next: ORDER[1],
     rest: { since: T0, after: ORDER[0] },
@@ -112,14 +112,14 @@ test("fokusView: after a done the view is the next set, the rest counting from t
   });
 });
 
-test("fokusView: the rest view's primary is a done on next; the next done rests again from its own tap", () => {
+test("fokusState: the rest view's primary is a done on next; the next done rests again from its own tap", () => {
   const log = tapAll([["done", ORDER[0], T0]]);
-  const view = fokusView(ORDER, log);
+  const view = fokusState(ORDER, log);
   assert.ok(view.kind === "set");
   // The primary taps `done` on view.next: its end is written, the set after it is shown.
   const after = applyTap(ORDER, log, "done", view.next, T1);
   assert.equal(after.get(setKey(ORDER[1]))?.endedAt, T1);
-  assert.deepEqual(fokusView(ORDER, after), {
+  assert.deepEqual(fokusState(ORDER, after), {
     kind: "set",
     next: ORDER[2],
     rest: { since: T1, after: ORDER[1] },
@@ -128,27 +128,27 @@ test("fokusView: the rest view's primary is a done on next; the next done rests 
   });
 });
 
-test("fokusView: the feel is optional: an unrated done shows the next set, felt_rpe stays null", () => {
+test("fokusState: the feel is optional: an unrated done shows the next set, felt_rpe stays null", () => {
   const log = tapAll([["done", ORDER[0], T0]]);
   assert.equal(log.get(setKey(ORDER[0]))?.feltRpe ?? null, null);
-  const view = fokusView(ORDER, log);
+  const view = fokusState(ORDER, log);
   assert.equal(view.kind, "set");
   assert.deepEqual(view.kind === "set" ? view.feel : null, ORDER[0]);
 });
 
-test("fokusView: a reload (the same log rebuilt) shows the same next-set view", () => {
+test("fokusState: a reload (the same log rebuilt) shows the same next-set view", () => {
   const log = tapAll([["done", ORDER[0], T0]]);
   const reloaded = new Map<string, LoggedSet>([...log.values()].map((l) => [setKey(l), { ...l }]));
-  assert.deepEqual(fokusView(ORDER, reloaded), fokusView(ORDER, log));
+  assert.deepEqual(fokusState(ORDER, reloaded), fokusState(ORDER, log));
 });
 
-test("fokusView: Fortryd after a done shows that set again, the timer counting from the tap before it (F8)", () => {
+test("fokusState: Fortryd after a done shows that set again, the timer counting from the tap before it (F8)", () => {
   const log = tapAll([
     ["done", ORDER[0], T0],
     ["done", ORDER[1], T1],
     ["undo", ORDER[1], T2],
   ]);
-  assert.deepEqual(fokusView(ORDER, log), {
+  assert.deepEqual(fokusState(ORDER, log), {
     kind: "set",
     next: ORDER[1],
     rest: { since: T0, after: ORDER[0] },
@@ -157,12 +157,12 @@ test("fokusView: Fortryd after a done shows that set again, the timer counting f
   });
 });
 
-test("fokusView: a skip as the latest tap shows the next set directly (no rest strip, no feel row)", () => {
+test("fokusState: a skip as the latest tap shows the next set directly (no rest strip, no feel row)", () => {
   const log = tapAll([
     ["done", ORDER[0], T0],
     ["skip", ORDER[1], T1],
   ]);
-  assert.deepEqual(fokusView(ORDER, log), { kind: "set", next: ORDER[2], rest: null, showRest: false, feel: null });
+  assert.deepEqual(fokusState(ORDER, log), { kind: "set", next: ORDER[2], rest: null, showRest: false, feel: null });
 });
 
 test("Til næste sæt is gone from src/ (fokus-flow.md §1)", () => {
@@ -172,13 +172,13 @@ test("Til næste sæt is gone from src/ (fokus-flow.md §1)", () => {
   assert.equal(r.stdout.trim(), "");
 });
 
-test("fokusView: finished when no set is open, also with skips", () => {
+test("fokusState: finished when no set is open, also with skips", () => {
   const log = tapAll([
     ["done", ORDER[0], T0],
     ["skip", ORDER[1], T1],
     ["done", ORDER[2], T2],
   ]);
-  assert.deepEqual(fokusView(ORDER, log), { kind: "finished", feel: ORDER[2] });
+  assert.deepEqual(fokusState(ORDER, log), { kind: "finished", feel: ORDER[2] });
 });
 
 test("setInContext: Sæt n af m by the row's sets; unknown row is null", () => {
@@ -430,11 +430,11 @@ function wTaps(taps: readonly ["begin" | "done" | "skip" | "undo", SetRef, strin
 
 test("pause variants: begin -> warm-up (A); Til sæt 1 -> set 1; done mid-run -> pause (B); done ending a run -> warm-up with feel (C)", () => {
   const begun = wTaps([["begin", { row: 4, set: 0 }, T0]]);
-  assert.deepEqual(fokusView(W_ORDER, begun), { kind: "warmup", warmup: { row: 4, set: 0 }, since: T0, feel: null });
+  assert.deepEqual(fokusState(W_ORDER, begun), { kind: "warmup", warmup: { row: 4, set: 0 }, since: T0, feel: null });
   assert.deepEqual(begunWarmup(W_ORDER, begun), { ref: { row: 4, set: 0 }, at: T0 });
   const warmedUp = applyTap(W_ORDER, begun, "done", { row: 4, set: 0 }, T1);
   // F5: the warm-up's done shows set 1 in the same layout, the timer counting from that tap (no feel row).
-  assert.deepEqual(fokusView(W_ORDER, warmedUp), {
+  assert.deepEqual(fokusState(W_ORDER, warmedUp), {
     kind: "set",
     next: { row: 4, set: 1 },
     rest: { since: T1, after: { row: 4, set: 0 } },
@@ -443,7 +443,7 @@ test("pause variants: begin -> warm-up (A); Til sæt 1 -> set 1; done mid-run ->
   });
   assert.equal(begunWarmup(W_ORDER, warmedUp), null);
   const one = applyTap(W_ORDER, warmedUp, "done", { row: 4, set: 1 }, T2);
-  assert.deepEqual(fokusView(W_ORDER, one), {
+  assert.deepEqual(fokusState(W_ORDER, one), {
     kind: "set",
     next: { row: 4, set: 2 },
     rest: { since: T2, after: { row: 4, set: 1 } },
@@ -452,7 +452,7 @@ test("pause variants: begin -> warm-up (A); Til sæt 1 -> set 1; done mid-run ->
   });
   const T3 = "2026-10-12T16:09:00.000Z";
   const two = applyTap(W_ORDER, one, "done", { row: 4, set: 2 }, T3);
-  assert.deepEqual(fokusView(W_ORDER, two), { kind: "warmup", warmup: { row: 7, set: 0 }, since: T3, feel: { row: 4, set: 2 } });
+  assert.deepEqual(fokusState(W_ORDER, two), { kind: "warmup", warmup: { row: 7, set: 0 }, since: T3, feel: { row: 4, set: 2 } });
 });
 
 test("pause variants: a skip that ends a run opens the next warm-up without a feel block (R5)", () => {
@@ -461,7 +461,7 @@ test("pause variants: a skip that ends a run opens the next warm-up without a fe
     ["done", { row: 4, set: 1 }, T1],
     ["skip", { row: 4, set: 2 }, T2],
   ]);
-  const view = fokusView(W_ORDER, log);
+  const view = fokusState(W_ORDER, log);
   assert.equal(view.kind, "warmup");
   assert.equal(view.kind === "warmup" ? view.feel : "x", null);
 });

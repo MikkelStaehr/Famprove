@@ -250,11 +250,10 @@ export function restWindowOf<E extends FokusRow>(exercises: readonly E[], pairs:
 /** S12: A's done, "Videre til Pull-ups"; spoken "Videre til Pull-ups, sæt 2 af 4 udført, Bench" (a working set only). */
 export function handOffLabel(
   bName: string,
-  done: { readonly number: number; readonly count: number } | null,
+  done: { readonly number: number; readonly count: number },
   aName: string,
 ): { readonly visible: string; readonly spoken: string } {
-  const what = done === null ? "opvarmning udført" : `sæt ${done.number} af ${done.count} udført`;
-  return { visible: `Videre til ${bName}`, spoken: `Videre til ${bName}, ${what}, ${aName}` };
+  return { visible: `Videre til ${bName}`, spoken: `Videre til ${bName}, sæt ${done.number} af ${done.count} udført, ${aName}` };
 }
 
 /** S11 / S16: the line under the name stack, null outside a pair and on a warm-up (it runs alone). */

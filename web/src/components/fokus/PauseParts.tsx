@@ -9,6 +9,7 @@ import {
   feelQuestion,
   footerText,
   type FokusExercise,
+  type RestWindow,
   nextFeel,
   nextSetSummary,
   rampBasis,
@@ -201,19 +202,15 @@ function RepsStepper({
  */
 export function RestStrip({
   since,
-  exercise,
-  superset = false,
+  window: { minS, maxS, superset },
   onAnnounce,
 }: {
   readonly since: string;
-  readonly exercise: FokusExercise;
-  /** The rest after a superset's B (supersets.md S14): the label says so. */
-  readonly superset?: boolean;
+  /** fokusView's restWindow; `superset`: the rest after a superset's B (supersets.md S14), the label says so. */
+  readonly window: RestWindow;
   readonly onAnnounce: (s: string) => void;
 }) {
   const seconds = useElapsed(since);
-  const minS = exercise.restMinS;
-  const maxS = exercise.restMaxS;
   const band = restBand(seconds, minS, maxS);
   const signal = useRef<{ readonly since: string; readonly s: RestSignal } | null>(null);
   const said = useRef<string | null>(null);

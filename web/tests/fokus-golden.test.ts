@@ -6,14 +6,12 @@ import { fileURLToPath } from "node:url";
 import { recordSetTap, type RecordOptions } from "../src/lib/db/set-log.ts";
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
 import {
-  displayName,
-  doneLabel,
   feelQuestion,
+  fokusState,
   fokusView,
   nextFeel,
   repsRange,
-  setInContext,
-  setOneOf,
+  type RestWindow,
   stepperValue,
   begunWarmup,
 } from "../src/lib/fokus-view.ts";
@@ -23,9 +21,7 @@ import {
   isWarmup,
   lastTap,
   type LoggedSet,
-  nextOpen,
   type PairRef,
-  progress,
   rangeTops,
   restStart,
   sessionOrderWithWarmups,
@@ -36,8 +32,8 @@ import {
   type Undoes,
   undoesOf,
 } from "../src/lib/set-taps.ts";
-import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf, runSetsOf } from "../src/lib/superset-view.ts";
-import { checklistView, type ExerciseView, spokenName } from "../src/lib/training-view.ts";
+import { pairHandOff, runSetsOf } from "../src/lib/superset-view.ts";
+import { checklistView, type ExerciseView } from "../src/lib/training-view.ts";
 
 // Golden "before" snapshot (slice golden-test, user 2026-10-16): what Fokus and Træning derive
 // after every tap, and what the server stores, for scripted and seeded tap sequences on synthetic
@@ -149,68 +145,45 @@ const ref = (r: SetRef | null | undefined) => (r == null ? null : setKey(r));
  */
 function screenFacts(s: Session, order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>) {
   const exercises = s.exercises;
-  const pairs = s.pairs;
-  const view = fokusView(order, log, (after, next) => pairHandOff(exercises, pairs, after, next));
-  const at = (r: SetRef) => setInContext(exercises, r);
+  const view = fokusView({ exercises, pairs: s.pairs, order, week: 1 }, log);
   const latest = lastTap(log);
   const shown = view.kind === "set" ? view.next : view.kind === "warmup" ? view.warmup : null;
-  const following = shown === null ? null : nextOpen(order, log, shown);
-  const windowOf = (after: SetRef) => {
-    const w = restWindowOf(exercises, pairs, after);
-    return w === null ? null : [w.row.restMinS, w.row.restMaxS, w.superset];
-  };
-  // FokusScreen.restOfSet: the strip's window after view.rest.after (a warm-up's done: the set it opens).
+  const following = view.kind === "finished" ? null : view.following;
+  const win = (w: RestWindow | null) => (w === null ? null : [w.minS, w.maxS, w.superset]);
+  // The pre-refactor FokusState, projected from the view.
+  const state =
+    view.kind === "set"
+      ? { kind: view.kind, next: view.next, rest: view.rest, showRest: view.showRest, feel: view.feel?.ref ?? null }
+      : view.kind === "warmup"
+        ? { kind: view.kind, warmup: view.warmup, since: view.since, feel: view.feel?.ref ?? null }
+        : { kind: view.kind, feel: view.feel?.ref ?? null };
   let restWindow: unknown = null;
-  if (view.kind === "set" && view.rest !== null) {
-    const win = restWindowOf(exercises, pairs, view.rest.after);
-    const restOf = win?.superset === true ? win.row : (at(isWarmup(view.rest.after) ? view.next : view.rest.after)?.exercise ?? null);
-    restWindow = [restOf?.restMinS ?? null, restOf?.restMaxS ?? null, win?.superset === true];
-  }
-  let label: { visible: string; spoken: string } | null = null;
-  let pair: string | null = null;
-  let warmupSince: string | null = null;
-  if (view.kind === "set") {
-    const next = at(view.next);
-    const handOff = handOffName(exercises, pairs, view.next, following);
-    if (next !== null) label = handOff === null ? doneLabel(next) : handOffLabel(handOff, next, spokenName(next.exercise));
-    pair = pairLine(exercises, pairs, view.next);
-  } else if (view.kind === "warmup") {
-    const setOne = at(setOneOf(view.warmup));
-    const handOff = handOffName(exercises, pairs, view.warmup, following);
-    if (setOne !== null) {
-      const name = spokenName(setOne.exercise);
-      label = handOff === null ? { visible: "Opvarmning udført", spoken: `Opvarmning udført, ${name}` } : handOffLabel(handOff, null, name);
-    }
-    warmupSince = latest !== null && latest.kind === "done" && pairHandOff(exercises, pairs, latest.ref, view.warmup) ? null : view.since;
-  }
+  if (view.kind === "set" && view.rest !== null) restWindow = view.restWindow === null ? [null, null, false] : win(view.restWindow);
   let feel: unknown = null;
   if (view.feel !== null) {
-    const f = at(view.feel);
-    const logged = log.get(setKey(view.feel));
-    const shownSet = view.kind === "set" ? at(view.next) : null;
-    const named = view.kind === "set" && f !== null && shownSet !== null ? displayName(f.exercise) !== displayName(shownSet.exercise) : true;
-    const range = f === null ? null : repsRange(f.exercise.repsText);
+    const f = view.feel;
+    const range = repsRange(f.set.exercise.repsText);
     feel = {
-      set: ref(view.feel),
-      question: f === null ? null : feelQuestion(f, named),
-      felt: logged?.feltRpe ?? null,
+      set: ref(f.ref),
+      question: feelQuestion(f.set, f.named),
+      felt: f.logged?.feltRpe ?? null,
       range: range === null ? null : [range.low, range.top],
-      stepper: range === null ? null : stepperValue(logged?.repsDone, range.top),
+      stepper: range === null ? null : stepperValue(f.logged?.repsDone, range.top),
     };
   }
   const cl = checklistView([...exercises], order, log);
   return {
-    view: norm(view),
+    view: norm(state),
     current: ref(shown),
     next: ref(following),
     showRest: view.kind === "set" ? view.showRest : null,
     restWindow,
-    restAfterCurrent: shown === null ? null : windowOf(shown), // nextSentence's restRowFor(current)
-    label,
-    pairLine: pair,
-    warmupSince: tapIndex(warmupSince),
+    restAfterCurrent: view.kind === "finished" ? null : win(view.restAfter), // nextSentence's rest row
+    label: view.kind === "finished" ? null : view.label,
+    pairLine: view.kind === "set" ? view.pairLine : null,
+    warmupSince: tapIndex(view.kind === "warmup" ? view.since : null),
     feel,
-    progress: progress(order, log),
+    progress: view.progress,
     lastTap: latest === null ? null : { ref: setKey(latest.ref), kind: latest.kind, at: tapIndex(latest.at) },
     restStart: tapIndex(restStart(log)),
     begun: norm(begunWarmup(order, log)),
@@ -344,12 +317,12 @@ function diffOf(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, r
 type Tap = { readonly kind: SetTapKind; readonly ref: SetRef; readonly value: number | null; readonly label: string };
 
 function feelTarget(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>): SetRef | null {
-  return fokusView(order, log).feel;
+  return fokusState(order, log).feel;
 }
 
 /** One named op on the current client state; null when the screens don't offer it now. */
 function op(s: Session, order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, name: string): Tap | null {
-  const view = fokusView(order, log, (a, n) => pairHandOff(s.exercises, s.pairs, a, n));
+  const view = fokusState(order, log, (a, n) => pairHandOff(s.exercises, s.pairs, a, n));
   const shown = view.kind === "set" ? view.next : view.kind === "warmup" ? view.warmup : null;
   const [what, arg] = name.split(":");
   switch (what) {
