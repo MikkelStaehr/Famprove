@@ -25,7 +25,7 @@ import {
 } from "@/lib/fokus-view";
 import { adjustmentLine, CAPPED_WORD } from "@/lib/training-view";
 import { type Signature, signature } from "@/lib/fokus-marks";
-import { type LoggedSet, type PairRef, type SetRef, setKey } from "@/lib/set-taps";
+import { type JumpMark, type LoggedSet, type PairRef, type SetRef, setKey } from "@/lib/set-taps";
 
 import { clientOrder, refusedText, runSetsOf, type SeamSave, slotKey, supersetOffer, type SupersetOffer, seamSentence, seamViews } from "@/lib/superset-view";
 import type { PairSlot } from "@/lib/supersets";
@@ -54,6 +54,8 @@ export type FokusSession = {
   readonly pairs?: readonly PairRef[];
   /** Today's stored run order after a jump (session_order); `order` already follows it. */
   readonly runRows?: readonly number[] | null;
+  /** The latest jump's undo mark (session_order); absent or null = none. */
+  readonly jump?: JumpMark | null;
   /** Every boundary between two consecutive runs, for the ⇄ switch (fokus-superset.md); absent = none. */
   readonly pairSlots?: readonly PairSlot[];
   /** Combined-variant parts (combo-parts.md): loadTrainingPlan's parts; absent = none. */
@@ -92,14 +94,14 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const switched = supersets.saves.size > 0;
   const orderedPairs = useMemo(() => (switched ? supersets.ordered : (session.pairs ?? [])), [switched, supersets.ordered, session.pairs]);
   const shape = useMemo(
-    () => ({ sets: runSetsOf(session.exercises), pairs: orderedPairs, runRows: session.runRows ?? null }),
-    [session.exercises, orderedPairs, session.runRows],
+    () => ({ sets: runSetsOf(session.exercises), pairs: orderedPairs, runRows: session.runRows ?? null, jump: session.jump ?? null }),
+    [session.exercises, orderedPairs, session.runRows, session.jump],
   );
   const baseOrder = useMemo(
     () => (switched ? clientOrder(session.exercises, orderedPairs, session.runRows ?? null) : session.order),
     [switched, session.exercises, orderedPairs, session.runRows, session.order],
   );
-  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpProblem } = useSetLog(session.log, baseOrder, date, session.session, session.exercises, shape);
+  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpProblem, shape: liveShape } = useSetLog(session.log, baseOrder, date, session.session, session.exercises, shape);
   // The session sheet (fokus-sheet.md): open state is never persisted (closed after a reload).
   const [sheet, setSheet] = useState<{ readonly animateIn: boolean } | null>(() => (openOnLoad ? { animateIn: false } : null));
   const barButton = useRef<HTMLButtonElement>(null);
@@ -121,7 +123,15 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
   // Every superset rule, label and sentence comes from the view; the screen renders and dispatches taps.
   const view = fokusView(
-    { exercises: session.exercises, pairs: orderedPairs, order, week: session.week, session: session.session, ...(session.parts === undefined ? {} : { parts: session.parts }) },
+    {
+      exercises: session.exercises,
+      pairs: orderedPairs,
+      order,
+      week: session.week,
+      session: session.session,
+      ...(session.parts === undefined ? {} : { parts: session.parts }),
+      ...(liveShape === undefined ? {} : { shape: liveShape }),
+    },
     log,
   );
   // combo-parts.md: the parts editor's drafts live here, so a failed save, Fortryd and a re-done keep them.

@@ -6,8 +6,10 @@ import { logExerciseTap } from "@/app/actions";
 import { freshAfterTap, type FreshTicks, initialFresh } from "@/lib/fresh-ticks";
 import { jumpFailure } from "@/lib/jump-save";
 import {
+  applyChanges,
+  applyOrderChanges,
   applyTap,
-  jumpRunRows,
+  type JumpMark,
   type LoggedSet,
   rangeTops,
   refused,
@@ -17,6 +19,7 @@ import {
   type SessionShape,
   type SetTapKind,
   shapeOrder,
+  transition,
   undoesOf,
 } from "@/lib/set-taps";
 
@@ -52,7 +55,12 @@ export type SetLog = {
    * supersets' orderPairs). Null = none.
    */
   readonly jumpProblem: JumpProblem | null;
+  /** The session's shape in force (with the jump's undo mark), for Fortryd's target; absent without a shape. */
+  readonly shape?: SessionShape;
 };
+
+/** The order and undo mark after a jump or its Fortryd this visit. */
+type Jumped = { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null };
 
 export type JumpProblem = { readonly row: number; readonly kind: "failed" | "refused" };
 
@@ -78,12 +86,15 @@ export function useSetLog(
   /** The session's runs, pairs and stored order: a `jump` needs them (Fokus); without it a jump does nothing. */
   shape?: SessionShape,
 ): SetLog {
-  // A jump this visit (the server stores it in session_order; a reload reads it back into `order`).
-  const [jumped, setJumped] = useState<readonly number[] | null>(null);
+  // A jump or its Fortryd this visit (the server stores it in session_order with its undo mark; a
+  // reload reads both back into `shape`).
+  const [jumped, setJumped] = useState<Jumped | null>(null);
   const liveShape = useMemo(
-    () => (shape === undefined ? undefined : jumped === null ? shape : { ...shape, runRows: jumped }),
+    () => (shape === undefined ? undefined : jumped === null ? shape : { ...shape, runRows: jumped.runRows, jump: jumped.jump }),
     [shape, jumped],
   );
+  // A jump's local time -> the server's T (its jumped_at), so Fortryd's guard names the stored jump.
+  const serverJumpAt = useRef(new Map<string, string>());
   const live = useMemo(
     () => (liveShape === undefined || jumped === null ? order : shapeOrder(liveShape)),
     [liveShape, jumped, order],
@@ -99,7 +110,7 @@ export function useSetLog(
   const [jumpProblem, setJumpProblem] = useState<JumpProblem | null>(null);
   // Every tap counts up; a jump keeps what it replaced, so a save that doesn't land can put it back.
   const tapSeq = useRef(0);
-  const jumpSnap = useRef<{ readonly seq: number; readonly log: ReadonlyMap<string, LoggedSet>; readonly jumped: readonly number[] | null } | null>(null);
+  const jumpSnap = useRef<{ readonly seq: number; readonly log: ReadonlyMap<string, LoggedSet>; readonly jumped: Jumped | null } | null>(null);
   const [rejected, setRejected] = useState(false);
   const [dev, setDev] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -113,11 +124,14 @@ export function useSetLog(
   }, []);
 
   /** A jump's save: stored keeps the order; failed or refused puts back what the jump replaced. */
-  const sendJump = useCallback(async (input: SetTapInput, seq: number) => {
+  const sendJump = useCallback(async (input: SetTapInput, seq: number, localAt: string) => {
     let outcome: JumpProblem["kind"] | null = "failed";
     try {
       const result = await logExerciseTap(input);
-      if (result.ok) outcome = null;
+      if (result.ok) {
+        outcome = null;
+        serverJumpAt.current.set(localAt, result.at);
+      }
       else if (result.reason === "dev") {
         setDev(true); // fixtures write nothing; the jump shows as if stored
         outcome = null;
@@ -141,7 +155,9 @@ export function useSetLog(
   }, []);
 
   const send = useCallback(
-    async (input: SetTapInput) => {
+    async (sent: SetTapInput) => {
+      // A jump's Fortryd names the stored jump: its server time once the jump's save has returned.
+      const input = sent.seen == null ? sent : { ...sent, seen: serverJumpAt.current.get(sent.seen) ?? sent.seen };
       try {
         const result = await logExerciseTap(input);
         if (result.ok) return;
@@ -161,16 +177,31 @@ export function useSetLog(
       if (kind === "jump") {
         // The shared transition (lib/set-taps applyTap) with the session's shape; the new order is jumpRunRows.
         if (liveShape === undefined) return;
-        const runRows = jumpRunRows(liveShape, log, ref.row);
-        if (runRows === null) return; // a done run or no run: the server refuses it too
+        const at = new Date().toISOString();
+        const changes = transition(live, log, { kind, target: ref, undoes: null, value: null }, at, tops, liveShape);
+        if (changes === null) return; // a done run or no run: the server refuses it too
         tapSeq.current += 1;
         const seq = tapSeq.current;
         jumpSnap.current = { seq, log, jumped };
         setJumpProblem(null);
-        setLog((previous) => applyTap(live, previous, "jump", ref, new Date().toISOString(), null, tops, liveShape));
-        setJumped(runRows);
+        setLog((previous) => applyTap(live, previous, "jump", ref, at, null, tops, liveShape));
+        const next = applyOrderChanges(liveShape, changes);
+        setJumped({ runRows: next.runRows, jump: next.jump ?? null });
         const input: SetTapInput = { kind, date, session, row: ref.row, set: ref.set, undoes: null };
-        queue.current = queue.current.then(() => sendJump(input, seq));
+        queue.current = queue.current.then(() => sendJump(input, seq, at));
+        return;
+      }
+      if (kind === "undo" && liveShape?.jump != null && undoesOf(log, ref, liveShape) === "jump") {
+        // Fortryd of the latest jump or chain (slice jump-undo): the shared transition, guarded on the jump seen.
+        const seen = liveShape.jump.jumpedAt;
+        const changes = transition(live, log, { kind, target: ref, undoes: "jump", value: null, seen }, new Date().toISOString(), tops, liveShape);
+        if (changes === null || changes.length === 0) return;
+        tapSeq.current += 1;
+        setLog((previous) => applyChanges(previous, changes));
+        const next = applyOrderChanges(liveShape, changes);
+        setJumped({ runRows: next.runRows, jump: next.jump ?? null });
+        const input: SetTapInput = { kind, date, session, row: ref.row, set: ref.set, undoes: "jump", seen };
+        queue.current = queue.current.then(() => send(input));
         return;
       }
       tapSeq.current += 1;
@@ -206,5 +237,5 @@ export function useSetLog(
   const flush = useCallback(() => queue.current, []);
   const failedNow = useCallback(() => failed.current.length, []);
 
-  return { log, fresh, tap, unsaved, retry, rejected, dev, flush, failedNow, order: live, jumpProblem };
+  return { log, fresh, tap, unsaved, retry, rejected, dev, flush, failedNow, order: live, jumpProblem, ...(liveShape === undefined ? {} : { shape: liveShape }) };
 }

@@ -20,6 +20,7 @@ import {
   restStart,
   runOfRows,
   setKey,
+  type SessionShape,
   type SetRef,
   stateOf,
 } from "./set-taps.ts";
@@ -119,6 +120,8 @@ export type FokusInput = {
   readonly session: number;
   /** Combined-variant parts (combo-parts.md); absent = no variant has parts. */
   readonly parts?: PartsData;
+  /** The session's shape with the latest jump's undo mark (slice jump-undo): Fortryd may undo the jump. Absent = none. */
+  readonly shape?: SessionShape;
 };
 
 /** A rest window: the recommended span in seconds (null = none) and whether it is a superset's (R3, S14). */
@@ -199,12 +202,12 @@ export function fokusView(input: FokusInput, log: ReadonlyMap<string, LoggedSet>
   const at = (r: SetRef) => setInContext(exercises, r);
   // supersets.md S13: A → B shows B at once, with no rest strip, timer or vibration.
   const state = fokusState(order, log, (after, next) => pairHandOff(exercises, pairs, after, next));
-  const latest = lastTap(log);
+  const latest = lastTap(log, input.shape);
   const begun = begunWarmup(order, log);
   const p = progress(order, log);
   const undo: UndoTarget | null =
     latest !== null
-      ? { kind: "tap", ref: latest.ref, line: lastTapText(exercises, latest), announce: undoAnnounce(at(latest.ref), latest.ref) }
+      ? { kind: "tap", ref: latest.ref, line: lastTapText(exercises, latest), announce: latest.kind === "jump" ? jumpUndoAnnounce(at(latest.ref)) : undoAnnounce(at(latest.ref), latest.ref) }
       : begun !== null
         ? { kind: "begin", ref: begun.ref, line: begunText(begun.at) }
         : null;
@@ -285,6 +288,11 @@ export function fokusView(input: FokusInput, log: ReadonlyMap<string, LoggedSet>
     tick: state.next,
     announce: { done, skip: shown === null ? "" : `${skipSentence(shown)} ${then}` },
   };
+}
+
+/** Fortryd of a jump (slice jump-undo): "Fortrudt: spring til Bænkpres." */
+function jumpUndoAnnounce(jumpedTo: SetInContext | null): string {
+  return jumpedTo === null ? "Fortrudt: spring." : `Fortrudt: spring til ${spokenName(jumpedTo.exercise)}.`;
 }
 
 /** "Fortrudt: Squat, sæt 1 er åben igen." / "Fortrudt: Squat, opvarmning er i gang igen." */
@@ -391,6 +399,7 @@ export function lastTapText(exercises: readonly FokusExercise[], tap: LastTap): 
   const s = setInContext(exercises, tap.ref);
   if (s === null) return null;
   const name = spokenName(s.exercise);
+  if (tap.kind === "jump") return `Fortryd spring til ${name}`;
   if (isWarmup(tap.ref)) return `${name}, opvarmning færdig kl. ${clockTime(tap.at)}`;
   return tap.kind === "done"
     ? `${name}, sæt ${s.number} udført kl. ${clockTime(tap.at)}`

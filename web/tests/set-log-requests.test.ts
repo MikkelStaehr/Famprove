@@ -232,7 +232,35 @@ const SCENARIOS: readonly { readonly name: string; readonly pairs: readonly Row[
       step("jump", 26, 1, 9),
     ],
   },
+  // Slice jump-undo (user 2026-10-17): Fortryd of a jump or a chain (new keys only).
+  ...JUMP_UNDO_SCENARIOS(),
 ];
+
+/** Fortryd of a jump: Fokus sends undoes "jump" with the jumped_at it saw (the jump's T). */
+function undoJump(m: number, jumpM: number): Step {
+  return step("undo", 27, 0, m, { undoes: "jump", seen: at(jumpM).toISOString() });
+}
+
+function JUMP_UNDO_SCENARIOS(): { readonly name: string; readonly pairs: readonly Row[]; readonly steps: readonly Step[] }[] {
+  const squat1 = [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5)];
+  return [
+    {
+      name: "jump undo: jump, Fortryd (the order and the start back), Fortryd again (nothing), go on",
+      pairs: [],
+      steps: [...squat1, step("jump", 27, 1, 6), undoJump(7, 6), undoJump(8, 6), step("done", 25, 2, 9)],
+    },
+    {
+      name: "jump undo: a chain of two jumps, one Fortryd",
+      pairs: [],
+      steps: [...squat1, step("jump", 26, 1, 6), step("undo", 26, 0, 7, { undoes: "jump", seen: at(6).toISOString() }), step("jump", 26, 1, 8), step("jump", 27, 1, 9), undoJump(10, 9)],
+    },
+    {
+      name: "jump undo: a done after the jump, Fortryd undoes the done, a stale jump undo is refused, then the jump",
+      pairs: [],
+      steps: [...squat1, step("jump", 27, 1, 6), step("done", 27, 0, 7), undoJump(8, 6), step("undo", 27, 0, 9, { undoes: "done" }), undoJump(10, 6)],
+    },
+  ];
+}
 
 /** The cut scenario: replay up to `cut` taps, cut the connection at request k of the next one, then retry it. */
 const CUTS: readonly { readonly name: string; readonly pairs: readonly Row[]; readonly before: readonly Step[]; readonly tap: Step }[] = [
@@ -250,6 +278,19 @@ const CUTS: readonly { readonly name: string; readonly pairs: readonly Row[]; re
     tap: step("jump", 27, 1, 14),
   },
   { name: "jump right after Begynd", pairs: [], before: [step("begin", 25, 0, 0)], tap: step("jump", 26, 1, 1) },
+  // Slice jump-undo: Fortryd of a jump and of a chain, cut at every request.
+  {
+    name: "undo of a jump after Squat 1",
+    pairs: [],
+    before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5), step("jump", 27, 1, 6)],
+    tap: undoJump(7, 6),
+  },
+  {
+    name: "undo of a chain of two jumps",
+    pairs: [],
+    before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5), step("jump", 26, 1, 6), step("jump", 27, 1, 7)],
+    tap: undoJump(8, 7),
+  },
 ];
 
 type Record_ = { readonly tap: string; readonly result: unknown; readonly requests: readonly Request[] };
@@ -284,7 +325,7 @@ async function record(): Promise<unknown> {
       const cut = await run(db, c.tap);
       db.cutAt = null;
       const retry = await run(db, c.tap);
-      cuts.push(c.tap.kind === "jump" ? { k, cut, retry, log: db.tables.exercise_set_log, order: db.tables.session_order } : { k, cut, retry, log: db.tables.exercise_set_log });
+      cuts.push(c.tap.kind === "jump" || c.tap.more?.undoes === "jump" ? { k, cut, retry, log: db.tables.exercise_set_log, order: db.tables.session_order } : { k, cut, retry, log: db.tables.exercise_set_log });
     }
     out[`cut: ${c.name}`] = cuts;
   }
@@ -316,6 +357,39 @@ test("a jump cut at every request, then retried, ends as the uncut jump (log and
       assert.deepEqual((await run(db, c.tap)).result, { ok: true, at: at(c.tap.m).toISOString() }, `${c.name} cut ${k}`);
       assert.deepEqual(db.tables.exercise_set_log, whole.tables.exercise_set_log, `${c.name} cut ${k}: log`);
       assert.deepEqual(db.tables.session_order, whole.tables.session_order, `${c.name} cut ${k}: order`);
+    }
+  }
+});
+
+/** The screens' state of a table: every set's times (not updated_at), and the order with its undo mark. */
+function state(db: Db) {
+  const log = db.tables.exercise_set_log
+    .map((r) => [r.row_no, r.set_no, r.started_at, r.ended_at, r.skipped, r.skipped_at ?? null, r.felt_rpe, r.reps_done])
+    .toSorted((a, b) => Number(a[0]) - Number(b[0]) || Number(a[1]) - Number(b[1]));
+  const o = db.tables.session_order.at(0);
+  // No row and the sheet's runs are the same order.
+  const order = o === undefined ? [25, 26, 27] : o.run_rows;
+  return { log, order, mark: o === undefined ? null : [o.previous_rows ?? null, o.jumped_at ?? null, o.moved_start ?? null] };
+}
+
+test("Fortryd of a jump (or a chain) cut at every request, then retried, is the state before the jump", async () => {
+  for (const c of CUTS.filter((x) => x.tap.more?.undoes === "jump")) {
+    const db0 = freshDb(c.pairs);
+    const firstJump = c.before.findIndex((s) => s.kind === "jump");
+    for (const s of c.before.slice(0, firstJump)) await run(db0, s);
+    const beforeJump = state(db0);
+    for (const s of c.before.slice(firstJump)) await run(db0, s);
+    const n = (await run(structuredClone(db0), c.tap)).requests.length;
+    assert.ok(n > 0);
+    for (let k = 1; k <= n; k += 1) {
+      const db = structuredClone(db0);
+      db.cutAt = k;
+      await run(db, c.tap);
+      db.cutAt = null;
+      assert.deepEqual((await run(db, c.tap)).result, { ok: true, at: at(c.tap.m).toISOString() }, `${c.name} cut ${k}`);
+      assert.deepEqual(state(db), { ...beforeJump, mark: [null, null, null] }, `${c.name} cut ${k}: state`);
+      const again = await run(db, c.tap); // once the mark has landed, a retry writes nothing
+      assert.deepEqual(again.requests.filter((r) => r.method !== "GET"), [], `${c.name} cut ${k}: a late retry`);
     }
   }
 });

@@ -30,14 +30,20 @@
  *                     moves to just after the finished runs, everything else keeps its order
  *                     (public.session_order, this date and session only). The passed set's start,
  *                     whatever wrote it (done, skip, Begynd), moves to C's first open set (the rest
- *                     or begin before it is C's now), and the session order is written last. No Fortryd:
- *                     jumping back is the undo. Refused for a done run or a row that starts no run.
+ *                     or begin before it is C's now), and the session order is written last, with
+ *                     what one Fortryd restores (slice jump-undo, user 2026-10-17): previous_rows (the
+ *                     order before it), moved_start (the start it moved) and jumped_at = T. A jump
+ *                     while the previous jump is still the latest tap (a chain) keeps the chain's
+ *                     first previous_rows and moved_start. Refused for a done run or a row that starts no run.
+ *   undo   jump   -> (undoes "jump": the latest jump is later than every done, skip and begin) the
+ *                     moved start back on the first open set under previous_rows, cleared from the
+ *                     jumped-to set, empty rows deleted, and last the order back (guarded on jumped_at).
  */
 
 export type SetRef = { readonly row: number; readonly set: number };
 export type SetTapKind = "begin" | "done" | "skip" | "undo" | "feel" | "reps" | "jump";
 /** What an undo undoes, as the client saw the set: so a retry of a half-done undo only finishes it. */
-export type Undoes = "done" | "skip" | "begin";
+export type Undoes = "done" | "skip" | "begin" | "jump";
 
 /** What the server action receives (validated again on the server). */
 export type SetTapInput = {
@@ -49,6 +55,8 @@ export type SetTapInput = {
   readonly undoes: Undoes | null; // set exactly for kind "undo"
   /** feel: -1 / 0 / +1, or null to clear; reps: the reps done; absent or null for the others. */
   readonly value?: number | null;
+  /** An undo of a jump: the jumped_at the client saw (the undo's guard); absent for every other tap. */
+  readonly seen?: string | null;
 };
 
 /** One set's logged state, as read back from the log (or optimistically applied). */
@@ -176,7 +184,38 @@ export type SessionShape = {
   readonly sets: readonly RunSet[];
   readonly pairs: readonly PairRef[];
   readonly runRows: readonly number[] | null;
+  /** What Fortryd of the latest jump (or chain) restores (session_order's undo columns); absent or null: none. */
+  readonly jump?: JumpMark | null;
 };
+
+/** session_order's previous_rows, jumped_at and moved_start (slice jump-undo): all set, or the mark is null. */
+export type JumpMark = {
+  readonly previousRows: readonly number[];
+  readonly jumpedAt: string;
+  readonly movedStart: string | null;
+};
+
+/** The runs' first rows in the sheet's order (pairs interleaved): the order in force when no row is stored. */
+export function sheetRunRows(shape: SessionShape): number[] {
+  const { units } = unitsOf(shapeOrder({ ...shape, runRows: null }), shape.sets, shape.pairs);
+  return [...units.values()].flatMap((u) => u.runs);
+}
+
+/**
+ * Whether the jump at `mark` is the session's latest tap: strictly later than every done, skip and
+ * begin (a start no other tap wrote). A tie goes to the done or skip.
+ */
+export function jumpLatest(log: ReadonlyMap<string, LoggedSet>, mark: JumpMark | null | undefined): mark is JumpMark {
+  if (mark == null) return false;
+  const t = Date.parse(mark.jumpedAt);
+  for (const l of log.values()) {
+    const begin = l.startedAt !== null && !startFromAnotherTap(log, l, l.startedAt) ? l.startedAt : null;
+    for (const time of [l.endedAt, l.skipped ? l.skippedAt : null, begin]) {
+      if (time !== null && Date.parse(time) >= t) return false;
+    }
+  }
+  return true;
+}
 
 /** The run (its first sheet row) each row belongs to; rows not in the session are absent. */
 export function runOfRows(sets: readonly RunSet[]): Map<number, number> {
@@ -324,10 +363,18 @@ export function progress(order: readonly SetRef[], log: ReadonlyMap<string, Logg
   return { done, skipped, total: sets.length };
 }
 
-/** The session's latest done or skip (what Fortryd undoes): the set, the kind and its time. */
-export type LastTap = { readonly ref: SetRef; readonly kind: "done" | "skip"; readonly at: string };
+/**
+ * The session's latest done or skip (what Fortryd undoes): the set, the kind and its time. With the
+ * session's shape, a jump later than every tap (jumpLatest) wins: its ref is the first open set
+ * under the jumped order (the jumped-to run's), its time jumped_at. The rest timer reads it without.
+ */
+export type LastTap = { readonly ref: SetRef; readonly kind: "done" | "skip" | "jump"; readonly at: string };
 
-export function lastTap(log: ReadonlyMap<string, LoggedSet>): LastTap | null {
+export function lastTap(log: ReadonlyMap<string, LoggedSet>, shape?: SessionShape): LastTap | null {
+  if (shape !== undefined && jumpLatest(log, shape.jump)) {
+    const ref = firstOpen(shapeOrder(shape), log);
+    if (ref !== null) return { ref, kind: "jump", at: shape.jump.jumpedAt };
+  }
   let latest: LastTap | null = null;
   for (const l of log.values()) {
     const tap: LastTap | null =
@@ -347,8 +394,10 @@ export function restStart(log: ReadonlyMap<string, LoggedSet>): string | null {
   return last !== null && last.kind === "done" && !isWarmup(last.ref) ? last.at : null;
 }
 
-/** What an undo of `target` would undo now; null when there is nothing to undo. */
-export function undoesOf(log: ReadonlyMap<string, LoggedSet>, target: SetRef): Undoes | null {
+/** What an undo of `target` would undo now; null when there is nothing to undo. With the shape, the latest jump (lastTap) on its ref. */
+export function undoesOf(log: ReadonlyMap<string, LoggedSet>, target: SetRef, shape?: SessionShape): Undoes | null {
+  const latest = shape === undefined ? null : lastTap(log, shape);
+  if (latest !== null && latest.kind === "jump" && setKey(latest.ref) === setKey(target)) return "jump";
   const own = log.get(setKey(target));
   if (own === undefined) return null;
   if (own.skipped) return "skip";
@@ -405,17 +454,32 @@ export type Guard = { readonly field: "startedAt" | "endedAt" | "skipped" | "ski
  *  patch       set `values` on the set's row where every guard holds (updatedAt null: leave it)
  *  clearStarts every set in the session with started_at = t and no end: started_at = null
  *  deleteEmpty delete the session's rows with no start, no end and not skipped
- *  order       upsert the session's run order (public.session_order); the log is unchanged
+ *  order       upsert the session's run order (public.session_order) with its undo columns; the log is unchanged
+ *  unjump      the order back to `runRows` and the undo columns cleared, where jumped_at = `seen`
  */
 export type Change =
   | { readonly op: "ensure"; readonly ref: SetRef; readonly values: LogValues; readonly updatedAt: string }
   | { readonly op: "patch"; readonly ref: SetRef; readonly when: readonly Guard[]; readonly values: LogValues; readonly updatedAt: string | null }
   | { readonly op: "clearStarts"; readonly t: string; readonly at: string }
   | { readonly op: "deleteEmpty" }
-  | { readonly op: "order"; readonly runRows: readonly number[]; readonly at: string };
+  | {
+      readonly op: "order";
+      readonly runRows: readonly number[];
+      readonly previousRows: readonly number[];
+      readonly movedStart: string | null;
+      readonly at: string; // also jumped_at
+    }
+  | { readonly op: "unjump"; readonly runRows: readonly number[]; readonly seen: string; readonly at: string };
 
 /** A tap as the transition reads it (the server action's input without date and session). */
-export type Tap = { readonly kind: SetTapKind; readonly target: SetRef; readonly undoes: Undoes | null; readonly value: number | null };
+export type Tap = {
+  readonly kind: SetTapKind;
+  readonly target: SetRef;
+  readonly undoes: Undoes | null;
+  readonly value: number | null;
+  /** An undo of a jump: the jumped_at the client saw. */
+  readonly seen?: string | null;
+};
 
 /** Sets `fields` to `at` where they are null (first write wins), unless the set is skipped. */
 function setIfNull(ref: SetRef, fields: readonly ("startedAt" | "endedAt")[], at: string): Change[] {
@@ -449,6 +513,7 @@ export function transition(
 ): Change[] | null {
   const { kind, target } = tap;
   if (kind === "jump") return shape === undefined ? null : jump(order, log, shape, target.row, at);
+  if (kind === "undo" && tap.undoes === "jump") return shape === undefined ? null : undoJump(order, log, shape, tap.seen ?? null, at);
   if (refused(log, kind, target)) return null;
   const logged = log.get(setKey(target));
   const after = nextOpen(order, log, target); // null: no open set after it
@@ -538,9 +603,12 @@ function jump(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, sha
   const passed = firstOpen(order, log);
   const first = firstOpen(shapeOrder({ ...shape, runRows }), log);
   const out: Change[] = [];
+  let moved: string | null = null; // the start this jump moves (null: none)
   if (passed !== null && first !== null && setKey(passed) !== setKey(first)) {
     const start = log.get(setKey(passed))?.startedAt ?? null;
     const own = log.get(setKey(first))?.startedAt ?? null;
+    // A retry after the clear landed finds the passed set without a start and C holding it.
+    moved = start ?? own;
     if (start !== null) {
       if (own === null) {
         out.push({ op: "ensure", ref: first, values: { startedAt: start }, updatedAt: at });
@@ -550,7 +618,52 @@ function jump(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, sha
     }
     out.push({ op: "deleteEmpty" }); // also on a retry after the clear landed, so its empty row goes
   }
-  out.push({ op: "order", runRows, at });
+  // The undo columns: a chain (the previous jump still the latest tap) keeps its first ones.
+  const chain = jumpLatest(log, shape.jump) ? shape.jump : null;
+  const previousRows = chain?.previousRows ?? shape.runRows ?? sheetRunRows(shape);
+  const movedStart = chain === null ? moved : chain.movedStart;
+  out.push({ op: "order", runRows, previousRows: [...previousRows], movedStart, at });
+  return out;
+}
+
+/**
+ * Fortryd of the latest jump or chain (slice jump-undo, user 2026-10-17), applied only while
+ * session_order's jumped_at is the one the client saw (`seen`): P = the first open set under
+ * previous_rows gets moved_start back where it has none; C' = the first open set under the jumped
+ * order loses it (where it still holds it and has no end, unless C' is P); empty rows go; the order
+ * back last (its own guard). A retry finishes it; once the mark has landed it writes nothing. null:
+ * refused (no seen, or a done or skip landed after the jump).
+ */
+function undoJump(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, shape: SessionShape, seen: string | null, at: string): Change[] | null {
+  if (seen === null) return null;
+  const mark = shape.jump ?? null;
+  if (mark === null || !sameInstant(mark.jumpedAt, seen)) return []; // landed (or a newer jump): nothing
+  if (!jumpLatest(log, mark)) return null;
+  const out: Change[] = [];
+  const m = mark.movedStart;
+  if (m !== null) {
+    const p = firstOpen(shapeOrder({ ...shape, runRows: mark.previousRows }), log);
+    const c = firstOpen(order, log);
+    if (p !== null) {
+      out.push({ op: "ensure", ref: p, values: { startedAt: m }, updatedAt: at });
+      out.push({ op: "patch", ref: p, when: [{ field: "startedAt", equals: null }, { field: "skipped", equals: false }], values: { startedAt: m }, updatedAt: at });
+    }
+    if (c !== null && (p === null || setKey(c) !== setKey(p))) {
+      out.push({ op: "patch", ref: c, when: [{ field: "startedAt", equals: m }, { field: "endedAt", equals: null }], values: { startedAt: null }, updatedAt: at });
+    }
+  }
+  out.push({ op: "deleteEmpty" });
+  out.push({ op: "unjump", runRows: [...mark.previousRows], seen: mark.jumpedAt, at });
+  return out;
+}
+
+/** The session's order after `changes` (a jump's order, an undo's unjump), as session_order applies them. */
+export function applyOrderChanges(shape: SessionShape, changes: readonly Change[]): SessionShape {
+  let out = shape;
+  for (const c of changes) {
+    if (c.op === "order") out = { ...out, runRows: c.runRows, jump: { previousRows: c.previousRows, jumpedAt: c.at, movedStart: c.movedStart } };
+    else if (c.op === "unjump" && out.jump != null && sameInstant(out.jump.jumpedAt, c.seen)) out = { ...out, runRows: c.runRows, jump: null };
+  }
   return out;
 }
 
@@ -604,7 +717,7 @@ export function applyTap(
 }
 
 const KINDS: readonly SetTapKind[] = ["begin", "done", "skip", "undo", "feel", "reps", "jump"];
-const UNDOES: readonly Undoes[] = ["done", "skip", "begin"];
+const UNDOES: readonly Undoes[] = ["done", "skip", "begin", "jump"];
 export const MAX_SESSION = 14; // the sheet never plans more; anything above is not a session
 const MAX_ROW = 10_000;
 const MAX_SET = 100;
@@ -644,5 +757,11 @@ export function parseSetTapInput(raw: unknown): SetTapInput | null {
   ) {
     return null;
   }
+  // An undo of a jump carries the jumped_at it saw; every other tap carries none.
+  if (undoes === "jump") {
+    if (typeof r.seen !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(r.seen) || !Number.isFinite(Date.parse(r.seen))) return null;
+    return { kind, date: r.date, session, row, set, undoes, value, seen: r.seen };
+  }
+  if (r.seen !== undefined && r.seen !== null) return null;
   return { kind, date: r.date, session, row, set, undoes, value };
 }

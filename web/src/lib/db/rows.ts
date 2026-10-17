@@ -3,6 +3,7 @@ import "server-only";
 import type { DataError } from "../data-error.ts";
 import { LIFTS, type StrengthLift } from "../lifts.ts";
 import type { SetPartRow, VariantPartRow } from "../set-parts.ts";
+import type { JumpMark } from "../set-taps.ts";
 
 /**
  * Row types + runtime validation for the three read-only sources. PostgREST JSON is
@@ -1481,22 +1482,41 @@ export type SessionOrderRow = {
   readonly session: number;
   readonly runRows: readonly number[];
   readonly updatedAt: string;
+  /**
+   * What Fortryd of the latest jump (or chain) restores (slice jump-undo): previous_rows, jumped_at
+   * and moved_start (null: the jump moved no start). Null when the latest tap is not a jump (the
+   * table's check: jumped_at and previous_rows are null together).
+   */
+  readonly jump: JumpMark | null;
 };
 
 export const SESSION_ORDER_SELECT = {
   table: "session_order",
-  columns: "date,session_no,run_rows,updated_at",
+  columns: "date,session_no,run_rows,updated_at,previous_rows,jumped_at,moved_start",
   order: "date,session_no",
 } as const;
 
-export function parseSessionOrderRow(raw: unknown): SessionOrderRow {
-  const f = new Fields(SESSION_ORDER_SELECT.table, raw);
-  const runRows = f.array("run_rows").map((r) => {
-    if (typeof r !== "number" || !Number.isInteger(r)) throw new RowError("session_order.run_rows: expected whole numbers");
+function wholeRows(value: unknown, column: string): number[] {
+  if (!Array.isArray(value)) throw new RowError(`session_order.${column}: expected an array`);
+  const rows = value.map((r: unknown) => {
+    if (typeof r !== "number" || !Number.isInteger(r)) throw new RowError(`session_order.${column}: expected whole numbers`);
     return r;
   });
-  if (runRows.length === 0) throw new RowError("session_order.run_rows: expected at least one row");
-  return { date: f.date("date"), session: f.number("session_no"), runRows, updatedAt: f.timestamp("updated_at") };
+  if (rows.length === 0) throw new RowError(`session_order.${column}: expected at least one row`);
+  return rows;
+}
+
+export function parseSessionOrderRow(raw: unknown): SessionOrderRow {
+  const f = new Fields(SESSION_ORDER_SELECT.table, raw);
+  const runRows = wholeRows(f.array("run_rows"), "run_rows");
+  const jumpedAt = f.timestampOrNull("jumped_at");
+  const previous = (raw as Record<string, unknown>).previous_rows; // narrowed by wholeRows
+  if ((jumpedAt === null) !== (previous === null || previous === undefined)) {
+    throw new RowError("session_order: jumped_at and previous_rows must be null together");
+  }
+  const jump: JumpMark | null =
+    jumpedAt === null ? null : { previousRows: wholeRows(previous, "previous_rows"), jumpedAt, movedStart: f.timestampOrNull("moved_start") };
+  return { date: f.date("date"), session: f.number("session_no"), runRows, updatedAt: f.timestamp("updated_at"), jump };
 }
 
 // --- combined-variant parts (slice combo-parts; types in lib/set-parts.ts) -------------------

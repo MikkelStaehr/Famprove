@@ -3,6 +3,7 @@ import "server-only";
 import { isoWeekStart } from "../dates.ts";
 import {
   type Change,
+  type JumpMark,
   type Guard,
   type LoggedSet,
   isWarmup,
@@ -142,23 +143,51 @@ export async function sessionPairRows(
   };
 }
 
-/** The session's stored run order (public.session_order); null = none (the sheet's order). */
-export async function sessionRunRows(c: PostgrestClient, date: string, session: number): Promise<readonly number[] | null> {
+/** The session's stored run order (public.session_order) and its undo mark; runRows null = none (the sheet's order). */
+export async function sessionRunRows(
+  c: PostgrestClient,
+  date: string,
+  session: number,
+): Promise<{ readonly runRows: readonly number[] | null; readonly jump: JumpMark | null }> {
   const rows = await selectAll(
     c,
     SESSION_ORDER_SELECT.table,
     { ...SESSION_ORDER_SELECT, filters: [["date", `eq.${date}`], ["session_no", `eq.${session}`]] },
     parseSessionOrderRow,
   );
-  return rows.at(0)?.runRows ?? null;
+  const row = rows.at(0);
+  return { runRows: row?.runRows ?? null, jump: row?.jump ?? null };
 }
 
-/** The jump's mark: one upsert of the session's run order on the primary key (the last write wins). */
-async function writeOrder(c: PostgrestClient, date: string, session: number, runRows: readonly number[], at: string): Promise<void> {
+/**
+ * The jump's mark: one upsert of the session's run order on the primary key (the last write wins),
+ * with what Fortryd restores (previous_rows, moved_start) and jumped_at = the tap's T.
+ */
+async function writeOrder(c: PostgrestClient, date: string, session: number, change: Extract<Change, { op: "order" }>): Promise<void> {
   await write(c, SESSION_ORDER_SELECT.table, "POST", {
     params: [["on_conflict", "date,session_no"]],
-    body: { date, session_no: session, run_rows: runRows, updated_at: at },
+    body: {
+      date,
+      session_no: session,
+      run_rows: change.runRows,
+      updated_at: change.at,
+      previous_rows: change.previousRows,
+      jumped_at: change.at,
+      moved_start: change.movedStart,
+    },
     prefer: "resolution=merge-duplicates",
+  });
+}
+
+/** Fortryd of a jump's mark: the order back, the undo columns cleared, only while jumped_at is the one undone. */
+async function writeUnjump(c: PostgrestClient, date: string, session: number, change: Extract<Change, { op: "unjump" }>): Promise<void> {
+  await write(c, SESSION_ORDER_SELECT.table, "PATCH", {
+    params: [
+      ["date", `eq.${date}`],
+      ["session_no", `eq.${session}`],
+      ["jumped_at", `eq.${change.seen}`],
+    ],
+    body: { run_rows: change.runRows, previous_rows: null, jumped_at: null, moved_start: null, updated_at: change.at },
   });
 }
 
@@ -242,7 +271,9 @@ async function send(c: PostgrestClient, date: string, session: number, change: C
     case "deleteEmpty":
       return deleteEmpty(c, date, session);
     case "order":
-      return writeOrder(c, date, session, change.runRows, change.at);
+      return writeOrder(c, date, session, change);
+    case "unjump":
+      return writeUnjump(c, date, session, change);
   }
 }
 
@@ -292,11 +323,11 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
     // Supersets: the pairs in force reorder the session (A1, B1, A2 ...), as on the screens.
     // A jump's stored run order (session_order) on top, read in the same batch as the pairs.
     const runs = sessionRuns(sets, ids);
-    const [pairRows, runRows] = await Promise.all([
+    const [pairRows, stored] = await Promise.all([
       sessionPairRows(c, input.date, input.session, runs),
       sessionRunRows(c, input.date, input.session),
     ]);
-    const shape: SessionShape = { sets, pairs: effectivePairs(runs, pairRows.today, pairRows.history), runRows };
+    const shape: SessionShape = { sets, pairs: effectivePairs(runs, pairRows.today, pairRows.history), runRows: stored.runRows, jump: stored.jump };
     const order = shapeOrder(shape);
     const inOrder = new Set(order.map(setKey)); // the sheet's sets and their exercises' warm-ups
     const names = new Map(sets.map((s) => [setKey(s.ref), s.name]));
@@ -315,7 +346,7 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
     const at = now.toISOString();
     // The rules are lib/set-taps.ts transition's (the client applies the same Changes); each
     // Change is one conditional request, sent in order, so a retry finishes a partly landed tap.
-    const tap = { kind: input.kind, target, undoes: input.undoes, value: input.value ?? null };
+    const tap = { kind: input.kind, target, undoes: input.undoes, value: input.value ?? null, seen: input.seen ?? null };
     const changes = transition(order, log, tap, at, tops, shape);
     if (changes === null) return { ok: false, reason: "invalid" }; // e.g. skip a done set
     for (const change of changes) await send(c, input.date, input.session, change, keyOf);

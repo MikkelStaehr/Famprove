@@ -63,6 +63,8 @@
  */
 import { LIFTS } from "../lifts.ts";
 import {
+  applyChanges,
+  applyOrderChanges,
   applyTap,
   firstOpen,
   isWarmup,
@@ -76,6 +78,7 @@ import {
   type SetRef,
   type SetTapKind,
   shapeOrder,
+  transition,
 } from "../set-taps.ts";
 import type { PartsData } from "../set-parts.ts";
 import { exerciseIdMap, exerciseIdOf, sessionRuns } from "../supersets.ts";
@@ -568,9 +571,11 @@ export function jumpedFixture(sets: readonly PrescribedSetRow[], today: IsoDate,
     const runRows = jumpRunRows(shape, log, c);
     if (runRows === null) continue;
     const jumpAt = new Date(now.getTime() - 30_000).toISOString();
-    log = applyTap(order, log, "jump", { row: c, set: 1 }, jumpAt, null, new Map(), shape);
+    // The shared transition: the log's writes and the order with its undo mark (slice jump-undo).
+    const changes = transition(order, log, { kind: "jump", target: { row: c, set: 1 }, undoes: null, value: null }, jumpAt, new Map(), shape) ?? [];
+    log = applyChanges(log, changes);
     setLog.push(...logRows(log, today, session, jumpAt));
-    sessionOrders.push({ date: today, session, runRows, updatedAt: jumpAt });
+    sessionOrders.push({ date: today, session, runRows, updatedAt: jumpAt, jump: applyOrderChanges(shape, changes).jump ?? null });
   }
   return { setLog, sessionOrders };
 }

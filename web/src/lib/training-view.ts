@@ -42,6 +42,7 @@ import {
   type SetRef,
   type SetState,
   stateOf,
+  type JumpMark,
 } from "./set-taps.ts";
 import { effectivePairs, exerciseIdMap, type PairSlot, pairSlots, type PairSource, sessionRuns } from "./supersets.ts";
 import type { ZoneKey } from "./zone-scale.ts";
@@ -200,6 +201,8 @@ export type StrengthSession = {
   readonly pairSlots: readonly PairSlot[];
   /** Today's stored run order after a jump (public.session_order run_rows); null = the sheet's order. `order` follows it. */
   readonly runRows: readonly number[] | null;
+  /** The latest jump's undo mark (session_order's previous_rows, jumped_at, moved_start); null = none. */
+  readonly jump: JumpMark | null;
 };
 
 /** A superset in force: the runs' first sheet rows, why (chosen today or suggested), and whether it can still be switched. */
@@ -418,7 +421,8 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
   const runSets = exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name, variantId: e.variantId })));
   const log = data.setLog.filter((l) => l.date === today && l.session === slot.session);
   const supersets = sessionSupersets(data, today, slot.session, runSets, log);
-  const runRows = data.sessionOrders?.find((r) => r.date === today && r.session === slot.session)?.runRows ?? null;
+  const stored = data.sessionOrders?.find((r) => r.date === today && r.session === slot.session);
+  const runRows = stored?.runRows ?? null;
   return {
     ...base,
     state: "next",
@@ -434,6 +438,7 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
       pairs: supersets.pairs,
       pairSlots: supersets.slots,
       runRows,
+      jump: stored?.jump ?? null,
     },
   };
 }

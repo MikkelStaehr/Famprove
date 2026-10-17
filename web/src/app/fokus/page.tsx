@@ -91,6 +91,7 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
           log: next.log,
           pairs: next.pairs,
           runRows: next.runRows,
+          jump: next.jump,
           pairSlots: next.pairSlots,
           ...(state.parts === undefined ? {} : { parts: state.parts }),
         }}

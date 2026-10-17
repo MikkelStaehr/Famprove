@@ -4,8 +4,10 @@ import { test } from "node:test";
 import { recordSetTap, type RecordOptions } from "../src/lib/db/set-log.ts";
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
 import {
+  applyChanges,
+  applyOrderChanges,
   applyTap,
-  jumpRunRows,
+  lastTap,
   type LoggedSet,
   type PairRef,
   rangeTops,
@@ -14,6 +16,7 @@ import {
   shapeOrder,
   type SetRef,
   type SetTapKind,
+  transition,
   undoesOf,
 } from "../src/lib/set-taps.ts";
 
@@ -110,12 +113,14 @@ function lcg(seed: number): () => number {
   };
 }
 
-const KINDS: readonly SetTapKind[] = ["begin", "done", "done", "done", "skip", "undo", "undo", "feel", "reps", "jump", "jump"];
+// "fortryd": Fokus's Fortryd (slice jump-undo): the latest tap with the session's shape, a jump included.
+const KINDS: readonly (SetTapKind | "fortryd")[] = ["begin", "done", "done", "done", "skip", "undo", "undo", "feel", "reps", "jump", "jump", "fortryd", "fortryd"];
 
 test("transition: the client's log and run order equal the server's stored rows after every tap, jumps included (200 seeded sequences)", async () => {
   console.error = () => {}; // recordSetTap logs refused saves
   let steps = 0;
   let jumps = 0;
+  let jumpUndos = 0;
   for (let seed = 1; seed <= 200; seed += 1) {
     const s = SESSIONS[seed % SESSIONS.length];
     // The order follows the client's run order after a jump (slice fokus-sheet), as the server's session_order.
@@ -128,24 +133,43 @@ test("transition: the client's log and run order equal the server's stored rows 
     let log: ReadonlyMap<string, LoggedSet> = new Map();
     for (let i = 1; i <= length; i += 1) {
       const order = shapeOrder(shape);
-      const kind = KINDS[Math.floor(rnd() * KINDS.length)];
-      const ref = order[Math.floor(rnd() * order.length)];
+      const picked = KINDS[Math.floor(rnd() * KINDS.length)];
+      const latest = lastTap(log, shape);
+      const fortryd = picked === "fortryd";
+      if (fortryd && latest === null) continue;
+      const kind: SetTapKind = fortryd ? "undo" : picked;
+      const ref = fortryd && latest !== null ? latest.ref : order[Math.floor(rnd() * order.length)];
       const value = kind === "feel" ? [-1, 0, 1, null][Math.floor(rnd() * 4)] : kind === "reps" ? Math.floor(rnd() * 24) - 2 : null;
       const at = new Date(DAY0 + i * 60_000);
-      const undoes = kind === "undo" ? (undoesOf(log, ref) ?? "done") : null; // as useSetLog
-      await recordSetTap({ kind, date: DATE, session: 1, row: ref.row, set: ref.set, undoes, value }, at, options);
-      const runRows = kind === "jump" ? jumpRunRows(shape, log, ref.row) : null; // as the client's jump (null: refused)
-      log = applyTap(order, log, kind, ref, at.toISOString(), value, tops, shape);
-      if (runRows !== null) {
-        shape = { ...shape, runRows };
-        jumps += 1;
+      // As useSetLog: a set's undo reads the set; Fokus's Fortryd reads the shape too (a jump, with the jump it saw).
+      const undoes = kind === "undo" ? (undoesOf(log, ref, fortryd ? shape : undefined) ?? "done") : null;
+      const seen = undoes === "jump" ? (shape.jump?.jumpedAt ?? null) : null;
+      await recordSetTap({ kind, date: DATE, session: 1, row: ref.row, set: ref.set, undoes, value, ...(seen === null ? {} : { seen }) }, at, options);
+      if (kind === "jump" || undoes === "jump") {
+        const changes = transition(order, log, { kind, target: ref, undoes, value, seen }, at.toISOString(), tops, shape);
+        if (changes !== null) {
+          log = applyChanges(log, changes);
+          shape = applyOrderChanges(shape, changes);
+          if (kind === "jump") jumps += 1;
+          else jumpUndos += 1;
+        }
+      } else {
+        log = applyTap(order, log, kind, ref, at.toISOString(), value, tops, shape);
       }
-      const label = `seed ${seed} step ${i}: ${kind} ${setKey(ref)} ${String(value)}`;
+      const label = `seed ${seed} step ${i}: ${picked} ${setKey(ref)} ${String(value)}`;
       assert.deepStrictEqual(clientState(log), serverState(db), label);
-      assert.deepStrictEqual(shape.runRows, (db.session_order.at(0)?.run_rows as number[] | undefined) ?? null, `${label}: run order`);
+      const stored = db.session_order.at(0);
+      assert.deepStrictEqual(shape.runRows, (stored?.run_rows as number[] | undefined) ?? null, `${label}: run order`);
+      const mark = shape.jump ?? null;
+      assert.deepStrictEqual(
+        mark === null ? null : [mark.previousRows, ms(mark.jumpedAt), ms(mark.movedStart)],
+        stored?.jumped_at == null ? null : [stored.previous_rows, ms(stored.jumped_at), ms(stored.moved_start)],
+        `${label}: undo mark`,
+      );
       steps += 1;
     }
   }
   assert.ok(steps >= 200 * 10);
   assert.ok(jumps >= 50, `only ${jumps} jumps landed`);
+  assert.ok(jumpUndos >= 20, `only ${jumpUndos} jump Fortryds landed`);
 });
