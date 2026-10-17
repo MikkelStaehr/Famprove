@@ -1,6 +1,7 @@
 "use client";
 
-import { type PointerEvent as ReactPointerEvent, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 
 import { Icon } from "@/components/icons";
 import { type SheetDot, type SheetRun, sheetRowSentence } from "@/lib/fokus-view";
@@ -10,6 +11,8 @@ import { DUR, EASE_EMBER, REDUCED_MOTION } from "@/lib/motion";
 const CLOSE_SHARE = 0.25;
 const FLICK_PX_PER_MS = 0.5;
 const SCRIM_OPACITY = 0.55;
+/** DESIGN.md Part B "Bottom sheet": scrim #000 (the theme resets Tailwind's palette, so no bg-black). */
+const SCRIM_COLOR = "#000";
 
 type Props = {
   readonly runs: readonly SheetRun[];
@@ -17,13 +20,32 @@ type Props = {
   readonly total: number;
   /** Slide up on mount (a tap opened it); false when the page loads with it open (nothing animates on first paint). */
   readonly animateIn: boolean;
-  /** The sheet's top edge in px from the viewport top (12px under the rest strip or the top bar; R4), measured on open. */
-  readonly measureTop: () => number;
+  /**
+   * Measured on open: the sheet's top edge in px from the viewport top (12px under the rest strip
+   * or the top bar; R4), and the rest strip's band (§7: it stays above the scrim), null without one.
+   */
+  readonly measure: () => SheetPlace;
   /** Called once the sheet is gone; `jumpTo` = the row tapped (a jump), else null. */
   readonly onClosed: (jumpTo: number | null) => void;
   /** Filled with the sheet's close, so a tap on the rest strip (outside the sheet) can close it. */
   readonly closeRef: RefObject<(() => void) | null>;
+  /** The ⇄ seam between two adjacent rows (fokus-superset.md §2.1), by their first rows; null = none. */
+  readonly seamAfter?: (rowA: number, rowB: number) => ReactNode;
 };
+
+export type SheetPlace = { readonly top: number; readonly strip: { readonly top: number; readonly bottom: number } | null };
+
+const noSubscribe = () => () => {};
+
+/**
+ * The sheet and its scrim render through a portal to document.body (§7), so no transformed or
+ * contained ancestor (the tab shell) clips them and the scrim covers the top bar. After hydration
+ * only: the server has no document.
+ */
+export function SessionSheet(props: Props) {
+  const client = useSyncExternalStore(noSubscribe, () => true, () => false);
+  return client ? createPortal(<SheetBody {...props} />, document.body) : null;
+}
 
 /**
  * The session sheet (fokus-sheet.md §6–§17; DESIGN.md Part B "Bottom sheet"): the session's runs
@@ -31,7 +53,7 @@ type Props = {
  * above the scrim (the screen lifts it). Closes by Luk, scrim, Escape, the back gesture and a swipe
  * down; slides with EASE_EMBER, not at all under reduced motion.
  */
-export function SessionSheet({ runs, done, total, animateIn, measureTop, onClosed, closeRef }: Props) {
+function SheetBody({ runs, done, total, animateIn, measure, onClosed, closeRef, seamAfter }: Props) {
   const sheet = useRef<HTMLDivElement>(null);
   const scrim = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -40,6 +62,8 @@ export function SessionSheet({ runs, done, total, animateIn, measureTop, onClose
   const pushed = useRef(false);
   const drag = useRef<{ y0: number; t0: number; y: number; t: number; id: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const scrimAbove = useRef<HTMLDivElement>(null);
+  const scrimBelow = useRef<HTMLDivElement>(null);
 
   const reduced = () => window.matchMedia(REDUCED_MOTION).matches;
 
@@ -79,7 +103,11 @@ export function SessionSheet({ runs, done, total, animateIn, measureTop, onClose
 
   // Open: slide up (a tap) or be there at once (first paint), focus the title, push one history entry.
   useLayoutEffect(() => {
-    if (sheet.current !== null) sheet.current.style.top = `${measureTop()}px`;
+    const place = measure();
+    if (sheet.current !== null) sheet.current.style.top = `${place.top}px`;
+    // §7: the scrim leaves the rest strip's band open (none: one piece covers it all).
+    if (scrimAbove.current !== null) scrimAbove.current.style.height = `${place.strip?.top ?? 0}px`;
+    if (scrimBelow.current !== null) scrimBelow.current.style.top = `${place.strip?.bottom ?? 0}px`;
     if (animateIn) void slide(1, 0, DUR.sheetOpen);
     title.current?.focus();
     window.history.pushState({ fokusSheet: true }, "");
@@ -157,7 +185,11 @@ export function SessionSheet({ runs, done, total, animateIn, measureTop, onClose
 
   return (
     <>
-      <div ref={scrim} aria-hidden="true" onClick={() => close(null)} className="fixed inset-0 z-40 bg-black" style={{ opacity: SCRIM_OPACITY }} />
+      {/* §7: the scrim dims everything but the rest strip's band (the strip stays live; a tap on it closes). */}
+      <div ref={scrim} aria-hidden="true" className="pointer-events-none fixed inset-0 z-40" style={{ opacity: SCRIM_OPACITY }}>
+        <div ref={scrimAbove} onClick={() => close(null)} className="pointer-events-auto absolute inset-x-0 top-0 h-0" style={{ background: SCRIM_COLOR }} />
+        <div ref={scrimBelow} onClick={() => close(null)} className="pointer-events-auto absolute inset-x-0 top-0 bottom-0" style={{ background: SCRIM_COLOR }} />
+      </div>
       <div
         ref={sheet}
         role="dialog"
@@ -187,7 +219,7 @@ export function SessionSheet({ runs, done, total, animateIn, measureTop, onClose
           I dag
         </p>
         <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <SheetRows runs={runs} onJump={(row) => close(row)} />
+          <SheetRows runs={runs} onJump={(row) => close(row)} seamAfter={seamAfter} />
         </div>
       </div>
     </>
@@ -201,7 +233,15 @@ function currentShare(el: HTMLElement): number {
 }
 
 /** §10: the rows in tap order; a superset pair shares one group with the rail and the indent. */
-function SheetRows({ runs, onJump }: { readonly runs: readonly SheetRun[]; readonly onJump: (row: number) => void }) {
+function SheetRows({
+  runs,
+  onJump,
+  seamAfter,
+}: {
+  readonly runs: readonly SheetRun[];
+  readonly onJump: (row: number) => void;
+  readonly seamAfter?: (rowA: number, rowB: number) => ReactNode;
+}) {
   const out: React.ReactNode[] = [];
   for (let i = 0; i < runs.length; i += 1) {
     const run = runs[i];
@@ -210,16 +250,21 @@ function SheetRows({ runs, onJump }: { readonly runs: readonly SheetRun[]; reado
       out.push(
         <div key={`pair-${run.row}`} role="group" aria-label={`Superset: ${run.name} og ${next.name}`} className="border-b border-border">
           <div className="ml-1 border-l-2 border-text pl-3">
-            <Row run={run} onJump={onJump} last={false} />
+            <Row run={run} onJump={onJump} last={seamAfter?.(run.row, next.row) != null} />
+            {seamAfter?.(run.row, next.row)}
             <Row run={next} onJump={onJump} last />
           </div>
         </div>,
       );
+      const after = runs[i + 2];
+      if (after !== undefined) out.push(<div key={`seam-${next.row}`}>{seamAfter?.(next.row, after.row)}</div>);
       i += 1;
     } else {
+      const seam = next === undefined ? null : (seamAfter?.(run.row, next.row) ?? null);
       out.push(
-        <div key={run.row} className="border-b border-border last:border-b-0">
+        <div key={run.row} className={seam === null ? "border-b border-border last:border-b-0" : undefined}>
           <Row run={run} onJump={onJump} last />
+          {seam}
         </div>,
       );
     }

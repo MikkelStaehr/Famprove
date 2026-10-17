@@ -34,6 +34,11 @@ export function seamState(slot: Pick<PairSlot, "paired" | "source" | "locked">):
   return slot.source === "suggested" ? "suggested" : "paired";
 }
 
+/** The seam reads as on (a pair, suggested, or locked in a pair). */
+export function seamPaired(state: SeamState): boolean {
+  return state === "paired" || state === "suggested" || state === "locked";
+}
+
 export function slotKey(p: PairRef): string {
   return `${p.rowA}-${p.rowB}`;
 }
@@ -268,4 +273,41 @@ export function pairLine(exercises: readonly FokusRow[], pairs: readonly PairRef
   const other = titleName(role.partner);
   if (role.solo) return `Alene – ${other} er færdig`;
   return role.role === "a" ? `Superset med ${other} · den følger uden pause` : `Superset med ${other} · pause bagefter`;
+}
+
+// ---------------------------------------------------------------- Fokus: the set-screen button (fokus-superset.md)
+
+export type SupersetOffer = {
+  readonly seam: SeamView;
+  /** "Superset med Pull-ups": the visible label and the accessible name (pressed from aria-pressed). */
+  readonly label: string;
+  readonly on: boolean;
+  /** `Som sidst` after it in the Suggested state. */
+  readonly suggested: boolean;
+  /** S11's pair line under the button while on (also on A's warm-up: the button just made the pair). */
+  readonly line: string | null;
+  /** S9's status for a tap that turns it on / off (R1: on A1, B's warm-up comes next). */
+  readonly sentence: (paired: boolean) => string;
+};
+
+/**
+ * fokus-superset.md §2.2 / R1: the button on A's view, its warm-up or set 1 (until A1 is done), while
+ * the pair to A's next run is unlocked (seamViews: locked once a run started or in another pair).
+ * Null on any other set, on a locked or not offered seam.
+ */
+export function supersetOffer(exercises: readonly Named[], seams: readonly SeamView[], current: SetRef): SupersetOffer | null {
+  const seam = seams.find((v) => v.rowA === current.row);
+  if (seam === undefined || seam.state === "locked" || seam.state === "none") return null;
+  const first = exercises.find((e) => e.row === seam.rowA)?.sets[0];
+  if (!isWarmup(current) && (first === undefined || setKey(first) !== setKey(current))) return null;
+  const on = seamPaired(seam.state);
+  const warmupNext = !isWarmup(current);
+  return {
+    seam,
+    label: `Superset med ${seam.nameB}`,
+    on,
+    suggested: seam.state === "suggested",
+    line: on ? `Superset med ${seam.nameB} · den følger uden pause` : null,
+    sentence: (paired) => (paired && warmupNext ? `${seamSentence(seam, true)} Først opvarmning til ${seam.nameB}.` : seamSentence(seam, paired)),
+  };
 }

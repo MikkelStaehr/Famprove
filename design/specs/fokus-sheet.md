@@ -55,4 +55,4 @@
 7. Luk, the scrim, Escape, the back gesture and a swipe past 25 % each close the sheet. A swipe of 10 % settles back. Focus returns to the bar button.
 8. Focus stays inside the open sheet (Tab from the last element goes to the first). The dialog has `aria-modal="true"` and its name is `Hele sessionen`.
 9. Under reduced motion, open, close and the bar reorder happen with no transition.
-10. A forced failed jump save shows §Copy's line and Gem igen. The order stays until a reload.
+10. A forced failed jump save shows its line ("Springet er ikke gemt. Rækkefølgen er som før.") and Gem igen, and the order goes back to the stored one at once (decided 2026-10-17: the client orders only by stored choices, as supersets' `orderPairs`, so it never starts a different set than the server); a refused jump shows its line.

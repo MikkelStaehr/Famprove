@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from "react";
 
 import {
   displayName,
@@ -327,7 +327,18 @@ function emptyFill(cx: number, minX: number | null, maxX: number | null): string
 const WARMUP_SCALE_S = 600;
 
 /** §2: the warm-up of `exercise`, with Python's ramp on a main lift (fokus-instrument.md §3: a mono table). */
-export function WarmupCard({ since, exercise, mainLift }: { readonly since: string | null; readonly exercise: FokusExercise; readonly mainLift: boolean }) {
+export function WarmupCard({
+  since,
+  exercise,
+  mainLift,
+  extra = null,
+}: {
+  readonly since: string | null;
+  readonly exercise: FokusExercise;
+  readonly mainLift: boolean;
+  /** fokus-superset.md §2.2: the ⇄ button under the name stack; null = none. */
+  readonly extra?: ReactNode;
+}) {
   const ramp = rampState(exercise, mainLift);
   const basis = rampBasis(exercise);
   const under = exerciseUnder(exercise);
@@ -338,6 +349,7 @@ export function WarmupCard({ since, exercise, mainLift }: { readonly since: stri
       </h2>
       {/* variants.md §3: the sheet's exercise muted under "Opvarmning · <variant>". */}
       {under !== null && <p className="mt-1 font-sans text-14 text-balance text-text-muted">{under}</p>}
+      {extra}
       <div className="mt-14">
         {/* No recorded start (§2.2): a static 0:00 with the tick at 0, never a clock from page load. */}
         {since === null ? <WarmupClock seconds={0} /> : <WarmupTimer since={since} />}

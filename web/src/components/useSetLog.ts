@@ -44,9 +44,16 @@ export type SetLog = {
   readonly failedNow: () => number;
   /** The tap order in force: the `order` passed in, or after a jump this visit, the jumped one (fokus-sheet.md R1). */
   readonly order: readonly SetRef[];
-  /** A jump's save failed and waits for retry (fokus-sheet.md §Copy). */
-  readonly jumpUnsaved: boolean;
+  /**
+   * The latest jump that did not land (fokus-sheet.md §Copy): `failed` (Gem igen re-taps it) or
+   * `refused`. Either way the order went back to the stored one: a jump is in the order only while
+   * its save is pending or saved, so the client never orders differently from the server (as
+   * supersets' orderPairs). Null = none.
+   */
+  readonly jumpProblem: JumpProblem | null;
 };
+
+export type JumpProblem = { readonly row: number; readonly kind: "failed" | "refused" };
 
 /** How long leaving a screen waits for queued saves before it goes anyway (offline, slow). */
 export const FLUSH_WAIT_MS = 3000;
@@ -88,7 +95,10 @@ export function useSetLog(
   // Failed taps, in order, outside React state: a retry must send each exactly once.
   const failed = useRef<SetTapInput[]>([]);
   const [unsaved, setUnsaved] = useState(0);
-  const [jumpUnsaved, setJumpUnsaved] = useState(false);
+  const [jumpProblem, setJumpProblem] = useState<JumpProblem | null>(null);
+  // Every tap counts up; a jump keeps what it replaced, so a save that doesn't land can put it back.
+  const tapSeq = useRef(0);
+  const jumpSnap = useRef<{ readonly seq: number; readonly log: ReadonlyMap<string, LoggedSet>; readonly jumped: readonly number[] | null } | null>(null);
   const [rejected, setRejected] = useState(false);
   const [dev, setDev] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -99,7 +109,29 @@ export function useSetLog(
 
   const countFailed = useCallback(() => {
     setUnsaved(new Set(failed.current.map((f) => setKey(f))).size);
-    setJumpUnsaved(failed.current.some((f) => f.kind === "jump"));
+  }, []);
+
+  /** A jump's save: stored keeps the order; failed or refused puts back what the jump replaced. */
+  const sendJump = useCallback(async (input: SetTapInput, seq: number) => {
+    let outcome: JumpProblem["kind"] | null = "failed";
+    try {
+      const result = await logExerciseTap(input);
+      if (result.ok) outcome = null;
+      else if (result.reason === "dev") {
+        setDev(true); // fixtures write nothing; the jump shows as if stored
+        outcome = null;
+      } else if (result.reason === "invalid") outcome = "refused";
+    } catch {
+      // offline, or a deployment that no longer knows this action: failed
+    }
+    const snap = jumpSnap.current;
+    if (snap === null || snap.seq !== seq) return; // a newer jump owns the order
+    jumpSnap.current = null;
+    if (outcome === null) return;
+    // Back to the stored order; the log too while nothing was tapped after the jump.
+    if (tapSeq.current === seq) setLog(snap.log);
+    setJumped(snap.jumped);
+    setJumpProblem({ row: input.row, kind: outcome });
   }, []);
 
   const send = useCallback(
@@ -125,12 +157,17 @@ export function useSetLog(
         if (liveShape === undefined) return;
         const runRows = jumpRunRows(liveShape, log, ref.row);
         if (runRows === null) return; // a done run or no run: the server refuses it too
+        tapSeq.current += 1;
+        const seq = tapSeq.current;
+        jumpSnap.current = { seq, log, jumped };
+        setJumpProblem(null);
         setLog((previous) => applyTap(live, previous, "jump", ref, new Date().toISOString(), null, tops, liveShape));
         setJumped(runRows);
         const input: SetTapInput = { kind, date, session, row: ref.row, set: ref.set, undoes: null };
-        queue.current = queue.current.then(() => send(input));
+        queue.current = queue.current.then(() => sendJump(input, seq));
         return;
       }
+      tapSeq.current += 1;
       if (refused(log, kind, ref)) return; // the server would refuse it too (skip of a done set)
       if ((kind === "feel" || kind === "reps") && lastMark.current.get(setKey(ref)) === "undo") return;
       if (kind === "done" || kind === "skip" || kind === "undo") lastMark.current.set(setKey(ref), kind);
@@ -148,7 +185,7 @@ export function useSetLog(
       const input: SetTapInput = { kind, date, session, row: ref.row, set: ref.set, undoes, ...(withValue ? { value } : {}) };
       queue.current = queue.current.then(() => send(input));
     },
-    [log, live, liveShape, date, session, send, countFailed, tops],
+    [log, live, liveShape, jumped, date, session, send, sendJump, countFailed, tops],
   );
 
   const retry = useCallback(() => {
@@ -163,5 +200,5 @@ export function useSetLog(
   const flush = useCallback(() => queue.current, []);
   const failedNow = useCallback(() => failed.current.length, []);
 
-  return { log, fresh, tap, unsaved, retry, rejected, dev, flush, failedNow, order: live, jumpUnsaved };
+  return { log, fresh, tap, unsaved, retry, rejected, dev, flush, failedNow, order: live, jumpProblem };
 }

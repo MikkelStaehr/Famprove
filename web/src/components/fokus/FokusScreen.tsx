@@ -27,10 +27,13 @@ import { adjustmentLine, CAPPED_WORD } from "@/lib/training-view";
 import { type Signature, signature } from "@/lib/fokus-marks";
 import { type LoggedSet, type PairRef, type SetRef, setKey } from "@/lib/set-taps";
 
-import { runSetsOf } from "@/lib/superset-view";
+import { clientOrder, refusedText, runSetsOf, type SeamSave, slotKey, supersetOffer, type SupersetOffer, seamSentence, seamViews } from "@/lib/superset-view";
+import type { PairSlot } from "@/lib/supersets";
+import { SupersetSeam } from "@/components/SupersetSeam";
+import { useSupersetSaves } from "@/components/useSupersetSaves";
 
 import { ProgressButton } from "./FokusProgress";
-import { SessionSheet } from "./SessionSheet";
+import { SessionSheet, type SheetPlace } from "./SessionSheet";
 import { Icon } from "@/components/icons";
 import { CAPTION, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTLINED, SKIP_BUTTON, PRIMARY_DOCK } from "./Instrument";
 import { SessionSignature } from "./SessionSignature";
@@ -51,6 +54,8 @@ export type FokusSession = {
   readonly pairs?: readonly PairRef[];
   /** Today's stored run order after a jump (session_order); `order` already follows it. */
   readonly runRows?: readonly number[] | null;
+  /** Every boundary between two consecutive runs, for the ⇄ switch (fokus-superset.md); absent = none. */
+  readonly pairSlots?: readonly PairSlot[];
   /** Combined-variant parts (combo-parts.md): loadTrainingPlan's parts; absent = none. */
   readonly parts?: PartsData;
 };
@@ -81,11 +86,20 @@ const FADE_IN = "transition-opacity duration-120 ease-out starting:opacity-0 mot
  * saved in order).
  */
 export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts, sheetOpen: openOnLoad = false }: FokusScreenProps) {
+  // fokus-superset.md: the ⇄ choices of this visit; the order follows stored or saving ones only (orderPairs).
+  const slots = useMemo(() => session.pairSlots ?? [], [session.pairSlots]);
+  const supersets = useSupersetSaves(slots, date, session.session);
+  const switched = supersets.saves.size > 0;
+  const orderedPairs = useMemo(() => (switched ? supersets.ordered : (session.pairs ?? [])), [switched, supersets.ordered, session.pairs]);
   const shape = useMemo(
-    () => ({ sets: runSetsOf(session.exercises), pairs: session.pairs ?? [], runRows: session.runRows ?? null }),
-    [session.exercises, session.pairs, session.runRows],
+    () => ({ sets: runSetsOf(session.exercises), pairs: orderedPairs, runRows: session.runRows ?? null }),
+    [session.exercises, orderedPairs, session.runRows],
   );
-  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpUnsaved } = useSetLog(session.log, session.order, date, session.session, session.exercises, shape);
+  const baseOrder = useMemo(
+    () => (switched ? clientOrder(session.exercises, orderedPairs, session.runRows ?? null) : session.order),
+    [switched, session.exercises, orderedPairs, session.runRows, session.order],
+  );
+  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpProblem } = useSetLog(session.log, baseOrder, date, session.session, session.exercises, shape);
   // The session sheet (fokus-sheet.md): open state is never persisted (closed after a reload).
   const [sheet, setSheet] = useState<{ readonly animateIn: boolean } | null>(() => (openOnLoad ? { animateIn: false } : null));
   const barButton = useRef<HTMLButtonElement>(null);
@@ -107,7 +121,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
   // Every superset rule, label and sentence comes from the view; the screen renders and dispatches taps.
   const view = fokusView(
-    { exercises: session.exercises, pairs: session.pairs ?? [], order, week: session.week, session: session.session, ...(session.parts === undefined ? {} : { parts: session.parts }) },
+    { exercises: session.exercises, pairs: orderedPairs, order, week: session.week, session: session.session, ...(session.parts === undefined ? {} : { parts: session.parts }) },
     log,
   );
   // combo-parts.md: the parts editor's drafts live here, so a failed save, Fortryd and a re-done keep them.
@@ -175,11 +189,26 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
   const lastLine = view.undo?.line ?? null;
 
-  /** §6 / R4: the sheet's top is 12px under the rest strip, or under the top bar without one. */
-  const sheetTop = (): number => {
-    const anchor = document.querySelector("[data-sheet-anchor]") ?? document.querySelector("[data-sheet-top]");
-    return (anchor?.getBoundingClientRect().bottom ?? 0) + 12;
+  // fokus-superset.md: the seams (sheet) and the set screen's button read the same views.
+  const seams = seamViews(session.exercises, slots, supersets.pairs, log.values());
+  const current = view.kind === "set" ? view.next : view.kind === "warmup" ? view.warmup : null;
+  const offer = current === null ? null : supersetOffer(session.exercises, seams, current);
+  const seamAfter = (rowA: number, rowB: number): ReactNode => {
+    const v = seams.find((x) => x.rowA === rowA && x.rowB === rowB);
+    if (v === undefined) return null;
+    const save = supersets.saves.get(slotKey(v));
+    if (v.state === "none" && save?.status !== "failed" && save?.status !== "refused") return null;
+    return <SupersetSeam v={v} save={save} onToggle={(paired) => supersets.toggle(v, paired, seamSentence(v, paired))} />;
   };
+  const offerBlock = offer === null ? null : <OfferButton offer={offer} save={supersets.saves.get(slotKey(offer.seam))} onToggle={(paired) => supersets.toggle(offer.seam, paired, offer.sentence(paired))} />;
+
+  /** §6 / R4: the sheet's top is 12px under the rest strip, or under the top bar without one; §7: the strip's band stays undimmed. */
+  const sheetPlace = (): SheetPlace => {
+    const strip = document.querySelector("[data-sheet-anchor]")?.getBoundingClientRect() ?? null;
+    const anchor = strip ?? document.querySelector("[data-sheet-top]")?.getBoundingClientRect() ?? null;
+    return { top: (anchor?.bottom ?? 0) + 12, strip: strip === null ? null : { top: strip.top, bottom: strip.bottom } };
+  };
+  const jumpName = (row: number): string => view.sheet.runs.find((r) => r.row === row)?.name ?? "øvelsen";
 
   const onSheetClosed = (jumpTo: number | null) => {
     setSheet(null);
@@ -188,8 +217,11 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       return;
     }
     // §13: the jump goes through the shared transition; focus goes to the new view's primary.
-    const sentence = jumpSentence(view.sheet.runs, jumpTo);
-    tap("jump", { row: jumpTo, set: 1 });
+    jump(jumpTo);
+  };
+  const jump = (row: number) => {
+    const sentence = jumpSentence(view.sheet.runs, row);
+    tap("jump", { row, set: 1 });
     after(sentence);
   };
   const open = sheet !== null;
@@ -222,9 +254,21 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       />
       <div className="mt-2 flex min-h-11 flex-col justify-center">
         {staleNote !== null && <WarningLine>{staleNote}</WarningLine>}
+        {/* fokus-sheet.md §Copy: a jump is in the order only while saving or saved, so a failed one is undone here. */}
+        {jumpProblem?.kind === "failed" && (
+          <WarningLine>
+            Springet er ikke gemt. Rækkefølgen er som før.{" "}
+            <button type="button" onClick={() => jump(jumpProblem.row)} className={`min-h-11 px-4 ${OUTLINED}`}>
+              Gem igen
+            </button>
+          </WarningLine>
+        )}
+        {jumpProblem?.kind === "refused" && (
+          <WarningLine>{`Kunne ikke springe til ${jumpName(jumpProblem.row)}: sessionen er ændret. Rækkefølgen er som før.`}</WarningLine>
+        )}
         {unsaved > 0 && (
           <WarningLine>
-            {jumpUnsaved ? "Springet er ikke gemt. Rækkefølgen står her, men forsvinder, hvis siden genindlæses." : `${unsavedText(unsaved)} De står her, men forsvinder, hvis siden genindlæses.`}{" "}
+            {`${unsavedText(unsaved)} De står her, men forsvinder, hvis siden genindlæses.`}{" "}
             <button
               type="button"
               onClick={retry}
@@ -259,6 +303,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           parts={view.feel === null ? null : partsBlock(view.feel.named ? displayName(view.feel.set.exercise) : null)}
           sheetOpen={open}
           onStripTap={() => closeSheet.current?.()}
+          offer={offerBlock}
         />
       )}
       {view.kind === "warmup" && (
@@ -272,6 +317,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           onWarmupEnd={onWarmupEnd}
           onTap={onFeelOrReps}
           parts={view.feel === null ? null : partsBlock(null)}
+          offer={offerBlock}
         />
         </div>
       )}
@@ -295,9 +341,10 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           done={p.done}
           total={p.total}
           animateIn={sheet.animateIn}
-          measureTop={sheetTop}
+          measure={sheetPlace}
           onClosed={onSheetClosed}
           closeRef={closeSheet}
+          seamAfter={seamAfter}
         />
       )}
     </div>
@@ -324,7 +371,10 @@ function SetView({
   parts,
   sheetOpen,
   onStripTap,
+  offer,
 }: {
+  /** fokus-superset.md §2.2: the ⇄ button in the pair line's slot; null = none. */
+  readonly offer: ReactNode;
   readonly view: Extract<FokusView, { kind: "set" }>;
   /** combo-parts.md §1: the parts editor under the feel row (it replaces the reps stepper); null = none. */
   readonly parts: ReactNode;
@@ -352,7 +402,7 @@ function SetView({
   return (
     <div className={`mt-2 flex flex-1 flex-col gap-3 ${FADE_IN}`}>
       {view.showRest && view.rest !== null && view.restWindow !== null && (
-        <div data-sheet-anchor onClick={sheetOpen ? onStripTap : undefined} className={sheetOpen ? "relative z-50" : undefined}>
+        <div data-sheet-anchor onClick={sheetOpen ? onStripTap : undefined}>
           <RestStrip key={view.rest.since} since={view.rest.since} rest={view.restWindow} onAnnounce={onAnnounce} />
         </div>
       )}
@@ -365,7 +415,8 @@ function SetView({
         </h2>
         {/* variants.md §3: the sheet's exercise muted under the variant (4px, same block). */}
         {under !== null && <p className="mt-1 font-sans text-16 text-balance text-text-muted">{under}</p>}
-        {line !== null && (
+        {offer}
+        {offer === null && line !== null && (
           <p className="mt-2 flex items-center gap-2 font-sans text-14 text-text-muted">
             <Icon name="arrow-left-right" size={16} />
             {line}
@@ -449,7 +500,10 @@ function WarmupView({
   onWarmupEnd,
   onTap,
   parts,
+  offer,
 }: {
+  /** fokus-superset.md §2.2: the ⇄ button under the name stack; null = none. */
+  readonly offer: ReactNode;
   readonly view: Extract<FokusView, { kind: "warmup" }>;
   /** combo-parts.md §1: the parts editor under the feel row; null = none. */
   readonly parts: ReactNode;
@@ -474,7 +528,7 @@ function WarmupView({
         </div>
       )}
       <div className={feel !== null ? "mt-10" : "mt-4"}>
-        <WarmupCard since={since} exercise={setOne.exercise} mainLift={mainLift} />
+        <WarmupCard since={since} exercise={setOne.exercise} mainLift={mainLift} extra={offer} />
       </div>
       <NextSetCard next={setOne} week={week} inWarmup afterTimer={rampState(setOne.exercise, mainLift) === "hidden"} />
       <DoneButton
@@ -572,5 +626,44 @@ function FigureWithWords({ figure }: { readonly figure: string }) {
       <span className="font-sans text-24">{m[1]} </span>
       <span className={FIGURE}>{m[2]}</span>
     </>
+  );
+}
+
+/**
+ * fokus-superset.md §2.2–§2.3: the dark ⇄ toggle in the hero card (44px, auto width, never
+ * truncated), `Som sidst` when suggested, the pair line under it while on, S7/S8 under that.
+ * Its slot is ≥ 44px, so nothing below it moves.
+ */
+function OfferButton({ offer, save, onToggle }: { readonly offer: SupersetOffer; readonly save: SeamSave | undefined; readonly onToggle: (paired: boolean) => void }) {
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1">
+        <button
+          type="button"
+          aria-pressed={offer.on}
+          onClick={() => onToggle(!offer.on)}
+          className={`inline-flex min-h-11 items-center gap-2 px-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${OUTLINED.replace("bg-card", offer.on ? "bg-raised" : "bg-card")}`}
+        >
+          <Icon name={offer.on ? "check" : "arrow-left-right"} size={18} />
+          {offer.label}
+        </button>
+        {offer.suggested && <span className="font-sans text-13 text-text-muted">Som sidst</span>}
+      </div>
+      {offer.line !== null && (
+        <p className="flex items-center gap-2 font-sans text-14 text-text-muted">
+          <Icon name="arrow-left-right" size={16} />
+          {offer.line}
+        </p>
+      )}
+      {save?.status === "failed" && (
+        <WarningLine>
+          Superset-valget er ikke gemt. Det står her, men forsvinder, hvis siden genindlæses.{" "}
+          <button type="button" onClick={() => onToggle(save.override ?? offer.on)} className={`min-h-11 px-4 ${OUTLINED}`}>
+            Gem igen
+          </button>
+        </WarningLine>
+      )}
+      {save?.status === "refused" && <WarningLine>{refusedText(offer.seam, save.reason)}</WarningLine>}
+    </div>
   );
 }

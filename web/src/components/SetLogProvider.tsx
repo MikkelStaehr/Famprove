@@ -1,24 +1,12 @@
 "use client";
 
-import { createContext, type ReactNode, use, useCallback, useMemo, useRef, useState } from "react";
+import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
 
-import { setSupersetPair } from "@/app/actions";
-import { REDUCED_MOTION } from "@/lib/motion";
-import {
-  clientOrder,
-  clientPairs,
-  orderPairs,
-  SEAM_IDLE,
-  type SeamSave,
-  seamReducer,
-  seamSentence,
-  type SeamView,
-  seamViews,
-  slotKey,
-} from "@/lib/superset-view";
+import { clientOrder, type SeamSave, seamSentence, type SeamView, seamViews } from "@/lib/superset-view";
 import { checklistView, type ChecklistView, type StrengthSession } from "@/lib/training-view";
 
 import { type SetLog, useSetLog } from "./useSetLog";
+import { useSupersetSaves } from "./useSupersetSaves";
 
 /**
  * The open session's set state for Træning (spec traening.md §3.1.4, §3.3): the header's
@@ -56,12 +44,8 @@ type ProviderProps = {
 };
 
 export function SetLogProvider({ session, date, devSwitches, children }: ProviderProps) {
-  const [saves, setSaves] = useState<ReadonlyMap<string, SeamSave>>(() => new Map());
-  const [drawn, setDrawn] = useState<ReadonlySet<string>>(() => new Set());
-  const [status, setStatus] = useState("");
-  const pairs = useMemo(() => clientPairs(session.pairSlots, saves), [session.pairSlots, saves]);
+  const { saves, pairs, ordered, drawn, status, toggle: save } = useSupersetSaves(session.pairSlots, date, session.session);
   // The order follows only stored choices: a failed save stays on the seam (S7), not in the order.
-  const ordered = useMemo(() => orderPairs(session.pairSlots, saves), [session.pairSlots, saves]);
   const order = useMemo(
     () => (saves.size === 0 ? session.order : clientOrder(session.exercises, ordered, session.runRows ?? null)),
     [saves.size, session.order, session.exercises, ordered, session.runRows],
@@ -72,32 +56,7 @@ export function SetLogProvider({ session, date, devSwitches, children }: Provide
     () => seamViews(session.exercises, session.pairSlots, pairs, setLog.log.values()),
     [session.exercises, session.pairSlots, pairs, setLog.log],
   );
-  // Each seam's latest tap: an older reply never overwrites a newer choice.
-  const seq = useRef(new Map<string, number>());
-
-  const toggle = useCallback(
-    (v: SeamView, paired: boolean) => {
-      const key = slotKey(v);
-      const n = (seq.current.get(key) ?? 0) + 1;
-      seq.current.set(key, n);
-      setSaves((m) => new Map(m).set(key, seamReducer(m.get(key) ?? SEAM_IDLE, { kind: "tap", paired })));
-      setStatus(seamSentence(v, paired));
-      const animate = !window.matchMedia(REDUCED_MOTION).matches;
-      setDrawn((d) => {
-        const next = new Set(d);
-        if (paired && animate) next.add(key);
-        else next.delete(key);
-        return next;
-      });
-      void setSupersetPair({ date, sessionNo: session.session, rowA: v.rowA, rowB: v.rowB, paired })
-        .catch(() => null)
-        .then((result) => {
-          if (seq.current.get(key) !== n) return;
-          setSaves((m) => new Map(m).set(key, seamReducer(m.get(key) ?? { override: paired, status: "saving" }, { kind: "result", result })));
-        });
-    },
-    [date, session.session],
-  );
+  const toggle = useCallback((v: SeamView, paired: boolean) => save(v, paired, seamSentence(v, paired)), [save]);
 
   const seams = useMemo(() => ({ views, saves, drawn, status, toggle }), [views, saves, drawn, status, toggle]);
   const value = useMemo(
