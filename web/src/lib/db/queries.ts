@@ -16,6 +16,7 @@ import {
   illustrativeWeeklyPlan,
   ILLUSTRATIVE_FEEL,
   isPauseFixture,
+  videoFixture,
   midsessionLog,
   sheetLog,
   comboParts,
@@ -495,8 +496,9 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     return { ...base, ...mid, ...jumpedFixture(mid.sets, today, new Date()), supersetPairs: [] };
   }
   if (fixture === "superset-offer") return { ...base, setLog: supersetOfferLog(sets, today, new Date()), supersetPairs: [] };
-  if (isPauseFixture(fixture)) {
-    const pause = pauseFixture(fixture, sets, plannedSets, today, new Date());
+  const pauseLike = videoFixture(fixture) !== null ? "pause" : fixture;
+  if (isPauseFixture(pauseLike)) {
+    const pause = pauseFixture(pauseLike, sets, plannedSets, today, new Date());
     return { ...base, ...pause, plannedSets: illustrativeToday(pause.sets, pause.plannedSets) };
   }
   return base;

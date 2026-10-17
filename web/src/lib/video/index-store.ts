@@ -25,6 +25,8 @@ export type ClipIndexEntry = {
   readonly starred: boolean;
   readonly starSynced: boolean; // false until starClip confirmed the row's starred
   readonly state: ClipState;
+  /** false: the row's insert failed, retried on the next open (video-record §8); absent = synced (older entries). */
+  readonly synced?: boolean;
 };
 
 export interface ClipIndex {

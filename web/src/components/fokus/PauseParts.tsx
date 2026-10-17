@@ -49,11 +49,14 @@ export function DoneButton({
   onClick,
   visible,
   spoken,
+  stop = false,
 }: {
   readonly primary: PrimaryRef;
   readonly onClick: () => void;
   readonly visible: string;
   readonly spoken: string;
+  /** video-record.md §7: while recording, a 10px --inverse-text square instead of the check. */
+  readonly stop?: boolean;
 }) {
   return (
     <>
@@ -61,7 +64,7 @@ export function DoneButton({
       <div aria-hidden="true" className="flex-1" />
       <div className={`mt-3 ${PRIMARY_DOCK}`}>
         <button ref={primary} type="button" aria-label={spoken} onClick={onClick} className={PRIMARY_BOX}>
-          <CheckIcon className="size-4.5" />
+          {stop ? <span aria-hidden="true" className="inline-block size-2.5 bg-inverse-text" /> : <CheckIcon className="size-4.5" />}
           {visible}
         </button>
       </div>

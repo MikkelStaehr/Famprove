@@ -54,7 +54,10 @@ export function ProgressButton({
   expanded,
   onOpen,
   buttonRef,
+  locked = false,
 }: {
+  /** video-record.md §7: while recording the bar is not a button (no chevron), so no jump moves the set. */
+  readonly locked?: boolean;
   readonly groups: readonly BarGroup[];
   readonly done: number;
   readonly total: number;
@@ -64,6 +67,21 @@ export function ProgressButton({
   readonly onOpen: () => void;
   readonly buttonRef: Ref<HTMLButtonElement>;
 }) {
+  if (locked) {
+    return (
+      <div className="mt-2 flex min-h-11 w-full items-end gap-3 pb-2 text-text">
+        <span className="sr-only">
+          {done} af {total} sæt udført{skipped}
+        </span>
+        <span className="min-w-0 flex-1">
+          <GroupedBar groups={groups} />
+        </span>
+        <span aria-hidden="true" className="flex shrink-0 items-center gap-1 font-mono text-16 leading-none font-medium tabular-nums">
+          {done}/{total}
+        </span>
+      </div>
+    );
+  }
   return (
     <button
       ref={buttonRef}

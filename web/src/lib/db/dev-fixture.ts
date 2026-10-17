@@ -127,7 +127,9 @@ export type DevFixture =
   | "sheet-superset"
   | "jumped"
   | "superset-offer"
-  | "combo";
+  | "combo"
+  | "recording"
+  | "camera-denied";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -153,12 +155,20 @@ const FIXTURES: readonly DevFixture[] = [
   "jumped",
   "superset-offer",
   "combo",
+  "recording",
+  "camera-denied",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
 export type PauseFixture = "warmup" | "pause" | "exercise-end" | "pause-rated" | "finished";
 export function isPauseFixture(f: DevFixture | null): f is PauseFixture {
   return f === "warmup" || f === "pause" || f === "exercise-end" || f === "pause-rated" || f === "finished";
+}
+
+/** DEV_FIXTURE=recording / camera-denied (video-record.md §Fixtures): the `pause` log with Fokus's record strip state. */
+export type VideoFixture = "recording" | "camera-denied";
+export function videoFixture(f: DevFixture | null): VideoFixture | null {
+  return f === "recording" || f === "camera-denied" ? f : null;
 }
 
 /** DEV_FIXTURE=pause-rated: the done set's age (3:40, between the 3:00 MIN and the 5:00 MAX). */

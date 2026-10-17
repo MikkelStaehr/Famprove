@@ -42,6 +42,9 @@ import { useWakeLock } from "./useWakeLock";
 import { PartsEditor } from "./PartsEditor";
 import { usePartsSave } from "./usePartsSave";
 import { draftFrom, type PartsDraft } from "@/lib/parts-editor";
+import { afbrudtLine, isLive, LIMIT_LINE, LOW_SPACE_LINE, optagName, recordingStatus, type RecState, savedPrefix, stopInDock, stopSpoken, stopVisible } from "@/lib/video/recording";
+import { type ClipRecorder, useClipRecorder, type VideoFixture } from "./useClipRecorder";
+import { DeniedLine, OptagButton, RecordStrip } from "./RecordParts";
 import type { PartsData } from "@/lib/set-parts";
 
 export type FokusSession = {
@@ -75,6 +78,8 @@ type FokusScreenProps = {
   readonly mainLifts: readonly string[] | null;
   /** DEV_FIXTURE=sheet / sheet-superset: the page loads with the session sheet open (never persisted). */
   readonly sheetOpen?: boolean;
+  /** video-record.md §2: recording offered (production host or next dev) and the dev fixture. Absent = never. */
+  readonly recording?: { readonly allowed: boolean; readonly fixture: VideoFixture };
 };
 
 // Part B Motion: a 120ms opacity cross-fade between views, 0ms under reduced motion.
@@ -87,7 +92,8 @@ const FADE_IN = "transition-opacity duration-120 ease-out starting:opacity-0 mot
  * (✓ Opvarmning udført), finished (Tilbage til Træning). Taps go through useSetLog (optimistic,
  * saved in order).
  */
-export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts, sheetOpen: openOnLoad = false }: FokusScreenProps) {
+export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts, sheetOpen: openOnLoad = false, recording }: FokusScreenProps) {
+  const rec = useClipRecorder(recording?.allowed ?? false, recording?.fixture ?? null);
   // fokus-superset.md: the ⇄ choices of this visit; the order follows stored or saving ones only (orderPairs).
   const slots = useMemo(() => session.pairSlots ?? [], [session.pairSlots]);
   const supersets = useSupersetSaves(slots, date, session.session);
@@ -158,10 +164,33 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
   const onDone = () => {
     if (view.kind !== "set") return;
+    const next = view.next;
+    const announce = view.announce.done;
+    // video-record.md §8: Stop = done. The recorder stops first, then the same done tap as without video.
+    if (stopInDock(rec.state)) {
+      const prefix = savedPrefix(rec.elapsed);
+      rec.stopAndDone(() => {
+        void partsSave.save(shownDraft);
+        tap("done", next);
+        after(`${prefix}${announce}`);
+      });
+      return;
+    }
+    if (rec.state.kind === "limit") rec.saveLimited();
+    else rec.clear();
     void partsSave.save(shownDraft); // R2: the parts are saved on the next done
-    tap("done", view.next);
-    after(view.announce.done);
+    tap("done", next);
+    after(announce);
   };
+
+  const onOptag = (setNo: number) => {
+    if (view.kind !== "set" || isLive(rec.state)) return;
+    rec.optag(view.next, date, session.session, () => after(recordingStatus(setNo)));
+  };
+  const onCancelRec = () => void rec.abort("cancel");
+  // §14: an error is announced once, assertively (the region's text appears with the line).
+  const alert = rec.state.kind === "afbrudt" && rec.state.reason !== "cancel" ? afbrudtLine(rec.state.reason, rec.state.durationS) : "";
+  const recLive = isLive(rec.state);
 
   const onSkip = () => {
     if (view.kind !== "set") return;
@@ -242,11 +271,14 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       <p role="status" className="sr-only">
         {announcement}
       </p>
+      <p role="alert" className="sr-only">
+        {alert}
+      </p>
 
       <div inert={open} data-sheet-top>
       {/* Top bar: fixed in layout, so the card never jumps (§4.1). */}
       <div className="flex items-center justify-between gap-3">
-        <HomeLink flush={saveAll} className={COMPACT_SECONDARY}>
+        <HomeLink flush={async () => { await rec.abort("cancel"); return saveAll(); }} className={COMPACT_SECONDARY}>
           <Icon name="x" size={18} />
           Afslut
         </HomeLink>
@@ -259,6 +291,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         total={p.total}
         skipped={view.skipped}
         expanded={open}
+        locked={recLive}
         buttonRef={barButton}
         onOpen={() => setSheet({ animateIn: true })}
       />
@@ -290,7 +323,8 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         )}
         {rejected && <WarningLine>Et tryk blev afvist. Genindlæs siden.</WarningLine>}
         {/* Fortryd alone on its row (round 3); what it undoes is the sr-only rest of its name (WCAG 2.5.3: starts with the label). */}
-        {lastLine !== null && (
+        {lastLine !== null && recLive && <p className="flex min-h-11 items-center justify-end font-sans text-13 text-text-muted">Stop optagelsen for at fortryde</p>}
+        {lastLine !== null && !recLive && (
           <p className="flex justify-end">
             <button type="button" onClick={onUndo} className={COMPACT_SECONDARY}>
               Fortryd<span className="sr-only">: {lastLine}</span>
@@ -314,6 +348,9 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           sheetOpen={open}
           onStripTap={() => closeSheet.current?.()}
           offer={offerBlock}
+          rec={rec}
+          onOptag={onOptag}
+          onCancelRec={onCancelRec}
         />
       )}
       {view.kind === "warmup" && (
@@ -382,7 +419,14 @@ function SetView({
   sheetOpen,
   onStripTap,
   offer,
+  rec,
+  onOptag,
+  onCancelRec,
 }: {
+  /** video-record.md: the record control's state (the strip, Optag, Stop in the dock). */
+  readonly rec: ClipRecorder;
+  readonly onOptag: (setNo: number) => void;
+  readonly onCancelRec: () => void;
   /** fokus-superset.md §2.2: the ⇄ button in the pair line's slot; null = none. */
   readonly offer: ReactNode;
   readonly view: Extract<FokusView, { kind: "set" }>;
@@ -407,11 +451,19 @@ function SetView({
   const cell = prescribedCell(e.prescribed);
   const under = exerciseUnder(e);
   const label = view.label;
-  const line = view.pairLine;
+  const pairLine = view.pairLine;
   const feel = view.feel;
+  const setNo = shownSetNo(label.visible, view.next.set);
+  const live = isLive(rec.state);
+  const recording = rec.state.kind === "recording" || rec.state.kind === "stopping";
+  const stop = stopInDock(rec.state);
+  const line = recLine(rec.state);
   return (
     <div className={`mt-2 flex flex-1 flex-col gap-3 ${FADE_IN}`}>
-      {view.showRest && view.rest !== null && view.restWindow !== null && (
+      {/* §5: the recording strip takes the rest strip's slot; §14: an error line replaces it. */}
+      {recording && <RecordStrip setNo={setNo} elapsed={rec.elapsed} previewRef={rec.previewRef} fixture={rec.fixture} />}
+      {!recording && line !== null && <WarningLine>{line}</WarningLine>}
+      {!recording && view.showRest && view.rest !== null && view.restWindow !== null && (
         <div data-sheet-anchor onClick={sheetOpen ? onStripTap : undefined}>
           <RestStrip key={view.rest.since} since={view.rest.since} rest={view.restWindow} onAnnounce={onAnnounce} />
         </div>
@@ -426,10 +478,10 @@ function SetView({
         {/* variants.md §3: the sheet's exercise muted under the variant (4px, same block). */}
         {under !== null && <p className="mt-1 font-sans text-16 text-balance text-text-muted">{under}</p>}
         {offer}
-        {offer === null && line !== null && (
+        {offer === null && pairLine !== null && (
           <p className="mt-2 flex items-center gap-2 font-sans text-14 text-text-muted">
             <Icon name="arrow-left-right" size={16} />
-            {line}
+            {pairLine}
           </p>
         )}
 
@@ -482,12 +534,21 @@ function SetView({
             {adjustment.rest}
           </p>
         )}
-        {/* F4: Spring over acts on this set, so it sits inside its card, bottom right. */}
-        <p className="mt-4 flex justify-end">
-          <button type="button" onClick={onSkip} className={SKIP_BUTTON}>
-            Spring over
-          </button>
-        </p>
+        {/* F4: Spring over acts on this set, so it sits inside its card, bottom right; video-record §1: Optag left. */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          {rec.available === true && !rec.lowSpace ? (
+            <OptagButton live={live} waiting={rec.state.kind === "requesting"} name={optagName(setNo, displayName(e))} onOptag={() => onOptag(setNo)} onCancel={onCancelRec} />
+          ) : (
+            <span />
+          )}
+          {!live && (
+            <button type="button" onClick={onSkip} className={SKIP_BUTTON}>
+              Spring over
+            </button>
+          )}
+        </div>
+        {rec.available === true && rec.lowSpace && !live && <p className="mt-3 font-sans text-13 text-text-muted">{LOW_SPACE_LINE}</p>}
+        {rec.state.kind === "denied" && <DeniedLine />}
       </section>
       {feel !== null && (
         <div className="mt-1">
@@ -495,10 +556,29 @@ function SetView({
           {parts}
         </div>
       )}
-      <DoneButton primary={primary} onClick={onDone} visible={label.visible} spoken={label.spoken} />
+      <DoneButton
+        primary={primary}
+        onClick={onDone}
+        visible={stop ? stopVisible(label.visible) : label.visible}
+        spoken={stop ? stopSpoken(label.spoken) : label.spoken}
+        stop={stop}
+      />
       </div>
     </div>
   );
+}
+
+/** The shown set number ("Sæt 2 udført" → 2), else the sheet's set number. */
+function shownSetNo(visible: string, fallback: number): number {
+  const m = /(\d+)/.exec(visible);
+  return m === null ? fallback : Number(m[1]);
+}
+
+/** §9/§14: the line that replaces the strip after the clip stopped without Stop; null = none. */
+function recLine(state: RecState): string | null {
+  if (state.kind === "limit") return LIMIT_LINE;
+  if (state.kind === "afbrudt") return afbrudtLine(state.reason, state.durationS);
+  return null;
 }
 
 /** fokus-pause.md §2 and §4 (Variants A and C): the warm-up, after the feel of the set before. */
