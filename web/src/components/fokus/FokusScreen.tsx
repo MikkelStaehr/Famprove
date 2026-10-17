@@ -8,6 +8,7 @@ import { HomeLink } from "./HomeLink";
 import {
   BEGIN_UNDONE_HREF,
   displayName,
+  exerciseName,
   exerciseUnder,
   type FinishCard,
   type FokusExercise,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/fokus-view";
 import { adjustmentLine, CAPPED_WORD } from "@/lib/training-view";
 import { type Signature, signature } from "@/lib/fokus-marks";
+import type { ClipNameStack } from "@/lib/video/index-store";
 import { type JumpMark, type LoggedSet, type PairRef, type SetRef, setKey } from "@/lib/set-taps";
 
 import { clientOrder, refusedText, runSetsOf, type SeamSave, slotKey, supersetOffer, type SupersetOffer, seamSentence, seamViews } from "@/lib/superset-view";
@@ -183,9 +185,18 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     after(announce);
   };
 
-  const onOptag = (setNo: number) => {
+  // Taps held behind a failed save live in memory only (review 2026-10-17): a reload asks first.
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (failedNow() > 0) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [failedNow]);
+
+  const onOptag = (setNo: number, names: ClipNameStack) => {
     if (view.kind !== "set" || isLive(rec.state)) return;
-    rec.optag(view.next, date, session.session, () => after(recordingStatus(setNo)));
+    rec.optag(view.next, names, date, session.session, () => after(recordingStatus(setNo)));
   };
   const onCancelRec = () => void rec.abort("cancel");
   // §14: an error is announced once, assertively (the region's text appears with the line).
@@ -300,7 +311,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         {/* jump-retry: a failed jump stays and halts the saves; Gem igen sends it, then the taps held behind it. */}
         {jumpProblem?.kind === "failed" && (
           <WarningLine>
-            Et spring blev ikke gemt.{" "}
+            Et spring blev ikke gemt. Genindlæs ikke før det er gemt.{" "}
             <button type="button" onClick={retry} className={`min-h-11 px-4 ${OUTLINED}`}>
               Gem igen
             </button>
@@ -325,7 +336,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         {/* Fortryd alone on its row (round 3); what it undoes is the sr-only rest of its name (WCAG 2.5.3: starts with the label). */}
         {lastLine !== null && recLive && <p className="flex min-h-11 items-center justify-end font-sans text-13 text-text-muted">Stop optagelsen for at fortryde</p>}
         {lastLine !== null && !recLive && (
-          <p className="flex justify-end">
+          <p className="flex min-h-11 items-center justify-end">
             <button type="button" onClick={onUndo} className={COMPACT_SECONDARY}>
               Fortryd<span className="sr-only">: {lastLine}</span>
             </button>
@@ -425,7 +436,7 @@ function SetView({
 }: {
   /** video-record.md: the record control's state (the strip, Optag, Stop in the dock). */
   readonly rec: ClipRecorder;
-  readonly onOptag: (setNo: number) => void;
+  readonly onOptag: (setNo: number, names: ClipNameStack) => void;
   readonly onCancelRec: () => void;
   /** fokus-superset.md §2.2: the ⇄ button in the pair line's slot; null = none. */
   readonly offer: ReactNode;
@@ -537,7 +548,7 @@ function SetView({
         {/* F4: Spring over acts on this set, so it sits inside its card, bottom right; video-record §1: Optag left. */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           {rec.available === true && !rec.lowSpace ? (
-            <OptagButton live={live} waiting={rec.state.kind === "requesting"} name={optagName(setNo, displayName(e))} onOptag={() => onOptag(setNo)} onCancel={onCancelRec} />
+            <OptagButton live={live} waiting={rec.state.kind === "requesting"} name={optagName(setNo, displayName(e))} onOptag={() => onOptag(setNo, { exercise: exerciseName(e), variant: e.variant === null ? null : displayName(e) })} onCancel={onCancelRec} />
           ) : (
             <span />
           )}

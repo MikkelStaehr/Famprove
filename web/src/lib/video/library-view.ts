@@ -8,7 +8,7 @@
  */
 import type { IsoDate } from "../db/rows.ts";
 import type { VideoClipRow } from "./clips.ts";
-import type { ClipIndexEntry } from "./index-store.ts";
+import type { ClipIndexEntry, ClipNameStack } from "./index-store.ts";
 import type { ClipExt } from "./mime.ts";
 
 export type ClipNames = {
@@ -77,8 +77,13 @@ export function shownName(row: Pick<LibraryRow, "exercise" | "variant">): string
   return row.variant ?? row.exercise;
 }
 
-function names(row: VideoClipRow | undefined, n: ClipNames): { exercise: string; variant: string | null } {
-  if (row === undefined) return { exercise: UNKNOWN_NAME, variant: null };
+/** The server row's names; without a row (afbrudt, not yet synced) the stack stored at Optag, else UNKNOWN_NAME. */
+function names(row: VideoClipRow | undefined, n: ClipNames, atOptag?: ClipNameStack): { exercise: string; variant: string | null } {
+  if (row === undefined) {
+    if (atOptag === undefined) return { exercise: UNKNOWN_NAME, variant: null };
+    const v = atOptag.variant;
+    return { exercise: atOptag.exercise, variant: v === null || v === atOptag.exercise ? null : v };
+  }
   const exercise = n.exercises[row.exerciseId] ?? UNKNOWN_NAME;
   const v = row.variantId === null ? null : (n.variants[row.variantId] ?? null);
   return { exercise, variant: v === null || v === exercise ? null : v };
@@ -111,7 +116,7 @@ export function libraryRows(
     for (const e of local) {
       if (e.state === "recording") continue; // the recorder owns it
       const r = rows.get(e.id);
-      const nm = names(r, n);
+      const nm = names(r, n, e.names);
       const label = shownName(nm);
       const date = r?.date ?? e.setKey.date;
       const set = r?.set ?? e.setKey.set;

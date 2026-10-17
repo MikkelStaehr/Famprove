@@ -144,3 +144,22 @@ test("onJumpResult is the pure decision", () => {
   assert.deepEqual(onJumpResult(NO_SAVES, jump1, "refused", true), { ...NO_SAVES, reload: true, stopped: true });
   assert.deepEqual(onJumpResult(NO_SAVES, jump1, "dev", false), { ...NO_SAVES, dev: true });
 });
+
+test("a jump after an ordinary tap that failed is held behind it; Gem igen sends the tap, then the jump", async () => {
+  const before: Input = { kind: "done", row: 20, set: 1 };
+  const f = fake(["failed"]);
+  f.queue.push(before);
+  await f.queue.flush();
+  f.queue.push(jump2);
+  await f.queue.flush();
+  assert.deepEqual(f.calls, ["done 20/1"]); // the jump never went out ahead of the failed done
+  assert.equal(f.state().halted, true);
+  assert.deepEqual(f.state().failed, [before, jump2]);
+  assert.deepEqual(failedBeforeJump(f.state()), [before]);
+  assert.equal(haltingJump(f.state()), jump2);
+  f.queue.retry();
+  await f.queue.flush();
+  assert.deepEqual(f.calls, ["done 20/1", "done 20/1", "jump 30/1"]);
+  assert.deepEqual(f.state().failed, []);
+  assert.equal(f.state().halted, false);
+});

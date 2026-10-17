@@ -16,6 +16,9 @@ export type ClipSetKey = {
   readonly set: number; // ≥ 1, working sets only
 };
 
+/** The name stack at Optag (video-library §5): the exercise and the variant's display name (null: none). */
+export type ClipNameStack = { readonly exercise: string; readonly variant: string | null };
+
 export type ClipIndexEntry = {
   readonly id: string; // the uuid, also public.video_clips.id
   readonly setKey: ClipSetKey;
@@ -27,6 +30,8 @@ export type ClipIndexEntry = {
   readonly state: ClipState;
   /** false: the row's insert failed, retried on the next open (video-record §8); absent = synced (older entries). */
   readonly synced?: boolean;
+  /** The names at Optag, so a clip with no server row (afbrudt) still shows them; absent on older entries. */
+  readonly names?: ClipNameStack;
 };
 
 export interface ClipIndex {

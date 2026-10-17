@@ -71,3 +71,20 @@ test("helpers", () => {
   const f = clipsFixture(today);
   assert.deepEqual(unsyncedClips([{ ...f.local[0]!, synced: false }]).length, 1);
 });
+
+test("an afbrudt clip has no server row: it shows the name stack stored at Optag, else Optagelse", () => {
+  const base: ClipIndexEntry = {
+    id: "a1", setKey: { date: today, sessionNo: 1, row: 25, set: 2 }, ext: "webm", recordedAt: `${today}T08:00:00.000Z`,
+    durationS: 31, starred: false, starSynced: true, state: "afbrudt",
+  };
+  const [named] = libraryRows([{ ...base, names: { exercise: "Squat", variant: "Pause Squat" } }], [], FIXTURE_NAMES);
+  assert.equal(named?.kind, "afbrudt");
+  assert.equal(named?.exercise, "Squat");
+  assert.equal(named?.variant, "Pause Squat");
+  assert.equal(named?.sr, "Afspil Pause Squat, sæt 2, 19. oktober, 31 sekunder, afbrudt.");
+  const [plain] = libraryRows([{ ...base, names: { exercise: "Bench", variant: null } }], [], FIXTURE_NAMES);
+  assert.equal(plain?.exercise, "Bench");
+  assert.equal(plain?.variant, null);
+  const [older] = libraryRows([base], [], FIXTURE_NAMES); // an entry from before the stack was stored
+  assert.equal(older?.exercise, "Optagelse");
+});

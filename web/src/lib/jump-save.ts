@@ -63,14 +63,24 @@ export function onTapResult<T extends Tap>(state: SaveState<T>, tap: T, outcome:
   }
 }
 
-/** A tap's turn came while the queue is halted (held behind the failed jump) or stopped (dropped). */
+/**
+ * A tap's turn came while it may not be sent (sendable): held behind the failed jump, or a jump held
+ * behind an earlier failed tap (it halts the queue, so Gem igen sends that tap first), or stopped (dropped).
+ */
 export function onHeld<T extends Tap>(state: SaveState<T>, tap: T): SaveState<T> {
-  return state.halted ? { ...state, failed: [...state.failed, tap] } : state;
+  if (state.halted) return { ...state, failed: [...state.failed, tap] };
+  if (!state.stopped && tap.kind === "jump" && state.failed.length > 0) return { ...state, failed: [...state.failed, tap], halted: true };
+  return state;
 }
 
-/** True when a tap whose turn has come is sent now. */
-export function sendable<T extends Tap>(state: SaveState<T>): boolean {
-  return !state.halted && !state.stopped;
+/**
+ * True when a tap whose turn has come is sent now. A jump never goes out ahead of an earlier tap that
+ * failed (review 2026-10-17): the server would move that unsaved set's start, and Gem igen would then
+ * land its done after the jump. The jump waits in `failed`, behind it.
+ */
+export function sendable<T extends Tap>(state: SaveState<T>, tap: T): boolean {
+  if (state.halted || state.stopped) return false;
+  return tap.kind !== "jump" || state.failed.length === 0;
 }
 
 /** The failed taps before the halting jump (the ones after it are held, said by the jump's line). */
@@ -120,7 +130,7 @@ export function createSaveQueue<T extends Tap>(
   };
 
   const send = async (input: T): Promise<void> => {
-    if (!sendable(state)) {
+    if (!sendable(state, input)) {
       set(onHeld(state, input));
       return;
     }

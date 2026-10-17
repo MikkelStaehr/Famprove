@@ -139,3 +139,18 @@ test("an undo of a jump without the jump it saw, or after a done landed, is refu
   const done = play([["done", 27, 0]], jumped, 11);
   assert.equal(transition(shapeOrder(done.shape), done.log, { ...undo, seen: T(10) }, T(12), new Map(), done.shape), null);
 });
+
+test("a first jump records only the start it moves: C's own start is never moved_start, so Fortryd leaves it", () => {
+  const log = new Map(BEFORE.log);
+  const passed = log.get("25#2");
+  assert.ok(passed !== undefined);
+  log.set("25#2", { ...passed, startedAt: null }); // the open set holds no start
+  const own = T(-30); // Facepulls' warm-up holds a start no tap before the passed set wrote
+  log.set("27#0", { row: 27, set: 0, startedAt: own, endedAt: null, skipped: false, skippedAt: null, updatedAt: own });
+  const jumped = play([["jump", 27, 1]], { log, shape: SHAPE }, 10);
+  assert.equal(jumped.shape.jump?.movedStart, null);
+  assert.equal(jumped.log.get("27#0")?.startedAt, own);
+  const undone = play([["fortryd", 0, 0]], jumped, 11);
+  assert.equal(undone.log.get("27#0")?.startedAt, own); // not moved to Squat 2
+  assert.equal(undone.log.get("25#2")?.startedAt ?? null, null);
+});

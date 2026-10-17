@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { afbrudtLine, IDLE, isLive, lowSpace, recReducer, type RecState, stopInDock, stopSpoken, stopThenDone } from "../src/lib/video/recording.ts";
+import { afbrudtLine, clipOutcome, IDLE, isLive, lowSpace, openGuard, recReducer, type RecState, stopInDock, stopSpoken, stopThenDone } from "../src/lib/video/recording.ts";
 
 test("idle → requesting → recording → stopping → saved", () => {
   let s: RecState = recReducer(IDLE, { type: "optag" });
@@ -66,4 +66,48 @@ test("copy and space", () => {
   assert.equal(lowSpace({ usage: 0, quota: 299_000_000 }), true);
   assert.equal(lowSpace({ usage: 0, quota: 301_000_000 }), false);
   assert.equal(lowSpace(null), false);
+});
+
+function fakeStream() {
+  const stopped: number[] = [];
+  const tracks = [0, 1].map((k) => ({ stop: () => void stopped.push(k) }));
+  return { stopped, getTracks: () => tracks };
+}
+
+test("a camera that opens after unmount, hide or Annullér is released at once and never recorded", () => {
+  const guard = openGuard();
+  const attempt = guard.begin();
+  assert.equal(guard.pending(), true);
+  assert.equal(guard.cancel(), true); // abort while getUserMedia is pending
+  assert.equal(guard.pending(), false);
+  const late = fakeStream();
+  assert.equal(guard.keep(attempt, late), false); // after the await: released, stop there
+  assert.deepEqual(late.stopped, [0, 1]);
+  assert.equal(guard.cancel(), false); // nothing pending any more: abort has nothing to cancel
+});
+
+test("an Optag that opens normally keeps its stream; once settled, abort finds nothing pending", () => {
+  const guard = openGuard();
+  const attempt = guard.begin();
+  const s = fakeStream();
+  assert.equal(guard.keep(attempt, s), true);
+  assert.deepEqual(s.stopped, []);
+  guard.settle(attempt);
+  assert.equal(guard.pending(), false);
+  assert.equal(guard.cancel(), false);
+  // A second Optag supersedes a first still pending: the first's stream is released when it arrives.
+  const first = guard.begin();
+  const second = guard.begin();
+  const s1 = fakeStream();
+  assert.equal(guard.keep(first, s1), false);
+  assert.deepEqual(s1.stopped, [0, 1]);
+  assert.equal(guard.keep(second, fakeStream()), true);
+});
+
+test("a clip whose stop event came after the 800 ms cap misses its last chunk: afbrudt (failed), never a short done", () => {
+  assert.equal(clipOutcome(true, null), null);
+  assert.equal(clipOutcome(false, null), "failed");
+  assert.equal(clipOutcome(true, "space"), "space");
+  // §14: the line the strip shows for it
+  assert.equal(recReducer({ kind: "stopping", startedAt: 0 }, { type: "abort", reason: "failed", durationS: 40 }).kind, "afbrudt");
 });

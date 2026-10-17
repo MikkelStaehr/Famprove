@@ -83,7 +83,9 @@ export function RecordStrip({
     <video ref={previewRef} muted playsInline autoPlay aria-hidden="true" className="size-full bg-bg object-contain" />
   );
   return (
-    <section aria-label="Optagelse" className="relative flex items-stretch justify-between gap-4 rounded-card border border-border bg-card p-4">
+    // acceptance 2: as tall as the rest strip it replaces (caption, timer, rail and band line: 177.8px
+    // at 390px, measured 2026-10-17), so the hero card under it stays put when recording starts.
+    <section aria-label="Optagelse" className="relative flex min-h-[11.1125rem] items-stretch justify-between gap-4 rounded-card border border-border bg-card p-4">
       <div className="flex min-w-0 flex-col">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex items-center gap-2 font-mono text-13 text-text uppercase">

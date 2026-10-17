@@ -607,8 +607,14 @@ function jump(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, sha
   if (passed !== null && first !== null && setKey(passed) !== setKey(first)) {
     const start = log.get(setKey(passed))?.startedAt ?? null;
     const own = log.get(setKey(first))?.startedAt ?? null;
-    // A retry after the clear landed finds the passed set without a start and C holding it.
-    moved = start ?? own;
+    // moved_start is only the start moved off the passed set (review 2026-10-17): C's own start is
+    // never recorded, so Fortryd leaves it. A retry after the clear landed finds the passed set
+    // without a start and C holding it: it was moved there when it is the time the tap before the
+    // passed set wrote (a done's end or a skip's time), or the passed set is the session's first (Begynd's).
+    const at0 = order.findIndex((s) => setKey(s) === setKey(passed));
+    const written = at0 > 0 ? startAfter(log.get(setKey(order[at0 - 1]))) : null;
+    const landed = own !== null && (at0 === 0 || (written !== null && sameInstant(own, written)));
+    moved = start ?? (landed ? own : null);
     if (start !== null) {
       if (own === null) {
         out.push({ op: "ensure", ref: first, values: { startedAt: start }, updatedAt: at });

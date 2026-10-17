@@ -4,12 +4,12 @@ import { type RefObject, useCallback, useEffect, useReducer, useRef, useState } 
 
 import { saveClip } from "@/app/actions";
 import { CAMERA_CONSTRAINTS } from "@/lib/video/constraints";
-import { type ClipIndex, type ClipIndexEntry, interrupted } from "@/lib/video/index-store";
+import { type ClipIndex, type ClipIndexEntry, type ClipNameStack, interrupted } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
 import { pickRecorderType, type RecorderType } from "@/lib/video/mime";
 import type { ClipFiles, ClipWriter } from "@/lib/video/opfs";
 import { opfsClipFiles, persistStorage } from "@/lib/video/opfs-browser";
-import { type AfbrudtReason, IDLE, lowSpace, recReducer, type RecState, stopThenDone } from "@/lib/video/recording";
+import { type AfbrudtReason, clipOutcome, IDLE, lowSpace, openGuard, recReducer, type RecState, stopThenDone } from "@/lib/video/recording";
 import { MAX_DURATION_S } from "@/lib/video/clips";
 import type { SetRef } from "@/lib/set-taps";
 
@@ -33,6 +33,8 @@ type Live = {
   stopped: Promise<void>;
   limit: ReturnType<typeof setTimeout> | undefined;
   failed: AfbrudtReason | null;
+  /** The recorder's stop event came (every chunk has arrived before it). */
+  stopFired: boolean;
 };
 
 export type ClipRecorder = {
@@ -44,7 +46,7 @@ export type ClipRecorder = {
   readonly elapsed: number;
   readonly fixture: boolean;
   readonly previewRef: RefObject<HTMLVideoElement | null>;
-  readonly optag: (ref: SetRef, date: string, sessionNo: number, onStarted: () => void) => void;
+  readonly optag: (ref: SetRef, names: ClipNameStack, date: string, sessionNo: number, onStarted: () => void) => void;
   /** Stop = done: the recorder first, then `done`, then the file and the row. */
   readonly stopAndDone: (done: () => void) => void;
   /** Annullér, Afslut, background: the clip is kept as afbrudt, no done. */
@@ -80,6 +82,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
   const index = useRef<ClipIndex | null>(null);
   const persisted = useRef(false);
   const limited = useRef<{ readonly entry: ClipIndexEntry; readonly durationS: number } | null>(null);
+  const opening = useRef(openGuard());
 
   const ix = (): ClipIndex => (index.current ??= indexedDbClipIndex());
   const fs = (): ClipFiles => (files.current ??= opfsClipFiles());
@@ -150,7 +153,11 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
 
   const abort = useCallback(async (reason: AfbrudtReason) => {
     const l = live.current;
-    if (l === null) return;
+    if (l === null) {
+      // The camera is still opening: the stream is released when it arrives, nothing is recorded.
+      if (opening.current.cancel()) dispatch({ type: "abort", reason, durationS: 0 });
+      return;
+    }
     live.current = null;
     const d = duration(l);
     releaseTracks(l.stream); // within 1 s of hidden: synchronously, before any await
@@ -171,19 +178,23 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
   }, []);
 
   const optag = useCallback(
-    (ref: SetRef, date: string, sessionNo: number, onStarted: () => void) => {
+    (ref: SetRef, names: ClipNameStack, date: string, sessionNo: number, onStarted: () => void) => {
       if (fixture !== null) return; // §16: no camera opens under the fixtures
       const type = supported();
       if (type === null) return;
       dispatch({ type: "optag" });
+      const attempt = opening.current.begin();
       void (async () => {
         let stream: MediaStream;
         try {
           stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
         } catch (error) {
+          if (attempt.cancelled) return;
+          opening.current.settle(attempt);
           dispatch(error instanceof DOMException && error.name === "NotAllowedError" ? { type: "denied" } : { type: "abort", reason: "failed", durationS: 0 });
           return;
         }
+        if (!opening.current.keep(attempt, stream)) return; // unmounted, hidden or cancelled meanwhile
         try {
           if (!persisted.current) {
             persisted.current = true;
@@ -201,14 +212,21 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
             starSynced: true,
             state: "recording",
             synced: false,
+            names,
           };
           await ix().put(entry);
+          if (!opening.current.keep(attempt, stream)) {
+            await writer.abort();
+            await ix().remove(id);
+            return;
+          }
+          opening.current.settle(attempt);
           const recorder = new MediaRecorder(stream, { mimeType: type.mimeType });
           let resolveStopped: () => void = () => undefined;
           const stopped = new Promise<void>((r) => {
             resolveStopped = r;
           });
-          const l: Live = { id, ref, type, stream, recorder, writer, entry, startedAt: null, chain: Promise.resolve(), stopped, limit: undefined, failed: null };
+          const l: Live = { id, ref, type, stream, recorder, writer, entry, startedAt: null, chain: Promise.resolve(), stopped, limit: undefined, failed: null, stopFired: false };
           live.current = l;
           recorder.ondataavailable = (e) => {
             if (e.data.size === 0) return;
@@ -217,7 +235,10 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
               void abort(l.failed);
             });
           };
-          recorder.onstop = () => resolveStopped();
+          recorder.onstop = () => {
+            l.stopFired = true;
+            resolveStopped();
+          };
           recorder.onerror = () => {
             l.failed = "failed";
             void abort("failed");
@@ -249,6 +270,8 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
         } catch {
           releaseTracks(stream);
           live.current = null;
+          if (attempt.cancelled) return;
+          opening.current.settle(attempt);
           dispatch({ type: "abort", reason: "failed", durationS: 0 });
         }
       })();
@@ -271,8 +294,18 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
         done,
         finalise: async () => {
           try {
+            // After the 800 ms cap a late chunk would land after close(): it is dropped, and the clip
+            // that misses it is kept as afbrudt with §14's error line, never saved short as done.
+            const whole = l.stopFired;
+            l.recorder.ondataavailable = null;
             await l.chain;
             await l.writer.close();
+            const failed = clipOutcome(whole, l.failed);
+            if (failed !== null) {
+              await ix().put({ ...l.entry, state: "afbrudt", durationS: d });
+              dispatch({ type: "abort", reason: failed, durationS: d });
+              return;
+            }
             await ix().put({ ...l.entry, state: "done", durationS: d });
             dispatch({ type: "stopped", durationS: d });
             await sync(l.entry, d);
@@ -296,7 +329,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
   // §14: hidden while recording stops at once (the tracks synchronously), no done, kept as afbrudt.
   useEffect(() => {
     const onHide = () => {
-      if (document.visibilityState === "hidden" && live.current !== null) void abort("background");
+      if (document.visibilityState === "hidden" && (live.current !== null || opening.current.pending())) void abort("background");
     };
     document.addEventListener("visibilitychange", onHide);
     return () => document.removeEventListener("visibilitychange", onHide);

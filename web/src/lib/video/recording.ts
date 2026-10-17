@@ -145,3 +145,51 @@ export async function stopThenDone(
   steps.done();
   await steps.finalise();
 }
+
+/** A camera request (Optag) that unmount, hide or Annullér may cancel while getUserMedia is pending. */
+export type OpenAttempt = { cancelled: boolean };
+
+type Releasable = { getTracks(): readonly { stop(): void }[] };
+
+/**
+ * The pending camera request (review 2026-10-17): a stream that opens after its Optag was cancelled
+ * is released at once and never recorded. `begin` per Optag; `cancel` from abort (true when a request
+ * was pending); `keep` after every await before the recorder is live (false: released, stop there);
+ * `settle` once it is live or has failed.
+ */
+export function openGuard() {
+  let pending: OpenAttempt | null = null;
+  return {
+    begin(): OpenAttempt {
+      if (pending !== null) pending.cancelled = true;
+      pending = { cancelled: false };
+      return pending;
+    },
+    cancel(): boolean {
+      if (pending === null) return false;
+      pending.cancelled = true;
+      pending = null;
+      return true;
+    },
+    pending(): boolean {
+      return pending !== null;
+    },
+    keep(attempt: OpenAttempt, stream: Releasable): boolean {
+      if (!attempt.cancelled) return true;
+      for (const t of stream.getTracks()) t.stop();
+      return false;
+    },
+    settle(attempt: OpenAttempt): void {
+      if (pending === attempt) pending = null;
+    },
+  };
+}
+
+/**
+ * Whether a stopped clip is whole (review 2026-10-17): its last chunk arrives before the recorder's
+ * stop event, so a Stop whose done went out at the 800 ms cap before that event misses it. Such a
+ * clip, or one whose chunk write failed, keeps its file but is afbrudt (§14's error line, no row).
+ */
+export function clipOutcome(stopFired: boolean, failed: AfbrudtReason | null): AfbrudtReason | null {
+  return failed ?? (stopFired ? null : "failed");
+}
