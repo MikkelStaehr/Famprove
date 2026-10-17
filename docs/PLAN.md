@@ -142,3 +142,9 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | fokus-superset | Superset chosen inside Fokus: in the sheet between neighbouring runs and as a button on the first exercise's set screen | M |
 | combo-parts | Combined variants: each part's kg, reps and per-side logged in Fokus (exercise_set_parts); TSS unchanged | L |
 | log-fix-1016 | Friday 16 Oct in the app's own log: Facepulls + Abs timing unusable, their superset pair, the Palloff + weighted situps parts; variant 6 renamed | S |
+| jump-undo | Fortryd right after a jump in Fokus goes back to before the jump (the order and the moved start) | M |
+| jump-retry | A jump whose save fails, also with another queued, shows the failure and Gem igen; never dropped silently | S |
+| variant-parts-grant | exercise_variant_parts: service_role select only (no insert) | S |
+| video-security | Before video: Permissions-Policy for the camera, a tighter CSP, video files in .gitignore | S |
+| video-record | Record a set in Fokus (Optag / Stop = sæt udført), 720p30 MP4/H.264 or WebM, no audio, OPFS with persist(); only metadata in Supabase | L |
+| video-library | The phone's clips: list, play, star (kept), share via Web Share, keep the last 8 weeks; the used space as a line on Træning | M |
