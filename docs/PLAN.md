@@ -138,3 +138,7 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | cleanup-small | The e1RM factor and the 2.5 rounding in one place, the web's isMainLift renamed, superseded rules marked in DESIGN.md and specs, dead code removed, no scoreFinal -> score fallback (audit #6-#8) | S |
 | recharts-pin | recharts pinned to an exact version (audit #5) | S |
 | skipped-at | exercise_set_log.skipped_at, so Fortryd always hits the right set (audit, behaviour fix after step 2) | M |
+| fokus-sheet | Fokus: the progress bar grouped per exercise; a bottom sheet with the whole session (set dots, I DAG kg, supersets); a tap jumps to an exercise for this session only (session_order) | L |
+| fokus-superset | Superset chosen inside Fokus: in the sheet between neighbouring runs and as a button on the first exercise's set screen | M |
+| combo-parts | Combined variants: each part's kg, reps and per-side logged in Fokus (exercise_set_parts); TSS unchanged | L |
+| log-fix-1016 | Friday 16 Oct in the app's own log: Facepulls + Abs timing unusable, their superset pair, the Palloff + weighted situps parts; variant 6 renamed | S |
