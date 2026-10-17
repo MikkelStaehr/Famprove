@@ -2,6 +2,7 @@ import "server-only";
 
 import type { DataError } from "../data-error.ts";
 import { LIFTS, type StrengthLift } from "../lifts.ts";
+import type { SetPartRow, VariantPartRow } from "../set-parts.ts";
 
 /**
  * Row types + runtime validation for the three read-only sources. PostgREST JSON is
@@ -1496,4 +1497,45 @@ export function parseSessionOrderRow(raw: unknown): SessionOrderRow {
   });
   if (runRows.length === 0) throw new RowError("session_order.run_rows: expected at least one row");
   return { date: f.date("date"), session: f.number("session_no"), runRows, updatedAt: f.timestamp("updated_at") };
+}
+
+// --- combined-variant parts (slice combo-parts; types in lib/set-parts.ts) -------------------
+
+export const VARIANT_PARTS_SELECT = {
+  table: "exercise_variant_parts",
+  columns: "variant_id,part_no,name,per_side",
+  order: "variant_id,part_no", // the primary key
+} as const;
+
+export function parseVariantPartRow(raw: unknown): VariantPartRow {
+  const f = new Fields(VARIANT_PARTS_SELECT.table, raw);
+  const name = f.string("name").trim();
+  if (name === "") throw new RowError("exercise_variant_parts.name: expected a name");
+  return { variantId: f.number("variant_id"), partNo: f.number("part_no"), name, perSide: f.boolean("per_side") };
+}
+
+export const SET_PARTS_SELECT = {
+  table: "exercise_set_parts",
+  columns: "date,session_no,row_no,set_no,part_no,variant_id,kg,reps,per_side,updated_at",
+  order: "date,session_no,row_no,set_no,part_no", // the primary key
+} as const;
+
+export function parseSetPartRow(raw: unknown): SetPartRow {
+  const f = new Fields(SET_PARTS_SELECT.table, raw);
+  const kg = f.numberOrNull("kg"); // 0 = no added weight; null = not logged
+  const reps = f.numberOrNull("reps"); // null = not logged; never 0
+  if (kg !== null && kg < 0) throw new RowError("exercise_set_parts.kg: expected ≥ 0 or null");
+  if (reps !== null && reps <= 0) throw new RowError("exercise_set_parts.reps: expected > 0 or null");
+  return {
+    date: f.date("date"),
+    session: f.number("session_no"),
+    row: f.number("row_no"),
+    set: f.number("set_no"),
+    partNo: f.number("part_no"),
+    variantId: f.number("variant_id"),
+    kg,
+    reps,
+    perSide: f.boolean("per_side"),
+    updatedAt: f.timestamp("updated_at"),
+  };
 }
