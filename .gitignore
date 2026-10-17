@@ -63,3 +63,10 @@ design/reference/
 
 # --- Golden test: a snapshot of the real tables (personal data; the repo is public) ---
 python/tests/golden/
+
+# --- Video of lifts (slice video-security): clips live only on the phone, never in git ---
+*.webm
+*.mp4
+*.mov
+*.mkv
+**/frames/

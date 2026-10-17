@@ -1,8 +1,19 @@
 import type { NextConfig } from "next";
 
-/** Read-only, single-user page: no framing, no sniffing, no referrer, no indexing. */
+/**
+ * Single-user page: no framing, no sniffing, no referrer, no indexing. Before video (user,
+ * 2026-10-17, slice video-security; security's review): the camera for this origin only and no
+ * microphone, location or screen capture; the browser connects, starts workers (blob: for the
+ * recorder) and embeds objects only from this origin. No script-src: no third-party script loads
+ * (fonts are self-hosted by next/font) and Next's own bootstrap is inline.
+ */
+export const CONTENT_SECURITY_POLICY =
+  "frame-ancestors 'none'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'";
+export const PERMISSIONS_POLICY = "camera=(self), microphone=(), geolocation=(), display-capture=()";
+
 const SECURITY_HEADERS = [
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },
+  { key: "Permissions-Policy", value: PERMISSIONS_POLICY },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "no-referrer" },
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
