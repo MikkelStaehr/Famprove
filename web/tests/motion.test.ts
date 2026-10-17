@@ -25,7 +25,7 @@ test("lerpPoints morphs point by point", () => {
 
 test("DESIGN.md Part B Motion and the code agree (the timing table is the contract)", () => {
   const design = readFileSync(new URL("../../DESIGN.md", import.meta.url), "utf-8");
-  for (const ms of [DUR.stack, DUR.draw, DUR.ringAt, DUR.prognoseAt, DUR.morph, DUR.roll, DUR.rollStagger, DUR.unfold, DUR.bars, DUR.barStagger]) {
+  for (const ms of [DUR.stack, DUR.draw, DUR.ringAt, DUR.prognoseAt, DUR.morph, DUR.roll, DUR.rollStagger, DUR.unfold, DUR.sheetOpen, DUR.sheetClose, DUR.bars, DUR.barStagger]) {
     assert.ok(design.includes(`${ms} ms`) || design.includes(`${ms}ms`), `DESIGN.md names ${ms} ms`);
   }
   assert.ok(design.replace(/\s/g, "").includes(EASE_EMBER.replace(/\s/g, "")), "DESIGN.md names the ember curve");

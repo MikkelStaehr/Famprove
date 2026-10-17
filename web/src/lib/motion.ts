@@ -21,6 +21,8 @@ export const DUR = {
   roll: 750, // rolling digits
   rollStagger: 45, // per digit
   unfold: 380, // Træning's exercises
+  sheetOpen: 380, // the bottom sheet slides up (fokus-sheet.md §17); the scrim fades with it
+  sheetClose: 240, // it slides down, or settles back after a swipe that does not close
   check: 400, // the check drawing itself, the dot's pop
   bars: 600, // Analyse's bars growing
   barStagger: 40,

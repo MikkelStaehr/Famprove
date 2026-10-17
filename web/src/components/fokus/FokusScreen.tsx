@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { settle, useSetLog } from "@/components/useSetLog";
 import { HomeLink } from "./HomeLink";
@@ -13,6 +13,7 @@ import {
   type FokusExercise,
   type FokusView,
   fokusView,
+  jumpSentence,
   kgBlock,
   lastWeekLine,
   nextCaption,
@@ -24,9 +25,12 @@ import {
 } from "@/lib/fokus-view";
 import { adjustmentLine, CAPPED_WORD } from "@/lib/training-view";
 import { type Signature, signature } from "@/lib/fokus-marks";
-import { isWarmup, type LoggedSet, type PairRef, type SetRef, setKey, stateOf } from "@/lib/set-taps";
+import { type LoggedSet, type PairRef, type SetRef, setKey } from "@/lib/set-taps";
 
-import { FokusProgress } from "./FokusProgress";
+import { runSetsOf } from "@/lib/superset-view";
+
+import { ProgressButton } from "./FokusProgress";
+import { SessionSheet } from "./SessionSheet";
 import { Icon } from "@/components/icons";
 import { CAPTION, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTLINED, SKIP_BUTTON, PRIMARY_DOCK } from "./Instrument";
 import { SessionSignature } from "./SessionSignature";
@@ -41,6 +45,8 @@ export type FokusSession = {
   readonly log: readonly LoggedSet[];
   /** The supersets in force (supersets.md S10–S17); `order` is already interleaved by them. */
   readonly pairs?: readonly PairRef[];
+  /** Today's stored run order after a jump (session_order); `order` already follows it. */
+  readonly runRows?: readonly number[] | null;
 };
 
 type FokusScreenProps = {
@@ -54,6 +60,8 @@ type FokusScreenProps = {
   readonly enteredFromTraening: boolean;
   /** The catalogue's main-lift name and alias keys (lib/fokus-view mainLiftKeys); null when unread. */
   readonly mainLifts: readonly string[] | null;
+  /** DEV_FIXTURE=sheet / sheet-superset: the page loads with the session sheet open (never persisted). */
+  readonly sheetOpen?: boolean;
 };
 
 // Part B Motion: a 120ms opacity cross-fade between views, 0ms under reduced motion.
@@ -66,8 +74,16 @@ const FADE_IN = "transition-opacity duration-120 ease-out starting:opacity-0 mot
  * (✓ Opvarmning udført), finished (Tilbage til Træning). Taps go through useSetLog (optimistic,
  * saved in order).
  */
-export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts }: FokusScreenProps) {
-  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow } = useSetLog(session.log, session.order, date, session.session, session.exercises);
+export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts, sheetOpen: openOnLoad = false }: FokusScreenProps) {
+  const shape = useMemo(
+    () => ({ sets: runSetsOf(session.exercises), pairs: session.pairs ?? [], runRows: session.runRows ?? null }),
+    [session.exercises, session.pairs, session.runRows],
+  );
+  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpUnsaved } = useSetLog(session.log, session.order, date, session.session, session.exercises, shape);
+  // The session sheet (fokus-sheet.md): open state is never persisted (closed after a reload).
+  const [sheet, setSheet] = useState<{ readonly animateIn: boolean } | null>(() => (openOnLoad ? { animateIn: false } : null));
+  const barButton = useRef<HTMLButtonElement>(null);
+  const closeSheet = useRef<(() => void) | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [focusRequest, setFocusRequest] = useState(0);
   const primary = useRef<HTMLButtonElement & HTMLAnchorElement>(null);
@@ -84,7 +100,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   }, [focusRequest]);
 
   // Every superset rule, label and sentence comes from the view; the screen renders and dispatches taps.
-  const view = fokusView({ exercises: session.exercises, pairs: session.pairs ?? [], order: session.order, week: session.week, session: session.session }, log);
+  const view = fokusView({ exercises: session.exercises, pairs: session.pairs ?? [], order, week: session.week, session: session.session }, log);
   // fokus-flow.md §4: the screen stays on from an open, begun session until it is finished.
   useWakeLock(log.size > 0 && view.kind !== "finished");
   const p = view.progress;
@@ -135,6 +151,25 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
   const lastLine = view.undo?.line ?? null;
 
+  /** §6 / R4: the sheet's top is 12px under the rest strip, or under the top bar without one. */
+  const sheetTop = (): number => {
+    const anchor = document.querySelector("[data-sheet-anchor]") ?? document.querySelector("[data-sheet-top]");
+    return (anchor?.getBoundingClientRect().bottom ?? 0) + 12;
+  };
+
+  const onSheetClosed = (jumpTo: number | null) => {
+    setSheet(null);
+    if (jumpTo === null) {
+      barButton.current?.focus();
+      return;
+    }
+    // §13: the jump goes through the shared transition; focus goes to the new view's primary.
+    const sentence = jumpSentence(view.sheet.runs, jumpTo);
+    tap("jump", { row: jumpTo, set: 1 });
+    after(sentence);
+  };
+  const open = sheet !== null;
+
   return (
     <div className="flex flex-1 flex-col">
       <h1 className="sr-only">Fokus</h1>
@@ -142,6 +177,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         {announcement}
       </p>
 
+      <div inert={open} data-sheet-top>
       {/* Top bar: fixed in layout, so the card never jumps (§4.1). */}
       <div className="flex items-center justify-between gap-3">
         <HomeLink flush={flush} className={COMPACT_SECONDARY}>
@@ -150,29 +186,21 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
         </HomeLink>
       </div>
       {(devSwitches || dev) && <p className="mt-2 font-mono text-13 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
-      {/* The progress with its count beside it (round 3): "0/19" on screen, the full sentence spoken. */}
-      <div className="mt-2 flex items-end gap-3">
-        <div className="min-w-0 flex-1">
-          <FokusProgress
-            order={session.order.filter((ref) => !isWarmup(ref))}
-            stateOf={(ref) => stateOf(log.get(setKey(ref)))}
-            current={view.tick}
-          />
-        </div>
-        <p className="shrink-0 font-mono text-16 leading-none font-medium tabular-nums">
-          <span aria-hidden="true">
-            {p.done}/{p.total}
-          </span>
-          <span className="sr-only">
-            {p.done} af {p.total} sæt udført{view.skipped}
-          </span>
-        </p>
-      </div>
+      {/* fokus-sheet.md §4: the count and the grouped bar are one button that opens the session sheet. */}
+      <ProgressButton
+        groups={view.sheet.groups}
+        done={p.done}
+        total={p.total}
+        skipped={view.skipped}
+        expanded={open}
+        buttonRef={barButton}
+        onOpen={() => setSheet({ animateIn: true })}
+      />
       <div className="mt-2 flex min-h-11 flex-col justify-center">
         {staleNote !== null && <WarningLine>{staleNote}</WarningLine>}
         {unsaved > 0 && (
           <WarningLine>
-            {unsavedText(unsaved)} De står her, men forsvinder, hvis siden genindlæses.{" "}
+            {jumpUnsaved ? "Springet er ikke gemt. Rækkefølgen står her, men forsvinder, hvis siden genindlæses." : `${unsavedText(unsaved)} De står her, men forsvinder, hvis siden genindlæses.`}{" "}
             <button
               type="button"
               onClick={retry}
@@ -192,6 +220,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           </p>
         )}
       </div>
+      </div>
 
       {view.kind === "set" && (
         <SetView
@@ -203,9 +232,12 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           onSkip={onSkip}
           onTap={onFeelOrReps}
           onAnnounce={setAnnouncement}
+          sheetOpen={open}
+          onStripTap={() => closeSheet.current?.()}
         />
       )}
       {view.kind === "warmup" && (
+        <div inert={open} className="flex flex-1 flex-col">
         <WarmupView
           key={`warmup-${setKey(view.warmup)}`}
           view={view}
@@ -215,17 +247,31 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           onWarmupEnd={onWarmupEnd}
           onTap={onFeelOrReps}
         />
+        </div>
       )}
       {view.kind === "finished" && (
+        <div inert={open} className="flex flex-1 flex-col">
         <FinishedView
           session={session.session}
           card={view.card}
-          marks={signature(session.exercises, session.order, log)}
+          marks={signature(session.exercises, order, log)}
           primary={primary}
           flush={flush}
           feel={view.feel}
           onTap={onFeelOrReps}
-          footer={<Footer order={session.order} log={log} />}
+          footer={<Footer order={order} log={log} />}
+        />
+        </div>
+      )}
+      {sheet !== null && (
+        <SessionSheet
+          runs={view.sheet.runs}
+          done={p.done}
+          total={p.total}
+          animateIn={sheet.animateIn}
+          measureTop={sheetTop}
+          onClosed={onSheetClosed}
+          closeRef={closeSheet}
         />
       )}
     </div>
@@ -249,8 +295,13 @@ function SetView({
   onSkip,
   onTap,
   onAnnounce,
+  sheetOpen,
+  onStripTap,
 }: {
   readonly view: Extract<FokusView, { kind: "set" }>;
+  /** §7: while the sheet is open the rest strip sits above the scrim (live, a tap closes the sheet), the rest is inert. */
+  readonly sheetOpen: boolean;
+  readonly onStripTap: () => void;
   readonly week: number;
   readonly primary: PrimaryRef;
   readonly onDone: () => void;
@@ -272,8 +323,11 @@ function SetView({
   return (
     <div className={`mt-2 flex flex-1 flex-col gap-3 ${FADE_IN}`}>
       {view.showRest && view.rest !== null && view.restWindow !== null && (
-        <RestStrip key={view.rest.since} since={view.rest.since} rest={view.restWindow} onAnnounce={onAnnounce} />
+        <div data-sheet-anchor onClick={sheetOpen ? onStripTap : undefined} className={sheetOpen ? "relative z-50" : undefined}>
+          <RestStrip key={view.rest.since} since={view.rest.since} rest={view.restWindow} onAnnounce={onAnnounce} />
+        </div>
       )}
+      <div inert={sheetOpen} className="flex flex-1 flex-col gap-3">
       {/* §1.3: the next set in a hero Card (26, padding 20). */}
       <section aria-labelledby="fokus-set" className="flex flex-col rounded-hero border border-border bg-card p-5">
         <p className={CAPTION}>{nextCaption(next)}</p>
@@ -351,6 +405,7 @@ function SetView({
         </div>
       )}
       <DoneButton primary={primary} onClick={onDone} visible={label.visible} spoken={label.spoken} />
+      </div>
     </div>
   );
 }

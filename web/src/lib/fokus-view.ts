@@ -881,3 +881,30 @@ export function sessionSheet(
   });
   return { runs, groups: groups.map(({ runs: r, pair, segments }) => ({ runs: r, pair, segments })) };
 }
+
+/** A sheet row's spoken name (fokus-sheet.md §Copy): done, skipped, today's kg, and what a tap does. */
+export function sheetRowSentence(run: SheetRun): string {
+  const total = run.dots.length;
+  const done = run.dots.filter((d) => d === "done").length;
+  const skipped = run.dots.filter((d) => d === "skipped").length;
+  if (run.current) {
+    const at = run.dots.indexOf("now");
+    const kg = run.kg === null ? "" : `, ${run.kg.spoken}`;
+    return at === -1 ? `${run.name}, nu${kg}.` : `${run.name}, nu, sæt ${at + 1} af ${total}${kg}.`;
+  }
+  const skip = skipped > 0 ? `, ${skipped} sprunget over` : "";
+  if (run.finished) return `${run.name}, ${done} af ${total} sæt udført${skip}, færdig.`;
+  const kg = run.kg === null ? "" : `, ${run.kg.spoken}`;
+  return `${run.name}, ${done} af ${total} sæt udført${skip}${kg}.${run.canJump ? " Tag den nu." : ""}`;
+}
+
+/** The polite status after a jump to `row` (§Copy), from the sheet before the jump. */
+export function jumpSentence(runs: readonly SheetRun[], row: number): string {
+  const to = runs.find((r) => r.row === row);
+  if (to === undefined) return "";
+  const started = to.dots.some((d) => d !== "upcoming");
+  if (!started) return `${to.name} nu, først opvarmning.`;
+  const from = runs.find((r) => r.current);
+  const left = from === undefined ? 0 : from.dots.filter((d) => d === "now" || d === "upcoming").length;
+  return from === undefined || left === 0 ? `${to.name} nu.` : `${to.name} nu. ${from.name} venter med ${left} sæt.`;
+}

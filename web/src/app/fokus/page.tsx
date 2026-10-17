@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { FokusError, NoSessionNote } from "@/components/fokus/FokusNotes";
 import { FokusScreen } from "@/components/fokus/FokusScreen";
 import { type DataError, isDataError } from "@/lib/data-error";
-import { devSwitchOn } from "@/lib/db/dev-fixture";
+import { devFixture, devSwitchOn } from "@/lib/db/dev-fixture";
 import { loadExerciseCategories, loadTrainingForm, loadTrainingPlan } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { fokusStaleNote, mainLiftKeys, noSessionSentence } from "@/lib/fokus-view";
@@ -87,12 +87,14 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
           order: next.order,
           log: next.log,
           pairs: next.pairs,
+          runRows: next.runRows,
         }}
         date={today}
         staleNote={stale}
         devSwitches={devSwitches}
         enteredFromTraening={params.view === "set"}
         mainLifts={mainLiftKeys(catalogue)}
+        sheetOpen={devFixture() === "sheet" || devFixture() === "sheet-superset"}
       />
     </FokusColumn>
   );
