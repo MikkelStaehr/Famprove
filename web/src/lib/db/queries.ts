@@ -17,6 +17,7 @@ import {
   ILLUSTRATIVE_FEEL,
   isPauseFixture,
   midsessionLog,
+  comboParts,
   comboSets,
   jumpedFixture,
   supersetOfferLog,
@@ -31,7 +32,12 @@ import { readSupabaseEnv } from "./env.ts";
 import { createClient, selectAll, selectFirst } from "./postgrest.ts";
 import { addDays, isoWeekStart } from "../dates.ts";
 import { withoutSkipped } from "../training-view.ts";
+import { latestPerPart, NO_PARTS, type PartsData } from "../set-parts.ts";
 import {
+  parseSetPartRow,
+  parseVariantPartRow,
+  SET_PARTS_SELECT,
+  VARIANT_PARTS_SELECT,
   ANALYSIS_SUMMARY_SELECT,
   parseAnalysisSummaryRow,
   ACTIVITIES_SELECT,
@@ -312,7 +318,31 @@ export type TrainingPlanData = {
   readonly exerciseIds?: readonly ExerciseIdRow[];
   /** Today's session_order rows, every session (a jump's run order); absent = none read (the sheet's order). */
   readonly sessionOrders?: readonly SessionOrderRow[];
+  /** Combined-variant parts (combo-parts.md): this week's variants' parts, today's logged parts, the last time per part; absent = none. */
+  readonly parts?: PartsData;
 };
+
+/**
+ * The parts editor's data (combo-parts.md): the parts of this week's variants, and their logged
+ * parts up to today (today's rows, and earlier days' latest per part). Decoration of a done set:
+ * if a read fails (e.g. the migration not yet applied), no variant has parts and it is logged.
+ */
+async function loadParts(db: ReturnType<typeof client>, sets: readonly PrescribedSetRow[], today: IsoDate): Promise<PartsData> {
+  const ids = [...new Set(sets.flatMap((s) => (s.variantId === null ? [] : [s.variantId])))].toSorted((a, b) => a - b);
+  if (ids.length === 0) return NO_PARTS;
+  const list = `in.(${ids.join(",")})`;
+  try {
+    const [variantParts, rows] = await Promise.all([
+      selectAll(db, VARIANT_PARTS_SELECT.table, { ...VARIANT_PARTS_SELECT, filters: [["variant_id", list]] }, parseVariantPartRow),
+      selectAll(db, SET_PARTS_SELECT.table, { ...SET_PARTS_SELECT, filters: [["variant_id", list], ["date", `lte.${today}`]] }, parseSetPartRow),
+    ]);
+    return { variantParts, today: rows.filter((r) => r.date === today), last: latestPerPart(rows.filter((r) => r.date < today)) };
+  } catch (error) {
+    if (!isDataError(error)) throw error;
+    console.error("training: reading the variant parts failed", error);
+    return NO_PARTS;
+  }
+}
 
 /**
  * This ISO week's strength sessions and prescription (the view picks session k + 1), last
@@ -433,6 +463,7 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
       },
     ),
   ]);
+  const parts = fixture === "combo" ? comboParts(today) : await loadParts(db, sets, today);
   const base = {
     weekStart,
     sessions,
@@ -446,6 +477,7 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     supersetPairs,
     exerciseIds,
     sessionOrders,
+    parts,
   };
   // Dev fixtures (never in production, never written): illustrative logs, ramps, adjustments.
   if (fixture === "superset" || fixture === "superset-suggested" || fixture === "sheet-superset") {

@@ -134,7 +134,8 @@ export async function write(
   method: "POST" | "PATCH" | "DELETE",
   options: {
     readonly params?: readonly Filter[];
-    readonly body?: Readonly<Record<string, unknown>>;
+    /** One row, or several for a bulk upsert in one request (lib/db/set-parts.ts). */
+    readonly body?: Readonly<Record<string, unknown>> | readonly Readonly<Record<string, unknown>>[];
     readonly prefer?: string;
   },
 ): Promise<void> {

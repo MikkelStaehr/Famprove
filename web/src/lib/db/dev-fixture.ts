@@ -54,8 +54,8 @@
  *   superset-offer  (fokus-superset.md) per session, Begynd just tapped: the first run's warm-up
  *          current, nothing else logged, no pair today or before (the offer shows, off).
  *   combo  (combo-parts.md) midsession with the row of each session's last done set given an
- *          illustrative combined variant (two parts, a name with "+"). Data only: the parts table
- *          comes with slice combo-parts.
+ *          illustrative combined variant (two parts, a name with "+"), its parts pre-filled from an
+ *          earlier session (comboParts); setSetParts writes nothing.
  *          None of them writes: the taps and the jump are refused under any dev switch.
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
@@ -77,6 +77,7 @@ import {
   type SetTapKind,
   shapeOrder,
 } from "../set-taps.ts";
+import type { PartsData } from "../set-parts.ts";
 import { exerciseIdMap, exerciseIdOf, sessionRuns } from "../supersets.ts";
 import { PostgrestError } from "./postgrest.ts";
 import type {
@@ -598,6 +599,26 @@ export function comboSets(sets: readonly PrescribedSetRow[]): PrescribedSetRow[]
     if (done !== undefined) rows.add(`${session}#${done.sheetRow}`);
   }
   return sets.map((s) => (rows.has(`${s.session}#${s.sheetRow}`) ? { ...s, ...COMBO_VARIANT } : s));
+}
+
+/**
+ * DEV_FIXTURE=combo's parts (combo-parts.md): COMBO_VARIANT's two parts (the first per side), each
+ * pre-filled from an illustrative earlier session a week ago; nothing logged today. Never written.
+ */
+export function comboParts(today: IsoDate): PartsData {
+  const id = COMBO_VARIANT.variantId;
+  const date = addDaysIso(today, -7);
+  const updatedAt = `${date}T16:00:00.000Z`;
+  const last = (partNo: number, kg: number, reps: number, perSide: boolean) =>
+    ({ date, session: 1, row: 1, set: 1, partNo, variantId: id, kg, reps, perSide, updatedAt });
+  return {
+    variantParts: [
+      { variantId: id, partNo: 1, name: "Split squat", perSide: true },
+      { variantId: id, partNo: 2, name: "Calf raise", perSide: false },
+    ],
+    today: [],
+    last: [last(1, 12.5, 8, true), last(2, 20, 12, false)],
+  };
 }
 
 function addDaysIso(date: IsoDate, days: number): IsoDate {

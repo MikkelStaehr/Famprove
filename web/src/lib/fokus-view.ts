@@ -36,6 +36,7 @@ import {
   titleName,
 } from "./training-view.ts";
 import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf, runSetsOf } from "./superset-view.ts";
+import { type FokusParts, NO_PARTS, partsFor, type PartsData } from "./set-parts.ts";
 
 /** What Fokus needs of one sheet row (a subset of ExerciseView, so fixtures stay small). */
 export type FokusExercise = Pick<
@@ -116,6 +117,8 @@ export type FokusInput = {
   readonly week: number;
   /** The session's number (the finished card's title). */
   readonly session: number;
+  /** Combined-variant parts (combo-parts.md); absent = no variant has parts. */
+  readonly parts?: PartsData;
 };
 
 /** A rest window: the recommended span in seconds (null = none) and whether it is a superset's (R3, S14). */
@@ -146,6 +149,11 @@ type Common = {
   readonly undo: UndoTarget | null;
   /** The session sheet and the grouped bar (fokus-sheet.md), in tap order (after any jump). */
   readonly sheet: SessionSheet;
+  /**
+   * The parts editor (combo-parts.md): present only right after the done of a set whose variant
+   * has parts (the feel row's set), pre-filled logged > last time > the variant's default.
+   */
+  readonly parts?: FokusParts;
 };
 
 /**
@@ -208,7 +216,15 @@ export function fokusView(input: FokusInput, log: ReadonlyMap<string, LoggedSet>
     return { ref: state.feel, set, logged: log.get(setKey(state.feel)) ?? null, named };
   };
   const tick = state.kind === "finished" ? null : state.kind === "warmup" ? setOneOf(state.warmup) : state.next;
-  const common = { progress: p, skipped: skippedText(p), undo, sheet: sessionSheet(exercises, pairs, order, log, tick) };
+  const justDone = state.feel === null || isWarmup(state.feel) ? null : state.feel;
+  const parts = justDone === null ? null : partsFor(input.parts ?? NO_PARTS, session, justDone, at(justDone)?.exercise.variantId ?? null);
+  const common = {
+    progress: p,
+    skipped: skippedText(p),
+    undo,
+    sheet: sessionSheet(exercises, pairs, order, log, tick),
+    ...(parts === null ? {} : { parts }),
+  };
   if (state.kind === "finished") return { ...common, kind: "finished", feel: feelOf(null), tick: null, card: finishCard(session, p, log) };
   if (state.kind === "warmup") {
     const shown = at(setOneOf(state.warmup));

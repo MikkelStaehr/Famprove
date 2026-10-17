@@ -2,7 +2,9 @@
 
 import { recordFtpChoice, undoFtpChoice } from "@/lib/db/ftp-ack";
 import { recordSetTap, type SetTapResult } from "@/lib/db/set-log";
+import { recordSetParts } from "@/lib/db/set-parts";
 import { recordSupersetPair } from "@/lib/db/superset-pairs";
+import { parseSetPartsInput, type SetPartsResult } from "@/lib/set-parts";
 import { parseSupersetInput, type SupersetResult } from "@/lib/supersets";
 import type { FtpChoiceResult, FtpUndoResult } from "@/lib/ftp-line";
 import { parseSetTapInput } from "@/lib/set-taps";
@@ -44,4 +46,16 @@ export async function setSupersetPair(raw: unknown): Promise<SupersetResult> {
   const input = parseSupersetInput(raw);
   if (input === null) return { ok: false, reason: "invalid" };
   return recordSupersetPair(input, new Date());
+}
+
+/**
+ * The parts of a combined variant's done set from Fokus (public.exercise_set_parts, slice
+ * combo-parts), the app's fourth write: one bulk upsert of every part. The client sends the date,
+ * session, the set and each part's kg, reps and per-side; the variant, refusals and the time are
+ * the server's (lib/db/set-parts.ts).
+ */
+export async function setSetParts(raw: unknown): Promise<SetPartsResult> {
+  const input = parseSetPartsInput(raw);
+  if (input === null) return { ok: false, reason: "invalid" };
+  return recordSetParts(input, new Date());
 }
