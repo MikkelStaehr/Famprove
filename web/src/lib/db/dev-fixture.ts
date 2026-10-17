@@ -129,7 +129,8 @@ export type DevFixture =
   | "superset-offer"
   | "combo"
   | "recording"
-  | "camera-denied";
+  | "camera-denied"
+  | "clips";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -157,6 +158,7 @@ const FIXTURES: readonly DevFixture[] = [
   "combo",
   "recording",
   "camera-denied",
+  "clips",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */

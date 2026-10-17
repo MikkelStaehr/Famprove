@@ -8,12 +8,17 @@ import { SessionBlock, SessionWeekSentence } from "@/components/SessionBlock";
 import { SetLogProvider } from "@/components/SetLogProvider";
 import { StrengthCard } from "@/components/StrengthCard";
 import { RestToday, RideToday } from "@/components/TodayCard";
+import { ClipLibrary } from "@/components/ClipLibrary";
 import { RefreshProvider, RefreshStatus, WithRefresh } from "@/components/Refresh";
 import { WarningLine } from "@/components/WarningLine";
 import { type WeekBody, WeekCard } from "@/components/WeekCard";
 import { dayDetails, weekView } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
-import { devSwitchOn } from "@/lib/db/dev-fixture";
+import { devFixture, devSwitchOn } from "@/lib/db/dev-fixture";
+import { readClipNames, readVideoClips } from "@/lib/db/video-clips";
+import { recordingAllowed, type VideoClipRow } from "@/lib/video/clips";
+import { clipsFixture, FIXTURE_NAMES } from "@/lib/video/library-fixture";
+import type { ClipNames } from "@/lib/video/library-view";
 import { loadDashboardData, loadTrainingForm, loadTrainingPlan, loadWeekDetail, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { addDays, isoWeek, isoWeekStart } from "@/lib/dates";
@@ -229,11 +234,33 @@ function DayCards({ plan, today, form }: { readonly plan: TrainingPlan; readonly
           className={LEFT_1}
         />
       )}
+      <VideoLibrary today={today} />
       {form}
       {rides}
       {strength !== null && <StrengthCard session={strength} className={LEFT_REST} />}
     </>
   );
+}
+
+/**
+ * The Optagelser card (video-library.md): under the session block (desktop: left column). Rows and
+ * names are read server-side; a failed read shows the local clips with the rows warning.
+ */
+async function VideoLibrary({ today }: { readonly today: IsoDate }) {
+  const canRecord = recordingAllowed(process.env, process.env.NODE_ENV);
+  if (devFixture() === "clips") {
+    const f = clipsFixture(today);
+    return <ClipLibrary today={today} rows={f.rows} names={FIXTURE_NAMES} canRecord={canRecord} fixture={{ local: f.local }} />;
+  }
+  let rows: VideoClipRow[] | null = null;
+  let names: ClipNames = { exercises: {}, variants: {} };
+  try {
+    [rows, names] = await Promise.all([readVideoClips(new Date()), devFixture() === null ? readClipNames() : Promise.resolve(names)]);
+  } catch (error) {
+    if (!isDataError(error)) throw error;
+    console.error("træning: reading video clips failed", error);
+  }
+  return <ClipLibrary today={today} rows={rows} names={names} canRecord={canRecord} fixture={null} />;
 }
 
 function PlanError({ error, at }: { readonly error: DataError; readonly at: Date }) {

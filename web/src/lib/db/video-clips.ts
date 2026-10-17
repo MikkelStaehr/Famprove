@@ -18,6 +18,7 @@ import { EnvError, readSupabaseEnv } from "./env.ts";
 import { createClient, patchCount, type PostgrestClient, PostgrestError, selectAll, write } from "./postgrest.ts";
 import { parseVideoClipRow, RowError, VIDEO_CLIPS_SELECT } from "./rows.ts";
 import { exerciseIds, sessionSets } from "./set-log.ts";
+import type { ClipNames } from "../video/library-view.ts";
 
 /**
  * The app's fifth write path (user, 2026-10-17, slice video-record): a working set's clip recorded
@@ -130,4 +131,19 @@ export async function readVideoClips(now: Date, options: VideoClipOptions = {}):
   if (devFixture(env, nodeEnv) !== null) return [];
   const since = addDays(localToday(now), -KEEP_DAYS);
   return selectAll(makeClient(), TABLE, { ...VIDEO_CLIPS_SELECT, filters: [["or", `(date.gte.${since},starred.is.true)`]] }, parseVideoClipRow);
+}
+
+/** The Optagelser card's names: public.exercises.name and exercise_variants.display_name by id. Errors propagate. */
+export async function readClipNames(options: VideoClipOptions = {}): Promise<ClipNames> {
+  const { client: makeClient = client } = options;
+  const c = makeClient();
+  const named = (table: string, col: string) =>
+    selectAll(c, table, { columns: `id,${col}`, order: "id" }, (raw) => {
+      if (typeof raw !== "object" || raw === null) throw new RowError(`${table}: expected an object`);
+      const r = raw as Record<string, unknown>; // checked field by field below
+      if (typeof r.id !== "number" || typeof r[col] !== "string") throw new RowError(`${table} row must have id and ${col}`);
+      return [r.id, r[col] as string] as const;
+    });
+  const [ex, va] = await Promise.all([named("exercises", "name"), named("exercise_variants", "display_name")]);
+  return { exercises: Object.fromEntries(ex), variants: Object.fromEntries(va) };
 }

@@ -14,8 +14,12 @@ import {
   ChevronRight,
   type LucideIcon,
   Minus,
+  Play,
   Plus,
   RotateCw,
+  Share2,
+  Star,
+  Trash2,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -50,7 +54,11 @@ export type IconName =
   | "x"
   | "minus"
   | "plus"
-  | "refresh";
+  | "refresh"
+  | "play"
+  | "star"
+  | "share"
+  | "trash";
 
 /** Part B sizes: 22 phone tab bar, 20 desktop tabs / card corners / icon buttons, 18 ListRow, 16 WarningLine and chevrons. */
 export type IconSize = 16 | 18 | 20 | 22;
@@ -96,6 +104,10 @@ const LUCIDE: Readonly<Record<Exclude<IconName, OwnName>, LucideIcon>> = {
   minus: Minus,
   plus: Plus,
   refresh: RotateCw,
+  play: Play,
+  star: Star,
+  share: Share2,
+  trash: Trash2,
 };
 
 const STROKE = 1.5;
@@ -108,9 +120,11 @@ type IconProps = {
   readonly name: IconName;
   readonly size?: IconSize;
   readonly className?: string;
+  /** Star on (Part B: the one filled icon). */
+  readonly filled?: boolean;
 };
 
-export function Icon({ name, size = 18, className }: IconProps) {
+export function Icon({ name, size = 18, className, filled = false }: IconProps) {
   const cls = className === undefined ? "shrink-0" : `shrink-0 ${className}`;
   if (isOwn(name)) {
     return (
@@ -132,5 +146,5 @@ export function Icon({ name, size = 18, className }: IconProps) {
     );
   }
   const Lucide = LUCIDE[name];
-  return <Lucide size={size} strokeWidth={STROKE} aria-hidden="true" focusable="false" className={cls} />;
+  return <Lucide size={size} strokeWidth={STROKE} fill={filled ? "currentColor" : "none"} aria-hidden="true" focusable="false" className={cls} />;
 }
