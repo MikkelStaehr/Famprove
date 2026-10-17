@@ -1,7 +1,7 @@
 // Exact-width, real-time screenshot of the web app through a Chromium browser's DevTools protocol
 // (CDP): Edge on Windows, Chrome on macOS, google-chrome on Linux; BROWSER_PATH (or EDGE_PATH) overrides.
 // node .claude/skills/run-web/shoot.mjs --out <file.png> [--path /load] [--width 390]
-//   [--open] [--dark] [--reduce-motion] [--zoom200] [--base http://localhost:3100] [--timeout 90]
+//   [--open] [--dark] [--reduce-motion] [--fake-camera] [--zoom200] [--base http://localhost:3100] [--timeout 90]
 //   [--ready "<css selector>"]  (default: the app's own readiness; a selector for a page outside the app,
 //   e.g. a design reference opened with --base file:///…/design/reference/ --path mockup.html)
 // Prints one JSON line; exits 1 on horizontal overflow, console errors, a page that never got ready,
@@ -21,6 +21,7 @@ const { values: opt } = parseArgs({
     open: { type: "boolean", default: false },
     dark: { type: "boolean", default: false },
     "reduce-motion": { type: "boolean", default: false },
+    "fake-camera": { type: "boolean", default: false },
     zoom200: { type: "boolean", default: false },
     timeout: { type: "string", default: "90" },
     ready: { type: "string" },
@@ -40,9 +41,12 @@ const DEFAULT_BROWSER = {
 const browserPath = process.env.BROWSER_PATH ?? process.env.EDGE_PATH ?? DEFAULT_BROWSER[process.platform] ?? "google-chrome";
 const profile = mkdtempSync(join(tmpdir(), "run-web-"));
 const port = 9800 + Math.floor(Math.random() * 100);
+// --fake-camera (slice video-record): Chrome's built-in fake camera, permission granted without a
+// prompt, so recording can be shot and measured headless. The test pattern is synthetic, never a real clip.
+const FAKE_CAMERA = ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"];
 const browser = spawn(
   browserPath,
-  ["--headless=new", "--disable-gpu", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, "about:blank"],
+  ["--headless=new", "--disable-gpu", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, ...(opt["fake-camera"] ? FAKE_CAMERA : []), "about:blank"],
   { stdio: "ignore" },
 );
 // A hung browser once stalled a screenshot run for hours (2026-10-13): the whole shot gets a hard limit.

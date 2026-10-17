@@ -3,7 +3,7 @@
 // "touch"), real time, optional CPU throttling.
 // node .claude/skills/run-web/swipe.mjs --path /load --steps "left,right,tap:/analyse,back"
 //   [--width 390] [--height 844] [--cpu 4] [--share 0.3] [--ms 300] [--mid <file.png>] [--out <file.png>]
-//   [--reduce-motion] [--zoom200] [--base http://localhost:3100] [--timeout 120]
+//   [--reduce-motion] [--fake-camera] [--zoom200] [--base http://localhost:3100] [--timeout 120]
 // Steps: left | right (a swipe of --share x width over --ms, from the middle, never the edge zones),
 //   flick-left | flick-right (15 % of the width in 80 ms), short-left | short-right (15 % over 600 ms),
 //   edge-left | edge-right (starting 10 px from the edge), tap:<path> (a click on that tab), key:<path> (focus + Enter), back | forward (history),
@@ -42,6 +42,7 @@ const { values: opt } = parseArgs({
     out: { type: "string" },
     base: { type: "string", default: process.env.BASE_URL ?? "http://localhost:3100" },
     "reduce-motion": { type: "boolean", default: false },
+    "fake-camera": { type: "boolean", default: false },
     zoom200: { type: "boolean", default: false },
     timeout: { type: "string", default: "120" },
     trace: { type: "string" },
@@ -60,9 +61,12 @@ const DEFAULT_BROWSER = {
 const browserPath = process.env.BROWSER_PATH ?? process.env.EDGE_PATH ?? DEFAULT_BROWSER[process.platform] ?? "google-chrome";
 const profile = mkdtempSync(join(tmpdir(), "run-web-"));
 const port = 9800 + Math.floor(Math.random() * 100);
+// --fake-camera (slice video-record): Chrome's built-in fake camera, permission granted without a
+// prompt, so recording can be shot and measured headless. The test pattern is synthetic, never a real clip.
+const FAKE_CAMERA = ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"];
 const browser = spawn(
   browserPath,
-  ["--headless=new", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, "about:blank"],
+  ["--headless=new", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, ...(opt["fake-camera"] ? FAKE_CAMERA : []), "about:blank"],
   { stdio: "ignore" },
 );
 const watchdog = setTimeout(() => {
