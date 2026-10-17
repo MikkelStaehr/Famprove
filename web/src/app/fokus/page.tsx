@@ -8,6 +8,7 @@ import { type DataError, isDataError } from "@/lib/data-error";
 import { devFixture, devSwitchOn } from "@/lib/db/dev-fixture";
 import { loadExerciseCategories, loadTrainingForm, loadTrainingPlan } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
+import type { PartsData } from "@/lib/set-parts";
 import { fokusStaleNote, mainLiftKeys, noSessionSentence } from "@/lib/fokus-view";
 import { buildTrainingPlan, resolveToday, trainingHeader, type TrainingPlan } from "@/lib/training-view";
 
@@ -30,13 +31,15 @@ async function staleNote(today: IsoDate, now: Date): Promise<string | null> {
 }
 
 type PlanState =
-  | { readonly kind: "ready"; readonly plan: TrainingPlan }
+  | { readonly kind: "ready"; readonly plan: TrainingPlan; readonly parts: PartsData | undefined }
   | { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 
 /** The plan and today's set log are one read: a failure of either is Fokus's ErrorState (§5). */
 async function planState(today: IsoDate): Promise<PlanState> {
   try {
-    return { kind: "ready", plan: buildTrainingPlan(await loadTrainingPlan(today), today) };
+    const data = await loadTrainingPlan(today);
+    // combo-parts.md: the parts editor's data goes to Fokus as read (fokusView pre-fills from it).
+    return { kind: "ready", plan: buildTrainingPlan(data, today), parts: data.parts };
   } catch (error) {
     if (isDataError(error)) {
       console.error("fokus: loading plan failed", error);
@@ -88,6 +91,7 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
           log: next.log,
           pairs: next.pairs,
           runRows: next.runRows,
+          ...(state.parts === undefined ? {} : { parts: state.parts }),
         }}
         date={today}
         staleNote={stale}

@@ -36,6 +36,10 @@ import { CAPTION, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTL
 import { SessionSignature } from "./SessionSignature";
 import { DoneButton, FeelBlock, Footer, NextSetCard, RestStrip, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
+import { PartsEditor } from "./PartsEditor";
+import { usePartsSave } from "./usePartsSave";
+import { draftFrom, type PartsDraft } from "@/lib/parts-editor";
+import type { PartsData } from "@/lib/set-parts";
 
 export type FokusSession = {
   readonly session: number;
@@ -47,6 +51,8 @@ export type FokusSession = {
   readonly pairs?: readonly PairRef[];
   /** Today's stored run order after a jump (session_order); `order` already follows it. */
   readonly runRows?: readonly number[] | null;
+  /** Combined-variant parts (combo-parts.md): loadTrainingPlan's parts; absent = none. */
+  readonly parts?: PartsData;
 };
 
 type FokusScreenProps = {
@@ -100,7 +106,23 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   }, [focusRequest]);
 
   // Every superset rule, label and sentence comes from the view; the screen renders and dispatches taps.
-  const view = fokusView({ exercises: session.exercises, pairs: session.pairs ?? [], order, week: session.week, session: session.session }, log);
+  const view = fokusView(
+    { exercises: session.exercises, pairs: session.pairs ?? [], order, week: session.week, session: session.session, ...(session.parts === undefined ? {} : { parts: session.parts }) },
+    log,
+  );
+  // combo-parts.md: the parts editor's drafts live here, so a failed save, Fortryd and a re-done keep them.
+  const partsSave = usePartsSave(date, session.session);
+  // The editor's draft: this screen's edits, else fokusView's pre-fill (logged > last time > default).
+  const shownDraft: PartsDraft | null =
+    view.parts === undefined ? null : (partsSave.draftOf(view.parts.row, view.parts.set) ?? draftFrom(view.parts));
+  const partsBlock = (named: string | null): ReactNode =>
+    shownDraft === null ? null : (
+      <PartsEditor draft={shownDraft} exercise={named} problem={partsSave.problem} onEdit={partsSave.edit} onRetry={() => void partsSave.save(shownDraft)} />
+    );
+  const saveAll = () => {
+    void partsSave.save(shownDraft);
+    return flush();
+  };
   // fokus-flow.md §4: the screen stays on from an open, begun session until it is finished.
   useWakeLock(log.size > 0 && view.kind !== "finished");
   const p = view.progress;
@@ -112,6 +134,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
   const onDone = () => {
     if (view.kind !== "set") return;
+    void partsSave.save(shownDraft); // R2: the parts are saved on the next done
     tap("done", view.next);
     after(view.announce.done);
   };
@@ -125,6 +148,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   /** "✓ Opvarmning udført": a done on the warm-up, which ends it and starts set 1 (its timer counts from this tap). */
   const onWarmupEnd = () => {
     if (view.kind !== "warmup") return;
+    void partsSave.save(shownDraft);
     tap("done", view.warmup);
     after(view.announce.done);
   };
@@ -180,7 +204,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       <div inert={open} data-sheet-top>
       {/* Top bar: fixed in layout, so the card never jumps (§4.1). */}
       <div className="flex items-center justify-between gap-3">
-        <HomeLink flush={flush} className={COMPACT_SECONDARY}>
+        <HomeLink flush={saveAll} className={COMPACT_SECONDARY}>
           <Icon name="x" size={18} />
           Afslut
         </HomeLink>
@@ -232,6 +256,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           onSkip={onSkip}
           onTap={onFeelOrReps}
           onAnnounce={setAnnouncement}
+          parts={view.feel === null ? null : partsBlock(view.feel.named ? displayName(view.feel.set.exercise) : null)}
           sheetOpen={open}
           onStripTap={() => closeSheet.current?.()}
         />
@@ -246,6 +271,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           primary={primary}
           onWarmupEnd={onWarmupEnd}
           onTap={onFeelOrReps}
+          parts={view.feel === null ? null : partsBlock(null)}
         />
         </div>
       )}
@@ -295,10 +321,13 @@ function SetView({
   onSkip,
   onTap,
   onAnnounce,
+  parts,
   sheetOpen,
   onStripTap,
 }: {
   readonly view: Extract<FokusView, { kind: "set" }>;
+  /** combo-parts.md §1: the parts editor under the feel row (it replaces the reps stepper); null = none. */
+  readonly parts: ReactNode;
   /** §7: while the sheet is open the rest strip sits above the scrim (live, a tap closes the sheet), the rest is inert. */
   readonly sheetOpen: boolean;
   readonly onStripTap: () => void;
@@ -401,7 +430,8 @@ function SetView({
       </section>
       {feel !== null && (
         <div className="mt-1">
-          <FeelBlock set={feel.set} logged={feel.logged} named={feel.named} onTap={onTap} />
+          <FeelBlock set={feel.set} logged={feel.logged} named={feel.named} onTap={onTap} hideReps={parts !== null} />
+          {parts}
         </div>
       )}
       <DoneButton primary={primary} onClick={onDone} visible={label.visible} spoken={label.spoken} />
@@ -418,8 +448,11 @@ function WarmupView({
   primary,
   onWarmupEnd,
   onTap,
+  parts,
 }: {
   readonly view: Extract<FokusView, { kind: "warmup" }>;
+  /** combo-parts.md §1: the parts editor under the feel row; null = none. */
+  readonly parts: ReactNode;
   readonly mainLifts: readonly string[] | null;
   readonly week: number;
   readonly primary: PrimaryRef;
@@ -436,7 +469,8 @@ function WarmupView({
     <div className={`flex flex-1 flex-col ${FADE_IN}`}>
       {feel !== null && (
         <div className="mt-2">
-          <FeelBlock set={feel.set} logged={feel.logged} named onTap={onTap} />
+          <FeelBlock set={feel.set} logged={feel.logged} named onTap={onTap} hideReps={parts !== null} />
+          {parts}
         </div>
       )}
       <div className={feel !== null ? "mt-10" : "mt-4"}>

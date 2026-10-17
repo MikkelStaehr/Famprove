@@ -80,14 +80,17 @@ export function FeelBlock({
   logged,
   named,
   onTap,
+  hideReps = false,
 }: {
   readonly set: SetInContext;
   readonly logged: LoggedSet | null;
   readonly named: boolean;
   readonly onTap: (kind: "feel" | "reps", ref: SetRef, value: number | null) => void;
+  /** combo-parts.md §1: the parts editor replaces the reps stepper for a set whose variant has parts. */
+  readonly hideReps?: boolean;
 }) {
   const id = useId();
-  const range = repsRange(set.exercise.repsText);
+  const range = hideReps ? null : repsRange(set.exercise.repsText);
   const felt = logged?.feltRpe ?? null;
   return (
     // fokus-flow.md §1.4: optional, on --bg (no card); the group's name says so (§5).
