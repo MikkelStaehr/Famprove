@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 import { logExerciseTap } from "@/app/actions";
 import { freshAfterTap, type FreshTicks, initialFresh } from "@/lib/fresh-ticks";
+import { jumpFailure } from "@/lib/jump-save";
 import {
   applyTap,
   jumpRunRows,
@@ -128,8 +129,13 @@ export function useSetLog(
     if (snap === null || snap.seq !== seq) return; // a newer jump owns the order
     jumpSnap.current = null;
     if (outcome === null) return;
-    // Back to the stored order; the log too while nothing was tapped after the jump.
-    if (tapSeq.current === seq) setLog(snap.log);
+    // Nothing tapped after the jump: back to the stored order and log. Later taps built on the
+    // moved log, which the server doesn't have: the reload state.
+    if (jumpFailure(tapSeq.current !== seq) === "reload") {
+      setRejected(true);
+      return;
+    }
+    setLog(snap.log);
     setJumped(snap.jumped);
     setJumpProblem({ row: input.row, kind: outcome });
   }, []);

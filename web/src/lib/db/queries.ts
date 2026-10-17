@@ -17,6 +17,7 @@ import {
   ILLUSTRATIVE_FEEL,
   isPauseFixture,
   midsessionLog,
+  sheetLog,
   comboParts,
   comboSets,
   jumpedFixture,
@@ -486,7 +487,8 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
   if (fixture === "midsession" || fixture === "sheet" || fixture === "combo") {
     const mid = midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets));
     const shown = fixture === "combo" ? comboSets(mid.sets) : mid.sets;
-    return { ...base, ...mid, sets: shown, setLog: midsessionLog(shown, today, new Date()) };
+    const setLog = fixture === "sheet" ? sheetLog(shown, today, new Date()) : midsessionLog(shown, today, new Date());
+    return { ...base, ...mid, sets: shown, setLog };
   }
   if (fixture === "jumped") {
     const mid = midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets));

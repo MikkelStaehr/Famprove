@@ -19,12 +19,14 @@ test("shown off on A's warm-up before any tap", () => {
   assert.equal(o?.sentence(true), "Bench og Pull-ups tages som superset.");
 });
 
-test("shown on A1 (R1) with the warm-up sentence when paired", () => {
-  const o = supersetOffer(exercises, [seam("paired")], { row: 10, set: 1 });
+test("shown on while paired, with the pair line; never on A1 (R1, decided 2026-10-17)", () => {
+  const o = supersetOffer(exercises, [seam("paired")], { row: 10, set: 0 });
   assert.equal(o?.on, true);
   assert.equal(o?.line, "Superset med Pull-ups · den følger uden pause");
-  assert.equal(o?.sentence(true), "Bench og Pull-ups tages som superset. Først opvarmning til Pull-ups.");
+  assert.equal(o?.sentence(true), "Bench og Pull-ups tages som superset.");
   assert.equal(o?.sentence(false), "Bench og Pull-ups tages hver for sig.");
+  assert.equal(supersetOffer(exercises, [seam("paired")], { row: 10, set: 1 }), null);
+  assert.equal(supersetOffer(exercises, [seam("available")], { row: 10, set: 1 }), null);
 });
 
 test("suggested starts on with Som sidst", () => {
@@ -39,7 +41,7 @@ test("hidden once a run has started (locked) or the seam is not offered", () => 
   assert.equal(supersetOffer(exercises, [seam("none")], { row: 10, set: 0 }), null);
 });
 
-test("hidden on any other set than A's warm-up or A1", () => {
+test("hidden on any other set than A's warm-up", () => {
   assert.equal(supersetOffer(exercises, [seam("available")], { row: 10, set: 2 }), null);
   assert.equal(supersetOffer(exercises, [seam("available")], { row: 11, set: 0 }), null);
   assert.equal(supersetOffer(exercises, [], { row: 10, set: 0 }), null);

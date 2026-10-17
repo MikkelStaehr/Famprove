@@ -575,6 +575,38 @@ export function jumpedFixture(sets: readonly PrescribedSetRow[], today: IsoDate,
   return { setLog, sessionOrders };
 }
 
+/**
+ * DEV_FIXTURE=sheet (fokus-sheet.md): midsession's shape (MIDSESSION_DONE working sets done, the next
+ * skipped) played through the real taps (lib/set-taps.ts: Begynd, warm-ups done on the way, 3 minutes
+ * apart, the skip 1:42 ago), so every start a real tap writes is there and a seam is never shown
+ * available in a state real taps can't produce (fokus-superset.md R1). Never written anywhere.
+ */
+export function sheetLog(sets: readonly PrescribedSetRow[], today: IsoDate, now: Date): SetLogRow[] {
+  const setLog: SetLogRow[] = [];
+  for (const [session, rows] of bySession(sets)) {
+    const order = shapeOrder(sessionShape(rows));
+    const first = firstOpen(order, new Map());
+    if (first === null) continue;
+    const taps: [SetTapKind, SetRef][] = [["begin", first]];
+    let probe: ReadonlyMap<string, LoggedSet> = applyTap(order, new Map(), "begin", first, now.toISOString());
+    let done = 0;
+    for (let next = firstOpen(order, probe); next !== null; next = firstOpen(order, probe)) {
+      const kind: SetTapKind = !isWarmup(next) && done === MIDSESSION_DONE ? "skip" : "done";
+      taps.push([kind, next]);
+      probe = applyTap(order, probe, kind, next, now.toISOString());
+      if (kind === "skip") break;
+      if (!isWarmup(next)) done += 1;
+    }
+    const at = (k: number) => new Date(now.getTime() - 102_000 - (taps.length - 1 - k) * 180_000).toISOString();
+    let log: ReadonlyMap<string, LoggedSet> = new Map();
+    taps.forEach(([kind, ref], k) => {
+      log = applyTap(order, log, kind, ref, at(k));
+    });
+    setLog.push(...logRows(log, today, session, at(taps.length - 1)));
+  }
+  return setLog;
+}
+
 /** DEV_FIXTURE=superset-offer (fokus-superset.md): per session, Begynd tapped 40 s ago and nothing else. Never written. */
 export function supersetOfferLog(sets: readonly PrescribedSetRow[], today: IsoDate, now: Date): SetLogRow[] {
   const at = new Date(now.getTime() - 40_000).toISOString();

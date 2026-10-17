@@ -114,7 +114,16 @@ function SheetBody({ runs, done, total, animateIn, measure, onClosed, closeRef, 
     pushed.current = true;
     const onPop = () => close(null, true);
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      // Unmounted while open: take back our history entry, only while it is still ours on top.
+      // After a tick, so a remount (React's dev double effect) that pushed again keeps its entry.
+      if (!pushed.current) return;
+      pushed.current = false;
+      setTimeout(() => {
+        if (!pushed.current && (window.history.state as { fokusSheet?: boolean } | null)?.fokusSheet === true) window.history.back();
+      }, 0);
+    };
     // Runs once per opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
