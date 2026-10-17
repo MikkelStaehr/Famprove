@@ -297,11 +297,11 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       />
       <div className="mt-2 flex min-h-11 flex-col justify-center">
         {staleNote !== null && <WarningLine>{staleNote}</WarningLine>}
-        {/* fokus-sheet.md §Copy: a jump is in the order only while saving or saved, so a failed one is undone here. */}
+        {/* jump-retry: a failed jump stays and halts the saves; Gem igen sends it, then the taps held behind it. */}
         {jumpProblem?.kind === "failed" && (
           <WarningLine>
-            Springet er ikke gemt. Rækkefølgen er som før.{" "}
-            <button type="button" onClick={() => jump(jumpProblem.row)} className={`min-h-11 px-4 ${OUTLINED}`}>
+            Et spring blev ikke gemt.{" "}
+            <button type="button" onClick={retry} className={`min-h-11 px-4 ${OUTLINED}`}>
               Gem igen
             </button>
           </WarningLine>
