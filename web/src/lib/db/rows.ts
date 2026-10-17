@@ -4,6 +4,7 @@ import type { DataError } from "../data-error.ts";
 import { LIFTS, type StrengthLift } from "../lifts.ts";
 import type { SetPartRow, VariantPartRow } from "../set-parts.ts";
 import type { JumpMark } from "../set-taps.ts";
+import type { VideoClipRow } from "../video/clips.ts";
 
 /**
  * Row types + runtime validation for the three read-only sources. PostgREST JSON is
@@ -1557,5 +1558,33 @@ export function parseSetPartRow(raw: unknown): SetPartRow {
     reps,
     perSide: f.boolean("per_side"),
     updatedAt: f.timestamp("updated_at"),
+  };
+}
+
+export const VIDEO_CLIPS_SELECT = {
+  table: "video_clips",
+  columns: "id,date,session_no,row_no,set_no,exercise_id,variant_id,recorded_at,duration_s,starred,clip_in_s,clip_out_s",
+  order: "recorded_at.desc,id", // newest first, then the primary key
+} as const;
+
+export function parseVideoClipRow(raw: unknown): VideoClipRow {
+  const f = new Fields(VIDEO_CLIPS_SELECT.table, raw);
+  const set = f.number("set_no");
+  const durationS = f.number("duration_s");
+  if (set < 1) throw new RowError("video_clips.set_no: expected a working set (≥ 1)");
+  if (!(durationS > 0 && durationS <= 900)) throw new RowError("video_clips.duration_s: expected 0 < x ≤ 900");
+  return {
+    id: f.string("id"),
+    date: f.date("date"),
+    session: f.number("session_no"),
+    row: f.number("row_no"),
+    set,
+    exerciseId: f.number("exercise_id"),
+    variantId: f.numberOrNull("variant_id"),
+    recordedAt: f.timestamp("recorded_at"),
+    durationS,
+    starred: f.boolean("starred"),
+    clipInS: f.numberOrNull("clip_in_s"),
+    clipOutS: f.numberOrNull("clip_out_s"),
   };
 }

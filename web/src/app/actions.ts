@@ -4,10 +4,19 @@ import { recordFtpChoice, undoFtpChoice } from "@/lib/db/ftp-ack";
 import { recordSetTap, type SetTapResult } from "@/lib/db/set-log";
 import { recordSetParts } from "@/lib/db/set-parts";
 import { recordSupersetPair } from "@/lib/db/superset-pairs";
+import { recordClip, recordStar, removeClip } from "@/lib/db/video-clips";
 import { parseSetPartsInput, type SetPartsResult } from "@/lib/set-parts";
 import { parseSupersetInput, type SupersetResult } from "@/lib/supersets";
 import type { FtpChoiceResult, FtpUndoResult } from "@/lib/ftp-line";
 import { parseSetTapInput } from "@/lib/set-taps";
+import {
+  type DeleteClipResult,
+  parseDeleteClipInput,
+  parseSaveClipInput,
+  parseStarClipInput,
+  type SaveClipResult,
+  type StarClipResult,
+} from "@/lib/video/clips";
 
 /**
  * A set timing tap from the Træning screens (public.exercise_set_log), one of the app's two writes.
@@ -58,4 +67,30 @@ export async function setSetParts(raw: unknown): Promise<SetPartsResult> {
   const input = parseSetPartsInput(raw);
   if (input === null) return { ok: false, reason: "invalid" };
   return recordSetParts(input, new Date());
+}
+
+/**
+ * A working set's clip recorded in Fokus (public.video_clips, slice video-record), the app's fifth
+ * write: one insert on conflict (id) do nothing. The client sends its uuid, the date, session, the
+ * set and the duration; exercise and variant ids, refusals and recorded_at are the server's
+ * (lib/db/video-clips.ts). Only metadata: the video never leaves the phone here.
+ */
+export async function saveClip(raw: unknown): Promise<SaveClipResult> {
+  const input = parseSaveClipInput(raw);
+  if (input === null) return { ok: false, reason: "invalid" };
+  return recordClip(input, new Date());
+}
+
+/** A star on a clip (kept past 8 weeks): one PATCH of starred. */
+export async function starClip(raw: unknown): Promise<StarClipResult> {
+  const input = parseStarClipInput(raw);
+  if (input === null) return { ok: false, reason: "invalid" };
+  return recordStar(input);
+}
+
+/** A clip deleted on the phone deletes its row: one DELETE, idempotent. */
+export async function deleteClip(raw: unknown): Promise<DeleteClipResult> {
+  const input = parseDeleteClipInput(raw);
+  if (input === null) return { ok: false, reason: "invalid" };
+  return removeClip(input);
 }

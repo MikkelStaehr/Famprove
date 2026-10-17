@@ -164,6 +164,42 @@ export async function write(
 }
 
 /**
+ * A sibling of `write` for a PATCH whose caller needs to know whether a row matched (lib/db/video-clips.ts:
+ * a star on a clip not saved yet): `Prefer: return=representation` with `select` = `columns`, and the
+ * affected rows' count back. Same headers, timeout and errors as `write`; a reply that is not a JSON
+ * array is a PostgrestError.
+ */
+export async function patchCount(
+  client: PostgrestClient,
+  table: string,
+  options: { readonly params: readonly Filter[]; readonly body: Readonly<Record<string, unknown>>; readonly columns: string },
+): Promise<number> {
+  const params = new URLSearchParams({ select: options.columns });
+  for (const [column, expression] of options.params) params.append(column, expression);
+  let response: Response;
+  try {
+    response = await client.fetch(`${client.restUrl}/${table}?${params.toString()}`, {
+      method: "PATCH",
+      headers: { ...authHeaders(client.key), "Content-Type": "application/json", Accept: "application/json", Prefer: "return=representation" },
+      body: JSON.stringify(options.body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (cause) {
+    throw new PostgrestError(table, null, `${table}: PATCH failed`, { cause });
+  }
+  if (!response.ok) throw new PostgrestError(table, response.status, `${table}: PATCH HTTP ${response.status}`);
+  let rows: unknown;
+  try {
+    rows = await response.json();
+  } catch (cause) {
+    throw new PostgrestError(table, response.status, `${table}: PATCH reply is not JSON`, { cause });
+  }
+  if (!Array.isArray(rows)) throw new PostgrestError(table, response.status, `${table}: PATCH reply is not an array`);
+  return rows.length;
+}
+
+/**
  * One POST of `body` that returns the stored row (`Prefer: return=representation`), for an insert
  * whose server defaults (an identity id, a timestamp) the caller needs back (lib/db/ftp-ack.ts).
  * Same headers, timeout and errors as `write`; a reply that is not one row is a PostgrestError.
