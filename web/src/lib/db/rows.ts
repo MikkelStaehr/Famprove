@@ -1469,3 +1469,31 @@ export function parseExerciseIdRow(raw: unknown): ExerciseIdRow {
   });
   return { id: f.number("id"), name: f.string("name"), aliases };
 }
+
+/**
+ * public.session_order (slice fokus-sheet, user 2026-10-17): a session's run order after a jump
+ * in Fokus, written only by lib/db/set-log.ts's jump tap. runRows = the runs' first sheet rows in
+ * order (a row that starts no run is ignored by the rules, lib/set-taps.ts withSessionOrder).
+ */
+export type SessionOrderRow = {
+  readonly date: IsoDate;
+  readonly session: number;
+  readonly runRows: readonly number[];
+  readonly updatedAt: string;
+};
+
+export const SESSION_ORDER_SELECT = {
+  table: "session_order",
+  columns: "date,session_no,run_rows,updated_at",
+  order: "date,session_no",
+} as const;
+
+export function parseSessionOrderRow(raw: unknown): SessionOrderRow {
+  const f = new Fields(SESSION_ORDER_SELECT.table, raw);
+  const runRows = f.array("run_rows").map((r) => {
+    if (typeof r !== "number" || !Number.isInteger(r)) throw new RowError("session_order.run_rows: expected whole numbers");
+    return r;
+  });
+  if (runRows.length === 0) throw new RowError("session_order.run_rows: expected at least one row");
+  return { date: f.date("date"), session: f.number("session_no"), runRows, updatedAt: f.timestamp("updated_at") };
+}

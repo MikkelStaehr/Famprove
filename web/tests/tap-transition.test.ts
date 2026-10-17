@@ -5,11 +5,13 @@ import { recordSetTap, type RecordOptions } from "../src/lib/db/set-log.ts";
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
 import {
   applyTap,
+  jumpRunRows,
   type LoggedSet,
   type PairRef,
   rangeTops,
-  sessionOrderWithWarmups,
+  type SessionShape,
   setKey,
+  shapeOrder,
   type SetRef,
   type SetTapKind,
   undoesOf,
@@ -55,6 +57,7 @@ function fakeDb(s: Session): Record<string, Row[]> {
     strength_sets: s.exercises.flatMap((e) => e.sets.map((r) => ({ week_start: DATE, session: 1, sheet_row: r.row, set_no: r.set, name: e.name, reps_text: e.repsText, variant_id: null }))),
     exercises: Object.entries(IDS).map(([name, id]) => ({ id, name, aliases: [] })),
     exercise_set_log: [],
+    session_order: [],
     superset_pairs: s.pairs.map((p) => ({
       date: DATE, session_no: 1, row_a: p.rowA, row_b: p.rowB,
       exercise_a: IDS[s.exercises.find((e) => e.row === p.rowA)?.name ?? ""], variant_a: null,
@@ -76,7 +79,9 @@ function fetchFor(db: Record<string, Row[]>): FetchLike {
       const found = rows.filter((r) => matches(r, parsed.searchParams)).map((r) => Object.fromEntries(cols.map((c) => [c, r[c] ?? null])));
       return new Response(JSON.stringify(found), { headers: { "Content-Range": found.length ? `0-${found.length - 1}/${found.length}` : "*/0" } });
     }
-    if (method === "POST") {
+    if (method === "POST" && table === "session_order") {
+      db[table] = [...rows.filter((r) => !(r.date === body.date && r.session_no === body.session_no)), body]; // upsert on its key
+    } else if (method === "POST") {
       if (!rows.some((r) => PK.every((k) => r[k] === body[k]))) rows.push({ started_at: null, ended_at: null, skipped: false, felt_rpe: null, reps_done: null, ...body });
     } else if (method === "PATCH") {
       for (const r of rows.filter((x) => matches(x, parsed.searchParams))) Object.assign(r, body);
@@ -105,14 +110,16 @@ function lcg(seed: number): () => number {
   };
 }
 
-const KINDS: readonly SetTapKind[] = ["begin", "done", "done", "done", "skip", "undo", "undo", "feel", "reps"];
+const KINDS: readonly SetTapKind[] = ["begin", "done", "done", "done", "skip", "undo", "undo", "feel", "reps", "jump", "jump"];
 
-test("transition: the client's log equals the server's stored rows after every tap (200 seeded sequences)", async () => {
+test("transition: the client's log and run order equal the server's stored rows after every tap, jumps included (200 seeded sequences)", async () => {
   console.error = () => {}; // recordSetTap logs refused saves
   let steps = 0;
+  let jumps = 0;
   for (let seed = 1; seed <= 200; seed += 1) {
     const s = SESSIONS[seed % SESSIONS.length];
-    const order = sessionOrderWithWarmups(s.exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name }))), s.pairs);
+    // The order follows the client's run order after a jump (slice fokus-sheet), as the server's session_order.
+    let shape: SessionShape = { sets: s.exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name }))), pairs: s.pairs, runRows: null };
     const tops = rangeTops(s.exercises);
     const db = fakeDb(s);
     const options: RecordOptions = { env: {}, nodeEnv: "production", client: () => createClient("https://fake.supabase.co", "sb_secret_fake", fetchFor(db)) };
@@ -120,16 +127,25 @@ test("transition: the client's log equals the server's stored rows after every t
     const length = 10 + Math.floor(rnd() * 31); // 10..40 taps
     let log: ReadonlyMap<string, LoggedSet> = new Map();
     for (let i = 1; i <= length; i += 1) {
+      const order = shapeOrder(shape);
       const kind = KINDS[Math.floor(rnd() * KINDS.length)];
       const ref = order[Math.floor(rnd() * order.length)];
       const value = kind === "feel" ? [-1, 0, 1, null][Math.floor(rnd() * 4)] : kind === "reps" ? Math.floor(rnd() * 24) - 2 : null;
       const at = new Date(DAY0 + i * 60_000);
       const undoes = kind === "undo" ? (undoesOf(log, ref) ?? "done") : null; // as useSetLog
       await recordSetTap({ kind, date: DATE, session: 1, row: ref.row, set: ref.set, undoes, value }, at, options);
-      log = applyTap(order, log, kind, ref, at.toISOString(), value, tops);
-      assert.deepStrictEqual(clientState(log), serverState(db), `seed ${seed} step ${i}: ${kind} ${setKey(ref)} ${String(value)}`);
+      const runRows = kind === "jump" ? jumpRunRows(shape, log, ref.row) : null; // as the client's jump (null: refused)
+      log = applyTap(order, log, kind, ref, at.toISOString(), value, tops, shape);
+      if (runRows !== null) {
+        shape = { ...shape, runRows };
+        jumps += 1;
+      }
+      const label = `seed ${seed} step ${i}: ${kind} ${setKey(ref)} ${String(value)}`;
+      assert.deepStrictEqual(clientState(log), serverState(db), label);
+      assert.deepStrictEqual(shape.runRows, (db.session_order.at(0)?.run_rows as number[] | undefined) ?? null, `${label}: run order`);
       steps += 1;
     }
   }
   assert.ok(steps >= 200 * 10);
+  assert.ok(jumps >= 50, `only ${jumps} jumps landed`);
 });

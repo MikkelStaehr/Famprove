@@ -5,7 +5,7 @@
  * pair line. The pairs themselves come from lib/supersets.ts (the server's rules).
  */
 
-import { isWarmup, type LoggedSet, type PairRef, runStartRows, type RunSet, sessionOrderWithWarmups, type SetRef, setKey } from "./set-taps.ts";
+import { isWarmup, type LoggedSet, type PairRef, runStartRows, type RunSet, sessionOrderWithWarmups, type SetRef, setKey, withSessionOrder } from "./set-taps.ts";
 import { type EffectivePair, type PairSlot, pairSlots, type PairSource, sessionRuns, type SupersetRefusal, type SupersetResult } from "./supersets.ts";
 import { type ExerciseView, titleName } from "./training-view.ts";
 
@@ -92,9 +92,13 @@ export function orderPairs(
   return clientPairs(serverSlots, stored);
 }
 
-/** The tap order (S10) for the client's pairs, so NÆSTE and the progress follow a fresh switch. */
-export function clientOrder(exercises: readonly Named[], pairs: readonly PairRef[]): SetRef[] {
-  return sessionOrderWithWarmups(runSetsOf(exercises), pairs);
+/**
+ * The tap order (S10) for the client's pairs, so NÆSTE and the progress follow a fresh switch;
+ * `runRows`: a jump's stored run order on top (withSessionOrder; null or absent = the sheet's).
+ */
+export function clientOrder(exercises: readonly Named[], pairs: readonly PairRef[], runRows: readonly number[] | null = null): SetRef[] {
+  const sets = runSetsOf(exercises);
+  return withSessionOrder(sessionOrderWithWarmups(sets, pairs), sets, pairs, runRows);
 }
 
 export type SeamView = {

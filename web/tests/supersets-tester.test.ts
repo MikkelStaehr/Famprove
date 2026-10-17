@@ -69,6 +69,7 @@ function fakeDb(sheet: [number, number, string][] = [[10, 2, "Squat"], [11, 3, "
       strength_sets: sheet.flatMap(([sheet_row, n, name]) => Array.from({ length: n }, (_, k) => ({ week_start: "2026-10-12", session: 1, sheet_row, set_no: k + 1, name, reps_text: "3", variant_id: null }))),
       exercises: names.map((name, i) => ({ id: i + 1, name, aliases: [] })),
       exercise_set_log: [],
+      session_order: [],
       superset_pairs: [],
     },
     requests: 0,

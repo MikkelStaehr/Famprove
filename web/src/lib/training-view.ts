@@ -37,6 +37,7 @@ import {
   type Progress,
   type RunSet,
   sessionOrderWithWarmups,
+  withSessionOrder,
   setKey,
   type SetRef,
   type SetState,
@@ -197,6 +198,8 @@ export type StrengthSession = {
   readonly pairs: readonly SupersetView[];
   /** Every boundary between two consecutive runs, for the ⇄ switch (paired or not, locked or not). */
   readonly pairSlots: readonly PairSlot[];
+  /** Today's stored run order after a jump (public.session_order run_rows); null = the sheet's order. `order` follows it. */
+  readonly runRows: readonly number[] | null;
 };
 
 /** A superset in force: the runs' first sheet rows, why (chosen today or suggested), and whether it can still be switched. */
@@ -415,6 +418,7 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
   const runSets = exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name, variantId: e.variantId })));
   const log = data.setLog.filter((l) => l.date === today && l.session === slot.session);
   const supersets = sessionSupersets(data, today, slot.session, runSets, log);
+  const runRows = data.sessionOrders?.find((r) => r.date === today && r.session === slot.session)?.runRows ?? null;
   return {
     ...base,
     state: "next",
@@ -424,11 +428,12 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
       block: slot.block,
       week: slot.week,
       exercises,
-      order: sessionOrderWithWarmups(runSets, supersets.pairs),
+      order: withSessionOrder(sessionOrderWithWarmups(runSets, supersets.pairs), runSets, supersets.pairs, runRows),
       log,
       logFailed: data.setLogFailed,
       pairs: supersets.pairs,
       pairSlots: supersets.slots,
+      runRows,
     },
   };
 }

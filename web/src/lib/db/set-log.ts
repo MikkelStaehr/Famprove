@@ -8,10 +8,11 @@ import {
   isWarmup,
   type LogValues,
   rangeTops,
-  sessionOrderWithWarmups,
+  type SessionShape,
   setKey,
   type SetRef,
   type SetTapInput,
+  shapeOrder,
   transition,
 } from "../set-taps.ts";
 import { effectivePairs, exerciseIdMap, type SessionRun, sessionRuns } from "../supersets.ts";
@@ -27,9 +28,11 @@ import {
   write,
 } from "./postgrest.ts";
 import {
+  parseSessionOrderRow,
   parseSetLogRow,
   parseSupersetPairRow,
   RowError,
+  SESSION_ORDER_SELECT,
   SET_LOG_SELECT,
   SUPERSET_PAIRS_SELECT,
   type SupersetPairRow,
@@ -139,6 +142,26 @@ export async function sessionPairRows(
   };
 }
 
+/** The session's stored run order (public.session_order); null = none (the sheet's order). */
+export async function sessionRunRows(c: PostgrestClient, date: string, session: number): Promise<readonly number[] | null> {
+  const rows = await selectAll(
+    c,
+    SESSION_ORDER_SELECT.table,
+    { ...SESSION_ORDER_SELECT, filters: [["date", `eq.${date}`], ["session_no", `eq.${session}`]] },
+    parseSessionOrderRow,
+  );
+  return rows.at(0)?.runRows ?? null;
+}
+
+/** The jump's mark: one upsert of the session's run order on the primary key (the last write wins). */
+async function writeOrder(c: PostgrestClient, date: string, session: number, runRows: readonly number[], at: string): Promise<void> {
+  await write(c, SESSION_ORDER_SELECT.table, "POST", {
+    params: [["on_conflict", "date,session_no"]],
+    body: { date, session_no: session, run_rows: runRows, updated_at: at },
+    prefer: "resolution=merge-duplicates",
+  });
+}
+
 function keyParams(k: Key): Filter[] {
   return [
     ["date", `eq.${k.date}`],
@@ -218,6 +241,8 @@ async function send(c: PostgrestClient, date: string, session: number, change: C
       return clearStarts(c, date, session, change.t, change.at);
     case "deleteEmpty":
       return deleteEmpty(c, date, session);
+    case "order":
+      return writeOrder(c, date, session, change.runRows, change.at);
   }
 }
 
@@ -265,9 +290,14 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
       exerciseIds(c),
     ]);
     // Supersets: the pairs in force reorder the session (A1, B1, A2 ...), as on the screens.
+    // A jump's stored run order (session_order) on top, read in the same batch as the pairs.
     const runs = sessionRuns(sets, ids);
-    const pairRows = await sessionPairRows(c, input.date, input.session, runs);
-    const order = sessionOrderWithWarmups(sets, effectivePairs(runs, pairRows.today, pairRows.history));
+    const [pairRows, runRows] = await Promise.all([
+      sessionPairRows(c, input.date, input.session, runs),
+      sessionRunRows(c, input.date, input.session),
+    ]);
+    const shape: SessionShape = { sets, pairs: effectivePairs(runs, pairRows.today, pairRows.history), runRows };
+    const order = shapeOrder(shape);
     const inOrder = new Set(order.map(setKey)); // the sheet's sets and their exercises' warm-ups
     const names = new Map(sets.map((s) => [setKey(s.ref), s.name]));
     const tops = rangeTops(sets.map((s) => ({ repsText: s.repsText, sets: [s.ref] })));
@@ -278,14 +308,15 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
       const id = ids.get(nameKey(nameOf(ref)));
       return id === undefined ? null : { date: input.date, session: input.session, ref, exerciseId: id };
     };
-    const own = keyOf(target);
-    if (own === null) return { ok: false, reason: "invalid" }; // not in the session, or unknown
+    // A jump names a run by its first row (transition refuses one that starts no run); any other
+    // tap names a set of the session.
+    if (input.kind !== "jump" && keyOf(target) === null) return { ok: false, reason: "invalid" }; // not in the session, or unknown
     const log = await sessionLog(c, input.date, input.session);
     const at = now.toISOString();
     // The rules are lib/set-taps.ts transition's (the client applies the same Changes); each
     // Change is one conditional request, sent in order, so a retry finishes a partly landed tap.
     const tap = { kind: input.kind, target, undoes: input.undoes, value: input.value ?? null };
-    const changes = transition(order, log, tap, at, tops);
+    const changes = transition(order, log, tap, at, tops, shape);
     if (changes === null) return { ok: false, reason: "invalid" }; // e.g. skip a done set
     for (const change of changes) await send(c, input.date, input.session, change, keyOf);
     return { ok: true, at };

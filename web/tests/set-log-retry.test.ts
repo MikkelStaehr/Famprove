@@ -52,6 +52,7 @@ function fakeDb(): FakeDb {
         { id: 3, name: "Dips", aliases: ["Dip"] },
       ],
       exercise_set_log: [],
+      session_order: [],
       superset_pairs: [],
     },
     writes: [],

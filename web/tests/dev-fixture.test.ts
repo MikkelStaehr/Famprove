@@ -7,6 +7,10 @@ import {
   ILLUSTRATIVE_REMAINING_TSS,
   illustrativeWeeklyPlan,
   midsessionLog,
+  comboSets,
+  COMBO_VARIANT,
+  jumpedFixture,
+  supersetOfferLog,
   illustrativeToday,
   midsessionPlanned,
   pauseFixture,
@@ -14,12 +18,13 @@ import {
   staleComputedAt,
 } from "../src/lib/db/dev-fixture.ts";
 import { fokusState } from "../src/lib/fokus-view.ts";
-import { type LoggedSet, sessionOrderWithWarmups, setKey } from "../src/lib/set-taps.ts";
+import { firstOpen, type LoggedSet, sessionOrderWithWarmups, setKey, shapeOrder } from "../src/lib/set-taps.ts";
+import type { PrescribedSetRow } from "../src/lib/db/rows.ts";
 import { PostgrestError } from "../src/lib/db/postgrest.ts";
 import { freshness } from "../src/lib/dashboard-view.ts";
 
 test("DEV_FIXTURE only switches under next dev, and only to known states", () => {
-  for (const state of ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers", "warmup", "pause", "exercise-end", "pause-rated", "finished", "feel", "calendar", "ftp-warning", "ftp-quiet", "superset", "superset-suggested"] as const) {
+  for (const state of ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers", "warmup", "pause", "exercise-end", "pause-rated", "finished", "feel", "calendar", "ftp-warning", "ftp-quiet", "superset", "superset-suggested", "sheet", "sheet-superset", "jumped", "superset-offer", "combo"] as const) {
     assert.equal(devFixture({ DEV_FIXTURE: state }, "development"), state);
     assert.equal(devFixture({ DEV_FIXTURE: state }, "production"), null);
     assert.equal(devFixture({ DEV_FIXTURE: state }, "test"), null);
@@ -34,7 +39,7 @@ test("DEV_FIXTURE only switches under next dev, and only to known states", () =>
   } finally {
     console.warn = warn;
   }
-  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, pause-rated, finished, feel, calendar, ftp-warning, ftp-quiet, superset, superset-suggested"]);
+  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, pause-rated, finished, feel, calendar, ftp-warning, ftp-quiet, superset, superset-suggested, sheet, sheet-superset, jumped, superset-offer, combo"]);
   assert.equal(devFixture({}, "development"), null);
 });
 
@@ -200,4 +205,40 @@ test("illustrativeWeeklyPlan keeps real rows and a real planned value; fills onl
   assert.equal(filled[1].doneTss, 118); // the view's done, not weekly_load's
   assert.equal(filled[1].plannedTss, 118 + ILLUSTRATIVE_REMAINING_TSS);
   assert.deepEqual(illustrativeWeeklyPlan([], null), []);
+});
+
+// Slice fokus-sheet: the jumped, superset-offer and combo fixtures (never written).
+function sheetRows(): PrescribedSetRow[] {
+  const runs: [number, string, number][] = [[30, "Squat", 2], [31, "Bench", 3], [32, "Row", 2], [33, "Curl", 2]];
+  return runs.flatMap(([sheetRow, name, n]) =>
+    Array.from({ length: n }, (_, k) => ({
+      weekStart: "2026-10-12", session: 1, block: "B", week: 3, sheetRow, setNo: k + 1, name, type: "X", setsText: String(n),
+      repsText: "5", prescribed: null, loggedKg: null, bodyweight: false, variantId: null, variant: null,
+    })),
+  );
+}
+
+test("jumped: A done, B1 done, then the jump: C's warm-up current with B1's end, B2 right after C", () => {
+  const now = new Date("2026-10-12T10:00:00.000Z");
+  const { setLog, sessionOrders } = jumpedFixture(sheetRows(), "2026-10-12", now);
+  assert.deepEqual(sessionOrders.map((o) => o.runRows), [[30, 32, 31, 33]]);
+  const log = new Map<string, LoggedSet>(setLog.map((r) => [setKey(r), r]));
+  const order = shapeOrder({ sets: sheetRows().map((r) => ({ ref: { row: r.sheetRow, set: r.setNo }, name: r.name })), pairs: [], runRows: sessionOrders[0].runRows });
+  assert.equal(setKey(firstOpen(order, log) ?? { row: 0, set: 0 }), "32#0");
+  assert.equal(log.get("32#0")?.startedAt, log.get("31#1")?.endedAt);
+  assert.equal(log.get("31#1")?.endedAt, new Date(now.getTime() - 102_000).toISOString());
+  assert.equal(log.get("31#2"), undefined); // B2 is upcoming again
+  assert.equal(order.filter((r) => r.row === 31 && r.set === 2).length, 1);
+  assert.ok(order.findIndex((r) => setKey(r) === "31#2") > order.findIndex((r) => setKey(r) === "32#2"));
+});
+
+test("superset-offer: only Begynd, on the first run's warm-up", () => {
+  const log = supersetOfferLog(sheetRows(), "2026-10-12", new Date("2026-10-12T10:00:00.000Z"));
+  assert.deepEqual(log.map((r) => [r.row, r.set, r.startedAt !== null, r.endedAt]), [[30, 0, true, null]]);
+});
+
+test("combo: the row of the last done set (midsession) carries the combined variant, nothing else changes", () => {
+  const rows = comboSets(sheetRows());
+  assert.deepEqual([...new Set(rows.filter((r) => r.variantId === COMBO_VARIANT.variantId).map((r) => r.sheetRow))], [31]);
+  assert.ok(COMBO_VARIANT.variant.includes("+"));
 });

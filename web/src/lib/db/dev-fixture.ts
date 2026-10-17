@@ -46,12 +46,37 @@
  *          runs per session), A1 and B1 done, resting before A2 (supersetFixture).
  *   superset-suggested  as superset, the pair a suggestion from 7 days ago, nothing done today.
  *          Under both, setSupersetPair and the taps write nothing (lib/db/superset-pairs.ts).
+ *   sheet / sheet-superset  (fokus-sheet.md) the data of midsession / superset; the screen opens
+ *          the session sheet on them.
+ *   jumped  midsession's rows after a jump (jumpedFixture): per session, the first run done, B1
+ *          done, then a jump to the third run C (its warm-up current, B2 right after C), with the
+ *          session_order row the jump writes; no supersets (the pairs are cleared).
+ *   superset-offer  (fokus-superset.md) per session, Begynd just tapped: the first run's warm-up
+ *          current, nothing else logged, no pair today or before (the offer shows, off).
+ *   combo  (combo-parts.md) midsession with the row of each session's last done set given an
+ *          illustrative combined variant (two parts, a name with "+"). Data only: the parts table
+ *          comes with slice combo-parts.
+ *          None of them writes: the taps and the jump are refused under any dev switch.
  * Only under `next dev`: `nodeEnv` defaults to the literal `process.env.NODE_ENV`, which the build
  * inlines, so a production bundle compares "production" and never reads DEV_FIXTURE. An unknown
  * value is warned about, never silently ignored (a mislabelled screenshot would look real).
  */
 import { LIFTS } from "../lifts.ts";
-import { sessionOrderWithWarmups, setKey, type SetRef } from "../set-taps.ts";
+import {
+  applyTap,
+  firstOpen,
+  isWarmup,
+  jumpRunRows,
+  type LoggedSet,
+  runOfRows,
+  type RunSet,
+  sessionOrderWithWarmups,
+  type SessionShape,
+  setKey,
+  type SetRef,
+  type SetTapKind,
+  shapeOrder,
+} from "../set-taps.ts";
 import { exerciseIdMap, exerciseIdOf, sessionRuns } from "../supersets.ts";
 import { PostgrestError } from "./postgrest.ts";
 import type {
@@ -66,6 +91,7 @@ import type {
   PlannedSetRow,
   PrescribedSetRow,
   ProjectedSession,
+  SessionOrderRow,
   RideMetricsRow,
   SetLogRow,
   StrengthWeekRow,
@@ -92,7 +118,12 @@ export type DevFixture =
   | "ftp-warning"
   | "ftp-quiet"
   | "superset"
-  | "superset-suggested";
+  | "superset-suggested"
+  | "sheet"
+  | "sheet-superset"
+  | "jumped"
+  | "superset-offer"
+  | "combo";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -113,6 +144,11 @@ const FIXTURES: readonly DevFixture[] = [
   "ftp-quiet",
   "superset",
   "superset-suggested",
+  "sheet",
+  "sheet-superset",
+  "jumped",
+  "superset-offer",
+  "combo",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
@@ -472,6 +508,96 @@ export function supersetFixture(
     );
   }
   return { supersetPairs: pairs, exerciseIds, setLog: log };
+}
+
+/** A session's sheet rows as the tap rules read them, in the sheet's order. */
+function sessionShape(rows: readonly PrescribedSetRow[]): SessionShape {
+  const sets: RunSet[] = rows
+    .toSorted((a, b) => a.sheetRow - b.sheetRow || a.setNo - b.setNo)
+    .map((r) => ({ ref: { row: r.sheetRow, set: r.setNo }, name: r.name, variantId: r.variantId }));
+  return { sets, pairs: [], runRows: null };
+}
+
+function bySession(sets: readonly PrescribedSetRow[]): Map<number, PrescribedSetRow[]> {
+  const out = new Map<number, PrescribedSetRow[]>();
+  for (const s of sets) out.set(s.session, [...(out.get(s.session) ?? []), s]);
+  return out;
+}
+
+function logRows(log: ReadonlyMap<string, LoggedSet>, today: IsoDate, session: number, fallback: string): SetLogRow[] {
+  return [...log.values()].map((l) => ({
+    date: today, session, row: l.row, set: l.set, startedAt: l.startedAt, endedAt: l.endedAt, skipped: l.skipped,
+    skippedAt: l.skippedAt, updatedAt: l.updatedAt ?? fallback, feltRpe: l.feltRpe ?? null, repsDone: l.repsDone ?? null,
+  }));
+}
+
+/**
+ * DEV_FIXTURE=jumped (fokus-sheet.md): per session with 3+ runs and a second run of 2+ sets, the
+ * taps played through the real rules (lib/set-taps.ts): Begynd, every done through B1 (3 minutes
+ * apart, B1 1:42 ago), then a jump to C 30 s ago. Never written anywhere.
+ */
+export function jumpedFixture(sets: readonly PrescribedSetRow[], today: IsoDate, now: Date): { setLog: SetLogRow[]; sessionOrders: SessionOrderRow[] } {
+  const setLog: SetLogRow[] = [];
+  const sessionOrders: SessionOrderRow[] = [];
+  for (const [session, rows] of bySession(sets)) {
+    const shape = sessionShape(rows);
+    const order = shapeOrder(shape);
+    const runOf = runOfRows(shape.sets);
+    const runs = [...new Set(order.filter((r) => !isWarmup(r)).map((r) => runOf.get(r.row) ?? -1))];
+    const [a, b, c] = runs;
+    const bSets = order.filter((r) => !isWarmup(r) && runOf.get(r.row) === b);
+    if (c === undefined || a === undefined || bSets.length < 2) continue;
+    const b1 = bSets[0];
+    const taps: [SetTapKind, SetRef][] = [];
+    let log: ReadonlyMap<string, LoggedSet> = new Map();
+    const first = firstOpen(order, log);
+    if (first === null) continue;
+    taps.push(["begin", first]);
+    // Count the taps first (so the last done lands 1:42 before now), then play them.
+    let probe: ReadonlyMap<string, LoggedSet> = applyTap(order, log, "begin", first, now.toISOString());
+    for (let next = firstOpen(order, probe); next !== null; next = firstOpen(order, probe)) {
+      taps.push(["done", next]);
+      probe = applyTap(order, probe, "done", next, now.toISOString());
+      if (setKey(next) === setKey(b1)) break;
+    }
+    const at = (k: number) => new Date(now.getTime() - 102_000 - (taps.length - 1 - k) * 180_000).toISOString();
+    taps.forEach(([kind, ref], k) => {
+      log = applyTap(order, log, kind, ref, at(k));
+    });
+    const runRows = jumpRunRows(shape, log, c);
+    if (runRows === null) continue;
+    const jumpAt = new Date(now.getTime() - 30_000).toISOString();
+    log = applyTap(order, log, "jump", { row: c, set: 1 }, jumpAt, null, new Map(), shape);
+    setLog.push(...logRows(log, today, session, jumpAt));
+    sessionOrders.push({ date: today, session, runRows, updatedAt: jumpAt });
+  }
+  return { setLog, sessionOrders };
+}
+
+/** DEV_FIXTURE=superset-offer (fokus-superset.md): per session, Begynd tapped 40 s ago and nothing else. Never written. */
+export function supersetOfferLog(sets: readonly PrescribedSetRow[], today: IsoDate, now: Date): SetLogRow[] {
+  const at = new Date(now.getTime() - 40_000).toISOString();
+  return [...bySession(sets)].flatMap(([session, rows]) => {
+    const order = shapeOrder(sessionShape(rows));
+    const first = firstOpen(order, new Map());
+    return first === null ? [] : logRows(applyTap(order, new Map(), "begin", first, at), today, session, at);
+  });
+}
+
+/** DEV_FIXTURE=combo's illustrative combined variant (a name with "+": two parts). Never a real variant. */
+export const COMBO_VARIANT = { variantId: -901, variant: "Split Squat + Calf Raise" } as const;
+
+/**
+ * DEV_FIXTURE=combo (combo-parts.md): midsession's rows with the row of each session's last done set
+ * (midsessionLog's MIDSESSION_DONE-th set in the sheet's order) given COMBO_VARIANT. Data only.
+ */
+export function comboSets(sets: readonly PrescribedSetRow[]): PrescribedSetRow[] {
+  const rows = new Set<string>();
+  for (const [session, list] of bySession(sets)) {
+    const done = list.toSorted((a, b) => a.sheetRow - b.sheetRow || a.setNo - b.setNo).at(MIDSESSION_DONE - 1);
+    if (done !== undefined) rows.add(`${session}#${done.sheetRow}`);
+  }
+  return sets.map((s) => (rows.has(`${s.session}#${s.sheetRow}`) ? { ...s, ...COMBO_VARIANT } : s));
 }
 
 function addDaysIso(date: IsoDate, days: number): IsoDate {

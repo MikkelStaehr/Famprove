@@ -26,10 +26,16 @@
  *                     tap itself writes the top of the range when reps_done is empty)
  * An undo of a done also clears the set's rating and reps done (the set is open again).
  * Python reads felt_rpe and reps_done; logging kg stays in the coach's sheet (the app never writes kg).
+ *   jump   run C  -> (slice fokus-sheet, user 2026-10-17) C (a run's first sheet row; `set` unused)
+ *                     moves to just after the finished runs, everything else keeps its order
+ *                     (public.session_order, this date and session only). The passed set's start,
+ *                     whatever wrote it (done, skip, Begynd), moves to C's first open set (the rest
+ *                     or begin before it is C's now), and the session order is written last. No Fortryd:
+ *                     jumping back is the undo. Refused for a done run or a row that starts no run.
  */
 
 export type SetRef = { readonly row: number; readonly set: number };
-export type SetTapKind = "begin" | "done" | "skip" | "undo" | "feel" | "reps";
+export type SetTapKind = "begin" | "done" | "skip" | "undo" | "feel" | "reps" | "jump";
 /** What an undo undoes, as the client saw the set: so a retry of a half-done undo only finishes it. */
 export type Undoes = "done" | "skip" | "begin";
 
@@ -158,6 +164,104 @@ export function sessionOrderWithWarmups(sets: readonly RunSet[], pairs: readonly
     i += 1;
   }
   return out;
+}
+
+// ---------------------------------------------------------------- the session order (jumps)
+
+/**
+ * A session's runs and pairs as the order rules read them; `runRows` = public.session_order's
+ * run_rows (null: no jump today, the sheet's order).
+ */
+export type SessionShape = {
+  readonly sets: readonly RunSet[];
+  readonly pairs: readonly PairRef[];
+  readonly runRows: readonly number[] | null;
+};
+
+/** The run (its first sheet row) each row belongs to; rows not in the session are absent. */
+export function runOfRows(sets: readonly RunSet[]): Map<number, number> {
+  const starts = runStartRows(sets);
+  const out = new Map<number, number>();
+  let run = -1;
+  for (const row of [...new Set(sets.map((s) => s.ref.row))].toSorted((a, b) => a - b)) {
+    if (starts.has(row)) run = row;
+    out.set(row, run);
+  }
+  return out;
+}
+
+/** A unit moves as one: a superset pair (keyed by its A run) or a lone run. Each unit's runs, in `order`'s order of first appearance. */
+function unitsOf(order: readonly SetRef[], sets: readonly RunSet[], pairs: readonly PairRef[]) {
+  const runOf = runOfRows(sets);
+  const unitOf = (run: number) => pairs.find((p) => p.rowA === run || p.rowB === run)?.rowA ?? run;
+  const units = new Map<number, { runs: number[]; refs: SetRef[] }>();
+  for (const ref of order) {
+    const run = runOf.get(ref.row);
+    if (run === undefined) continue;
+    const id = unitOf(run);
+    const u = units.get(id) ?? { runs: [], refs: [] };
+    if (!u.runs.includes(run)) u.runs.push(run);
+    u.refs.push(ref);
+    units.set(id, u);
+  }
+  return { units, unitOf, runs: new Set(runOf.values()) };
+}
+
+/**
+ * The tap order with a stored session order on top (a sibling of sessionOrderWithWarmups, which
+ * keeps its meaning): `order` = sessionOrderWithWarmups(sets, pairs); its units (a pair moves as
+ * one) are put in `runRows`' order. A row in runRows that starts no run of the session is ignored;
+ * a unit runRows doesn't name keeps its place after the unit before it in the sheet's order. No
+ * runRows (or none that apply): `order` as it is.
+ */
+export function withSessionOrder(
+  order: readonly SetRef[],
+  sets: readonly RunSet[],
+  pairs: readonly PairRef[],
+  runRows: readonly number[] | null,
+): SetRef[] {
+  if (runRows === null || runRows.length === 0) return [...order];
+  const { units, unitOf, runs } = unitsOf(order, sets, pairs);
+  const sheet = [...units.keys()];
+  const placed: number[] = [];
+  for (const row of runRows) {
+    if (!runs.has(row)) continue; // not a run of this session: ignored
+    const id = unitOf(row);
+    if (units.has(id) && !placed.includes(id)) placed.push(id);
+  }
+  if (placed.length === 0) return [...order];
+  for (let i = 0; i < sheet.length; i += 1) {
+    if (placed.includes(sheet[i])) continue;
+    const before = i === 0 ? -1 : placed.indexOf(sheet[i - 1]);
+    placed.splice(before + 1, 0, sheet[i]);
+  }
+  return placed.flatMap((id) => units.get(id)?.refs ?? []);
+}
+
+/** The session's tap order: the sheet's, the pairs interleaved, the stored session order on top. */
+export function shapeOrder(shape: SessionShape): SetRef[] {
+  return withSessionOrder(sessionOrderWithWarmups(shape.sets, shape.pairs), shape.sets, shape.pairs, shape.runRows);
+}
+
+/**
+ * The run order after a jump to the run starting at `row` (the jump rule, user 2026-10-17): its
+ * unit (with its pair partner) moves to just before the first unit, other than itself, that still
+ * has an open set; everything else keeps its order, so a half-done run comes right after it.
+ * Returns every run's first row in the new order; null when `row` starts no run of the session or
+ * its unit has no open set left (a done run). A jump to the current unit returns the order as it
+ * is (a retry of a jump that landed).
+ */
+export function jumpRunRows(shape: SessionShape, log: ReadonlyMap<string, LoggedSet>, row: number): number[] | null {
+  const order = shapeOrder(shape);
+  const { units, unitOf, runs } = unitsOf(order, shape.sets, shape.pairs);
+  if (!runs.has(row)) return null;
+  const target = unitOf(row);
+  const open = (id: number) => (units.get(id)?.refs ?? []).some((r) => current(r, log));
+  if (!open(target)) return null;
+  const rest = [...units.keys()].filter((id) => id !== target);
+  const at = rest.findIndex((id) => open(id));
+  rest.splice(at === -1 ? rest.length : at, 0, target);
+  return rest.flatMap((id) => units.get(id)?.runs ?? []);
 }
 
 /** A warm-up whose set 1 is done or skipped is passed over (ticked on the overview). */
@@ -301,12 +405,14 @@ export type Guard = { readonly field: "startedAt" | "endedAt" | "skipped" | "ski
  *  patch       set `values` on the set's row where every guard holds (updatedAt null: leave it)
  *  clearStarts every set in the session with started_at = t and no end: started_at = null
  *  deleteEmpty delete the session's rows with no start, no end and not skipped
+ *  order       upsert the session's run order (public.session_order); the log is unchanged
  */
 export type Change =
   | { readonly op: "ensure"; readonly ref: SetRef; readonly values: LogValues; readonly updatedAt: string }
   | { readonly op: "patch"; readonly ref: SetRef; readonly when: readonly Guard[]; readonly values: LogValues; readonly updatedAt: string | null }
   | { readonly op: "clearStarts"; readonly t: string; readonly at: string }
-  | { readonly op: "deleteEmpty" };
+  | { readonly op: "deleteEmpty" }
+  | { readonly op: "order"; readonly runRows: readonly number[]; readonly at: string };
 
 /** A tap as the transition reads it (the server action's input without date and session). */
 export type Tap = { readonly kind: SetTapKind; readonly target: SetRef; readonly undoes: Undoes | null; readonly value: number | null };
@@ -332,8 +438,17 @@ function setIfNull(ref: SetRef, fields: readonly ("startedAt" | "endedAt")[], at
  * server sends each Change as one request (lib/db/set-log.ts); the client applies them to its log
  * (applyChanges), so both follow one copy of the rules.
  */
-export function transition(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, tap: Tap, at: string, tops: RangeTops): Change[] | null {
+export function transition(
+  order: readonly SetRef[],
+  log: ReadonlyMap<string, LoggedSet>,
+  tap: Tap,
+  at: string,
+  tops: RangeTops,
+  /** The session's runs, pairs and stored order (a jump needs them; `order` = shapeOrder(shape)). */
+  shape?: SessionShape,
+): Change[] | null {
   const { kind, target } = tap;
+  if (kind === "jump") return shape === undefined ? null : jump(order, log, shape, target.row, at);
   if (refused(log, kind, target)) return null;
   const logged = log.get(setKey(target));
   const after = nextOpen(order, log, target); // null: no open set after it
@@ -410,6 +525,35 @@ export function transition(order: readonly SetRef[], log: ReadonlyMap<string, Lo
   }
 }
 
+/**
+ * A jump's writes (module comment; decided 2026-10-17): the passed set's start, whatever wrote it
+ * (a done, a skip or Begynd), moves to C's first open set (its warm-up when open): C's start first,
+ * then the passed set's start cleared (guarded on that start) and the empty rows deleted, the
+ * session order last (its own mark). A retry finds the old order: C already holding a start means
+ * the move landed (only the clear and the order are left), so every cut point finishes the same.
+ */
+function jump(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, shape: SessionShape, row: number, at: string): Change[] | null {
+  const runRows = jumpRunRows(shape, log, row);
+  if (runRows === null) return null;
+  const passed = firstOpen(order, log);
+  const first = firstOpen(shapeOrder({ ...shape, runRows }), log);
+  const out: Change[] = [];
+  if (passed !== null && first !== null && setKey(passed) !== setKey(first)) {
+    const start = log.get(setKey(passed))?.startedAt ?? null;
+    const own = log.get(setKey(first))?.startedAt ?? null;
+    if (start !== null) {
+      if (own === null) {
+        out.push({ op: "ensure", ref: first, values: { startedAt: start }, updatedAt: at });
+        out.push({ op: "patch", ref: first, when: [{ field: "startedAt", equals: null }, { field: "skipped", equals: false }], values: { startedAt: start }, updatedAt: at });
+      }
+      out.push({ op: "patch", ref: passed, when: [{ field: "startedAt", equals: start }, { field: "endedAt", equals: null }], values: { startedAt: null }, updatedAt: at });
+    }
+    out.push({ op: "deleteEmpty" }); // also on a retry after the clear landed, so its empty row goes
+  }
+  out.push({ op: "order", runRows, at });
+  return out;
+}
+
 function holds(row: LoggedSet, guard: Guard): boolean {
   const value = row[guard.field] ?? null;
   if (guard.equals === null) return value === null;
@@ -430,7 +574,7 @@ export function applyChanges(log: ReadonlyMap<string, LoggedSet>, changes: reado
       if (row !== undefined && c.when.every((g) => holds(row, g))) next.set(k, { ...row, ...c.values, ...(c.updatedAt === null ? {} : { updatedAt: c.updatedAt }) });
     } else if (c.op === "clearStarts") {
       for (const [k, row] of next) if (row.endedAt === null && sameInstant(row.startedAt, c.t)) next.set(k, { ...row, startedAt: null, updatedAt: c.at });
-    } else {
+    } else if (c.op === "deleteEmpty") {
       for (const [k, row] of next) if (row.startedAt === null && row.endedAt === null && !row.skipped) next.delete(k);
     }
   }
@@ -451,13 +595,15 @@ export function applyTap(
   at: string,
   value: number | null = null,
   tops: RangeTops = new Map(),
+  /** For a jump: the session's runs, pairs and stored order (the new order: jumpRunRows). */
+  shape?: SessionShape,
 ): Map<string, LoggedSet> {
   const undoes = kind === "undo" ? (undoesOf(log, target) ?? "done") : null;
-  const changes = transition(order, log, { kind, target, undoes, value }, at, tops);
+  const changes = transition(order, log, { kind, target, undoes, value }, at, tops, shape);
   return changes === null ? new Map(log) : applyChanges(log, changes);
 }
 
-const KINDS: readonly SetTapKind[] = ["begin", "done", "skip", "undo", "feel", "reps"];
+const KINDS: readonly SetTapKind[] = ["begin", "done", "skip", "undo", "feel", "reps", "jump"];
 const UNDOES: readonly Undoes[] = ["done", "skip", "begin"];
 export const MAX_SESSION = 14; // the sheet never plans more; anything above is not a session
 const MAX_ROW = 10_000;

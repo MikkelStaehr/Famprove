@@ -18,6 +18,7 @@ import {
   type Progress,
   progress,
   restStart,
+  runOfRows,
   setKey,
   type SetRef,
   stateOf,
@@ -34,7 +35,7 @@ import {
   spokenName,
   titleName,
 } from "./training-view.ts";
-import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf } from "./superset-view.ts";
+import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf, runSetsOf } from "./superset-view.ts";
 
 /** What Fokus needs of one sheet row (a subset of ExerciseView, so fixtures stay small). */
 export type FokusExercise = Pick<
@@ -143,6 +144,8 @@ type Common = {
   /** The barcode's "now" tick: the set the view is about (none when finished). */
   readonly tick: SetRef | null;
   readonly undo: UndoTarget | null;
+  /** The session sheet and the grouped bar (fokus-sheet.md), in tap order (after any jump). */
+  readonly sheet: SessionSheet;
 };
 
 /**
@@ -204,7 +207,8 @@ export function fokusView(input: FokusInput, log: ReadonlyMap<string, LoggedSet>
     const named = state.kind === "set" && shown !== null ? displayName(set.exercise) !== displayName(shown.exercise) : true;
     return { ref: state.feel, set, logged: log.get(setKey(state.feel)) ?? null, named };
   };
-  const common = { progress: p, skipped: skippedText(p), undo };
+  const tick = state.kind === "finished" ? null : state.kind === "warmup" ? setOneOf(state.warmup) : state.next;
+  const common = { progress: p, skipped: skippedText(p), undo, sheet: sessionSheet(exercises, pairs, order, log, tick) };
   if (state.kind === "finished") return { ...common, kind: "finished", feel: feelOf(null), tick: null, card: finishCard(session, p, log) };
   if (state.kind === "warmup") {
     const shown = at(setOneOf(state.warmup));
@@ -419,16 +423,7 @@ export function nextSetSummary(
     parts.push(word === null ? figure : `${figure} ${word}`);
   }
   if (e.prescribed !== null) parts.push(rangeFigure(e.prescribed));
-  const today = todayKgView(e);
-  const kg: NextKg | null =
-    today === null
-      ? null
-      : {
-          caption: today.caption,
-          text: today.unit === null ? today.figure : `${today.figure}\u00a0kg`,
-          italic: today.italic,
-          spoken: today.spoken,
-        };
+  const kg = nextKg(e);
   const title = inWarmup ? `Sæt ${s.number} af ${s.count}` : `${displayName(e)} · sæt ${s.number} af ${s.count}`;
   return {
     title,
@@ -437,6 +432,14 @@ export function nextSetSummary(
     kg,
     lastWeek: lastWeekItem(e, week),
   };
+}
+
+/** A row's I DAG kg (fokus-kg.md §3) as the next-set block and the session sheet show it; null = nothing. */
+export function nextKg(e: FokusExercise): NextKg | null {
+  const today = todayKgView(e);
+  return today === null
+    ? null
+    : { caption: today.caption, text: today.unit === null ? today.figure : `${today.figure}\u00a0kg`, italic: today.italic, spoken: today.spoken };
 }
 
 /**
@@ -784,4 +787,97 @@ export function prescribedCell(prescribed: string | null): PrescribedCell | null
   const pct = /^\s*(.+?)\s*%\s*$/.exec(prescribed);
   if (pct !== null) return { caption: "Procent", value: rangeFigure(pct[1]), unit: "%" };
   return { caption: null, value: prescribed.trim(), unit: null };
+}
+
+// ---------------------------------------------------------------- the session sheet (fokus-sheet.md)
+
+/** A set's dot (§10) and bar segment: shape carries the state. `now` = the view's tick. */
+export type SheetDot = "done" | "skipped" | "now" | "upcoming";
+
+/** One row of the session sheet (§10–§13): one exercise run, in tap order (after any jump). */
+export type SheetRun = {
+  /** The run's first sheet row: the name stack's row and the jump's target. */
+  readonly row: number;
+  /** The name stack (variants.md): the variant's display name when set, the exercise name under it (else null). */
+  readonly name: string;
+  readonly under: string | null;
+  /** One per working set of the run, in its order. */
+  readonly dots: readonly SheetDot[];
+  /** I DAG: the run's next open set's kg; a finished run: its last set's (shown muted); null = nothing. */
+  readonly kg: NextKg | null;
+  /** The pair partner's first row (a superset in force), else null. */
+  readonly partner: number | null;
+  /** The view's set (or warm-up's set 1) is in this run: NU, not a button. */
+  readonly current: boolean;
+  /** Every set done or skipped: muted, not a button. */
+  readonly finished: boolean;
+  /** A tap jumps: not finished and not in the current unit (a pair moves as one, so the current run's partner is no jump). */
+  readonly canJump: boolean;
+};
+
+/** A bar group (§"The grouped bar" 1–3): one run, or a superset pair as one group interleaved; warm-ups out. */
+export type BarGroup = {
+  /** The group's runs (first rows): one, or a pair's A then B. */
+  readonly runs: readonly number[];
+  readonly pair: boolean;
+  readonly segments: readonly { readonly ref: SetRef; readonly state: SheetDot }[];
+};
+
+export type SessionSheet = { readonly runs: readonly SheetRun[]; readonly groups: readonly BarGroup[] };
+
+/** The sheet's rows and the bar's groups from the tap order and the log (pure: the same log gives the same sheet). */
+export function sessionSheet(
+  exercises: readonly FokusExercise[],
+  pairs: readonly PairRef[],
+  order: readonly SetRef[],
+  log: ReadonlyMap<string, LoggedSet>,
+  tick: SetRef | null,
+): SessionSheet {
+  const runOf = runOfRows(runSetsOf(exercises));
+  const pairOf = (run: number) => pairs.find((p) => p.rowA === run || p.rowB === run) ?? null;
+  const unitOf = (run: number) => pairOf(run)?.rowA ?? run;
+  const rowOf = (row: number) => exercises.find((e) => e.row === row);
+  const dot = (r: SetRef): SheetDot => {
+    if (tick !== null && setKey(r) === setKey(tick)) return "now";
+    const st = stateOf(log.get(setKey(r)));
+    return st === "open" ? "upcoming" : st;
+  };
+  const byRun = new Map<number, SetRef[]>();
+  const groups: { unit: number; runs: number[]; pair: boolean; segments: { ref: SetRef; state: SheetDot }[] }[] = [];
+  for (const r of order) {
+    if (isWarmup(r)) continue;
+    const run = runOf.get(r.row);
+    if (run === undefined) continue;
+    byRun.set(run, [...(byRun.get(run) ?? []), r]);
+    const unit = unitOf(run);
+    let g = groups.at(-1);
+    if (g === undefined || g.unit !== unit) {
+      g = { unit, runs: [], pair: pairOf(run) !== null, segments: [] };
+      groups.push(g);
+    }
+    if (!g.runs.includes(run)) g.runs.push(run);
+    g.segments.push({ ref: r, state: dot(r) });
+  }
+  const currentRun = tick === null ? undefined : runOf.get(tick.row);
+  const currentUnit = currentRun === undefined ? null : unitOf(currentRun);
+  const runs = [...byRun].map(([run, refs]): SheetRun => {
+    const first = rowOf(run);
+    const dots = refs.map(dot);
+    const finished = dots.every((d) => d === "done" || d === "skipped");
+    const kgRef = finished ? refs.at(-1) : refs.find((r) => stateOf(log.get(setKey(r))) === "open");
+    const kgRow = kgRef === undefined ? undefined : rowOf(kgRef.row);
+    const p = pairOf(run);
+    return {
+      row: run,
+      name: first === undefined ? "" : displayName(first),
+      under: first === undefined ? null : exerciseUnder(first),
+      dots,
+      kg: kgRow === undefined ? null : nextKg(kgRow),
+      partner: p === null ? null : p.rowA === run ? p.rowB : p.rowA,
+      current: run === currentRun,
+      finished,
+      canJump: !finished && unitOf(run) !== currentUnit,
+    };
+  });
+  return { runs, groups: groups.map(({ runs: r, pair, segments }) => ({ runs: r, pair, segments })) };
 }

@@ -50,6 +50,7 @@ function freshDb(pairs: readonly Row[] = []): Db {
         { id: 3, name: "Facepulls", aliases: [] },
       ],
       exercise_set_log: [],
+      session_order: [], // a jump's order (slice fokus-sheet): read on every tap, written by a jump only
       superset_pairs: pairs.map((p) => ({ ...p })),
     },
     requests: [],
@@ -95,7 +96,10 @@ function fetchFor(db: Db): FetchLike {
       return new Response(JSON.stringify(found), { headers: { "Content-Range": range } });
     }
     const item = (body ?? {}) as Row; // the write's body: one row
-    if (method === "POST") {
+    if (method === "POST" && table === "session_order") {
+      // One row per (date, session_no), upserted with merge-duplicates.
+      db.tables[table] = [...rows.filter((r) => !(r.date === item.date && r.session_no === item.session_no)), item];
+    } else if (method === "POST") {
       const key = ["date", "session_no", "row_no", "set_no"];
       if (!rows.some((r) => key.every((k) => r[k] === item[k]))) {
         const row = { started_at: null, ended_at: null, skipped: false, felt_rpe: null, reps_done: null, ...item };
@@ -190,6 +194,44 @@ const SCENARIOS: readonly { readonly name: string; readonly pairs: readonly Row[
       step("done", 27, 0, 12),
     ],
   },
+  // Slice fokus-sheet: the jump (new keys only; every scenario above is unchanged).
+  {
+    name: "jump: after B1 to C, C's sets, then B2",
+    pairs: [],
+    steps: [
+      step("begin", 25, 0, 0),
+      step("done", 25, 0, 2),
+      step("done", 25, 1, 5),
+      step("done", 25, 2, 9),
+      step("done", 26, 0, 10),
+      step("done", 26, 1, 13),
+      step("jump", 27, 1, 14),
+      step("jump", 27, 1, 15),
+      step("done", 27, 0, 16),
+      step("done", 27, 1, 18),
+      step("done", 27, 2, 21),
+      step("done", 26, 2, 24),
+    ],
+  },
+  {
+    name: "jump: right after Begynd, then back",
+    pairs: [],
+    steps: [step("begin", 25, 0, 0), step("jump", 26, 1, 1), step("done", 26, 0, 3), step("jump", 25, 1, 4), step("done", 25, 0, 6)],
+  },
+  {
+    name: "jump: refused (a done run, a row of no run) and in a pair",
+    pairs: [PAIR],
+    steps: [
+      step("begin", 25, 0, 0),
+      step("jump", 99, 1, 1),
+      step("jump", 27, 1, 2),
+      step("done", 27, 0, 3),
+      step("done", 27, 1, 5),
+      step("done", 27, 2, 7),
+      step("jump", 27, 1, 8),
+      step("jump", 26, 1, 9),
+    ],
+  },
 ];
 
 /** The cut scenario: replay up to `cut` taps, cut the connection at request k of the next one, then retry it. */
@@ -201,6 +243,13 @@ const CUTS: readonly { readonly name: string; readonly pairs: readonly Row[]; re
   { name: "done on a skipped set 25#2", pairs: [], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5), step("skip", 25, 2, 6)], tap: step("done", 25, 2, 8) },
   { name: "undo done 25#1", pairs: [], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5)], tap: step("undo", 25, 1, 6, { undoes: "done" }) },
   { name: "A1's done in a pair", pairs: [PAIR], before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 26, 0, 3)], tap: step("done", 25, 1, 6) },
+  {
+    name: "jump after B1 to C",
+    pairs: [],
+    before: [step("begin", 25, 0, 0), step("done", 25, 0, 2), step("done", 25, 1, 5), step("done", 25, 2, 9), step("done", 26, 0, 10), step("done", 26, 1, 13)],
+    tap: step("jump", 27, 1, 14),
+  },
+  { name: "jump right after Begynd", pairs: [], before: [step("begin", 25, 0, 0)], tap: step("jump", 26, 1, 1) },
 ];
 
 type Record_ = { readonly tap: string; readonly result: unknown; readonly requests: readonly Request[] };
@@ -222,7 +271,7 @@ async function record(): Promise<unknown> {
     const db = freshDb(sc.pairs);
     const taps: Record_[] = [];
     for (const s of sc.steps) taps.push(await run(db, s));
-    out[sc.name] = { taps, log: db.tables.exercise_set_log };
+    out[sc.name] = sc.steps.some((s) => s.kind === "jump") ? { taps, log: db.tables.exercise_set_log, order: db.tables.session_order } : { taps, log: db.tables.exercise_set_log };
   }
   for (const c of CUTS) {
     const db0 = freshDb(c.pairs);
@@ -235,7 +284,7 @@ async function record(): Promise<unknown> {
       const cut = await run(db, c.tap);
       db.cutAt = null;
       const retry = await run(db, c.tap);
-      cuts.push({ k, cut, retry, log: db.tables.exercise_set_log });
+      cuts.push(c.tap.kind === "jump" ? { k, cut, retry, log: db.tables.exercise_set_log, order: db.tables.session_order } : { k, cut, retry, log: db.tables.exercise_set_log });
     }
     out[`cut: ${c.name}`] = cuts;
   }
@@ -250,4 +299,23 @@ test("recordSetTap sends exactly the recorded requests for every tap, cut and re
   }
   const expected = JSON.parse(readFileSync(FIXTURE, "utf8")) as unknown;
   assert.deepEqual(got, expected);
+});
+
+test("a jump cut at every request, then retried, ends as the uncut jump (log and order)", async () => {
+  for (const c of CUTS.filter((x) => x.tap.kind === "jump")) {
+    const db0 = freshDb(c.pairs);
+    for (const s of c.before) await run(db0, s);
+    const whole = structuredClone(db0);
+    const n = (await run(whole, c.tap)).requests.length;
+    assert.ok(n > 0);
+    for (let k = 1; k <= n; k += 1) {
+      const db = structuredClone(db0);
+      db.cutAt = k;
+      await run(db, c.tap);
+      db.cutAt = null;
+      assert.deepEqual((await run(db, c.tap)).result, { ok: true, at: at(c.tap.m).toISOString() }, `${c.name} cut ${k}`);
+      assert.deepEqual(db.tables.exercise_set_log, whole.tables.exercise_set_log, `${c.name} cut ${k}: log`);
+      assert.deepEqual(db.tables.session_order, whole.tables.session_order, `${c.name} cut ${k}: order`);
+    }
+  }
 });

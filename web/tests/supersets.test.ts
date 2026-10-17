@@ -133,6 +133,7 @@ function fakeDb(): FakeDb {
         { id: 4, name: "Dips", aliases: [] },
       ],
       exercise_set_log: [],
+      session_order: [],
       superset_pairs: [],
     },
     requests: 0,

@@ -63,8 +63,8 @@ export function SetLogProvider({ session, date, devSwitches, children }: Provide
   // The order follows only stored choices: a failed save stays on the seam (S7), not in the order.
   const ordered = useMemo(() => orderPairs(session.pairSlots, saves), [session.pairSlots, saves]);
   const order = useMemo(
-    () => (saves.size === 0 ? session.order : clientOrder(session.exercises, ordered)),
-    [saves.size, session.order, session.exercises, ordered],
+    () => (saves.size === 0 ? session.order : clientOrder(session.exercises, ordered, session.runRows ?? null)),
+    [saves.size, session.order, session.exercises, ordered, session.runRows],
   );
   const setLog = useSetLog(session.log, order, date, session.session, session.exercises);
   const view = useMemo(() => checklistView(session.exercises, order, setLog.log), [session.exercises, order, setLog.log]);

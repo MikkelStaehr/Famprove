@@ -186,6 +186,7 @@ function fakeDb(): FakeDb {
         { id: 4, name: "Dødløft", aliases: [] },
       ],
       exercise_set_log: [],
+      session_order: [],
       superset_pairs: [],
     },
     calls: [],

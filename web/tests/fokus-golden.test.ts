@@ -19,6 +19,10 @@ import {
   applyTap,
   firstOpen,
   isWarmup,
+  jumpRunRows,
+  runStartRows,
+  type SessionShape,
+  shapeOrder,
   lastTap,
   type LoggedSet,
   type PairRef,
@@ -225,6 +229,7 @@ function fakeDb(s: Session): FakeDb {
       ),
       exercises: Object.entries(EXERCISE_IDS).map(([name, id]) => ({ id, name, aliases: [] })),
       exercise_set_log: [],
+      session_order: [],
       superset_pairs: s.pairs.map((p) => ({
         date: DATE,
         session_no: 1,
@@ -354,6 +359,10 @@ function op(s: Session, order: readonly SetRef[], log: ReadonlyMap<string, Logge
       if (f === null || range === null) return null; // the stepper shows on a range set only
       return { kind: "reps", ref: f, value: range.top + Number(arg), label: name };
     }
+    case "jump": {
+      // The sheet's row tap (fokus-sheet.md §13): any run start; the rules refuse a done or current one.
+      return { kind: "jump", ref: { row: Number(arg), set: 1 }, value: null, label: name };
+    }
     case "tick":
     case "untick": {
       const [row, set] = arg.split("#").map(Number);
@@ -377,13 +386,31 @@ function offered(s: Session, order: readonly SetRef[], log: ReadonlyMap<string, 
 
 type Step = Record<string, unknown>;
 
-async function run(s: Session, pick: (log: ReadonlyMap<string, LoggedSet>, i: number) => Tap | null | "stop", maxSteps: number) {
-  const order = orderOf(s);
+/** The sheet as a jump sequence records it (slice fokus-sheet; new sequences only, so the rest stays identical). */
+function sheetFacts(s: Session, order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>, runRows: readonly number[] | null) {
+  const { sheet } = fokusView({ exercises: s.exercises, pairs: s.pairs, order, week: s.week ?? 1, session: 1 }, log);
+  return {
+    runOrder: runRows,
+    rows: sheet.runs.map((r) => `${r.row} ${r.name}${r.under === null ? "" : `/${r.under}`} [${r.dots.join(",")}]${r.kg === null ? "" : ` ${r.kg.text}`}${r.partner === null ? "" : ` pair:${r.partner}`}${r.current ? " NU" : ""}${r.finished ? " færdig" : ""}${r.canJump ? " >" : ""}`),
+    groups: sheet.groups.map((g) => `${g.runs.join("+")}${g.pair ? " pair" : ""}: ${g.segments.map((x) => `${setKey(x.ref)}:${x.state}`).join(" ")}`),
+  };
+}
+
+async function run(
+  s: Session,
+  pick: (log: ReadonlyMap<string, LoggedSet>, i: number, order: readonly SetRef[]) => Tap | null | "stop",
+  maxSteps: number,
+  withSheet = false,
+) {
+  // A jump reorders the runs (session_order); without one this is orderOf(s), as before.
+  let shape: SessionShape = { sets: runSetsOf(s.exercises), pairs: s.pairs, runRows: null };
+  let order = shapeOrder(shape);
   const db = fakeDb(s);
   let log: ReadonlyMap<string, LoggedSet> = new Map();
-  const steps: Step[] = [{ tap: null, facts: screenFacts(s, order, log), server: [], diff: [] }];
+  const sheetOf = () => (withSheet ? { sheet: sheetFacts(s, order, log, shape.runRows) } : {});
+  const steps: Step[] = [{ tap: null, facts: screenFacts(s, order, log), server: [], diff: [], ...sheetOf() }];
   for (let i = 1; i <= maxSteps; i += 1) {
-    const tap = pick(log, i);
+    const tap = pick(log, i, order);
     if (tap === "stop") break;
     if (tap === null) {
       steps.push({ tap: "(not offered)" });
@@ -392,7 +419,12 @@ async function run(s: Session, pick: (log: ReadonlyMap<string, LoggedSet>, i: nu
     const at = new Date(DAY0 + i * 60_000);
     const undoes: Undoes | null = tap.kind === "undo" ? (undoesOf(log, tap.ref) ?? "done") : null; // as useSetLog
     const result = await recordSetTap({ kind: tap.kind, date: DATE, session: 1, row: tap.ref.row, set: tap.ref.set, undoes, value: tap.value }, at, options(db));
-    log = applyTap(order, log, tap.kind, tap.ref, at.toISOString(), tap.value, rangeTops(s.exercises));
+    const jumped = tap.kind === "jump" ? jumpRunRows(shape, log, tap.ref.row) : null;
+    log = applyTap(order, log, tap.kind, tap.ref, at.toISOString(), tap.value, rangeTops(s.exercises), shape);
+    if (jumped !== null) {
+      shape = { ...shape, runRows: jumped };
+      order = shapeOrder(shape);
+    }
     const rows = serverRows(db);
     steps.push({
       tap: `${tap.label} -> ${tap.kind} ${setKey(tap.ref)}${tap.value === null ? "" : ` ${tap.value}`}${undoes === null ? "" : ` undoes=${undoes}`}`,
@@ -403,6 +435,7 @@ async function run(s: Session, pick: (log: ReadonlyMap<string, LoggedSet>, i: nu
         return row === undefined ? [] : [`${setKey(r)} ${String(row.kind)} x${String(row.exercise_id)} ${cellText(serverCells(row))}`];
       }),
       diff: diffOf(order, log, rows),
+      ...sheetOf(),
     });
   }
   return { session: s.name, order: order.map(setKey).join(" "), steps };
@@ -475,6 +508,30 @@ async function record() {
   for (let seed = 1; seed <= 40; seed += 1) {
     const s = SESSIONS[seed % SESSIONS.length];
     await add(`seed ${seed} (${s.name})`, seeded(s, seed));
+  }
+  // Slice fokus-sheet: jumps (new sequences only; the order follows the jump, the sheet is recorded).
+  const jumpRun = (s: Session, ops: readonly string[]) => run(s, (log, i, order) => (i > ops.length ? "stop" : op(s, order, log, ops[i - 1])), ops.length, true);
+  await add("jump: plain, after B1 to C, C's sets, B2 next, Fortryd", jumpRun(PLAIN, ["begin", "done", "done", "done", "done", "done", "done", "jump:12", "done", "done", "done", "done", "fortryd"]));
+  await add("jump: plain, right after Begynd, then back", jumpRun(PLAIN, ["begin", "jump:12", "done", "jump:10", "done"]));
+  await add("jump: plain, refused (done run, current run, row of no run)", jumpRun(PLAIN, ["begin", "done", "done", "done", "done", "jump:10", "jump:11", "jump:99"]));
+  await add("jump: superset-3+3, mid-pair to Face Pull, then back to the pair", jumpRun(SESSIONS[1], ["begin", "done", "done", "done", "done", "jump:32", "done", "done", "jump:31", "done", "done"]));
+  for (let seed = 1; seed <= 12; seed += 1) {
+    const s = SESSIONS[seed % SESSIONS.length];
+    const rnd = lcg(1000 + seed);
+    const length = 10 + Math.floor(rnd() * 21);
+    const starts = [...runStartRows(runSetsOf(s.exercises))];
+    await add(
+      `seed-jump ${seed} (${s.name})`,
+      run(
+        s,
+        (log, _i, order) => {
+          const taps = [...offered(s, order, log), ...starts.map((r) => op(s, order, log, `jump:${r}`)).filter((t): t is Tap => t !== null)];
+          return taps.length === 0 ? "stop" : taps[Math.floor(rnd() * taps.length)];
+        },
+        length,
+        true,
+      ),
+    );
   }
   return { note: "Generated by tests/fokus-golden.test.ts; REGENERATE_FOKUS_GOLDEN=1 pnpm test rewrites it.", sequences };
 }

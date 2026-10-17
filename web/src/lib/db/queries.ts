@@ -17,6 +17,9 @@ import {
   ILLUSTRATIVE_FEEL,
   isPauseFixture,
   midsessionLog,
+  comboSets,
+  jumpedFixture,
+  supersetOfferLog,
   supersetFixture,
   illustrativeToday,
   midsessionPlanned,
@@ -55,7 +58,9 @@ import {
   PLANNED_TARGETS_SELECT,
   PRESCRIBED_SETS_SELECT,
   SET_LOG_SELECT,
+  SESSION_ORDER_SELECT,
   SUPERSET_PAIRS_SELECT,
+  parseSessionOrderRow,
   parseSupersetPairRow,
   EXERCISE_IDS_SELECT,
   parseExerciseIdRow,
@@ -94,6 +99,7 @@ import type {
   ExerciseCategoryRow,
   ExerciseFeelRow,
   ExerciseIdRow,
+  SessionOrderRow,
   SupersetPairRow,
   IsoDate,
   PlannedSetRow,
@@ -304,6 +310,8 @@ export type TrainingPlanData = {
   readonly supersetPairs?: readonly SupersetPairRow[];
   /** public.exercises ids by name and alias (superset runs are keyed by exercise id); absent = none read. */
   readonly exerciseIds?: readonly ExerciseIdRow[];
+  /** Today's session_order rows, every session (a jump's run order); absent = none read (the sheet's order). */
+  readonly sessionOrders?: readonly SessionOrderRow[];
 };
 
 /**
@@ -333,7 +341,7 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
   }
   const db = client();
   const horizon = addDays(today, NEXT_SESSION_DAYS);
-  const [sessions, sets, rides, upcomingRides, plannedSets, setLog, supersetPairs, exerciseIds] = await Promise.all([
+  const [sessions, sets, rides, upcomingRides, plannedSets, setLog, supersetPairs, exerciseIds, sessionOrders] = await Promise.all([
     selectAll(
       db,
       STRENGTH_SESSIONS_SELECT.table,
@@ -384,6 +392,8 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     // (a failure fails the plan rather than showing an order the server doesn't use).
     selectAll(db, SUPERSET_PAIRS_SELECT.table, { ...SUPERSET_PAIRS_SELECT, filters: [["date", `lte.${today}`]] }, parseSupersetPairRow),
     selectAll(db, EXERCISE_IDS_SELECT.table, EXERCISE_IDS_SELECT, parseExerciseIdRow),
+    // A jump's run order: as the pairs, the server orders taps by it, so a failure fails the plan.
+    selectAll(db, SESSION_ORDER_SELECT.table, { ...SESSION_ORDER_SELECT, filters: [["date", `eq.${today}`]] }, parseSessionOrderRow),
   ]);
   // Last week's sets of the same tab(s): one query per (tab, week - 1). Tab names come from
   // this week's rows (server data) and go through URLSearchParams as eq. values.
@@ -435,18 +445,22 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     setLogFailed: setLog === null,
     supersetPairs,
     exerciseIds,
+    sessionOrders,
   };
   // Dev fixtures (never in production, never written): illustrative logs, ramps, adjustments.
-  if (fixture === "superset" || fixture === "superset-suggested") {
-    return { ...base, ...supersetFixture(fixture, base, today, new Date()) };
+  if (fixture === "superset" || fixture === "superset-suggested" || fixture === "sheet-superset") {
+    return { ...base, ...supersetFixture(fixture === "sheet-superset" ? "superset" : fixture, base, today, new Date()) };
   }
-  if (fixture === "midsession") {
-    return {
-      ...base,
-      ...midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets)),
-      setLog: midsessionLog(sets, today, new Date()),
-    };
+  if (fixture === "midsession" || fixture === "sheet" || fixture === "combo") {
+    const mid = midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets));
+    const shown = fixture === "combo" ? comboSets(mid.sets) : mid.sets;
+    return { ...base, ...mid, sets: shown, setLog: midsessionLog(shown, today, new Date()) };
   }
+  if (fixture === "jumped") {
+    const mid = midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets));
+    return { ...base, ...mid, ...jumpedFixture(mid.sets, today, new Date()), supersetPairs: [] };
+  }
+  if (fixture === "superset-offer") return { ...base, setLog: supersetOfferLog(sets, today, new Date()), supersetPairs: [] };
   if (isPauseFixture(fixture)) {
     const pause = pauseFixture(fixture, sets, plannedSets, today, new Date());
     return { ...base, ...pause, plannedSets: illustrativeToday(pause.sets, pause.plannedSets) };
