@@ -9,7 +9,7 @@ import { MonoCaption } from "@/components/MonoCaption";
 import { SectionTitle } from "@/components/SectionTitle";
 import { WarningLine } from "@/components/WarningLine";
 import type { IsoDate } from "@/lib/db/rows";
-import type { VideoClipRow } from "@/lib/video/clips";
+import { type DeleteClipResult, PERMANENT_SAVE_REFUSALS, type VideoClipRow } from "@/lib/video/clips";
 import { cleanupPlan } from "@/lib/video/cleanup";
 import { type ClipIndex, type ClipIndexEntry, memoryClipIndex } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
@@ -23,6 +23,9 @@ import {
   type LibraryRow,
   libraryRows,
   pendingStars,
+  PLAYER_HISTORY_STATE,
+  playerCloseVia,
+  playerShouldPush,
   shownName,
   unsyncedClips,
   usedBytes,
@@ -49,6 +52,16 @@ type Props = {
 
 type Store = { readonly index: ClipIndex; readonly files: ClipFiles };
 type Local = { kind: "loading" } | { kind: "none" } | { kind: "error" } | { kind: "ready"; entries: ClipIndexEntry[] };
+
+/** deleteClip that never throws: a thrown call (the network) is a failed one, so the caller goes on. */
+async function tryDeleteClip(id: string): Promise<DeleteClipResult> {
+  try {
+    return await deleteClip({ id });
+  } catch (error) {
+    console.error("optagelser: deleting a clip's row failed", error);
+    return { ok: false, reason: "failed" };
+  }
+}
 
 /** A browser that has recorded has an index database; one without (the desktop) lists rows read-only (R2). */
 async function hasIndex(): Promise<boolean> {
@@ -96,6 +109,7 @@ export function ClipLibrary({ today, rows: initialRows, names, canRecord, fixtur
       for (const e of unsyncedClips(entries)) {
         const r = await saveClip({ id: e.id, date: e.setKey.date, sessionNo: e.setKey.sessionNo, row: e.setKey.row, set: e.setKey.set, durationS: e.durationS });
         if (r.ok) await s.index.put({ ...e, synced: true });
+        else if (PERMANENT_SAVE_REFUSALS.has(r.reason)) await s.index.put({ ...e, syncRefused: r.reason }); // never retried
       }
       for (const e of pendingStars(entries)) {
         const r = await starClip({ id: e.id, starred: e.starred });
@@ -107,9 +121,9 @@ export function ClipLibrary({ today, rows: initialRows, names, canRecord, fixtur
         for (const e of plan.deleteLocal) {
           await s.files.remove(e.id, e.ext);
           await s.index.remove(e.id);
-          await deleteClip({ id: e.id });
+          await tryDeleteClip(e.id); // a failed row is tomorrow's deleteServerOnly; the cleanup goes on
         }
-        for (const id of plan.deleteServerOnly) await deleteClip({ id });
+        for (const id of plan.deleteServerOnly) await tryDeleteClip(id);
         const gone = new Set([...plan.deleteLocal.map((e) => e.id), ...plan.deleteServerOnly]);
         setRows(initialRows.filter((r) => !gone.has(r.id)));
         setCleaned(plan.deleteLocal.length);
@@ -166,8 +180,12 @@ export function ClipLibrary({ today, rows: initialRows, names, canRecord, fixtur
         await s.files.remove(row.id, row.ext);
         await s.index.remove(row.id);
       }
-      const r = await deleteClip({ id: row.id });
-      if (!r.ok && row.kind !== "missing") {
+      const r = await tryDeleteClip(row.id);
+      if (!r.ok && row.kind === "missing") {
+        setStatus("Oplysningen blev ikke slettet. Prøv igen."); // the row stays
+        return;
+      }
+      if (!r.ok) {
         setLocal({ kind: "ready", entries: s === null ? [] : await s.index.all() }); // the row stays as fil mangler (§12)
         setStatus("Videoen er slettet.");
         return;
@@ -178,10 +196,18 @@ export function ClipLibrary({ today, rows: initialRows, names, canRecord, fixtur
     setStatus(row.kind === "missing" ? "Oplysningen er slettet." : "Videoen er slettet.");
   }
 
-  function close() {
+  /** Closes the player now (the back gesture's popstate, or no entry of ours on top). Stable, so the Player's effect runs once. */
+  const close = useCallback(() => {
+    const el = opener.current;
     setOpen(null);
-    opener.current?.focus();
-  }
+    setTimeout(() => el?.focus(), 0); // after the Player's cleanup lifts inert from <main>
+  }, []);
+
+  /** Luk and Escape: back over our history entry when it is on top; its popstate then closes (§10). */
+  const requestClose = useCallback(() => {
+    if (playerCloseVia(window.history.state) === "back") window.history.back();
+    else close();
+  }, [close]);
 
   // §9: no rows and recording not possible here: no card.
   if (canRecordHere === false && list.length === 0 && local.kind !== "loading") return null;
@@ -273,12 +299,13 @@ export function ClipLibrary({ today, rows: initialRows, names, canRecord, fixtur
           row={open}
           files={files}
           fixture={fixture !== null}
-          onClose={close}
+          onClose={requestClose}
+          onPopped={close}
           onStar={() => void toggleStar(open)}
           onDelete={() => {
             void remove(open);
-            setOpen(null);
             opener.current = null;
+            requestClose();
           }}
         />
       )}
@@ -348,13 +375,17 @@ function Player({
   files,
   fixture,
   onClose,
+  onPopped,
   onStar,
   onDelete,
 }: {
   readonly row: LibraryRow;
   readonly files: ClipFiles | null;
   readonly fixture: boolean;
+  /** Luk and Escape (back over the player's entry when it is on top). */
   readonly onClose: () => void;
+  /** The entry was popped (back gesture, or onClose's back): close without another back. */
+  readonly onPopped: () => void;
   readonly onStar: () => void;
   readonly onDelete: () => void;
 }) {
@@ -404,8 +435,8 @@ function Player({
         }
       }
     };
-    window.history.pushState({ clipPlayer: true }, "");
-    const onPop = () => onClose();
+    if (playerShouldPush(window.history.state)) window.history.pushState({ [PLAYER_HISTORY_STATE]: true }, "");
+    const onPop = () => onPopped();
     window.addEventListener("keydown", onKey);
     window.addEventListener("popstate", onPop);
     return () => {
@@ -413,7 +444,7 @@ function Player({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", onPop);
     };
-  }, [onClose]);
+  }, [onClose, onPopped]);
 
   useEffect(() => {
     if (confirm) keepBtn.current?.focus();

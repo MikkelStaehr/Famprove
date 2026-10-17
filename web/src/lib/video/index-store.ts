@@ -30,6 +30,8 @@ export type ClipIndexEntry = {
   readonly state: ClipState;
   /** false: the row's insert failed, retried on the next open (video-record §8); absent = synced (older entries). */
   readonly synced?: boolean;
+  /** Set when saveClip refused the row for good (PERMANENT_SAVE_REFUSALS): never retried; absent = retry. */
+  readonly syncRefused?: string;
   /** The names at Optag, so a clip with no server row (afbrudt) still shows them; absent on older entries. */
   readonly names?: ClipNameStack;
 };

@@ -156,7 +156,27 @@ export function pendingStars(local: readonly ClipIndexEntry[]): ClipIndexEntry[]
 
 /** Clips whose row insert failed (video-record §8): retried by the cleanup. */
 export function unsyncedClips(local: readonly ClipIndexEntry[]): ClipIndexEntry[] {
-  return local.filter((e) => e.state === "done" && e.synced === false && e.durationS !== null);
+  return local.filter((e) => e.state === "done" && e.synced === false && e.durationS !== null && e.syncRefused === undefined);
+}
+
+/** The player's history entry (video-library §10): pushed once on open, so the back gesture closes it. */
+export const PLAYER_HISTORY_STATE = "clipPlayer";
+
+export function isPlayerEntry(state: unknown): boolean {
+  return typeof state === "object" && state !== null && (state as Record<string, unknown>)[PLAYER_HISTORY_STATE] === true; // history.state is untyped
+}
+
+/**
+ * Luk and Escape: "back" while the player's entry is on top (popstate then closes the player, so the
+ * entry is not left behind); else "close" at once. The back gesture's popstate always just closes.
+ */
+export function playerCloseVia(state: unknown): "back" | "close" {
+  return isPlayerEntry(state) ? "back" : "close";
+}
+
+/** On open: push the entry unless it is already on top (a re-run effect, e.g. React's dev double mount). */
+export function playerShouldPush(state: unknown): boolean {
+  return !isPlayerEntry(state);
 }
 
 /** The cleanup runs once a day (a local timestamp, Copenhagen's date). */

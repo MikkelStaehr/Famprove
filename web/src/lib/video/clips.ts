@@ -4,6 +4,7 @@
  * phone (OPFS, lib/video/opfs.ts); public.video_clips holds only metadata (never frames,
  * landmarks, file names, paths, device info or a hash). Python never reads it.
  */
+import { addDays } from "../dates.ts";
 import type { IsoDate } from "../db/rows.ts";
 
 /** numeric(6,1) with check 0 < duration_s <= 900 in public.video_clips. */
@@ -27,7 +28,22 @@ export type SaveClipInput = {
   readonly durationS: number; // as sent; range-checked by the action after rounding to 0.1 s
 };
 
-export type SaveClipReason = "invalid" | "not_allowed" | "not_today" | "warmup" | "no_set" | "no_exercise" | "duration" | "failed";
+export type SaveClipReason = "invalid" | "not_allowed" | "too_old" | "future" | "warmup" | "no_set" | "no_exercise" | "duration" | "failed";
+
+/**
+ * Refusals a retry can never turn into a save: the phone marks the clip and stops retrying it.
+ * not_allowed (a preview host) and failed (the network, the database) may pass later.
+ */
+export const PERMANENT_SAVE_REFUSALS: ReadonlySet<SaveClipReason> = new Set(["too_old", "warmup", "no_set", "no_exercise", "duration", "invalid"]);
+
+/**
+ * A clip's date against today (both Copenhagen dates): null = savable; "future" after today;
+ * "too_old" before today − KEEP_DAYS (the cleanup's keep, so a row older than that is never kept).
+ */
+export function clipDateAge(date: IsoDate, today: IsoDate): "future" | "too_old" | null {
+  if (date > today) return "future";
+  return date < addDays(today, -KEEP_DAYS) ? "too_old" : null;
+}
 
 export type SaveClipResult =
   | { readonly ok: true; readonly dev: boolean; readonly id: string }

@@ -5,6 +5,7 @@ import { exerciseIdOf } from "../supersets.ts";
 import { localToday } from "../training-view.ts";
 import {
   type DeleteClipResult,
+  clipDateAge,
   KEEP_DAYS,
   recordingAllowed,
   type SaveClipInput,
@@ -29,7 +30,8 @@ import type { ClipNames } from "../video/library-view.ts";
  *  - save: the client sends { id (its uuid), date, sessionNo, row, set, durationS }; exercise_id and
  *    variant_id come from the sheet's row (strength_sets of that ISO week's session) and
  *    public.exercises, never from the client. Refused (no write): recording not allowed on this
- *    host (a preview URL); not today (Copenhagen); a warm-up (set 0); the set not in the session;
+ *    host (a preview URL); a date in the future or older than KEEP_DAYS (Copenhagen; an insert that
+ *    failed is retried on a later day, so an earlier date in the keep is fine); a warm-up (set 0); the set not in the session;
  *    its exercise not in the catalogue; the duration outside 0 < x ≤ 900 s after rounding to 0.1.
  *    One request: insert on conflict (id) do nothing (resolution=ignore-duplicates), so a retry
  *    after a lost reply is the same row and the first insert's recorded_at stands.
@@ -68,7 +70,8 @@ export async function recordClip(input: SaveClipInput, now: Date, options: Video
   const durationS = storedDuration(input.durationS);
   if (durationS === null) return { ok: false, reason: "duration" };
   if (devSwitchOn(env, nodeEnv)) return { ok: true, dev: true, id: input.id }; // nothing is read or written
-  if (input.date !== localToday(now)) return { ok: false, reason: "not_today" };
+  const age = clipDateAge(input.date, localToday(now));
+  if (age !== null) return { ok: false, reason: age };
   try {
     const c = makeClient();
     const [sets, ids] = await Promise.all([sessionSets(c, isoWeekStart(input.date), input.sessionNo), exerciseIds(c)]);

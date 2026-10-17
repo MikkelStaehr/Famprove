@@ -5,7 +5,18 @@ import { cleanupPlan } from "../src/lib/video/cleanup.ts";
 import type { VideoClipRow } from "../src/lib/video/clips.ts";
 import type { ClipIndexEntry } from "../src/lib/video/index-store.ts";
 import { clipsFixture, FIXTURE_NAMES } from "../src/lib/video/library-fixture.ts";
-import { cleanupDue, cleanupLine, clipDay, clipDuration, libraryRows, pendingStars, unsyncedClips, usedBytes } from "../src/lib/video/library-view.ts";
+import {
+  cleanupDue,
+  cleanupLine,
+  clipDay,
+  clipDuration,
+  libraryRows,
+  pendingStars,
+  playerCloseVia,
+  playerShouldPush,
+  unsyncedClips,
+  usedBytes,
+} from "../src/lib/video/library-view.ts";
 
 const today = "2026-10-19";
 
@@ -87,4 +98,22 @@ test("an afbrudt clip has no server row: it shows the name stack stored at Optag
   assert.equal(plain?.variant, null);
   const [older] = libraryRows([base], [], FIXTURE_NAMES); // an entry from before the stack was stored
   assert.equal(older?.exercise, "Optagelse");
+});
+
+test("player history: one entry on open; Luk/Escape go back over it, else close at once", () => {
+  const ours = { clipPlayer: true, __NA: true }; // Next merges its own keys into a pushed state
+  const theirs = { __NA: true };
+  assert.equal(playerShouldPush(theirs), true, "open pushes");
+  assert.equal(playerShouldPush(null), true);
+  assert.equal(playerShouldPush(ours), false, "a re-run effect (a star tap, the dev double mount) pushes nothing");
+  assert.equal(playerCloseVia(ours), "back", "Luk leaves no entry behind");
+  assert.equal(playerCloseVia(theirs), "close", "the entry is gone (popped): close without another back");
+  assert.equal(playerCloseVia(undefined), "close");
+  assert.equal(playerCloseVia({ clipPlayer: "yes" }), "close");
+});
+
+test("a clip refused for good is not retried", () => {
+  const base = { id: "a", setKey: { date: "2026-10-16", sessionNo: 1, row: 30, set: 1 }, ext: "webm", recordedAt: "2026-10-16T10:00:00Z", durationS: 12, starred: false, starSynced: true, state: "done", synced: false } as const;
+  assert.deepEqual(unsyncedClips([base as ClipIndexEntry]).map((e) => e.id), ["a"]);
+  assert.deepEqual(unsyncedClips([{ ...base, syncRefused: "too_old" } as ClipIndexEntry]), []);
 });

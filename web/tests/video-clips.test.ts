@@ -3,7 +3,15 @@ import { test } from "node:test";
 
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
 import { readVideoClips, recordClip, recordStar, removeClip, type VideoClipOptions } from "../src/lib/db/video-clips.ts";
-import { parseDeleteClipInput, parseSaveClipInput, parseStarClipInput, recordingAllowed, type SaveClipInput } from "../src/lib/video/clips.ts";
+import {
+  clipDateAge,
+  parseDeleteClipInput,
+  parseSaveClipInput,
+  parseStarClipInput,
+  PERMANENT_SAVE_REFUSALS,
+  recordingAllowed,
+  type SaveClipInput,
+} from "../src/lib/video/clips.ts";
 
 // --- fake PostgREST ----------------------------------------------------------------------------
 
@@ -137,7 +145,9 @@ test("save: one row with the sheet's exercise and variant, the duration as numer
 
 test("save: refusals write nothing", async () => {
   const cases: [SaveClipInput, string, Record<string, string>?, string?][] = [
-    [input({ date: "2026-10-16" }), "not_today"],
+    [input({ date: "2026-10-18" }), "future"],
+    [input({ date: "2026-08-21" }), "too_old"], // 57 days before 2026-10-17
+    [input({ date: "2026-08-22" }), "no_set"], // 56 days: inside the keep, so the sheet is read (no set that week)
     [input({ set: 0 }), "warmup"],
     [input({ set: 3 }), "no_set"],
     [input({ row: 99 }), "no_set"],
@@ -155,6 +165,23 @@ test("save: refusals write nothing", async () => {
   }
   const db = fakeDb();
   assert.equal((await recordClip(input({ durationS: 900.04 }), NOW, opts(db))).ok, true, "900.04 rounds to 900.0");
+});
+
+test("save: an earlier day inside the keep is saved with its own date and week (a retried insert)", async () => {
+  const db = fakeDb();
+  assert.deepEqual(await recordClip(input({ date: "2026-10-16" }), NOW, opts(db)), { ok: true, dev: false, id: ID });
+  assert.equal(db.tables.video_clips[0].date, "2026-10-16");
+  assert.equal(db.tables.video_clips[0].exercise_id, 11);
+});
+
+test("save: the date window and the permanent refusals", () => {
+  assert.equal(clipDateAge("2026-10-17", "2026-10-17"), null);
+  assert.equal(clipDateAge("2026-10-16", "2026-10-17"), null);
+  assert.equal(clipDateAge("2026-08-22", "2026-10-17"), null);
+  assert.equal(clipDateAge("2026-08-21", "2026-10-17"), "too_old");
+  assert.equal(clipDateAge("2026-10-18", "2026-10-17"), "future");
+  for (const r of ["too_old", "warmup", "no_set", "no_exercise", "duration", "invalid"] as const) assert.ok(PERMANENT_SAVE_REFUSALS.has(r), r);
+  for (const r of ["not_allowed", "failed", "future"] as const) assert.ok(!PERMANENT_SAVE_REFUSALS.has(r), r);
 });
 
 test("recording is allowed on production and in next dev, never on a preview", () => {
