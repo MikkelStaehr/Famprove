@@ -214,6 +214,7 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 | `--text` | #EDE8DF | text, grid level 3, cycling bars, the fitness line, icons, marker |
 | `--text-muted` | #8F897E | secondary text, labels, captions, prognose line, inactive tabs and segments, block brackets |
 | `--today` | #E0612F | **only the today marker**: the today outline in the grid, the `I DAG` caption (week card; Analyse › Cykel's today line). Not on Belastning's fitness curve. Never a fill, never a button, never on the inverse card |
+| `--rec` | #F2555A | **only the recording indicator** (user 2026-10-18, slice `rec-indicator`): the pulsing dot before Fokus's recording counter, nothing else. Part B's one red. Never text, a fill, a button, a border, a chart mark, an error or a warning (those stay `--warning`), never on the inverse card (2.77:1). Always next to the running counter and the word `OPTAGER` |
 | `--warning` | #C9A86A | stale line, `WarningLine`, "Tjek effektdata", flagged VI; always with the warning icon and words |
 | `--focus` | #EDE8DF | 2px focus ring, 2px offset; on `InverseCard` the ring is `--inverse-text` |
 | `--zone-risk` | #D9826B | Risiko |
@@ -225,6 +226,8 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 | `--inverse-text` | #141413 | text on it; the dark button fill on it |
 | `--inverse-muted` | #5C5851 | secondary text and captions on it |
 
+**Recording colour rule** (user 2026-10-18). `--rec` exists only while a clip records and only as the dot; when recording stops the dot goes with the strip. Orange stays only the today marker; the two never meet on one screen state that matters (the recording strip has no today mark). The dot is never the only carrier: the counter runs and `OPTAGER` names it.
+
 **Zone colour rule.** A zone colour is used for: today's form figure, the active `ZoneBar` segment and its label, the `ZonePill` (text + 1px border at 40 % + fill at 8 % of the zone colour) and Træning's form figure. It is also used for the ramp verdict in the fitness curve header (`Falder` neutral, `Sund opbygning` optimal, `Hård opbygning` transition, `For hurtigt` risk; a plain word, never a pill; `fitness-round.md` §1). It is **always next to the zone's word** or the verdict's word (pill, active label, hint sentence or verdict). Inactive `ZoneBar` segments are their zone colour at 30 % opacity (decorative). Zone colours never appear in charts, bars, buttons or tabs.
 
 **Contrast** (computed by `design-lead` 2026-10-14 with the WCAG 2.x formula; `tester` recomputes at render time):
@@ -233,6 +236,7 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 | `--text` | 15.48 | 14.27 | any text |
 | `--text-muted` | 5.44 | 5.02 | any text (≥ 4.5); on `--raised` 4.14: **not for text on a selected segment** |
 | `--today` | 5.33 | 4.91 | the `I DAG` caption (text OK), today line/outline (≥ 3:1) |
+| `--rec` | 5.60 | 5.16 | the recording dot only (≥ 3:1 needed; also ≥ 3:1 at the pulse's lowest opacity 0.7 on `--card`: 3.12). Computed by `design-lead` 2026-10-18; `tester` recomputes at render |
 | `--zone-risk` | 6.62 | 6.10 | text and marks |
 | `--zone-optimal` | 8.99 | 8.28 | text and marks |
 | `--zone-neutral` | 8.67 | 7.99 | text and marks |
@@ -291,6 +295,10 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 ## Space and density
 Compact cards, generous radius. Phone: page padding 20px top / 16px sides, 12px between cards. Card padding: section card 18px (header row 18 18 14 when a chart follows), form card 20px, hero card 22px 20px 16px, half card 16px, tile 14px. Inside a card: 14–18px between groups, 6–10px inside a group, 4px between a caption and its value. `ListRow` padding 10px 0, gap 12px. Desktop: same paddings, 24px grid gap.
 
+**Fokus strip height** `--h-fokus-strip` = 11.1125rem (177.8px, the rest card's measured height on 2026-10-17; replaces the hand-typed `min-h-[11.1125rem]` in `RecordParts.tsx`). Both the rest card and the recording strip use `min-height: var(--h-fokus-strip)`, so they match by construction and the hero card never moves when recording starts or stops. `min-height`, never `height`: at 200 % text both grow instead of clipping. If either's content outgrows it, raise the token, never one card.
+
+**Recording counter** (user 2026-10-18: readable at 3 m, the phone on a stand): `● 0:12` on one row, bottom of the strip's left column. Dot: a 20px CSS disc in `--rec`, `aria-hidden`, vertically centred on the digits, 8px gap. Counter: Geist Mono 600, 64px, line-height 1 (64px), `--text`, tabular, `m:ss` up to `15:00`. Reason: the rule of thumb is ≈ 8 arcmin of digit height for a glance read at a distance (1.6× a 20/20 letter's 5′; digits are familiar shapes): 3 m × tan 8′ ≈ 7 mm; Geist Mono's digits are ≈ 0.7 em, so 64px gives ≈ 45 CSS px ≈ 7 mm on a ~160 CSS-px-per-inch Android phone (rendered height computed by `ui` at render). It is the largest that fits: 390 − 2×16 page − 2×16 card − 88 preview − 12 gap = 226px; dot 20 + gap 8 + `15:00` at 5 × 0.6 em × 64 = 192 → 220px. The counter is `--text` (14.27:1), not red: contrast, not colour, reads at 3 m.
+
 ## Icons
 (Rewritten 2026-10-15, slice `motion-icons`; spec `design/specs/motion-numbers-icons.md`.) **One library: `lucide-react`.** Line icons, 24 viewBox, `fill="none"`, `stroke="currentColor"`, **stroke-width 1.5** (scaled with size, not `absoluteStrokeWidth`), **round caps and joins** (Lucide's; replaces the earlier butt caps). Sizes: 22 (phone tab bar), 20 (desktop tabs, card corners, icon buttons), 18 (`ListRow`, button trailing arrow), 16 (`WarningLine`, chevrons). Always `aria-hidden` next to text; an icon-only button has `aria-label`. `web/src/components/icons.tsx` is the only file that imports Lucide: a name → component map, so call sites use `<Icon name=…>` unchanged.
 - **Lucide map:** bike → `Bike` · arrow-right (Begynd træning) → `ArrowRight` · chevron-left/right/down → `ChevronLeft` / `ChevronRight` / `ChevronDown` · warning → `TriangleAlert` · check → `Check` · arrow-up / arrow-down / arrow-flat (deltas) → `ArrowUp` / `ArrowDown` / `ArrowRight` · arrow-up-right / arrow-down-right (Analyse › Cykel's answer direction) → `ArrowUpRight` / `ArrowDownRight` · x → `X` · minus → `Minus` · plus → `Plus` · refresh (Hent data nu, 16px after the "opdateret" time; spins while fetching) → `RotateCw` · video (2026-10-17, `video-library.md`): play → `Play` · star → `Star` (on = `fill="currentColor"` + `aria-pressed`, the one filled icon) · share → `Share2` · trash → `Trash2`.
@@ -345,6 +353,7 @@ Calm and quick; motion confirms where you are and what changed, never decorates.
 | Segment and tab colour; `<details>` chevron | 120 ms ease-out; 150 ms | | |
 | Button press | opacity 0.85 on `:active`, no scale | | |
 | Skeleton pulse | 1.2 s opacity | | |
+| Recording dot pulse (`--dur-rec-pulse`) | 1.2 s per cycle, infinite, only while recording | `ease-in-out`, opacity 1 → 0.7 → 1 (0.7 keeps ≥ 3:1 on `--card`); no scale, so nothing beside it moves. Reduced motion: no pulse, the dot stays at opacity 1 | `video-record.md` §5, §11 |
 | Rest timer | steps once a second, no transition | | |
 
 - **Sinking page:** darkened by a black scrim at opacity 0.55 × t over the page, never `filter: brightness` (same pixels on a dark page; opacity is cheaper).

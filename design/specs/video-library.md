@@ -17,7 +17,7 @@
 5. The row is one `<button>` (opens the player) except its ★: leading 18px `Play` (muted) | name stack (variant Geist 15/500, exercise name Geist 13 muted under it when a variant is set; never truncated) with MonoCaption 12 muted under it: `lør. 17. okt · sæt 2 · 0:48` | ★ icon button 44 × 44 (`Star`, filled `currentColor` when on, `aria-pressed`, name `Behold altid`). Row sr: `Afspil Squat, sæt 2, 17. oktober, 48 sekunder.`
 6. **★** saves locally at once (< 100ms), then syncs; a failed sync adds `ikke synkroniseret` (MonoCaption 11 muted) to the meta line and retries on the next open.
 7. **Afbrudt** clips (no row): meta `sæt 2 · afbrudt · 0:31`; no ★; Del and Slet in the player.
-8. **fil mangler** (a row with no file, R2): no Play, not a button; meta `fil mangler`; a dark compact **Slet** (44) on the right, no confirm (no video is lost), name `Slet oplysningen om Squat, sæt 2, 17. oktober`. Status after: `Oplysningen er slettet.`
+8. **fil mangler** (a row with no file, R2): no Play, not a button; meta `fil mangler`; a dark compact **Slet** (44) on the right, no confirm (no video is lost), name `Slet oplysningen om Squat, sæt 2, 17. oktober`. Status after: `Oplysningen er slettet.` A failed delete keeps the row and its Slet (the retry) and shows, as a WarningLine next to it: `Klippet blev ikke slettet. Prøv igen.` (user 2026-10-18; replaces `Oplysningen blev ikke slettet. Prøv igen.`)
 9. **Can't record here** (unsupported or a preview host) and no rows: the card is absent. Unsupported with rows: the list shows, plus muted Geist 13 `Denne browser kan ikke optage video.`
 
 ## Player (R1)

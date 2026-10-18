@@ -4,7 +4,7 @@
 
 **Readings (user decides):**
 - R1 Stop **is** the done: while recording, the dock's one light button reads **■ Stop · Sæt 2 udført**. Option: a separate dark Stop next to the done (two taps, and the done is no longer the only primary).
-- R2 No red: the recording mark is a cream disc + the word `OPTAGER` + a running time (Ember spends colour on zones and today only). Option: a new `--rec` red token for the disc (contrast ≥ 3:1 computed by `ui`).
+- R2 Decided (user 2026-10-18, slice `rec-indicator`): the recording disc is the new `--rec` red (DESIGN.md Part B), with the word `OPTAGER` and a running time; `--rec` is used for nothing else.
 - R3 Rear camera (`facingMode: environment`), no switch in phase 1. Option: front camera, or a switch before recording.
 - R4 An "afbrudt" clip is **kept** on the phone (no row, no done), listed in Optagelser with Del and Slet, no ★. Option: discard it.
 
@@ -15,13 +15,13 @@
 
 ## Recording state
 4. **One tap starts.** The button shows `Venter på kamera …` (with the permission prompt on first use) until `MediaRecorder` fires `start`; then the state below appears at once. 720p, 30 fps, no audio; chunks are written to OPFS every second.
-5. **Recording strip** takes the rest strip's slot (Card 22, padding 16; the rest timer stops being shown, nothing is written). Left: label row `OPTAGER` (MonoCaption 13 `--text`, the disc before it) ↔ `SÆT 2 · UDEN LYD` (MonoCaption 13 muted); the running time `text-56` Mono from `0:00`. Right: the **live preview**, a box 88 × 128 (radius 10, 1px `--border`, `--bg` letterbox, `object-fit: contain`, never cropped, not mirrored), `aria-hidden`. The hero card (name, reps, `I DAG` kg) does not move or shrink.
+5. **Recording strip** takes the rest strip's slot (Card 22, padding 16, `min-height: var(--h-fokus-strip)`, the same token as the rest card, DESIGN.md Part B › Space; the rest timer stops being shown, nothing is written). Left: label row `OPTAGER` (MonoCaption 13 `--text`) ↔ `SÆT 2 · UDEN LYD` (MonoCaption 13 muted); under it, at the column's bottom, the **counter** `● 0:12`: a 20px `--rec` disc (`aria-hidden`, 8px gap) and the running time in Geist Mono 600 64px, line-height 1, `--text`, tabular, from `0:00` to `15:00`, readable at 3 m (DESIGN.md Part B › Recording counter). The left column is 12px from the preview. Right: the **live preview**, a box 88 × 128 (radius 10, 1px `--border`, `--bg` letterbox, `object-fit: contain`, never cropped, not mirrored), `aria-hidden`. The hero card (name, reps, `I DAG` kg) does not move or shrink.
 6. **Bigger preview:** the preview is a button (`aria-label="Vis kameraet stort"`); a tap lays it over the hero card at full card width (9:16, at most the hero card's height), a second tap or Escape shrinks it (`Vis kameraet lille`). The dock stays visible.
 7. **Controls while recording:** the dock reads **■ Stop · Sæt 2 udført** (light; an 10px `--inverse-text` CSS square instead of the check). Optag becomes **Annullér optagelse** (dark, `X` icon): stops, keeps the clip as afbrudt (R4), no done. Spring over is hidden. Fortryd's row reads `Stop optagelsen for at fortryde` (muted). The bar is not a button (no chevron) so no jump can move the set under the clip. Afslut stops the clip as afbrudt, then leaves as today.
 8. **Stop = done.** The tap fires the existing done unchanged at the tap's time and stops the recorder in the same tap. The done never waits for the video: the view moves to the next set at once (< 100ms), the file is finalised, then the row is inserted (`id` = the phone's uuid, so a retry is the same row). A failed insert is retried at Træning's next open; the clip shows `ikke synkroniseret` there.
 9. **Limit:** at 15:00 (`duration_s ≤ 900`) the recorder stops by itself; the strip shows `Optagelsen stoppede ved 15:00. Den gemmes med sættet.` and the dock returns to **✓ Sæt 2 udført**.
 10. **Haptics:** `navigator.vibrate?.(30)` once on `start` (confirms it really records). None on stop. The rest-minimum vibration (`fokus-flow.md` §3) is suppressed while recording, so it never shakes the frame; its announcement still fires.
-11. **Motion:** the disc pulses opacity 1 → 0.4 → 1 over 1.2 s, `--ease`; the preview grows in 240ms `--ease`. Under `prefers-reduced-motion` the disc is steady and the preview snaps. Nothing else animates.
+11. **Motion:** the `--rec` disc pulses opacity 1 → 0.7 → 1 over `--dur-rec-pulse` (1.2 s, `ease-in-out`, infinite; 0.7 keeps it ≥ 3:1), only while recording; the preview grows in 240ms `--ease`. Under `prefers-reduced-motion` the disc stays, steady at opacity 1, and the preview snaps. Nothing else animates.
 
 ## Permission, errors
 12. **First use:** the tap goes straight to Chrome's prompt (no pre-screen; the button label says it is waiting).
