@@ -148,3 +148,4 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | video-security | Before video: Permissions-Policy for the camera, a tighter CSP, video files in .gitignore | S |
 | video-record | Record a set in Fokus (Optag / Stop = sæt udført), 720p30 MP4/H.264 or WebM, no audio, OPFS with persist(); only metadata in Supabase | L |
 | video-library | The phone's clips: list, play, star (kept), share via Web Share, keep the last 8 weeks; the used space as a line on Træning | M |
+| rec-indicator | Recording in Fokus: a --rec token (red, only while recording), a pulsing dot and a counter readable at 3 m; reduced motion keeps the dot without the pulse; the strip's height from a token; "Klippet blev ikke slettet. Prøv igen." | S |
