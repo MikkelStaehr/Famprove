@@ -238,7 +238,7 @@ export function RestStrip({
   const line = restBandLine(band, minS, maxS);
   const rail = minS !== null && maxS !== null ? restRail(seconds, minS, maxS) : null;
   return (
-    <section aria-label="Pause" className="flex flex-col rounded-card border border-border bg-card p-4">
+    <section aria-label="Pause" className="flex min-h-(--h-fokus-strip) flex-col rounded-card border border-border bg-card p-4">
       <p className="flex flex-wrap items-baseline justify-between gap-x-3">
         <span className={CAPTION}>Pause</span>
         {advice !== null && <span className="font-mono text-13 text-text-muted">{superset ? `${advice} · superset` : advice}</span>}

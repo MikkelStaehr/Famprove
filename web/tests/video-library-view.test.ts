@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { cleanupPlan } from "../src/lib/video/cleanup.ts";
@@ -11,6 +12,7 @@ import {
   clipDay,
   clipDuration,
   libraryRows,
+  MISSING_DELETE_FAILED,
   pendingStars,
   playerCloseVia,
   playerShouldPush,
@@ -116,4 +118,11 @@ test("a clip refused for good is not retried", () => {
   const base = { id: "a", setKey: { date: "2026-10-16", sessionNo: 1, row: 30, set: 1 }, ext: "webm", recordedAt: "2026-10-16T10:00:00Z", durationS: 12, starred: false, starSynced: true, state: "done", synced: false } as const;
   assert.deepEqual(unsyncedClips([base as ClipIndexEntry]).map((e) => e.id), ["a"]);
   assert.deepEqual(unsyncedClips([{ ...base, syncRefused: "too_old" } as ClipIndexEntry]), []);
+});
+
+test("a fil mangler row's failed delete reads exactly as video-library.md §8 (user 2026-10-18)", () => {
+  assert.equal(MISSING_DELETE_FAILED, "Klippet blev ikke slettet. Prøv igen.");
+  const lib = readFileSync(new URL("../src/components/ClipLibrary.tsx", import.meta.url), "utf8");
+  assert.ok(lib.includes("setStatus(MISSING_DELETE_FAILED)"), "ClipLibrary shows the constant");
+  assert.ok(!lib.includes("Oplysningen blev ikke slettet"), "the replaced wording is gone");
 });

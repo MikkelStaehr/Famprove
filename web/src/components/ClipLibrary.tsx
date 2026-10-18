@@ -22,6 +22,7 @@ import {
   FIRST_ROWS,
   type LibraryRow,
   libraryRows,
+  MISSING_DELETE_FAILED,
   pendingStars,
   PLAYER_HISTORY_STATE,
   playerCloseVia,
@@ -182,7 +183,7 @@ export function ClipLibrary({ today, rows: initialRows, names, canRecord, fixtur
       }
       const r = await tryDeleteClip(row.id);
       if (!r.ok && row.kind === "missing") {
-        setStatus("Oplysningen blev ikke slettet. Prøv igen."); // the row stays
+        setStatus(MISSING_DELETE_FAILED); // the row stays
         return;
       }
       if (!r.ok) {

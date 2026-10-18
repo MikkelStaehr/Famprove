@@ -30,6 +30,7 @@ export const DUR = {
   iconDraw: 650, // the curve
   iconGrow: 500, // the bars, 70 ms apart
   iconStagger: 70,
+  recPulse: 1200, // the recording dot's pulse cycle, ease-in-out, infinite (globals.css --dur-rec-pulse)
 } as const;
 
 /** easeOutQuart: the stack. */

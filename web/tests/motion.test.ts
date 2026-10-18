@@ -38,3 +38,15 @@ test("globals.css carries the same ember curve as lib/motion.ts", () => {
   const norm = (v: string) => v.replace(/\s/g, "").replace(/(^|[(,])0\./g, "$1.");
   assert.equal(norm(m[1]), norm(EASE_EMBER));
 });
+
+test("the recording dot's pulse: DESIGN.md, globals.css and lib/motion.ts agree", () => {
+  const design = readFileSync(new URL("../../DESIGN.md", import.meta.url), "utf-8");
+  const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf-8");
+  const s = `${DUR.recPulse / 1000} s`;
+  assert.ok(new RegExp(`\\(\`--dur-rec-pulse\`\\) \\| ${s.replace(".", "\\.")} per cycle`).test(design), `DESIGN.md: --dur-rec-pulse ${s}`);
+  assert.match(css, new RegExp(`--dur-rec-pulse: ${DUR.recPulse / 1000}s;`));
+  assert.match(css, /\.rec-pulse \{\s*animation: rec-pulse var\(--dur-rec-pulse\) ease-in-out infinite;/);
+  assert.match(css, /@keyframes rec-pulse \{\s*0%, 100% \{ opacity: 1; \}\s*50% \{ opacity: 0\.7; \}/);
+  // Reduced motion: no pulse, the dot steady at opacity 1.
+  assert.match(css, /prefers-reduced-motion: reduce\) \{\s*\.rec-pulse,\s*\.rec-grow \{\s*animation: none;\s*opacity: 1;/);
+});

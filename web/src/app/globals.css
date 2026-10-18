@@ -21,6 +21,9 @@
   /* Always with the warning icon and words. */
   --warning: #c9a86a;
   --focus: #ede8df;
+  /* Only the recording dot before Fokus's recording counter (DESIGN.md "Recording colour rule"):
+     never text, a fill, a button, a border, a chart mark, an error, or on the inverse card. */
+  --rec: #f2555a;
   /* Form zones: always next to the zone's word (DESIGN.md "Zone colour rule"). */
   --zone-risk: #d9826b;
   --zone-optimal: #8fbf8a;
@@ -37,6 +40,11 @@
   /* Phone bottom bar (TabBar): 10px top padding + 6px + the 22px icon + 4px + the 11px label line
      + 6px + max(24px, the home-indicator inset) + the 1px border = 4.5rem + the inset. */
   --bottom-bar: calc(4.5rem + env(safe-area-inset-bottom));
+  /* Fokus strip height (DESIGN.md Space): the min-height of both the rest card and the recording
+     strip, so the hero card never moves when recording starts or stops. min-height, never height. */
+  --h-fokus-strip: 11.1125rem;
+  /* The recording dot's pulse cycle (DESIGN.md Motion; lib/motion.ts DUR.recPulse, motion.test). */
+  --dur-rec-pulse: 1.2s;
 }
 
 @media (min-width: 640px) {
@@ -97,6 +105,7 @@
   --color-today: var(--today);
   --color-warning: var(--warning);
   --color-focus: var(--focus);
+  --color-rec: var(--rec);
   --color-zone-risk: var(--zone-risk);
   --color-zone-optimal: var(--zone-optimal);
   --color-zone-neutral: var(--zone-neutral);
@@ -350,18 +359,19 @@ main:has(> [data-screen="fokus"]) {
   }
 }
 
-/* video-record.md §11: the recording disc pulses 1 → 0.4 → 1 over 1.2 s; the big preview grows in
-   240 ms. Both still under reduced motion (the disc steady, the preview snaps). */
+/* video-record.md §11: the --rec dot pulses opacity 1 → 0.7 → 1 over --dur-rec-pulse (0.7 keeps it
+   ≥ 3:1 on --card; no scale, nothing beside it moves); the big preview grows in 240 ms. Under
+   reduced motion the dot stays steady at opacity 1 and the preview snaps. */
 @keyframes rec-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  50% { opacity: 0.7; }
 }
 @keyframes rec-grow {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: none; }
 }
 .rec-pulse {
-  animation: rec-pulse 1.2s var(--ease-ember) infinite;
+  animation: rec-pulse var(--dur-rec-pulse) ease-in-out infinite;
 }
 .rec-grow {
   animation: rec-grow 240ms var(--ease-ember);
@@ -370,5 +380,18 @@ main:has(> [data-screen="fokus"]) {
   .rec-pulse,
   .rec-grow {
     animation: none;
+    opacity: 1;
   }
+}
+
+/* The recording counter (DESIGN.md Part B "Recording counter", readable at 3 m): Geist Mono 600,
+   64px, line-height 1, --text, tabular. Not a type-scale size: only this counter uses it. */
+@utility rec-counter {
+  font-family: --theme(--font-mono);
+  font-weight: 600;
+  font-size: 4rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
 }

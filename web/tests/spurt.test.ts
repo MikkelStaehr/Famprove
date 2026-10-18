@@ -46,7 +46,7 @@ const THEME_INLINE = vars(block(CSS, CSS.indexOf("@theme inline")));
 const THEME_STATIC = vars(block(CSS, CSS.indexOf("@theme static")));
 
 test("DESIGN.md Part B lists the Ember tokens this test checks", () => {
-  assert.equal(expected.length, 21, `parsed ${expected.length} hex colour tokens`);
+  assert.equal(expected.length, 22, `parsed ${expected.length} hex colour tokens`);
   assert.equal(radii.length, 10, `parsed ${radii.length} radius tokens`); // + stack and sink (motion-shell)
   assert.deepEqual(
     sizes.map((s) => s.px),
@@ -136,6 +136,7 @@ const MARK_PAIRS: readonly (readonly [string, string])[] = [
   ["--focus", "--card"],
   ["--shade-2", "--card"],
   ["--text-muted", "--card"], // secondary button border
+  ["--rec", "--card"], // the recording dot (Part B: also ≥ 3:1 at the pulse's 0.7, checked below)
 ];
 
 test("text ≥ 4.5:1 and marks/focus ≥ 3:1, computed from the token values", () => {
@@ -156,6 +157,14 @@ test("text ≥ 4.5:1 and marks/focus ≥ 3:1, computed from the token values", (
   assert.deepEqual(fails, []);
   // Part B: --today on the inverse card is 2.91:1, so it is forbidden there.
   assert.ok(ratio(hex("--today"), hex("--inverse-bg")) < 3);
+});
+
+test("--rec at the pulse's lowest opacity 0.7 on --card still ≥ 3:1; never on the inverse card", () => {
+  const hex = (name: string) => (ROOT.get(name) ?? "").toLowerCase();
+  const mix = (fg: string, bg: string, a: number) =>
+    `#${[1, 3, 5].map((i) => Math.round(parseInt(fg.slice(i, i + 2), 16) * a + parseInt(bg.slice(i, i + 2), 16) * (1 - a)).toString(16).padStart(2, "0")).join("")}`;
+  assert.ok(ratio(mix(hex("--rec"), hex("--card"), 0.7), hex("--card")) >= 3);
+  assert.ok(ratio(hex("--rec"), hex("--inverse-bg")) < 3); // Part B: 2.77:1, so forbidden there
 });
 
 test("orange is only today: no text, status or zone token resolves to --today", () => {

@@ -255,6 +255,7 @@ Applies to Belastning's fitness curve, training-day grid and daily TSS bars, Cyk
 
 | Token | Face | Use |
 |---|---|---|
+| `rec-counter` 64px (1) | Mono 600, tabular | the recording counter in Fokus ("● 0:12", readable at 3 m; `video-record.md`), the only 64 px text |
 | `text-56` (1) | Mono 500, −0.03em | today's form figure on `/load`; Fokus rest timer, warm-up clock, finished-view counts |
 | `text-48` (1) | Mono 500, −0.03em | Belastning's fitness figure in the curve card header (`fitness-round.md` §1) |
 | `text-44` (1) | Mono 500, −0.03em | Fokus reps and kg figures (`reset-fokus.md`) |

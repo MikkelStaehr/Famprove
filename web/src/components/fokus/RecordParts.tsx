@@ -6,9 +6,14 @@ import { Icon } from "@/components/icons";
 import { clock, DENIED_HELP, DENIED_TITLE, WAITING_LABEL } from "@/lib/video/recording";
 import { CAPTION, FokusWarning, OUTLINED } from "./Instrument";
 
-/** §1: the 8px disc in --text before Optag and OPTAGER (never the ● glyph, never red: R2). */
-export function RecDisc({ pulse = false }: { readonly pulse?: boolean }) {
-  return <span aria-hidden="true" className={`inline-block size-2 shrink-0 rounded-full bg-text ${pulse ? "rec-pulse" : ""}`} />;
+/** §1: the 8px disc in --text before Optag (never the ● glyph, never --rec: R2). */
+export function RecDisc() {
+  return <span aria-hidden="true" className="inline-block size-2 shrink-0 rounded-full bg-text" />;
+}
+
+/** §5/§11: the recording dot, a 20px --rec disc pulsing 1 → 0.7 → 1; the one place --rec is used. */
+function RecDot() {
+  return <span aria-hidden="true" className="rec-pulse inline-block size-5 shrink-0 rounded-full bg-rec" />;
 }
 
 /** §1/§7: Optag (dark, 44px, compact) in the hero card's bottom row; Annullér optagelse while recording. */
@@ -83,19 +88,18 @@ export function RecordStrip({
     <video ref={previewRef} muted playsInline autoPlay aria-hidden="true" className="size-full bg-bg object-contain" />
   );
   return (
-    // acceptance 2: as tall as the rest strip it replaces (caption, timer, rail and band line: 177.8px
-    // at 390px, measured 2026-10-17), so the hero card under it stays put when recording starts.
-    <section aria-label="Optagelse" className="relative flex min-h-[11.1125rem] items-stretch justify-between gap-4 rounded-card border border-border bg-card p-4">
+    // acceptance 2: --h-fokus-strip is the rest card's min-height too, so the hero card under it stays
+    // put when recording starts. §5: the left column is 12px from the preview.
+    <section aria-label="Optagelse" className="relative flex min-h-(--h-fokus-strip) items-stretch justify-between gap-3 rounded-card border border-border bg-card p-4">
       <div className="flex min-w-0 flex-col">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="flex items-center gap-2 font-mono text-13 text-text uppercase">
-            <RecDisc pulse />
-            Optager
-          </span>
+          <span className="font-mono text-13 text-text uppercase">Optager</span>
           <span className={CAPTION}>{`Sæt ${setNo} · uden lyd`}</span>
         </p>
-        <p aria-hidden="true" className="mt-2 font-mono text-56 font-medium tabular-nums">
-          {clock(elapsed)}
+        {/* `● 0:12` at the column's bottom, readable at 3 m (DESIGN.md Recording counter). */}
+        <p aria-hidden="true" className="mt-auto flex items-center gap-2 pt-2">
+          <RecDot />
+          <span className="rec-counter">{clock(elapsed)}</span>
         </p>
       </div>
       <button

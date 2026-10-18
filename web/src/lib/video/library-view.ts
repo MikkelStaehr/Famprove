@@ -149,6 +149,9 @@ export function libraryRows(
 /** The card's first rows (R3: 3, then "Vis alle n"). */
 export const FIRST_ROWS = 3;
 
+/** video-library.md §8: a fil mangler row's failed delete (user 2026-10-18); the row and its Slet stay. */
+export const MISSING_DELETE_FAILED = "Klippet blev ikke slettet. Prøv igen.";
+
 /** Stars saved on the phone the server hasn't confirmed: resent on the next open (§6). */
 export function pendingStars(local: readonly ClipIndexEntry[]): ClipIndexEntry[] {
   return local.filter((e) => e.state === "done" && !e.starSynced);
