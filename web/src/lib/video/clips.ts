@@ -54,10 +54,10 @@ export type StarClipResult =
   | { readonly ok: true; readonly dev: boolean; readonly found: boolean }
   | { readonly ok: false; readonly reason: "invalid" | "failed" };
 
-/** Idempotent: a clip already gone is ok. */
+/** Idempotent: a clip already gone is ok. not_allowed: a preview host (as the other clip actions); the phone retries later. */
 export type DeleteClipResult =
   | { readonly ok: true; readonly dev: boolean }
-  | { readonly ok: false; readonly reason: "invalid" | "failed" };
+  | { readonly ok: false; readonly reason: "invalid" | "not_allowed" | "failed" };
 
 /** public.video_clips, one row per clip. */
 export type VideoClipRow = {

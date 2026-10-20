@@ -12,8 +12,11 @@ import {
   deleteUndoneLine,
   deleteWindowText,
   finishDelete,
+  batchTimers,
+  cleanupRemoveLocal,
   finishDueDeletes,
   markSaved,
+  pendingBatches,
   notPendingDelete,
   savedDeletable,
   secondsLeft,
@@ -93,7 +96,7 @@ test("Fortryd inside the window restores the row, the same file and gemt ✓, wi
   assert.equal((await w.index.get(A))?.savedOut, true);
   assert.equal((await w.index.get(A))?.pendingDelete, undefined);
   assert.deepEqual(await w.files.names(), [`${A}.mp4`]);
-  assert.equal(await finishDelete(w.deps, A, at(20_000)), "done"); // nothing pending: no DELETE
+  assert.equal(await finishDelete(w.deps, A, at(20_000)), "none"); // nothing pending: no DELETE, and the UI does nothing
   assert.deepEqual(w.calls, []);
   assert.deepEqual(await w.files.names(), [`${A}.mp4`]);
 });
@@ -315,4 +318,124 @@ test("lines", () => {
   assert.equal(secondsLeft(deadline, T0.getTime()), 10);
   assert.equal(secondsLeft(deadline, at(9_001).getTime()), 1);
   assert.equal(secondsLeft(deadline, at(10_000).getTime()), 0);
+});
+
+// --- review fixes ------------------------------------------------------------------------------
+
+const C = "6f1c2d3e-4a5b-4c6d-8e7f-0123456789ad";
+
+/** A fake clock for batchTimers: run() fires every timer due by `to`. */
+function fakeTimers() {
+  let next = 1;
+  const due = new Map<number, { at: number; fn: () => void }>();
+  let nowMs = 0;
+  return {
+    api: {
+      setTimeout: (fn: () => void, ms: number) => {
+        const h = next++;
+        due.set(h, { at: nowMs + ms, fn });
+        return h;
+      },
+      clearTimeout: (h: unknown) => void due.delete(h as number),
+    },
+    set now(v: number) {
+      nowMs = v;
+    },
+    run(to: number) {
+      nowMs = to;
+      for (const [h, t] of [...due]) {
+        if (t.at > to) continue;
+        due.delete(h);
+        t.fn();
+      }
+    },
+    count: () => due.size,
+  };
+}
+
+test("a batch of 3, a reload inside the window, the deadline: one timer finishes all 3", async () => {
+  const w = await world([entry(A, { savedOut: true }), entry(B, { savedOut: true }), entry(C, { savedOut: true })]);
+  await startDelete(w.deps, [A, B, C], "b3", T0);
+  // reload at +4 s: a new view of the same stores
+  const due = await finishDueDeletes(w.deps, at(4_000));
+  assert.deepEqual(due.pending.map((e) => e.id), [A, B, C]);
+  const batches = pendingBatches(due.pending);
+  assert.deepEqual(batches, [{ batch: "b3", ids: [A, B, C], deadline: at(DELETE_UNDO_MS).toISOString() }]);
+  const clock = fakeTimers();
+  clock.now = at(4_000).getTime();
+  const finishing: Promise<unknown>[] = [];
+  const timers = batchTimers(clock.api, (_batch, ids) => {
+    finishing.push(Promise.all(ids.map((id) => finishDelete(w.deps, id, at(DELETE_UNDO_MS + 50)))));
+  });
+  for (const b of batches) timers.schedule(b.batch, b.ids, b.deadline, at(4_000).getTime());
+  assert.equal(clock.count(), 1);
+  clock.run(at(DELETE_UNDO_MS + 50).getTime());
+  assert.deepEqual(await Promise.all(finishing), [["done", "done", "done"]]);
+  assert.deepEqual(w.calls, [A, B, C]);
+  assert.deepEqual(await w.index.all(), []);
+  assert.deepEqual(await w.files.names(), []);
+});
+
+test("scheduling a batch's clips one at a time never cancels the earlier ones", () => {
+  const clock = fakeTimers();
+  const fired: string[][] = [];
+  const timers = batchTimers(clock.api, (_b, ids) => fired.push([...ids]));
+  for (const id of [A, B, C]) timers.schedule("b3", [id], at(DELETE_UNDO_MS).toISOString(), T0.getTime());
+  clock.run(at(DELETE_UNDO_MS + 50).getTime());
+  assert.deepEqual(fired, [[A, B, C]]);
+  timers.schedule("b4", [A], at(DELETE_UNDO_MS).toISOString(), T0.getTime());
+  timers.cancel("b4");
+  timers.schedule("b5", [B], at(DELETE_UNDO_MS).toISOString(), T0.getTime());
+  timers.clearAll();
+  clock.run(at(60_000).getTime());
+  assert.deepEqual(fired, [[A, B, C]]);
+});
+
+test("Fortryd just before the finish: the finish returns none and deletes nothing", async () => {
+  const w = await world([entry(A)]);
+  await startDelete(w.deps, [A], "b1", T0);
+  const [back, fin] = await Promise.all([undoDelete(w.deps, [A], "b1", at(DELETE_UNDO_MS - 1)), finishDelete(w.deps, A, at(DELETE_UNDO_MS + 50))]);
+  assert.equal(back.length, 1);
+  assert.equal(fin, "none");
+  assert.deepEqual(w.calls, []);
+  assert.deepEqual(await listed(w), [A]);
+  assert.deepEqual(await w.files.names(), [`${A}.mp4`]);
+});
+
+test("the finish just before Fortryd: done, and the Fortryd restores nothing", async () => {
+  const w = await world([entry(A)]);
+  await startDelete(w.deps, [A], "b1", T0);
+  const [fin, back] = await Promise.all([finishDelete(w.deps, A, at(DELETE_UNDO_MS + 50)), undoDelete(w.deps, [A], "b1", at(DELETE_UNDO_MS - 1))]);
+  assert.equal(fin, "done");
+  assert.deepEqual(back, []);
+  assert.deepEqual(w.calls, [A]);
+  assert.deepEqual(await w.index.all(), []);
+});
+
+test("a ★ set after the render refuses the mark (starred) unless confirmed", async () => {
+  const w = await world([entry(A), entry(B)]);
+  await w.index.put({ ...entry(A), starred: true }); // the star lands between the render and the tap
+  const r = await startDelete(w.deps, [A, B], "b1", T0);
+  assert.deepEqual(r.starred, [A]);
+  assert.deepEqual(r.marked.map((e) => e.id), [B]);
+  assert.equal((await w.index.get(A))?.pendingDelete, undefined);
+  const ok = await startDelete(w.deps, [A], "b2", T0, { allowStarred: true }); // Slet alligevel
+  assert.deepEqual(ok.starred, []);
+  assert.equal((await w.index.get(A))?.pendingDelete?.batch, "b2");
+});
+
+test("the cleanup's local delete runs under the clip's lock and skips a pending delete or a ★", async () => {
+  const w = await world([entry(A), entry(B), entry(C, { starred: true })]);
+  await startDelete(w.deps, [B], "b1", T0);
+  assert.equal(await cleanupRemoveLocal(w.deps, A), true);
+  assert.equal(await cleanupRemoveLocal(w.deps, B), false); // the delete path's
+  assert.equal(await cleanupRemoveLocal(w.deps, C), false);
+  assert.equal(await cleanupRemoveLocal(w.deps, A), false); // already gone
+  assert.equal(await w.index.get(A), null);
+  assert.deepEqual((await w.files.names()).sort(), [`${B}.mp4`, `${C}.mp4`]);
+  // a mark taken while the cleanup waits for the lock wins
+  const marking = startDelete(w.deps, [C], "b2", T0, { allowStarred: true });
+  const cleaning = cleanupRemoveLocal(w.deps, C);
+  await marking;
+  assert.equal(await cleaning, false);
 });

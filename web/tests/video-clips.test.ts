@@ -243,6 +243,15 @@ test("delete: one DELETE, idempotent", async () => {
   assert.equal(db.tables.video_clips.length, 0);
 });
 
+test("delete: refused on a preview host, nothing sent", async () => {
+  const db = fakeDb();
+  await recordClip(input(), NOW, opts(db));
+  const before = db.requests;
+  assert.deepEqual(await removeClip({ id: ID }, opts(db, { VERCEL_ENV: "preview" })), { ok: false, reason: "not_allowed" });
+  assert.equal(db.requests, before);
+  assert.equal(db.tables.video_clips.length, 1);
+});
+
 test("dev switches write nothing", async () => {
   const db = fakeDb();
   const dev = opts(db, { DEV_TODAY: "2026-10-01" }, "development");

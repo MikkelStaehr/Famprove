@@ -237,6 +237,7 @@ export async function recordClipAuto(input: SetClipAutoInput, options: VideoClip
 
 export async function removeClip(input: { readonly id: string }, options: VideoClipOptions = {}): Promise<DeleteClipResult> {
   const { env = process.env, nodeEnv = process.env.NODE_ENV, client: makeClient = client } = options;
+  if (!recordingAllowed(env, nodeEnv)) return { ok: false, reason: "not_allowed" }; // a preview host, as the other clip actions
   if (devSwitchOn(env, nodeEnv)) return { ok: true, dev: true };
   try {
     await write(makeClient(), TABLE, "DELETE", { params: [["id", `eq.${input.id}`]] });

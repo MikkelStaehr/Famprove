@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 
 import { deleteClip, saveClip, starClip, trimClip } from "@/app/actions";
 import {
+  batchTimers,
+  cleanupRemoveLocal,
   DELETE_ANNOUNCE,
   type DeleteDeps,
   deleteDoneLine,
@@ -16,6 +18,7 @@ import {
   finishDueDeletes,
   markSaved,
   notPendingDelete,
+  pendingBatches,
   savedDeletable,
   secondsLeft as deleteSecondsLeft,
   shareMarksSaved,
@@ -232,7 +235,15 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   /** clip-delete §3: the delete line (a Fortryd window, or its outcome); null = none. */
   const [delLine, setDelLine] = useState<DelLine | null>(null);
   const [nowMs, setNowMs] = useState(0);
-  const deleteTimers = useRef(new Map<string, number>());
+  /** clip-delete: one finish timer per batch (a reload or the page visible again re-arms them grouped by batch). */
+  const deleteTimersRef = useRef<ReturnType<typeof batchTimers> | null>(null);
+  const delTimers = useCallback(() => {
+    deleteTimersRef.current ??= batchTimers(
+      { setTimeout: (fn, ms) => window.setTimeout(fn, ms), clearTimeout: (h) => window.clearTimeout(h as number) }, // the handle is setTimeout's number
+      (batch, ids) => void finishDeleteRef.current(batch, ids),
+    );
+    return deleteTimersRef.current;
+  }, []);
   const currentBatch = useRef<string | null>(null);
   /** clip-delete §3 Focus: where focus goes when the player closes after Slet (a row id, "heading"); null = the opener. */
   const focusAfter = useRef<string | null>(null);
@@ -291,7 +302,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         setDelLine({ kind: "text", text: deleteFailedLine(dueDeletes.failed.length) });
         setStatus(deleteFailedLine(dueDeletes.failed.length));
       }
-      for (const e of dueDeletes.pending) if (e.pendingDelete !== undefined) scheduleDeleteRef.current(e.pendingDelete.batch, [e.id], e.pendingDelete.deadline); // a reload inside the window: hidden, finished at its deadline, no Fortryd
+      for (const b of pendingBatches(dueDeletes.pending)) delTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime()); // a reload inside the window: hidden, one timer per batch finishes all its clips at the deadline, no Fortryd
       let entries = await s.index.all();
       // Retries: unsynced clips (video-record §8) and unconfirmed stars (§6), then the daily cleanup.
       for (const e of notPendingDelete(unsyncedClips(entries))) {
@@ -306,15 +317,16 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       const last = window.localStorage.getItem(CLEANUP_KEY);
       if (initialRows !== null && cleanupDue(last, today)) {
         const plan = cleanupPlan(entries, initialRows, new Date());
+        const removed: string[] = [];
         for (const e of notPendingDelete(plan.deleteLocal)) {
-          for (const f of clipFiles(e)) await s.files.removeFile(f);
-          await s.index.remove(e.id);
+          if (!(await cleanupRemoveLocal(s, e.id))) continue; // under the clip's lock: a delete or cut in flight wins
+          removed.push(e.id);
           await tryDeleteClip(e.id); // a failed row is tomorrow's deleteServerOnly; the cleanup goes on
         }
         for (const id of plan.deleteServerOnly) await tryDeleteClip(id);
-        const gone = new Set([...notPendingDelete(plan.deleteLocal).map((e) => e.id), ...plan.deleteServerOnly, ...dueDeletes.finished]);
+        const gone = new Set([...removed, ...plan.deleteServerOnly, ...dueDeletes.finished]);
         setRows(initialRows.filter((r) => !gone.has(r.id)));
-        setCleaned(notPendingDelete(plan.deleteLocal).length);
+        setCleaned(removed.length);
         window.localStorage.setItem(CLEANUP_KEY, today);
       }
       entries = await s.index.all();
@@ -327,7 +339,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       console.error("optagelser: reading the clip index failed", error);
       setLocal({ kind: "error" });
     }
-  }, [fixture, initialRows, today]);
+  }, [fixture, initialRows, today, delTimers]);
 
   useEffect(() => {
     const t = setTimeout(() => setSlowLoad(true), 300);
@@ -403,7 +415,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           deps: browserAutoDeps,
         });
         setRunning(null);
-        recordRun(browserStore(), r.id, out, Date.now());
+        recordRun(browserStore(), r.id, out, new Date().getTime());
         if (out.kind === "aborted" && !ctrl.signal.aborted) {
           // clip-auto-3: a hidden page aborts the run (nothing written; the pickup's own abort is the
           // only other cause, excluded above); the same clip again once visible, even if the page is
@@ -508,20 +520,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     trimTimers.current.set(id, window.setTimeout(() => void finishRef.current(id), ms));
   });
 
-  /** clip-delete: one finish timer per batch, at its deadline. */
-  const scheduleDeleteRef = useRef((batch: string, ids: readonly string[], deadline: string) => {
-    const old = deleteTimers.current.get(batch);
-    if (old !== undefined) window.clearTimeout(old);
-    const ms = Math.max(0, Date.parse(deadline) - new Date().getTime()) + 50;
-    deleteTimers.current.set(batch, window.setTimeout(() => void finishDeleteRef.current(batch, ids), ms));
-  });
-  useEffect(() => {
-    const timers = deleteTimers.current;
-    return () => {
-      for (const t of timers.values()) window.clearTimeout(t); // the next load's finishDueDeletes finishes them
-      timers.clear();
-    };
-  }, []);
+  useEffect(() => () => delTimers().clearAll(), [delTimers]); // unmount: the next load's finishDueDeletes finishes them
   // §3: Fortryd's text countdown (10 → 1) while a window is open.
   const windowOpen = delLine?.kind === "window";
   useEffect(() => {
@@ -530,13 +529,15 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     return () => window.clearInterval(t);
   }, [windowOpen]);
 
-  // §3 lifecycle: the finish timers go on unmount and while hidden; visible again re-arms every
-  // pending window (past its deadline it finishes at once); a next mount's finishDueTrims covers the rest.
+  // §3 lifecycle (cuts and deletes alike): the finish timers go on unmount and while hidden; visible
+  // again re-arms every pending window from the index (past its deadline it finishes at once; deletes
+  // one timer per batch); a next mount's finishDueTrims / finishDueDeletes covers the rest.
   useEffect(() => {
     const timers = trimTimers.current;
     const clearAll = () => {
       for (const t of timers.values()) window.clearTimeout(t);
       timers.clear();
+      delTimers().clearAll();
     };
     const onVis = () => {
       if (document.visibilityState === "hidden") {
@@ -547,6 +548,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       if (s === null) return;
       void s.index.all().then((all) => {
         for (const e of all) if (e.pendingTrim !== undefined) scheduleFinishRef.current(e.id, e.pendingTrim.deadline);
+        for (const b of pendingBatches(all)) delTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime());
       });
     };
     document.addEventListener("visibilitychange", onVis);
@@ -554,7 +556,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       document.removeEventListener("visibilitychange", onVis);
       clearAll();
     };
-  }, []);
+  }, [delTimers]);
 
   /** §2.3 Gem klip: startTrim; done updates the row (new file, length, no stored range) and times the finish. */
   async function runTrim(id: string, inS: number, outS: number): Promise<StartTrimResult> {
@@ -622,7 +624,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     let failedCuts = 0;
     let preparing: string | null = null;
     const sentIds: string[] = [];
-    setDelLine(null);
+    setDelLine((l) => (l?.kind === "window" ? l : null)); // an open Fortryd stays (its own slot); only an old outcome line goes
     const result: SaveResult = await saveSequence(clips, {
       read: async (id) => {
         if (fixture !== null) return new Blob([]);
@@ -692,18 +694,24 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     }, 0);
   }
 
-  /** Slet (one clip) and Slet gemte (a batch): mark, hide, open Fortryd's window, time the finish. */
-  async function startDeleteRows(targets: readonly LibraryRow[], viaPlayer: boolean) {
+  /**
+   * Slet (one clip) and Slet gemte (a batch): mark, hide, open Fortryd's window, time the finish.
+   * "starred": nothing marked because ★ was set after the render (the player then shows its confirm).
+   */
+  async function startDeleteRows(targets: readonly LibraryRow[], viaPlayer: boolean, allowStarred = false): Promise<"started" | "starred" | "none"> {
     const deps = deleteDeps();
     const s = store.current;
-    if (deps === null || s === null || targets.length === 0) return;
+    if (deps === null || s === null || targets.length === 0) return "none";
     const ids = targets.map((r) => r.id);
     const focus = focusTargetAfter(new Set(ids));
     if (viaPlayer) focusAfter.current = focus;
     const batch = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${new Date().toISOString()}-${ids.join(",")}`;
-    const { marked, deadline } = await startDelete(deps, ids, batch, new Date());
+    const { marked, starred, deadline } = await startDelete(deps, ids, batch, new Date(), { allowStarred });
     setLocal({ kind: "ready", entries: await s.index.all() });
-    if (marked.length === 0) return;
+    if (marked.length === 0) {
+      if (viaPlayer) focusAfter.current = null;
+      return starred.length > 0 ? "starred" : "none";
+    }
     const first = targets.find((r) => r.id === marked[0]?.id) ?? targets[0];
     const label = first === undefined ? "" : `${shownName(first)} · sæt ${first.set}`;
     currentBatch.current = batch;
@@ -711,8 +719,9 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     setNowMs(new Date().getTime());
     setDelLine({ kind: "window", batch, ids: marked.map((e) => e.id), deadline, count: marked.length, label });
     setStatus(DELETE_ANNOUNCE);
-    scheduleDeleteRef.current(batch, marked.map((e) => e.id), deadline);
+    delTimers().schedule(batch, marked.map((e) => e.id), deadline, new Date().getTime());
     if (!viaPlayer) focusClip(focus);
+    return "started";
   }
 
   /** Fortryd: the batch's marks go (no server write); focus to the first restored row. */
@@ -722,9 +731,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     if (deps === null || s === null) return;
     const restored = await undoDelete(deps, line.ids, line.batch, new Date());
     if (restored.length === 0) return; // the window closed first: the finish goes on
-    const t = deleteTimers.current.get(line.batch);
-    if (t !== undefined) window.clearTimeout(t);
-    deleteTimers.current.delete(line.batch);
+    delTimers().cancel(line.batch);
     setLocal({ kind: "ready", entries: await s.index.all() });
     const text = deleteUndoneLine(restored.length, line.label);
     setDelLine({ kind: "text", text });
@@ -735,21 +742,23 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
 
   /** At 0: finishDelete per clip (DELETE → files → entry), then the frigjort or failure line. */
   async function finishDeleteBatch(batch: string, ids: readonly string[]) {
-    deleteTimers.current.delete(batch);
     const deps = deleteDeps();
     const s = store.current;
     if (deps === null || s === null) return;
     const done: string[] = [];
+    const waiting: ClipIndexEntry[] = [];
     let failed = 0;
     for (const id of ids) {
       const r = await finishDelete(deps, id, new Date());
       if (r === "done") done.push(id);
       else if (r === "failed") failed += 1;
-      else {
+      else if (r === "waiting") {
         const e = await s.index.get(id);
-        if (e?.pendingDelete !== undefined) scheduleDeleteRef.current(batch, [id], e.pendingDelete.deadline);
-      }
+        if (e !== null) waiting.push(e);
+      } // "none": a Fortryd landed first; the clip is listed again and its line stays
     }
+    for (const b of pendingBatches(waiting)) delTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime()); // once for the batch
+    if (done.length === 0 && failed === 0) return;
     const gone = new Set(done);
     const freed = done.reduce<number | null>((sum, id) => {
       const b = sizesRef.current[id];
@@ -922,7 +931,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
             <p className="font-sans text-13 text-text-muted">{delLine.text}</p>
           ) : null}
           <p role="status" className="font-sans text-13 text-text-muted empty:hidden">
-            {delLine === null ? saveLine : ""}
+            {saveLine}
           </p>
         </div>
       )}
@@ -1006,10 +1015,12 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           onPopped={close}
           onStar={() => void toggleStar(open)}
           onSaved={() => void markSavedNow([open.id])}
-          onDelete={() => {
-            void startDeleteRows([openRow], true);
+          onDelete={async (allowStarred) => {
+            const r = await startDeleteRows([openRow], true, allowStarred);
+            if (r === "starred") return "starred"; // ★ set after the render: the player shows its confirm
             opener.current = null;
             requestClose();
+            return "started";
           }}
         />
       )}
@@ -1173,7 +1184,8 @@ function Player({
   readonly onStar: () => void;
   /** clip-delete §2: Gem handed the file over, or a share resolved: `gemt ✓`. */
   readonly onSaved: () => void;
-  readonly onDelete: () => void;
+  /** Slet (allowStarred: Slet alligevel); "starred": refused, a ★ landed after the render. */
+  readonly onDelete: (allowStarred: boolean) => Promise<"started" | "starred">;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -1576,7 +1588,7 @@ function Player({
           <>
             <p className="font-sans text-14 text-text">Denne video er markeret Behold altid. Slet den alligevel?</p>
             <div className="flex gap-2">
-              <button type="button" className={DARK_BTN} onClick={onDelete}>
+              <button type="button" className={DARK_BTN} onClick={() => void onDelete(true)}>
                 Slet alligevel
               </button>
               <button ref={keepBtn} type="button" className={`min-h-11 px-3 font-sans text-14 text-text underline-offset-4 hover:underline ${BTN}`} onClick={() => setConfirm(false)}>
@@ -1660,7 +1672,7 @@ function Player({
                   {server === null ? "Klip" : editLabel(server, auto)}
                 </button>
               )}
-              <button type="button" data-clip-delete="" className={DARK_BTN} onClick={() => (row.starred ? setConfirm(true) : onDelete())}>
+              <button type="button" data-clip-delete="" className={DARK_BTN} onClick={() => (row.starred ? setConfirm(true) : void onDelete(false).then((r) => r === "starred" && setConfirm(true)))}>
                 <Icon name="trash" size={18} />
                 Slet
               </button>

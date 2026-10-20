@@ -32,26 +32,34 @@ function withoutDelete(entry: ClipIndexEntry): ClipIndexEntry {
   return copy;
 }
 
-/** Slet (one clip, or Slet gemte's batch): mark each entry; returns the marked ones (an id without an entry is skipped). */
+/**
+ * Slet (one clip, or Slet gemte's batch): mark each entry; returns the marked ones (an id without an
+ * entry is skipped). ★ is rechecked under the lock: a starred clip is refused (`starred`) unless the
+ * user confirmed it (`allowStarred`, the player's Slet alligevel), so a star added after the render wins.
+ */
 export async function startDelete(
   deps: Pick<DeleteDeps, "index" | "lock">,
   ids: readonly string[],
   batch: string,
   now: Date,
-): Promise<{ readonly marked: ClipIndexEntry[]; readonly deadline: string }> {
+  opts: { readonly allowStarred?: boolean } = {},
+): Promise<{ readonly marked: ClipIndexEntry[]; readonly starred: string[]; readonly deadline: string }> {
   const deadline = new Date(now.getTime() + DELETE_UNDO_MS).toISOString();
   const marked: ClipIndexEntry[] = [];
+  const starred: string[] = [];
   for (const id of ids) {
-    const e = await lockOf(deps)(id, {}, async () => {
+    const e = await lockOf(deps)(id, {}, async (): Promise<ClipIndexEntry | "starred" | null> => {
       const entry = await deps.index.get(id);
       if (entry === null || entry.state === "recording" || entry.pendingDelete !== undefined) return null;
+      if (entry.starred && opts.allowStarred !== true) return "starred";
       const next: ClipIndexEntry = { ...entry, pendingDelete: { deadline, batch } };
       await deps.index.put(next);
       return next;
     });
-    if (e !== null) marked.push(e);
+    if (e === "starred") starred.push(id);
+    else if (e !== null) marked.push(e);
   }
-  return { marked, deadline };
+  return { marked, starred, deadline };
 }
 
 /** Fortryd: clears the batch's marks while its window is open; returns the restored entries (empty = expired or gone). */
@@ -71,8 +79,12 @@ export async function undoDelete(deps: Pick<DeleteDeps, "index" | "lock">, ids: 
   return restored;
 }
 
-/** done: gone (or nothing was pending); waiting: inside the window; failed: the DELETE failed, everything stays for the next load. */
-export type FinishDeleteResult = "done" | "waiting" | "failed";
+/**
+ * done: gone (now, or its entry already was); none: the entry has no pending-delete mark (a Fortryd
+ * landed first), so the caller does nothing; waiting: inside the window; failed: the DELETE failed,
+ * everything stays for the next load.
+ */
+export type FinishDeleteResult = "done" | "none" | "waiting" | "failed";
 
 /** At 0: (a) deleteClip, (b) the files, (c) the entry last. Under the clip's lock, reading the entry there. */
 export function finishDelete(deps: DeleteDeps, id: string, now: Date): Promise<FinishDeleteResult> {
@@ -80,7 +92,8 @@ export function finishDelete(deps: DeleteDeps, id: string, now: Date): Promise<F
     try {
       const entry = await deps.index.get(id);
       const p = entry?.pendingDelete;
-      if (entry === null || p === undefined) return "done";
+      if (entry === null) return "done";
+      if (p === undefined) return "none";
       if (now.getTime() < Date.parse(p.deadline)) return "waiting";
       let r: DeleteClipResult;
       try {
@@ -111,9 +124,75 @@ export async function finishDueDeletes(
     const r = await finishDelete(deps, e.id, now);
     if (r === "done") finished.push(e.id);
     else if (r === "failed") failed.push(e.id);
-    else pending.push(e);
+    else if (r === "waiting") pending.push(e); // "none": a Fortryd landed first
   }
   return { finished, failed, pending };
+}
+
+/** One batch's pending deletes (a reload, or the page visible again, re-arms one timer per batch). */
+export type DeleteBatch = { readonly batch: string; readonly ids: readonly string[]; readonly deadline: string };
+
+/** The pending deletes grouped by batch, in the entries' order; a batch's deadline is its latest. */
+export function pendingBatches(entries: readonly ClipIndexEntry[]): DeleteBatch[] {
+  const by = new Map<string, { ids: string[]; deadline: string }>();
+  for (const e of entries) {
+    const p = e.pendingDelete;
+    if (p === undefined) continue;
+    const b = by.get(p.batch);
+    if (b === undefined) by.set(p.batch, { ids: [e.id], deadline: p.deadline });
+    else {
+      b.ids.push(e.id);
+      if (Date.parse(p.deadline) > Date.parse(b.deadline)) b.deadline = p.deadline;
+    }
+  }
+  return [...by].map(([batch, b]) => ({ batch, ids: b.ids, deadline: b.deadline }));
+}
+
+export type TimerApi = { readonly setTimeout: (fn: () => void, ms: number) => unknown; readonly clearTimeout: (handle: unknown) => void };
+
+/**
+ * One finish timer per batch, at its deadline (+50 ms). Scheduling a batch again keeps the clips it
+ * already holds (a clip scheduled on its own never cancels its batch-mates); cancel and clearAll drop them.
+ */
+export function batchTimers(api: TimerApi, finish: (batch: string, ids: readonly string[]) => void) {
+  const timers = new Map<string, { readonly handle: unknown; readonly ids: ReadonlySet<string> }>();
+  return {
+    schedule(batch: string, ids: readonly string[], deadline: string, nowMs: number): void {
+      const old = timers.get(batch);
+      if (old !== undefined) api.clearTimeout(old.handle);
+      const all = new Set([...(old?.ids ?? []), ...ids]);
+      const ms = Math.max(0, Date.parse(deadline) - nowMs) + 50;
+      const handle = api.setTimeout(() => {
+        timers.delete(batch);
+        finish(batch, [...all]);
+      }, ms);
+      timers.set(batch, { handle, ids: all });
+    },
+    cancel(batch: string): void {
+      const t = timers.get(batch);
+      if (t !== undefined) api.clearTimeout(t.handle);
+      timers.delete(batch);
+    },
+    clearAll(): void {
+      for (const t of timers.values()) api.clearTimeout(t.handle);
+      timers.clear();
+    },
+  };
+}
+
+/**
+ * The 8-week cleanup's local delete of one clip, under the clip's lock: reread there, skipped when the
+ * entry is gone, pending a delete (the delete path's) or starred; else its files, then the entry.
+ * Returns true when it removed the clip (the caller then deletes the server row).
+ */
+export function cleanupRemoveLocal(deps: Pick<DeleteDeps, "index" | "files" | "lock">, id: string): Promise<boolean> {
+  return lockOf(deps)(id, {}, async () => {
+    const entry = await deps.index.get(id);
+    if (entry === null || entry.pendingDelete !== undefined || entry.starred) return false;
+    for (const f of clipFiles(entry)) await deps.files.removeFile(f);
+    await deps.index.remove(id);
+    return true;
+  });
 }
 
 /** `gemt ✓`'s setter (Gem, Gem alle, a resolved share; the fixture uses it too). Under the lock, so a cut's put keeps it. */
