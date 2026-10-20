@@ -32,11 +32,7 @@ async function keyframeTest(devices: readonly MediaDeviceInfo[], run: DiagResour
   if (device === undefined) return null;
   let stream: MediaStream;
   try {
-    stream = await withTimeout(
-      navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: device.deviceId }, width: { ideal: 960 }, height: { ideal: 720 } }, audio: false }),
-      10_000,
-      "getUserMedia",
-    );
+    stream = await openCamera({ deviceId: { exact: device.deviceId }, width: { ideal: 960 }, height: { ideal: 720 } });
   } catch {
     return run.released ? null : { line: "Afstanden kunne ikke måles.", warning: null };
   }
@@ -91,6 +87,20 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   });
 }
 
+/** One camera, video only, with a timeout; a stream that arrives after it is stopped at once, so no lens stays on (security, 2026-10-20). */
+async function openCamera(video: MediaTrackConstraints): Promise<MediaStream> {
+  const asked = navigator.mediaDevices.getUserMedia({ video, audio: false });
+  try {
+    return await withTimeout(asked, 10_000, "getUserMedia");
+  } catch (error) {
+    asked.then(
+      (late) => late.getTracks().forEach((t) => t.stop()),
+      () => undefined,
+    );
+    throw error;
+  }
+}
+
 async function tryConstraints(track: MediaStreamTrack, c: MediaTrackConstraints): Promise<DiagOutcome> {
   try {
     await withTimeout(track.applyConstraints(c), 5000, "applyConstraints");
@@ -139,15 +149,9 @@ type Phase =
 /** One camera, opened alone by deviceId; its tracks are stopped before this returns. */
 async function testCamera(device: MediaDeviceInfo, index: number, res: DiagResources): Promise<Shown | null> {
   let stream: MediaStream;
-  const asked = navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: device.deviceId } }, audio: false });
   try {
-    stream = await withTimeout(asked, 10_000, "getUserMedia");
+    stream = await openCamera({ deviceId: { exact: device.deviceId } });
   } catch (error) {
-    // A stream that arrives after the timeout is stopped at once, so no lens stays on (security, 2026-10-20).
-    asked.then(
-      (late) => late.getTracks().forEach((t) => t.stop()),
-      () => undefined,
-    );
     const failed: DiagOutcome = { ok: false, error: errorText(error) };
     return { index, label: device.label, open: failed, capabilities: null, otherCapabilities: [], tries: [], zoomMin: null, shot: null, shotUrl: null };
   }

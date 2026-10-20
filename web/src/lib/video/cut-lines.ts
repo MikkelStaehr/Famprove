@@ -60,7 +60,9 @@ export async function prepareClip(blob: Blob, name: string, cut: CutRange, cutFn
   try {
     const r = await cutFn(blob, cut.range.inS, cut.range.outS);
     return { kind: "cut", blob: r.blob, name: cutFileName(name), actual: r.actual };
-  } catch {
+  } catch (error) {
+    // On the phone's own console only: why the cut fell back to the whole video (no file name in it).
+    console.warn("Klip lykkedes ikke:", error instanceof Error ? error.message : String(error));
     return { kind: "failed", blob, name };
   }
 }
@@ -86,6 +88,12 @@ export function busyText(cut: CutRange): string {
 export function splitCount(sent: number, cut: number): string | null {
   if (cut === 0 || cut === sent) return null;
   return `${sent} klip sendt til Downloads: ${cut} klippet, ${sent - cut} hele videoen.`;
+}
+
+/** Gem alle: the clips whose cut failed and went whole, said also when all failed or there was one (review 2026-10-20). */
+export function failedCutsLine(failed: number): string | null {
+  if (failed === 0) return null;
+  return `Klippet lykkedes ikke for ${failed} klip: ${failed === 1 ? "hele videoen" : "hele videoerne"} er sendt.`;
 }
 
 /** §6: the recorder's mime type in plain words. */

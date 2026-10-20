@@ -188,6 +188,9 @@ export async function cutClip(file: Blob, inS: number, outS: number): Promise<{ 
   const head = header();
 
   const payload = kept.reduce((a, s) => a + s.size, 0);
+  // mdat's size and stco's offset are 32-bit: a cut must stay under 4 GB. A clip is at most 900 s
+  // (≈ 280 MB at the recorder's rate), so this only guards a file the app didn't record.
+  if (headLength + 8 + payload > 0xffffffff) throw new CutError("truncated", "the cut would be over 4 GB (32-bit mdat)");
   const mdat = new Uint8Array(8);
   new DataView(mdat.buffer).setUint32(0, 8 + payload);
   mdat.set([0x6d, 0x64, 0x61, 0x74], 4); // "mdat"

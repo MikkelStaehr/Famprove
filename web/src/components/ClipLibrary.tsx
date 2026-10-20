@@ -51,7 +51,7 @@ import {
 } from "@/lib/video/save";
 import { shareClip, shareData } from "@/lib/video/share";
 import { type CutRange, cutClip, cutRange } from "@/lib/video/cut";
-import { busyText, cutFileName, cutLine, prepareClip, type Prepared, saveDoneLine, shareCutLine, splitCount } from "@/lib/video/cut-lines";
+import { busyText, cutFileName, cutLine, failedCutsLine, prepareClip, type Prepared, saveDoneLine, shareCutLine, splitCount } from "@/lib/video/cut-lines";
 import { formatBytes } from "@/lib/video/space";
 
 const CLEANUP_KEY = "famprove.clips.cleanup";
@@ -235,6 +235,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     const s = store.current;
     const byId = new Map(list.map((r) => [r.id, r]));
     let cutCount = 0;
+    let failedCuts = 0;
     const result: SaveResult = await saveSequence(clips, {
       read: async (id) => {
         if (fixture !== null) return new Blob([]);
@@ -254,6 +255,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         const cut = r === undefined ? ({ reason: "none", range: null } as const) : cutOf(r);
         if (fixture !== null) return { blob, name: cut.range === null ? clip.name : cutFileName(clip.name), cut: cut.range !== null };
         const p = await prepareClip(blob, clip.name, cut, cutClip);
+        if (p.kind === "failed") failedCuts += 1;
         return { blob: p.blob, name: p.name, cut: p.kind === "cut" };
       },
       onSent: (cut) => {
@@ -262,7 +264,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     });
     setSaving(null);
     setRest(result.remaining);
-    setSaveLine(`${testPrefix}${doneLine(result, splitCount(result.sent, cutCount))}`);
+    const failedLine = failedCutsLine(failedCuts);
+    setSaveLine(`${testPrefix}${doneLine(result, splitCount(result.sent, cutCount))}${failedLine === null ? "" : ` ${failedLine}`}`);
     await forgetMissing(result.missing.map((c) => c.id));
   }
 

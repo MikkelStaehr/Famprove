@@ -14,7 +14,7 @@ import {
   shareCutLine,
 } from "../src/lib/video/cut-lines.ts";
 import { clipFileNames, doneLine, type SaveClip, saveSequence } from "../src/lib/video/save.ts";
-import { splitCount } from "../src/lib/video/cut-lines.ts";
+import { failedCutsLine, splitCount } from "../src/lib/video/cut-lines.ts";
 
 const USER: CutRange = { reason: "user", range: { inS: 12.3, outS: 48 } };
 const AUTO: CutRange = { reason: "auto", range: { inS: 12.3, outS: 48 } };
@@ -108,4 +108,10 @@ test("Kameratest keyframe line from given times: spacing, > 1,5 s warning, WebM,
   assert.equal(gap.warning, "◆ Et klip kan starte op til 2,4 s for tidligt.");
   assert.equal(keyframeLines(null, "video/webm;codecs=vp9").line, "◆ WebM kan ikke klippes. Gem og Del giver hele videoen.");
   assert.equal(keyframeLines([0], "video/mp4;codecs=avc1").line, "Afstanden kunne ikke måles.");
+});
+
+test("Gem alle: a failed cut is said, also when every cut failed or there was one clip (review 2026-10-20)", () => {
+  assert.equal(failedCutsLine(0), null);
+  assert.equal(failedCutsLine(1), "Klippet lykkedes ikke for 1 klip: hele videoen er sendt.");
+  assert.equal(failedCutsLine(3), "Klippet lykkedes ikke for 3 klip: hele videoerne er sendt.");
 });
