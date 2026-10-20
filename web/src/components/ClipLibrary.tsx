@@ -14,7 +14,7 @@ import { type DeleteClipResult, PERMANENT_SAVE_REFUSALS, type VideoClipRow } fro
 import { cleanupPlan } from "@/lib/video/cleanup";
 import { type ClipIndex, type ClipIndexEntry, memoryClipIndex } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
-import { FIXTURE_CLIP_BYTES } from "@/lib/video/library-fixture";
+import { FIXTURE_CLIP_BYTES, fixturePlayhead } from "@/lib/video/library-fixture";
 import {
   cleanupDue,
   cleanupLine,
@@ -54,6 +54,7 @@ import { type CutRange, cutClip, cutRange } from "@/lib/video/cut";
 import { busyText, cutFileName, cutLine, failedCutsLine, prepareClip, type Prepared, saveDoneLine, shareCutLine, splitCount } from "@/lib/video/cut-lines";
 import { formatBytes } from "@/lib/video/space";
 import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/clip-range";
+import { markPoint, markRange, pendingLine, refusedLine, SAVING_LINE, savedLine, startLabel, startLine, UNDO_FAILED_LINE, undoInput, undoneLine } from "@/lib/video/clip-mark";
 import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, inPickupWindow, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
@@ -88,6 +89,19 @@ function untilVisible(signal: AbortSignal): Promise<void> {
 const DARK_BTN = `inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-track px-4 font-sans text-14 font-medium text-text ${BTN}`;
 /** Gem and Del keep their width while they read `Klipper …` / `Forbereder …` (clip-cut §7). */
 const BUSY_WIDTH = "min-w-[7.5rem]";
+/** clip-mark §1: the two marks, half the row each, Ember's 56px stepper height. */
+const MARK_BTN = `inline-flex min-h-14 flex-1 items-center justify-center gap-1 rounded-full px-4 font-sans text-button text-text aria-disabled:opacity-60 ${BTN}`;
+const TEXT_LINK = `inline-flex min-h-11 items-center text-text underline underline-offset-4 ${BTN}`;
+
+/** The status line's button: Fjern klip's and a mark's Fortryd, or a failed write's Prøv igen (never focused by a tap, §3). */
+type RangeAction =
+  | { readonly kind: "undo-remove"; readonly old: ClipRangeS }
+  | { readonly kind: "undo-mark"; readonly prev: StoredRange }
+  | { readonly kind: "retry-mark"; readonly range: ClipRangeS; readonly prev: StoredRange }
+  | { readonly kind: "retry-undo"; readonly prev: StoredRange };
+type RangeText = { readonly text: string; readonly warn: boolean; readonly action: RangeAction | null };
+/** A mark's Fortryd stays until the player closes or the next mark saves (§2.3). */
+const keptUndo = (t: RangeText | null): RangeAction | null => (t?.action?.kind === "undo-mark" ? t.action : null);
 
 type Props = {
   readonly today: IsoDate;
@@ -721,8 +735,13 @@ function Player({
   const [saveText, setSaveText] = useState<string | null>(null);
   const [saveReading, setSaveReading] = useState(false);
   const [editing, setEditing] = useState(false);
-  /** clip-handles §3: the status line after the editor closes; `undo` = Fjern klip's old range (its Fortryd). */
-  const [rangeText, setRangeText] = useState<{ readonly text: string; readonly warn: boolean; readonly undo: ClipRangeS | null } | null>(null);
+  /** clip-handles §3 / clip-mark §2: the status line under the buttons, with its Fortryd or Prøv igen. */
+  const [rangeText, setRangeText] = useState<RangeText | null>(null);
+  /** clip-mark: the pending Start (s), and a mark's or its Fortryd's write in flight. */
+  const [pending, setPending] = useState<number | null>(null);
+  const [markBusy, setMarkBusy] = useState(false);
+  const startBtn = useRef<HTMLButtonElement>(null);
+  const endBtn = useRef<HTMLButtonElement>(null);
   const videoEl = useRef<HTMLVideoElement>(null);
   const editBtn = useRef<HTMLButtonElement>(null);
   const gone = useRef(false);
@@ -838,10 +857,82 @@ function Player({
     const r = await sendClipRange(row.id, old);
     if (r.ok && r.inS !== null && r.outS !== null) {
       onRange(row.id, { inS: r.inS, outS: r.outS });
-      setRangeText({ text: "Klip gemt.", warn: false, undo: null });
+      setRangeText({ text: "Klip gemt.", warn: false, action: null });
     } else {
-      setRangeText({ text: rangeErrorLine(r.ok ? "failed" : r.reason), warn: true, undo: old });
+      setRangeText({ text: rangeErrorLine(r.ok ? "failed" : r.reason), warn: true, action: { kind: "undo-remove", old } });
     }
+  }
+
+  /** clip-mark: the playhead at tap time; the fixture (no video) reads §4's fixture playhead. */
+  function playhead(): number {
+    if (fixture) return fixturePlayhead(row.id, pending !== null);
+    return videoEl.current?.currentTime ?? Number.NaN;
+  }
+
+  /** §2.1 Start her: a pending in point; no write, the video keeps playing. */
+  function markStart() {
+    if (markBusy || server === null) return;
+    const t = playhead();
+    if (!Number.isFinite(t)) return;
+    const inS = markPoint(t, server.durationS);
+    setPending(inS);
+    setRangeText((old) => ({ text: startLine(inS), warn: false, action: keptUndo(old) }));
+  }
+
+  /** §2.2 Slut her: one setClipRange by the in rule, or the refused line and no write. */
+  function markEnd() {
+    if (markBusy || server === null) return;
+    const t = playhead();
+    if (!Number.isFinite(t)) return;
+    const m = markRange(server, pending, t);
+    if (m.kind === "refused") {
+      setRangeText((old) => ({ text: refusedLine(m.inS), warn: true, action: keptUndo(old) }));
+      return;
+    }
+    void sendMark(m.range, undoInput(server));
+  }
+
+  /** A mark's write (and Prøv igen's, with the same values). */
+  async function sendMark(range: ClipRangeS, prev: StoredRange) {
+    setMarkBusy(true);
+    setRangeText((old) => ({ text: SAVING_LINE, warn: false, action: old?.action?.kind === "retry-mark" ? old.action : null }));
+    const r = await sendClipRange(row.id, range);
+    setMarkBusy(false);
+    setPending(null); // saved: the new range shows; failed: the old cut line keeps (§2.2)
+    if (r.ok) {
+      const stored: StoredRange = r.inS === null || r.outS === null ? { inS: null, outS: null } : { inS: r.inS, outS: r.outS };
+      onRange(row.id, stored);
+      setRangeText({ text: stored.inS === null ? "Klip gemt." : savedLine(stored), warn: false, action: { kind: "undo-mark", prev } });
+      if (document.activeElement === null || document.activeElement === document.body) endBtn.current?.focus(); // Prøv igen is gone
+      return;
+    }
+    const retry = r.reason === "failed" || r.reason === "network";
+    setRangeText({ text: rangeErrorLine(r.reason), warn: true, action: retry ? { kind: "retry-mark", range, prev } : null });
+  }
+
+  /** §2.3 Fortryd: one setClipRange back to the range stored before the mark (null/null when none). */
+  async function undoMark(prev: StoredRange) {
+    setMarkBusy(true);
+    setRangeText((old) => ({ text: SAVING_LINE, warn: false, action: old?.action?.kind === "retry-undo" ? old.action : null }));
+    const r = await sendClipRange(row.id, prev);
+    setMarkBusy(false);
+    if (r.ok) {
+      onRange(row.id, prev);
+      setRangeText({ text: undoneLine(prev), warn: false, action: null });
+      if (document.activeElement === null || document.activeElement === document.body) endBtn.current?.focus();
+      return;
+    }
+    setRangeText({ text: UNDO_FAILED_LINE, warn: true, action: { kind: "retry-undo", prev } });
+  }
+
+  function runAction(a: RangeAction) {
+    if (markBusy) return;
+    if (a.kind === "undo-remove") void undoRemove(a.old);
+    else if (a.kind === "undo-mark") {
+      endBtn.current?.focus(); // Fortryd goes; focus never stays on it (§3)
+      void undoMark(a.prev);
+    } else if (a.kind === "retry-mark") void sendMark(a.range, a.prev);
+    else void undoMark(a.prev);
   }
 
   /** Gem (§1): the blob the player loaded (as Del), else one read; fixture: no file, no URL. */
@@ -905,8 +996,25 @@ function Player({
           <MonoCaption uppercase={false}>{row.meta}</MonoCaption>
         </div>
       </div>
-      {cutLine(cut) !== null && <p className="pl-[60px] pr-3 font-mono text-13 text-text-muted">{cutLine(cut)}</p>}
-      {autoLine !== null && (
+      {pending !== null && !editing ? (
+        <p className="flex flex-wrap items-center gap-x-3 pl-[60px] pr-3 font-mono text-13 text-text-muted">
+          <span>{pendingLine(pending)}</span>
+          <button
+            type="button"
+            className={`${TEXT_LINK} font-sans`}
+            onClick={() => {
+              setPending(null);
+              setRangeText((old) => (old !== null && old.action === null && !old.warn ? null : old));
+              startBtn.current?.focus();
+            }}
+          >
+            Ryd
+          </button>
+        </p>
+      ) : (
+        cutLine(cut) !== null && <p className="pl-[60px] pr-3 font-mono text-13 text-text-muted">{cutLine(cut)}</p>
+      )}
+      {autoLine !== null && pending === null && (
         <p className="pl-[60px] pr-3 font-sans text-13 text-text-muted">
           {autoLine.words}
           {autoLine.figure !== null && (
@@ -947,12 +1055,12 @@ function Player({
             onCancel={closeEditor}
             onSaved={(r) => {
               onRange(row.id, r);
-              setRangeText({ text: "Klip gemt.", warn: false, undo: null });
+              setRangeText({ text: "Klip gemt.", warn: false, action: null });
               closeEditor();
             }}
             onRemoved={(old) => {
               onRange(row.id, { inS: null, outS: null });
-              setRangeText({ text: "Dit klip er fjernet.", warn: false, undo: old });
+              setRangeText({ text: "Dit klip er fjernet.", warn: false, action: { kind: "undo-remove", old } });
               closeEditor();
             }}
           />
@@ -972,6 +1080,34 @@ function Player({
           </>
         ) : (
           <>
+            {canEdit && (
+              <div className="flex gap-2">
+                <button
+                  ref={startBtn}
+                  type="button"
+                  aria-disabled={markBusy || undefined}
+                  className={`${MARK_BTN} ${pending === null ? "bg-track" : "bg-raised"}`}
+                  onClick={markStart}
+                >
+                  <span aria-hidden="true" className="font-mono">
+                    [
+                  </span>
+                  <span className="tabular-nums">{startLabel(pending)}</span>
+                </button>
+                <button ref={endBtn} type="button" aria-disabled={markBusy || undefined} className={`${MARK_BTN} bg-track`} onClick={markEnd}>
+                  {markBusy ? (
+                    SAVING_LINE
+                  ) : (
+                    <>
+                      <span>Slut her</span>
+                      <span aria-hidden="true" className="font-mono">
+                        ]
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {row.kind === "clip" && (
                 <button type="button" aria-pressed={row.starred} className={DARK_BTN} onClick={onStar}>
@@ -998,6 +1134,7 @@ function Player({
                   className={DARK_BTN}
                   onClick={() => {
                     setRangeText(null);
+                    setPending(null); // clip-mark §1: opening the editor clears a pending Start
                     setEditing(true);
                   }}
                 >
@@ -1026,12 +1163,17 @@ function Player({
                     )}
                     {rangeText.text}
                   </span>
-                  {rangeText.undo !== null && (
-                    <button type="button" className={`min-h-11 text-text underline underline-offset-4 ${BTN}`} onClick={() => {
-                        if (rangeText.undo !== null) void undoRemove(rangeText.undo);
+                  {rangeText.action !== null && (
+                    <button
+                      key={rangeText.action.kind.startsWith("undo") ? "fortryd" : "retry"}
+                      type="button"
+                      aria-disabled={markBusy || undefined}
+                      className={`min-h-11 text-text underline underline-offset-4 aria-disabled:opacity-60 ${BTN}`}
+                      onClick={() => {
+                        if (rangeText.action !== null) runAction(rangeText.action);
                       }}
                     >
-                      Fortryd
+                      {rangeText.action.kind.startsWith("undo") ? "Fortryd" : "Prøv igen"}
                     </button>
                   )}
                 </span>

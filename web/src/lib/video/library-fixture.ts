@@ -77,3 +77,14 @@ export function clipsFixture(today: IsoDate): { readonly rows: VideoClipRow[]; r
 
 /** The fixture's sizes (bytes) per clip, for the space line. */
 export const FIXTURE_CLIP_BYTES = 68_000_000;
+
+/**
+ * clip-mark §4: the fixture has no video, so the marks read a fixture playhead: the 1st clip and
+ * the failing one (FIXTURE_FAILING_RANGE_ID, the spec's "clip 3") read 12.3 s before a pending
+ * Start and 48.0 s after it; the 2nd reads 4.8 s; every other clip 0.
+ */
+export function fixturePlayhead(clipId: string, pending: boolean): number {
+  if (clipId === id(1) || clipId === id(4)) return pending ? 48 : 12.3;
+  if (clipId === id(2)) return 4.8;
+  return 0;
+}
