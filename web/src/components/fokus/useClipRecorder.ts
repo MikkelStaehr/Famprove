@@ -5,7 +5,7 @@ import { type RefObject, useCallback, useEffect, useReducer, useRef, useState } 
 import { saveClip, trimClip } from "@/app/actions";
 import { finishDueTrims, syncAllowed } from "@/lib/video/trim";
 import { CAMERA_CONSTRAINTS } from "@/lib/video/constraints";
-import { type ClipIndex, type ClipIndexEntry, type ClipNameStack, interrupted } from "@/lib/video/index-store";
+import { type ClipIndex, type ClipIndexEntry, type ClipNameStack, clipFile, interrupted } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
 import { pickRecorderType, recorderOptions, type RecorderType } from "@/lib/video/mime";
 import type { ClipFiles, ClipWriter } from "@/lib/video/opfs";
@@ -146,7 +146,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFix
       });
     let blob: Blob | null = null;
     try {
-      blob = await fs().read(l.id, l.type.ext);
+      blob = await fs().readFile(clipFile(l.entry)); // clip-trim: every read goes through clipFile
     } catch {
       blob = null;
     }
