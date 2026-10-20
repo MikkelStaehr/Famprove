@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { jumpedFixture } from "../src/lib/db/dev-fixture.ts";
 import type { PrescribedSetRow } from "../src/lib/db/rows.ts";
 import { createSaveQueue, halts, type SaveOutcome } from "../src/lib/jump-save.ts";
-import { pickAfter, pickedShape, pickOutcome } from "../src/lib/pick-save.ts";
+import { pickAfter, pickedShape, pickOutcome, unpickOrder } from "../src/lib/pick-save.ts";
 import { lastTap, type LoggedSet, setKey, undoesOf } from "../src/lib/set-taps.ts";
 import { pickRunRows, sessionRuns } from "../src/lib/supersets.ts";
 
@@ -69,4 +69,18 @@ test("superset-any: jump, then pick, then Fortryd undoes the done before the jum
   assert.equal(after.jump, null); // as the server's upsert (previous_rows, jumped_at, moved_start = null)
   assert.notEqual(lastTap(log, after)?.kind, "jump");
   assert.notEqual(undoesOf(log, jump!.ref, after), "jump"); // Fortryd now undoes a set, never the pick's order
+});
+
+test("superset-any rule 11 (review 2026-10-20): a failed pick puts the stored order back but keeps a held jump's", () => {
+  const stored = [10, 20, 30, 40];
+  const picked = [10, 40, 20, 30]; // B = 40 right after A = 10
+  // Nothing held moved a run: the stored order.
+  assert.deepEqual(unpickOrder(stored, picked, picked, 10, 40), stored);
+  assert.equal(unpickOrder(null, picked, picked, 10, 40), null);
+  // A held jump to 30 (A done): the jump stays, only the pick is undone (B back to its stored seat).
+  assert.deepEqual(unpickOrder(stored, [10, 40, 20, 30], [10, 40, 30, 20], 10, 40), [10, 30, 20, 40]);
+  // B kept its seat after A while a jump moved another run: B goes back before its stored successor.
+  assert.deepEqual(unpickOrder([10, 20, 30, 40, 50], [10, 30, 20, 40, 50], [10, 30, 50, 20, 40], 10, 30), [10, 50, 20, 30, 40]);
+  // A held jump moved B itself: the held order stays until it is sent.
+  assert.deepEqual(unpickOrder(stored, picked, [40, 10, 20, 30], 10, 40), [40, 10, 20, 30]);
 });

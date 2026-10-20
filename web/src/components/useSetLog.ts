@@ -65,7 +65,7 @@ export type SetLog = {
   /** The order and undo mark after a jump this visit (null = the stored ones). */
   readonly jumped: { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null } | null;
   /** Puts an order in force over the jump's (a landed pick: lib/pick-save pickedShape), or back (null). */
-  readonly adoptOrder: (next: { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null } | null) => void;
+  readonly adoptOrder: (next: AdoptedOrder | null | ((current: AdoptedOrder | null) => AdoptedOrder | null)) => void;
 };
 
 /** A superset pick in the save queue (slice superset-any): A's run start as `row`, set 0; halts like a jump. */
@@ -73,6 +73,8 @@ export type PickTap = { readonly kind: "pick"; readonly row: number; readonly se
 
 /** The order and undo mark after a jump or its Fortryd this visit. */
 type Jumped = { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null };
+/** The order (and undo mark) a superset pick sets in the set log; a function reads the one in force. */
+export type AdoptedOrder = Jumped;
 
 export type JumpProblem = { readonly row: number; readonly kind: "failed" | "refused" };
 
@@ -203,7 +205,7 @@ export function useSetLog(
   const pushPick = useCallback((pick: PickTap, send: () => Promise<SaveOutcome>) => queue.push(pick, send), [queue]);
   const pickHalted = halting !== null && halting.kind === "pick";
   // A pick is newer than a jump this visit: its order is in force and the jump's undo mark is gone.
-  const adoptOrder = useCallback((next: { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null } | null) => setJumped(next), []);
+  const adoptOrder = useCallback((next: AdoptedOrder | null | ((current: AdoptedOrder | null) => AdoptedOrder | null)) => setJumped(next), []);
   const rejected = saves.reload;
   const dev = saves.dev;
 

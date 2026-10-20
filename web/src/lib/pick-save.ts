@@ -40,3 +40,33 @@ export function pickAfter(
 export function pickedShape<S extends { readonly runRows: readonly number[] | null; readonly jump?: JumpMark | null }>(shape: S, runRows: readonly number[] | null): S {
   return { ...shape, runRows, jump: null };
 }
+
+/**
+ * The order after a failed or refused pick while later taps are held (review 2026-10-20): the
+ * stored order with the held taps' order effects kept. `current` is the order on screen now (the
+ * pick's, then any held jump's); unchanged since the pick = nothing held moved a run: the stored
+ * order. Else only the pick is undone: B leaves its seat after A and goes back before the run that
+ * followed it in the stored order (the end if none), unless a held tap moved B itself (B no longer
+ * right after A): then the held order stays as it is until it is sent.
+ */
+export function unpickOrder(
+  stored: readonly number[] | null,
+  picked: readonly number[],
+  current: readonly number[] | null,
+  rowA: number,
+  rowB: number,
+): readonly number[] | null {
+  if (current === null || sameRows(current, picked)) return stored;
+  const at = current.indexOf(rowB);
+  if (at < 1 || current[at - 1] !== rowA) return current;
+  const base = stored ?? picked;
+  const after = base.indexOf(rowB);
+  const successor = after < 0 ? undefined : base.slice(after + 1).find((r) => r !== rowA);
+  const rest = current.filter((r) => r !== rowB);
+  const to = successor === undefined ? -1 : rest.indexOf(successor);
+  return to < 0 ? [...rest, rowB] : [...rest.slice(0, to), rowB, ...rest.slice(to)];
+}
+
+function sameRows(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((r, i) => r === b[i]);
+}

@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { setSupersetPair } from "@/app/actions";
-import { pickAfter, pickedShape, pickOutcome } from "@/lib/pick-save";
+import { pickAfter, pickedShape, pickOutcome, unpickOrder } from "@/lib/pick-save";
 import { pickedOrder, pickedSlot, pickSentence, type SeamView, slotKey } from "@/lib/superset-view";
 import type { PairSlot } from "@/lib/supersets";
 import { type ExerciseView, titleName } from "@/lib/training-view";
@@ -93,11 +93,16 @@ export function usePartnerPick(
         }
         // Rule 11 / 12: back to the stored order and pair at once.
         setPickedRows(after.runRows);
-        queue.adoptOrder(jumpedBefore);
+        // A jump made after the pick and held behind it stays on screen until it is sent (review 2026-10-20).
+        queue.adoptOrder((current) => {
+          if (next === null || current === null) return jumpedBefore;
+          const rows = unpickOrder(after.runRows, next, current.runRows, v.rowA, rowB);
+          return rows === after.runRows ? jumpedBefore : { runRows: rows, jump: current.jump };
+        });
         saves.mark(target, { kind: "clear" });
         setExtra((xs) => xs.filter((x) => slotKey(x) !== slotKey(slot)));
         if (after.line === "failed") {
-          setProblem({ rowA: v.rowA, kind: "failed", text: `Supersettet med ${b} er ikke gemt.`, sub: "Rækkefølgen står her, men forsvinder, hvis siden genindlæses." });
+          setProblem({ rowA: v.rowA, kind: "failed", text: `Supersettet med ${b} er ikke gemt.`, sub: "Rækkefølgen er som før." });
         } else {
           const why = result !== null && !result.ok && result.reason === "started" ? `fordi ${b} er gået i gang` : "fordi sessionen er ændret";
           setProblem({ rowA: v.rowA, kind: "refused", text: `${b} kan ikke tages som superset med ${v.nameA}, ${why}. Rækkefølgen er som før.`, sub: null });
