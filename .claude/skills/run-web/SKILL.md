@@ -49,12 +49,12 @@ contain personal training data: write them to the session scratchpad or `%TEMP%`
 
 `shoot.mjs` options: `--out <png>` (required) · `--path /load?week=2026-W33` (default `/`) ·
 `--width 390` · `--open` (open every `<details>`) · `--dark` · `--reduce-motion` (emulates
-`prefers-reduced-motion: reduce`) · `--fake-camera` (Chrome's fake camera, permission granted without a prompt: for recording in Fokus; also on `swipe.mjs`) · `--zoom200` (root font 200 %) · `--click "<css>|text=<label>"` (taps before the shot, repeatable) · `--wait-text "<text>"` (after the taps, wait ≤ 30 s for the text, e.g. Kameratest's `Nøglebilleder`) ·
+`prefers-reduced-motion: reduce`) · `--fake-camera` (Chrome's fake camera, permission granted without a prompt: for recording in Fokus; also on `swipe.mjs`) · `--zoom200` (root font 200 %) · `--click "<css>|text=<label>"` (taps before the shot, repeatable) · `--wait-text "<text>"` (after the taps, wait ≤ 30 s for the text, e.g. Kameratest's `Nøglebilleder`) · `--wait-seconds 30` (how long `--wait-text` waits) · `--webgl` (software WebGL2 via SwiftShader instead of `--disable-gpu`: MediaPipe Pose needs WebGL2 even on its CPU delegate; its timings are not the phone's) ·
 `--base http://localhost:3100` · `--ready "<css selector>"` (a page outside the app, e.g. the local design
 reference: `--base file://$PWD/design/reference/ --path belastning-mockup.html --width 1400`; a bundle that
 renders inside a frame never matches, so the shot waits 30 s, exits 1 and still writes the PNG) · `--timeout 90` (seconds for the whole shot: a hung browser is killed
 and the shot exits 1, never waited on; one stalled a run for hours on 2026-10-13). It prints one JSON line (height, horizontal overflow, console
-errors) and exits 1 on overflow, console errors or a page that never got ready. Then **Read the
+errors, `offOrigin`: every request that left the page's origin, from CDP's Network log) and exits 1 on overflow, console errors or a page that never got ready. Then **Read the
 PNG** — a screenshot you haven't looked at proves nothing.
 
 `serve.ps1 -Mode prod` serves the last `pnpm build` with `next start`. Building rewrites `web/.next`,

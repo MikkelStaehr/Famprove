@@ -4,6 +4,10 @@
 //   [--open] [--dark] [--reduce-motion] [--fake-camera] [--zoom200] [--base http://localhost:3100] [--timeout 90]
 //   [--click "<css selector>|text=<label>"]... (taps in order before the shot)
 //   [--wait-text "<text>"]  (after the taps, wait up to 30 s until the page shows this text)
+//   [--webgl]  (software WebGL2 instead of --disable-gpu: MediaPipe needs it)
+//   [--wait-seconds 30]  (how long --wait-text waits, inside --timeout)
+// The JSON line lists every request that left the page's origin (offOrigin: the URLs, from CDP's
+// Network domain), so a self-hosted asset is proven local (slice clip-pose: MediaPipe).
 //   [--ready "<css selector>"]  (default: the app's own readiness; a selector for a page outside the app,
 //   e.g. a design reference opened with --base file:///…/design/reference/ --path mockup.html)
 // Prints one JSON line; exits 1 on horizontal overflow, console errors, a page that never got ready,
@@ -24,12 +28,15 @@ const { values: opt } = parseArgs({
     dark: { type: "boolean", default: false },
     "reduce-motion": { type: "boolean", default: false },
     "fake-camera": { type: "boolean", default: false },
+    webgl: { type: "boolean", default: false },
     zoom200: { type: "boolean", default: false },
     timeout: { type: "string", default: "90" },
     ready: { type: "string" },
     // After the taps, wait (≤ 30 s, inside --timeout) until the page's text contains this (slice
     // clip-cut: Kameratest's 4 s test clip ends after the shot would be taken); not found = exit 1.
     "wait-text": { type: "string" },
+    // How long --wait-text waits (slice clip-pose: Kameratest's Pose run comes after the 4 s clip).
+    "wait-seconds": { type: "string", default: "30" },
     // Taps before the shot, in order, 800 ms apart (slice fokus-minimise: a jump, then Minimér):
     // a CSS selector (the first match), or text=<start of a button's or link's text>.
     click: { type: "string", multiple: true },
@@ -52,9 +59,12 @@ const port = 9800 + Math.floor(Math.random() * 100);
 // --fake-camera (slice video-record): Chrome's built-in fake camera, permission granted without a
 // prompt, so recording can be shot and measured headless. The test pattern is synthetic, never a real clip.
 const FAKE_CAMERA = ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"];
+// --webgl (slice clip-pose): software WebGL2 (SwiftShader) instead of --disable-gpu, for MediaPipe,
+// which uploads every frame through WebGL2 even on its CPU delegate. Timings are not the phone's.
+const WEBGL = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
 const browser = spawn(
   browserPath,
-  ["--headless=new", "--disable-gpu", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, ...(opt["fake-camera"] ? FAKE_CAMERA : []), "about:blank"],
+  ["--headless=new", ...(opt.webgl ? WEBGL : ["--disable-gpu"]), "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, ...(opt["fake-camera"] ? FAKE_CAMERA : []), "about:blank"],
   { stdio: "ignore" },
 );
 // A hung browser once stalled a screenshot run for hours (2026-10-13): the whole shot gets a hard limit.
@@ -84,6 +94,7 @@ try {
   let id = 0;
   const pending = new Map();
   const errors = [];
+  const offOrigin = new Set(); // requests that left the page's origin (CDP Network)
   ws.addEventListener("message", (m) => {
     const msg = JSON.parse(m.data);
     if (msg.id && pending.has(msg.id)) {
@@ -91,6 +102,9 @@ try {
       pending.delete(msg.id);
     } else if (msg.method === "Runtime.exceptionThrown") {
       errors.push(msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text);
+    } else if (msg.method === "Network.requestWillBeSent") {
+      const url = msg.params.request.url;
+      if (/^(https?|wss?):/.test(url) && new URL(url).origin !== new URL(opt.base).origin) offOrigin.add(url);
     } else if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
       errors.push(msg.params.args.map((a) => a.value ?? a.description).join(" "));
     }
@@ -106,6 +120,7 @@ try {
 
   await send("Runtime.enable");
   await send("Page.enable");
+  await send("Network.enable");
   // Exact viewport: --window-size is clamped to ~516 px on Windows; device metrics are not.
   const metrics = (height) =>
     send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 600 });
@@ -152,12 +167,13 @@ try {
   }
   if (opt["wait-text"] !== undefined) {
     let seen = false;
-    for (let i = 0; i < 150 && !seen; i++) {
+    const waitS = Number(opt["wait-seconds"]);
+    for (let i = 0; i < waitS * 5 && !seen; i++) {
       seen = await evaluate(`document.body.innerText.includes(${JSON.stringify(opt["wait-text"])})`);
       if (!seen) await sleep(200);
     }
     if (!seen) {
-      console.error(`--wait-text ${opt["wait-text"]}: not shown within 30 s`);
+      console.error(`--wait-text ${opt["wait-text"]}: not shown within ${waitS} s`);
       exitCode = 1;
     }
   }
@@ -186,7 +202,7 @@ try {
   writeFileSync(opt.out, Buffer.from(shot.data, "base64"));
 
   const horizontalOverflow = page.scrollWidth > page.clientWidth || page.innerOverflow;
-  console.log(JSON.stringify({ out: opt.out, width, height: page.height, horizontalOverflow, consoleErrors: errors }));
+  console.log(JSON.stringify({ out: opt.out, width, height: page.height, horizontalOverflow, consoleErrors: errors, offOrigin: [...offOrigin] }));
   if (horizontalOverflow || errors.length > 0) exitCode = 1;
   ws.close();
 } finally {
