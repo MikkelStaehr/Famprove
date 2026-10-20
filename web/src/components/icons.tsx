@@ -22,6 +22,7 @@ import {
   Share2,
   Download,
   Star,
+  Scissors,
   Trash2,
   TriangleAlert,
   X,
@@ -64,6 +65,7 @@ export type IconName =
   | "star"
   | "share"
   | "trash"
+  | "scissors"
   | "download";
 
 /** Part B sizes: 22 phone tab bar, 20 desktop tabs / card corners / icon buttons, 18 ListRow, 16 WarningLine and chevrons. */
@@ -117,6 +119,7 @@ const LUCIDE: Readonly<Record<Exclude<IconName, OwnName>, LucideIcon>> = {
   share: Share2,
   download: Download,
   trash: Trash2,
+  scissors: Scissors,
 };
 
 const STROKE = 1.5;

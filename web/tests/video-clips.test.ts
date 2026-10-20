@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
-import { readVideoClips, recordClip, recordStar, removeClip, type VideoClipOptions } from "../src/lib/db/video-clips.ts";
+import { readVideoClips, recordClip, recordClipRange, recordStar, removeClip, type VideoClipOptions } from "../src/lib/db/video-clips.ts";
+import { FIXTURE_FAILING_RANGE_ID } from "../src/lib/video/clip-range.ts";
 import {
   clipDateAge,
   parseDeleteClipInput,
@@ -81,7 +82,8 @@ function fetchFor(db: FakeDb): FetchLike {
         response = new Response(null, { status: 201 });
       } else if (method === "PATCH") {
         const body = JSON.parse(String(init.body)) as Row; // the test's own request body
-        assert.deepEqual(Object.keys(body), ["starred"], "only starred is updated");
+        const keys = Object.keys(body).join(",");
+        assert.ok(keys === "starred" || keys === "clip_in_s,clip_out_s", `only starred or the range is updated (${keys})`);
         const hit = rows.filter((r) => matches(r, parsed.searchParams));
         for (const r of hit) Object.assign(r, body);
         response = new Response(JSON.stringify(hit.map((r) => ({ id: r.id }))), { status: 200 });
@@ -251,4 +253,52 @@ test("read: the last 8 weeks plus every starred row, parsed", async () => {
   db.tables.video_clips[0].set_no = 0;
   await assert.rejects(readVideoClips(NOW, opts(db)), /set_no/);
   assert.deepEqual(await readVideoClips(NOW, opts(fakeDb(), { DEV_FIXTURE: "empty" }, "development")), []);
+});
+
+// --- clip-handles: setClipRange ---------------------------------------------------------------
+
+test("range: one read + one PATCH, rounded to 0.1, idempotent (AC 9, 10)", async () => {
+  const db = fakeDb();
+  await recordClip(input(), NOW, opts(db)); // duration_s 14.3
+  const before = db.requests;
+  const want = { ok: true, dev: false, inS: 2.3, outS: 9.1 };
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 2.34, outS: 9.06 }, opts(db)), want);
+  assert.equal(db.requests - before, 2, "one read of duration_s, one PATCH");
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 2.34, outS: 9.06 }, opts(db)), want, "the same values twice: two OK replies");
+  assert.equal(db.tables.video_clips.length, 1);
+  assert.deepEqual([db.tables.video_clips[0].clip_in_s, db.tables.video_clips[0].clip_out_s], [2.3, 9.1]);
+  assert.deepEqual(await recordClipRange({ id: ID, inS: null, outS: null }, opts(db)), { ok: true, dev: false, inS: null, outS: null });
+  assert.deepEqual([db.tables.video_clips[0].clip_in_s, db.tables.video_clips[0].clip_out_s], [null, null]);
+});
+
+test("range: refusals write nothing (AC 9)", async () => {
+  const db = fakeDb();
+  await recordClip(input(), NOW, opts(db)); // duration_s 14.3
+  const writes = db.writes;
+  for (const [inS, outS] of [[5, 5], [6, 5], [5, 5.9], [-0.1, 4], [2, 14.4], [null, 4], [2, null], [Number.NaN, 4], [2, Number.POSITIVE_INFINITY], ["2", 4]] as const) {
+    assert.deepEqual(await recordClipRange({ id: ID, inS, outS }, opts(db)), { ok: false, reason: "range" }, `${String(inS)}/${String(outS)}`);
+  }
+  assert.equal(db.writes, writes);
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 0, outS: 14.3 }, opts(db)), { ok: true, dev: false, inS: 0, outS: 14.3 }, "the whole clip is a range");
+});
+
+test("range: an unknown id is not_found; a preview host and a failed request are refused", async () => {
+  const db = fakeDb();
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 1, outS: 3 }, opts(db)), { ok: false, reason: "not_found" });
+  assert.equal(db.writes, 0);
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 1, outS: 3 }, opts(db, { VERCEL_ENV: "preview" })), { ok: false, reason: "not_allowed" });
+  await recordClip(input(), NOW, opts(db));
+  db.cut = { at: db.requests + 2, afterApply: false };
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 1, outS: 3 }, opts(db)), { ok: false, reason: "failed" });
+});
+
+test("range: dev switches reach no Supabase request; the clips fixture's failing clip fails (AC 11)", async () => {
+  const db = fakeDb();
+  const today = opts(db, { DEV_TODAY: "2026-10-19" }, "development");
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 1.04, outS: 3 }, today), { ok: true, dev: true, inS: 1, outS: 3 });
+  const clips = opts(db, { DEV_FIXTURE: "clips" }, "development");
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 1, outS: 3 }, clips), { ok: true, dev: true, inS: 1, outS: 3 });
+  assert.deepEqual(await recordClipRange({ id: FIXTURE_FAILING_RANGE_ID, inS: 1, outS: 3 }, clips), { ok: false, reason: "failed" });
+  assert.deepEqual(await recordClipRange({ id: ID, inS: 3, outS: 1 }, clips), { ok: false, reason: "range" });
+  assert.equal(db.requests, 0);
 });

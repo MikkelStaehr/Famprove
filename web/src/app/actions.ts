@@ -4,7 +4,8 @@ import { recordFtpChoice, undoFtpChoice } from "@/lib/db/ftp-ack";
 import { recordSetTap, type SetTapResult } from "@/lib/db/set-log";
 import { recordSetParts } from "@/lib/db/set-parts";
 import { recordSupersetPair } from "@/lib/db/superset-pairs";
-import { recordClip, recordStar, removeClip } from "@/lib/db/video-clips";
+import { recordClip, recordClipRange, recordStar, removeClip } from "@/lib/db/video-clips";
+import { parseSetClipRangeInput, type SetClipRangeResult } from "@/lib/video/clip-range";
 import { parseSetPartsInput, type SetPartsResult } from "@/lib/set-parts";
 import { parseSupersetInput, type SupersetResult } from "@/lib/supersets";
 import type { FtpChoiceResult, FtpUndoResult } from "@/lib/ftp-line";
@@ -86,6 +87,13 @@ export async function starClip(raw: unknown): Promise<StarClipResult> {
   const input = parseStarClipInput(raw);
   if (input === null) return { ok: false, reason: "invalid" };
   return recordStar(input);
+}
+
+/** The user's in/out on a clip (slice clip-handles): one PATCH of clip_in_s/clip_out_s; both numbers or both null. */
+export async function setClipRange(raw: unknown): Promise<SetClipRangeResult> {
+  const input = parseSetClipRangeInput(raw);
+  if (input === null) return { ok: false, reason: "invalid" };
+  return recordClipRange(input);
 }
 
 /** A clip deleted on the phone deletes its row: one DELETE, idempotent. */

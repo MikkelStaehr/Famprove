@@ -53,6 +53,8 @@ import { shareClip, shareData } from "@/lib/video/share";
 import { type CutRange, cutClip, cutRange } from "@/lib/video/cut";
 import { busyText, cutFileName, cutLine, failedCutsLine, prepareClip, type Prepared, saveDoneLine, shareCutLine, splitCount } from "@/lib/video/cut-lines";
 import { formatBytes } from "@/lib/video/space";
+import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/clip-range";
+import { ClipEditor, sendClipRange } from "./ClipEditor";
 
 const CLEANUP_KEY = "famprove.clips.cleanup";
 const BTN = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
@@ -439,6 +441,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           fixture={fixture !== null}
           fileName={fileNames.get(open.id) ?? null}
           cut={cutOf(open)}
+          server={serverById.get(open.id) ?? null}
+          onRange={(id, r) => setRows((rs) => rs?.map((x) => (x.id === id ? { ...x, clipInS: r.inS, clipOutS: r.outS } : x)) ?? rs)}
           onDownload={download}
           onMissing={() => void forgetMissing([open.id])}
           onClose={requestClose}
@@ -518,6 +522,8 @@ function Player({
   fixture,
   fileName,
   cut,
+  server,
+  onRange,
   onDownload,
   onMissing,
   onClose,
@@ -532,6 +538,10 @@ function Player({
   readonly fileName: string | null;
   /** The clip's cut (clip-cut): Gem and Del hand it over; the line under the title shows it. */
   readonly cut: CutRange;
+  /** The clip's row on the server (clip-handles: the editor needs its duration); null = none. */
+  readonly server: VideoClipRow | null;
+  /** The user's range was stored (or removed): the row in memory follows the server's reply. */
+  readonly onRange: (id: string, range: StoredRange) => void;
   readonly onDownload: (blob: Blob, name: string) => void;
   /** The file is gone (§10): the row turns fil mangler on close. */
   readonly onMissing: () => void;
@@ -549,6 +559,11 @@ function Player({
   const [preparing, setPreparing] = useState(false);
   const [saveText, setSaveText] = useState<string | null>(null);
   const [saveReading, setSaveReading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  /** clip-handles §3: the status line after the editor closes; `undo` = Fjern klip's old range (its Fortryd). */
+  const [rangeText, setRangeText] = useState<{ readonly text: string; readonly warn: boolean; readonly undo: ClipRangeS | null } | null>(null);
+  const videoEl = useRef<HTMLVideoElement>(null);
+  const editBtn = useRef<HTMLButtonElement>(null);
   const gone = useRef(false);
   const dialog = useRef<HTMLDivElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
@@ -578,7 +593,7 @@ function Player({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "Tab" && dialog.current !== null) {
-        const f = dialog.current.querySelectorAll<HTMLElement>("button, video[controls]");
+        const f = dialog.current.querySelectorAll<HTMLElement>("button:not(:disabled), video[controls], [role=slider]");
         if (f.length === 0) return;
         const first = f[0];
         const last = f[f.length - 1];
@@ -636,6 +651,25 @@ function Player({
   useEffect(() => () => {
     if (gone.current) missing.current();
   }, []);
+
+  /** clip-handles §1: Klip / Ret klip on an MP4 clip with a server row; never WebM, afbrudt or missing. */
+  const canEdit = row.kind === "clip" && row.ext === "mp4" && server !== null;
+
+  function closeEditor() {
+    setEditing(false);
+    setTimeout(() => editBtn.current?.focus(), 0); // back on Klip / Ret klip once the row is back
+  }
+
+  /** §3: Fjern klip's Fortryd writes the old range back (until the player closes). */
+  async function undoRemove(old: ClipRangeS) {
+    const r = await sendClipRange(row.id, old);
+    if (r.ok && r.inS !== null && r.outS !== null) {
+      onRange(row.id, { inS: r.inS, outS: r.outS });
+      setRangeText({ text: "Klip gemt.", warn: false, undo: null });
+    } else {
+      setRangeText({ text: rangeErrorLine(r.ok ? "failed" : r.reason), warn: true, undo: old });
+    }
+  }
 
   /** Gem (§1): the blob the player loaded (as Del), else one read; fixture: no file, no URL. */
   async function save() {
@@ -695,11 +729,27 @@ function Player({
             <MonoCaption uppercase={false}>Testvisning: ingen video</MonoCaption>
           </div>
         ) : url === null ? null : (
-          <video src={url} controls playsInline muted className="max-h-full max-w-full object-contain" />
+          <video ref={videoEl} src={url} controls={!editing} playsInline muted className="max-h-full max-w-full object-contain" />
         )}
       </div>
       <div className="flex flex-col gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        {confirm ? (
+        {editing && server !== null ? (
+          <ClipEditor
+            clip={server}
+            video={videoEl}
+            onCancel={closeEditor}
+            onSaved={(r) => {
+              onRange(row.id, r);
+              setRangeText({ text: "Klip gemt.", warn: false, undo: null });
+              closeEditor();
+            }}
+            onRemoved={(old) => {
+              onRange(row.id, { inS: null, outS: null });
+              setRangeText({ text: "Dit klip er fjernet.", warn: false, undo: old });
+              closeEditor();
+            }}
+          />
+        ) : confirm ? (
           <>
             <p className="font-sans text-14 text-text">
               Slet videoen fra telefonen? Den kan ikke hentes igen.{row.starred ? " Den er markeret til at blive beholdt." : ""}
@@ -734,6 +784,20 @@ function Player({
                   {saveReading ? busyText(cut) : "Gem"}
                 </button>
               )}
+              {canEdit && (
+                <button
+                  ref={editBtn}
+                  type="button"
+                  className={DARK_BTN}
+                  onClick={() => {
+                    setRangeText(null);
+                    setEditing(true);
+                  }}
+                >
+                  <Icon name="scissors" size={18} />
+                  {server?.clipInS !== null && server?.clipOutS !== null ? "Ret klip" : "Klip"}
+                </button>
+              )}
               <button type="button" className={DARK_BTN} onClick={() => setConfirm(true)}>
                 <Icon name="trash" size={18} />
                 Slet
@@ -744,6 +808,25 @@ function Player({
             <p role="status" className="font-sans text-13 text-text-muted">
               {saveText}
             </p>
+            <div role="status" className="font-sans text-13 text-text-muted">
+              {rangeText !== null && (
+                <span className="flex flex-wrap items-center gap-x-3">
+                  <span>
+                    {rangeText.warn && (
+                      <span aria-hidden="true" className="text-warning">
+                        ◆{" "}
+                      </span>
+                    )}
+                    {rangeText.text}
+                  </span>
+                  {rangeText.undo !== null && (
+                    <button type="button" className={`min-h-11 text-text underline underline-offset-4 ${BTN}`} onClick={() => void undoRemove(rangeText.undo as ClipRangeS)}>
+                      Fortryd
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
           </>
         )}
       </div>

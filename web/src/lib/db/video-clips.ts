@@ -20,6 +20,7 @@ import { createClient, patchCount, type PostgrestClient, PostgrestError, selectA
 import { parseVideoClipRow, RowError, VIDEO_CLIPS_SELECT } from "./rows.ts";
 import { exerciseIds, sessionSets } from "./set-log.ts";
 import { type ClipNames, type RunSets, runSetNumbers, type SessionSetRow } from "../video/library-view.ts";
+import { FIXTURE_FAILING_RANGE_ID, type SetClipRangeInput, type SetClipRangeResult, validateClipRange } from "../video/clip-range.ts";
 
 /**
  * The app's fifth write path (user, 2026-10-17, slice video-record): a working set's clip recorded
@@ -36,6 +37,9 @@ import { type ClipNames, type RunSets, runSetNumbers, type SessionSetRow } from 
  *    One request: insert on conflict (id) do nothing (resolution=ignore-duplicates), so a retry
  *    after a lost reply is the same row and the first insert's recorded_at stands.
  *  - star: one PATCH of starred by id; `found` says whether the row exists yet.
+ *  - range (slice clip-handles): the user's in/out, one PATCH of clip_in_s/clip_out_s by id after one
+ *    read of the row's duration_s; both numbers or both null, rounded to 0.1, 0 ≤ in < out, out − in ≥ 1,
+ *    out ≤ duration_s (lib/video/clip-range.ts, shared with the editor). Refused on a preview host.
  *  - delete: one DELETE by id (deleting a clip on the phone deletes its row); idempotent.
  * Dev switches (DEV_TODAY, DEV_FIXTURE) write nothing and answer as if written.
  * Python never reads the table: TSS is unchanged.
@@ -110,6 +114,41 @@ export async function recordStar(
     return { ok: true, dev: false, found: n > 0 };
   } catch (error) {
     return failed(error, "star not saved");
+  }
+}
+
+/**
+ * The user's in/out (slice clip-handles): one PATCH of clip_in_s/clip_out_s on the clip's id, after one
+ * read of its duration_s. Idempotent: the same values twice give the same row. Refused on a preview
+ * host (as recordClip), for a bad range, or `not_found` without the row. Dev switches read and write
+ * nothing and answer as if saved, except the clips fixture's failing clip (the failed line's shot).
+ */
+export async function recordClipRange(input: SetClipRangeInput, options: VideoClipOptions = {}): Promise<SetClipRangeResult> {
+  const { env = process.env, nodeEnv = process.env.NODE_ENV, client: makeClient = client } = options;
+  if (!recordingAllowed(env, nodeEnv)) return { ok: false, reason: "not_allowed" };
+  const shaped = validateClipRange(input.inS, input.outS, null);
+  if (shaped === null) return { ok: false, reason: "range" };
+  if (devSwitchOn(env, nodeEnv)) {
+    if (devFixture(env, nodeEnv) === "clips" && input.id === FIXTURE_FAILING_RANGE_ID) return { ok: false, reason: "failed" };
+    return { ok: true, dev: true, ...shaped };
+  }
+  try {
+    const c = makeClient();
+    const found = await selectAll(c, TABLE, { columns: "id,duration_s", order: "id", filters: [["id", `eq.${input.id}`]] }, (raw) => {
+      if (typeof raw !== "object" || raw === null) throw new RowError(`${TABLE}: expected an object`);
+      const d = (raw as Record<string, unknown>).duration_s; // checked below
+      if (typeof d !== "number") throw new RowError(`${TABLE}.duration_s must be a number`);
+      return d;
+    });
+    const durationS = found[0];
+    if (durationS === undefined) return { ok: false, reason: "not_found" };
+    const range = validateClipRange(input.inS, input.outS, durationS);
+    if (range === null) return { ok: false, reason: "range" };
+    const n = await patchCount(c, TABLE, { params: [["id", `eq.${input.id}`]], body: { clip_in_s: range.inS, clip_out_s: range.outS }, columns: "id" });
+    if (n === 0) return { ok: false, reason: "not_found" }; // deleted between the read and the write
+    return { ok: true, dev: false, ...range };
+  } catch (error) {
+    return failed(error, "clip range not saved");
   }
 }
 
