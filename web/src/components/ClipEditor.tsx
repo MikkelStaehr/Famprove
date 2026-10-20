@@ -132,7 +132,8 @@ export function ClipEditor({
     setPlayT(r.inS);
     const tick = () => {
       const t = v !== null ? v.currentTime : r.inS + (nowMs() - t0) / 1000;
-      if (t >= r.outS) {
+      // duration_s is rounded to 0.1 s, so out may sit past the file's real end: ended stops it too.
+      if (t >= r.outS || (v !== null && v.ended)) {
         stopPlay(r);
         return;
       }
@@ -156,6 +157,7 @@ export function ClipEditor({
   }
 
   function onPointerDown(handle: Handle, e: PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return; // the primary button or a touch only, never a right click
     e.currentTarget.setPointerCapture(e.pointerId);
     e.currentTarget.focus();
     drag.current = handle;
@@ -214,6 +216,7 @@ export function ClipEditor({
         onPointerMove={(e) => onPointerMove(h, e)}
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
+        onLostPointerCapture={onPointerEnd}
         onKeyDown={(e) => onKey(h, e)}
       >
         <span aria-hidden="true" className="block h-12 w-1 rounded-full bg-text group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-focus" />
