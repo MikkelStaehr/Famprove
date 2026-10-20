@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# MediaPipe WASM, copied from node_modules by scripts/copy-mediapipe.mjs on dev and build (slice clip-pose).
+# The model in public/mediapipe/models/ is committed.
+/public/mediapipe/*/wasm/

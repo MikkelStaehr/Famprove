@@ -67,8 +67,9 @@ Next.js (web/), server components only; the three tabs in one (tabs) shell of pa
 | `DESIGN.md`, `design/` | Visual contract (design-lead), screen specs, pattern packs |
 | `.claude/skills/run-web/` | The only way to run and screenshot the web app (port 3100) |
 | `web/src/lib/video/cut.ts` | The clip cut (slice clip-cut): `cutMp4` (keyframe at or before in → last sample before out, a plain MP4 of the header plus slices of the original Blob), `keyframeTimes`, `cutRange` (user points, then auto when clipped, never WebM); mp4box only by dynamic `import()`; check in Chrome with `web/scripts/verify-cut.mjs` |
+| `web/src/lib/video/pose-run.ts` | Pose lite on the phone (slice clip-pose): `createPose` (self-hosted WASM + model, CPU delegate, VIDEO mode, needs WebGL2), `runPose` (a detached `<video>` seeked at 1/fps, `detectForVideo` per frame, 90 s cap, AbortSignal; landmarks in memory only); dynamic `import()` only; Kameratest's `Pose:` line; shot with run-web's `--webgl` |
 
-Web dependencies beyond Next/React/Tailwind: `recharts` (charts), `lucide-react` (icons), `mp4box` 2.4.1 exact (the user's choice for cutting a clip without re-encoding; reads Chrome's fragmented MP4).
+Web dependencies beyond Next/React/Tailwind: `recharts` (charts), `lucide-react` (icons), `mp4box` 2.4.1 exact (the user's choice for cutting a clip without re-encoding; reads Chrome's fragmented MP4); `@mediapipe/tasks-vision` 1.1.0 exact, Apache-2.0 (the user's choice for the on-phone automatic clip; video never leaves the phone): its WASM is copied to the git-ignored `web/public/mediapipe/<version>/wasm/` by `web/scripts/copy-mediapipe.mjs` on `pnpm dev` / `pnpm build` (Vercel's build too), the model `pose_landmarker_lite.task` (float16 v1, sha256 tested, `NOTICE`) is committed in `web/public/mediapipe/models/`.
 
 ## Tables
 `activities` (rides; `data_warning` = the power-data check, domain/power_check.py) · `strength_activities` (WeightTraining from intervals.icu) ·

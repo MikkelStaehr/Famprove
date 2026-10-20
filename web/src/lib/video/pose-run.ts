@@ -1,0 +1,188 @@
+/**
+ * MediaPipe Pose lite on the phone (slice clip-pose): the risk check before clip-auto. Self-hosted:
+ * the WASM is copied to /mediapipe/<version>/wasm by scripts/copy-mediapipe.mjs and the model is
+ * committed under /mediapipe/models, so every request stays on this origin (no CDN default path).
+ * The package is loaded only by dynamic import(), never in the initial bundle. Landmarks stay in
+ * memory; nothing is stored or sent.
+ */
+import type { PoseLandmarker } from "@mediapipe/tasks-vision";
+
+/** The installed @mediapipe/tasks-vision version (a test holds it equal to package.json). */
+export const MEDIAPIPE_VERSION = "1.1.0";
+export const WASM_BASE = `/mediapipe/${MEDIAPIPE_VERSION}/wasm`;
+export const MODEL_PATH = "/mediapipe/models/pose_landmarker_lite.task";
+/** The wall-time cap of one run, load included. */
+export const POSE_CAP_MS = 90_000;
+
+/** One landmark: normalised x, y and visibility (0–1). */
+export type PosePoint = readonly [x: number, y: number, visibility: number];
+/** One sampled frame: its time in the clip (s) and the 33 landmarks of one person, or null when none was found. */
+export type PoseFrame = { readonly t: number; readonly landmarks: readonly PosePoint[] | null };
+/** loadMs: WASM + model; totalMs: the frame pass (seeks + detection); msPerFrame: mean detection time. */
+export type PoseTiming = { readonly loadMs: number; readonly frames: number; readonly msPerFrame: number; readonly totalMs: number };
+export type PoseResult = { readonly frames: readonly PoseFrame[]; readonly timing: PoseTiming };
+
+export type PoseFailure = "aborted" | "timeout" | "load" | "video" | "detect";
+export class PoseError extends Error {
+  readonly reason: PoseFailure;
+  constructor(reason: PoseFailure, message: string) {
+    super(message);
+    this.name = "PoseError";
+    this.reason = reason;
+  }
+}
+
+/** MediaPipe's vision tasks upload every frame through WebGL2, even with the CPU delegate. */
+function hasWebGl2(): boolean {
+  const gl = document.createElement("canvas").getContext("webgl2");
+  gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  return gl !== null;
+}
+
+/** The landmarker, from this origin only. The caller closes it. */
+export async function createPose(): Promise<PoseLandmarker> {
+  if (!hasWebGl2()) throw new PoseError("load", "ingen WebGL2 i browseren");
+  const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
+  const fileset = await FilesetResolver.forVisionTasks(WASM_BASE);
+  return PoseLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: MODEL_PATH, delegate: "CPU" },
+    runningMode: "VIDEO",
+    numPoses: 1,
+  });
+}
+
+/** Rejects with the signal's reason once it aborts. */
+function untilAbort<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    p.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      },
+    );
+  });
+}
+
+/** Resolves on the media event, rejects on an error event or after ms. */
+function mediaEvent(video: HTMLVideoElement, name: string, ms: number): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const done = () => {
+      clearTimeout(timer);
+      video.removeEventListener(name, ok);
+      video.removeEventListener("error", bad);
+    };
+    const ok = () => {
+      done();
+      resolve();
+    };
+    const bad = () => {
+      done();
+      reject(new PoseError("video", "videoen kunne ikke læses"));
+    };
+    const timer = setTimeout(() => {
+      done();
+      reject(new PoseError("video", `${name} kom ikke inden for ${ms / 1000} s`));
+    }, ms);
+    video.addEventListener(name, ok, { once: true });
+    video.addEventListener("error", bad, { once: true });
+  });
+}
+
+/** The clip's length (s). A MediaRecorder file may report Infinity until the end has been seeked to. */
+async function durationOf(video: HTMLVideoElement): Promise<number> {
+  if (Number.isFinite(video.duration) && video.duration > 0) return video.duration;
+  const changed = mediaEvent(video, "durationchange", 5000);
+  video.currentTime = 1e7;
+  await changed;
+  return Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+}
+
+/**
+ * Pose on a recorded clip: a detached <video> on a blob URL, seeked in 1/fps steps, detectForVideo
+ * per frame, yielding to the event loop between frames. Aborts on the signal or after POSE_CAP_MS.
+ * The blob URL is revoked and the landmarker closed on every way out.
+ */
+export async function runPose(
+  blob: Blob,
+  opts: { readonly fps?: number; readonly signal?: AbortSignal; readonly onProgress?: (done: number, of: number) => void } = {},
+): Promise<PoseResult> {
+  const fps = opts.fps ?? 5;
+  const started = performance.now();
+  const ctrl = new AbortController();
+  const cap = setTimeout(() => ctrl.abort(new PoseError("timeout", `over ${POSE_CAP_MS / 1000} s`)), POSE_CAP_MS);
+  const outer = opts.signal;
+  const onOuter = () => ctrl.abort(new PoseError("aborted", "afbrudt"));
+  if (outer?.aborted) onOuter();
+  else outer?.addEventListener("abort", onOuter, { once: true });
+  const signal = ctrl.signal;
+
+  let landmarker: PoseLandmarker | null = null;
+  const url = URL.createObjectURL(blob);
+  const video = document.createElement("video");
+  try {
+    const loading = createPose();
+    // A landmarker that arrives after an abort is closed at once.
+    loading.then(
+      (l) => {
+        if (signal.aborted) l.close();
+      },
+      () => undefined,
+    );
+    try {
+      landmarker = await untilAbort(loading, signal);
+    } catch (error) {
+      if (error instanceof PoseError) throw error;
+      throw new PoseError("load", error instanceof Error ? error.message : String(error));
+    }
+    const loadMs = performance.now() - started;
+
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    const meta = mediaEvent(video, "loadedmetadata", 10_000);
+    video.src = url;
+    await untilAbort(meta, signal);
+    const duration = await untilAbort(durationOf(video), signal);
+    if (duration <= 0) throw new PoseError("video", "ingen længde");
+
+    const times: number[] = [];
+    for (let t = 0; t < duration; t += 1 / fps) times.push(Math.round(t * 1000) / 1000);
+    const frames: PoseFrame[] = [];
+    let detectMs = 0;
+    const pass = performance.now();
+    for (const t of times) {
+      const seeked = mediaEvent(video, "seeked", 5000);
+      video.currentTime = t;
+      await untilAbort(seeked, signal);
+      const before = performance.now();
+      let found: PoseFrame["landmarks"];
+      try {
+        const result = landmarker.detectForVideo(video, Math.round(t * 1000));
+        const person = result.landmarks[0];
+        found = person === undefined ? null : person.map((p) => [p.x, p.y, p.visibility] as const);
+      } catch (error) {
+        throw new PoseError("detect", error instanceof Error ? error.message : String(error));
+      }
+      detectMs += performance.now() - before;
+      frames.push({ t, landmarks: found });
+      opts.onProgress?.(frames.length, times.length);
+      await untilAbort(new Promise((r) => setTimeout(r, 0)), signal);
+    }
+    const totalMs = performance.now() - pass;
+    return { frames, timing: { loadMs, frames: frames.length, msPerFrame: frames.length === 0 ? 0 : detectMs / frames.length, totalMs } };
+  } finally {
+    clearTimeout(cap);
+    outer?.removeEventListener("abort", onOuter);
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(url);
+    landmarker?.close();
+  }
+}

@@ -3,6 +3,7 @@
  * offers, as plain text the user copies and sends. Pure, no I/O. Nothing leaves the phone except
  * by the user's own paste: no deviceId or groupId is ever kept, shown or copied (cameras are numbered).
  */
+import { formatSeconds } from "./cut-lines.ts";
 
 /** The capability and setting keys the report shows, in this order (camera-wide picks lens, zoom and size from them). */
 export const DIAG_KEYS = ["width", "height", "aspectRatio", "frameRate", "zoom", "facingMode", "resizeMode"] as const;
@@ -202,3 +203,41 @@ export function diagResources(revoke: (url: string) => void) {
 }
 
 export type DiagResources = ReturnType<typeof diagResources>;
+
+/** Pose landmarks counted as "a joint seen": elbows, wrists, hips and knees (MediaPipe's 33-point indices). */
+export const SEEN_JOINTS: readonly number[] = [13, 14, 15, 16, 23, 24, 25, 26];
+/** A landmark counts as seen from this visibility. */
+export const SEEN_VISIBILITY = 0.5;
+
+/** One frame as the pose line needs it: the landmarks' (x, y, visibility), or null when no person was found. */
+export type PoseFrameLike = { readonly landmarks: readonly (readonly [number, number, number])[] | null };
+
+/** The share (0–1) of frames with at least one hip, knee, wrist or elbow at visibility ≥ 0.5; null for no frames. */
+export function jointsSeenShare(frames: readonly PoseFrameLike[]): number | null {
+  if (frames.length === 0) return null;
+  const seen = frames.filter((f) => f.landmarks !== null && SEEN_JOINTS.some((i) => (f.landmarks?.[i]?.[2] ?? 0) >= SEEN_VISIBILITY));
+  return seen.length / frames.length;
+}
+
+/** Kameratest's pose outcome: the timing of a run, or why it failed (a short reason). */
+export type PoseOutcome =
+  | {
+      readonly ok: true;
+      readonly timing: { readonly loadMs: number; readonly frames: number; readonly msPerFrame: number; readonly totalMs: number };
+      readonly seenShare: number | null;
+    }
+  | { readonly ok: false; readonly reason: string };
+
+/** `Pose: 20 billeder på 1,4 s (70 ms pr. billede, indlæsning 2,1 s) · led set i 85 % af billederne`, or the failure line. */
+export function poseLine(o: PoseOutcome): string {
+  if (!o.ok) return `Pose kunne ikke køre (${o.reason})`;
+  const { frames, totalMs, msPerFrame, loadMs } = o.timing;
+  const seen = o.seenShare === null ? "" : ` · led set i ${Math.round(o.seenShare * 100)} % af billederne`;
+  return `Pose: ${frames} ${frames === 1 ? "billede" : "billeder"} på ${formatSeconds(totalMs / 1000)} (${Math.round(msPerFrame)} ms pr. billede, indlæsning ${formatSeconds(loadMs / 1000)})${seen}`;
+}
+
+/** A failure's short reason for the pose line: at most 60 characters, never a stack. */
+export function poseReason(error: unknown): string {
+  const text = typeof error === "object" && error !== null && "reason" in error && "message" in error && typeof error.message === "string" ? error.message : errorText(error);
+  return text.length > 60 ? `${text.slice(0, 59)}…` : text;
+}

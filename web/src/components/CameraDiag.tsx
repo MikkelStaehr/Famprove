@@ -10,8 +10,11 @@ import {
   errorText,
   formatCamera,
   formatReport,
+  jointsSeenShare,
   otherKeys,
   pickDiag,
+  poseLine,
+  poseReason,
   zoomMinOf,
 } from "@/lib/video/camera-diag";
 import { keyframeLines, type KeyframeLines } from "@/lib/video/cut-lines";
@@ -20,21 +23,24 @@ import { pickRecorderType, recorderOptions } from "@/lib/video/mime";
 /** The keyframe test clip's length (clip-cut §6). */
 const TEST_CLIP_MS = 4000;
 
+/** The keyframe lines and the test clip, which the caller keeps only until Pose has run on it (clip-pose). */
+type KeyframeTest = { readonly lines: KeyframeLines; readonly recording: Blob | null };
+
 /**
  * clip-cut §6: a 4 s clip at 960×720 with the recorder's options, its keyframe spacing measured on
  * the recording. The tracks go into the run's resources (released on every way out); the recording
- * lives only in this function and is dropped once measured. null = the run was released.
+ * is handed back for the Pose run and dropped after it. null = the run was released.
  */
-async function keyframeTest(devices: readonly MediaDeviceInfo[], run: DiagResources): Promise<KeyframeLines | null> {
+async function keyframeTest(devices: readonly MediaDeviceInfo[], run: DiagResources): Promise<KeyframeTest | null> {
   const type = pickRecorderType(typeof MediaRecorder === "undefined" ? undefined : (t) => MediaRecorder.isTypeSupported(t));
-  if (type === null) return { line: "Afstanden kunne ikke måles.", warning: null };
+  if (type === null) return { lines: { line: "Afstanden kunne ikke måles.", warning: null }, recording: null };
   const device = devices.find((d) => /back|rear|environment|bag/i.test(d.label)) ?? devices[0];
   if (device === undefined) return null;
   let stream: MediaStream;
   try {
     stream = await openCamera({ deviceId: { exact: device.deviceId }, width: { ideal: 960 }, height: { ideal: 720 } });
   } catch {
-    return run.released ? null : { line: "Afstanden kunne ikke måles.", warning: null };
+    return run.released ? null : { lines: { line: "Afstanden kunne ikke måles.", warning: null }, recording: null };
   }
   if (!run.addTracks(stream.getTracks())) return null;
   let chunks: Blob[] = [];
@@ -55,14 +61,26 @@ async function keyframeTest(devices: readonly MediaDeviceInfo[], run: DiagResour
   }
   run.stopTracks();
   if (run.released) return null;
-  const recording = new Blob(chunks, { type: type.fileType });
+  const recording = chunks.length === 0 ? null : new Blob(chunks, { type: type.fileType });
   chunks = [];
-  if (type.ext === "webm") return keyframeLines(null, type.mimeType);
+  if (type.ext === "webm" || recording === null) return { lines: keyframeLines(null, type.mimeType), recording };
   try {
     const { keyframeTimes } = await import("@/lib/video/cut");
-    return keyframeLines(await keyframeTimes(recording), type.mimeType);
+    return { lines: keyframeLines(await keyframeTimes(recording), type.mimeType), recording };
   } catch {
-    return keyframeLines(null, type.mimeType);
+    return { lines: keyframeLines(null, type.mimeType), recording };
+  }
+}
+
+/** clip-pose: Pose lite on the test clip, as Kameratest's one line. Aborted by the signal (every way out). */
+async function poseTest(recording: Blob | null, signal: AbortSignal): Promise<string> {
+  if (recording === null) return poseLine({ ok: false, reason: "intet testklip" });
+  try {
+    const { runPose } = await import("@/lib/video/pose-run");
+    const r = await runPose(recording, { fps: 5, signal });
+    return poseLine({ ok: true, timing: r.timing, seenShare: jointsSeenShare(r.frames) });
+  } catch (error) {
+    return poseLine({ ok: false, reason: poseReason(error) });
   }
 }
 
@@ -142,6 +160,7 @@ type Shown = CameraResult & { readonly shotUrl: string | null };
 type Phase =
   | { readonly kind: "idle" }
   | { readonly kind: "running"; readonly at: number; readonly of: number }
+  | { readonly kind: "pose" } // Pose runs on the test clip
   | { readonly kind: "done" }
   | { readonly kind: "stopped" } // the page was hidden mid-run or after: tracks stopped, shots revoked
   | { readonly kind: "error"; readonly text: string };
@@ -194,11 +213,14 @@ export function CameraDiag() {
   const [cameras, setCameras] = useState<Shown[]>([]);
   const [copied, setCopied] = useState<string>("");
   const [keyframes, setKeyframes] = useState<KeyframeLines | null>(null);
+  const [pose, setPose] = useState<string | null>(null);
   const res = useRef<DiagResources | null>(null);
+  const poseAbort = useRef<AbortController | null>(null);
 
   // Every way out (CLAUDE.md lifecycles): unmount, page hidden (incl. bfcache) and back.
   useEffect(() => {
     const stop = () => {
+      poseAbort.current?.abort();
       const current = res.current;
       if (current === null || current.released) return;
       current.release();
@@ -215,17 +237,22 @@ export function CameraDiag() {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", stop);
       window.removeEventListener("popstate", stop);
+      poseAbort.current?.abort();
       res.current?.release();
     };
   }, []);
 
   async function start() {
+    poseAbort.current?.abort();
     res.current?.release();
     const run = diagResources((url) => URL.revokeObjectURL(url));
     res.current = run;
+    const abort = new AbortController();
+    poseAbort.current = abort;
     setCameras([]);
     setCopied("");
     setKeyframes(null);
+    setPose(null);
     if (navigator.mediaDevices?.getUserMedia === undefined) {
       setPhase({ kind: "error", text: "Denne browser giver ikke adgang til kameraet." });
       return;
@@ -253,7 +280,12 @@ export function CameraDiag() {
       setPhase({ kind: "running", at: devices.length, of: devices.length });
       const kf = await keyframeTest(devices, run);
       if (kf === null || run.released) return;
-      setKeyframes(kf);
+      setKeyframes(kf.lines);
+      setPhase({ kind: "pose" });
+      // The clip lives only until Pose has run on it; nothing keeps it after this run.
+      const line = await poseTest(kf.recording, abort.signal);
+      if (run.released || abort.signal.aborted) return;
+      setPose(line);
     }
     if (!run.released) setPhase(devices.length === 0 ? { kind: "error", text: "Browseren viser ingen kameraer." } : { kind: "done" });
   }
@@ -261,14 +293,15 @@ export function CameraDiag() {
   async function copyAll() {
     try {
       const kf = keyframes === null ? "" : `\n\n${keyframes.line}${keyframes.warning === null ? "" : `\n${keyframes.warning}`}`;
-      await navigator.clipboard.writeText(`${formatReport(cameras, new Date())}${kf}`);
+      const ps = pose === null ? "" : `\n${pose}`;
+      await navigator.clipboard.writeText(`${formatReport(cameras, new Date())}${kf}${ps}`);
       setCopied("Kopieret.");
     } catch {
       setCopied("Kunne ikke kopiere. Markér teksten, og kopiér selv.");
     }
   }
 
-  const running = phase.kind === "running";
+  const running = phase.kind === "running" || phase.kind === "pose";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
@@ -286,7 +319,9 @@ export function CameraDiag() {
           ? phase.of === 0
             ? "Spørger om adgang til kameraet …"
             : `Tester kamera ${phase.at} af ${phase.of} …`
-          : phase.kind === "done"
+          : phase.kind === "pose"
+            ? "Måler kropsgenkendelsen på testklippet …"
+            : phase.kind === "done"
             ? `${cameras.length} ${cameras.length === 1 ? "kamera" : "kameraer"} testet.`
             : phase.kind === "stopped"
               ? "Stoppet, da siden blev skjult. Kameraet er lukket, og testbillederne er fjernet."
@@ -297,6 +332,7 @@ export function CameraDiag() {
         <div className="flex flex-col gap-1">
           <p className={`font-mono text-13 ${keyframes.line.startsWith("◆") ? "text-warning" : "text-text-muted"}`}>{keyframes.line}</p>
           {keyframes.warning !== null && <p className="font-mono text-13 text-warning">{keyframes.warning}</p>}
+          {pose !== null && <p className="font-mono text-13 text-text-muted">{pose}</p>}
         </div>
       )}
       {phase.kind === "error" && (

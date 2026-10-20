@@ -11,6 +11,8 @@ export const CONTENT_SECURITY_POLICY =
   "frame-ancestors 'none'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'";
 export const PERMISSIONS_POLICY = "camera=(self), microphone=(), geolocation=(), display-capture=()";
 
+export const MEDIAPIPE_CACHE = "public, max-age=31536000, immutable";
+
 const SECURITY_HEADERS = [
   { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },
   { key: "Permissions-Policy", value: PERMISSIONS_POLICY },
@@ -23,7 +25,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   devIndicators: false, // no dev badge over the page (it covered content in screenshots)
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      // Pose's WASM sits under its version and the model is pinned (slice clip-pose): never refetched.
+      { source: "/mediapipe/:path*", headers: [{ key: "Cache-Control", value: MEDIAPIPE_CACHE }] },
+    ];
   },
   // The tab shell (docs/decisions/tab-shell.md §2): Træning is /train; the home-screen bookmark on /
   // keeps working through a temporary redirect (308 would be cached for good).
