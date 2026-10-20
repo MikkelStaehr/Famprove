@@ -5,7 +5,28 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 
 import { deleteClip, saveClip, starClip, trimClip } from "@/app/actions";
-import { finishDueTrims } from "@/lib/video/trim";
+import { type CutResult, finishDueTrims, finishTrim, startTrim, type StartTrimResult, type TrimDeps, undoTrim, type UndoTrimResult } from "@/lib/video/trim";
+import {
+  CUTTING_LINE,
+  cutPoints,
+  doneAnnouncement,
+  doneLine,
+  endAt,
+  failedLine,
+  finishedLine,
+  GEM_KLIP,
+  NO_POINTS,
+  OUT_CLEARED_LINE,
+  type Points,
+  pointsLine,
+  secondsLeft,
+  startAt,
+  storedLine,
+  storedPoints,
+  type TrimState,
+  trimStep,
+  undoneLine as trimUndoneLine,
+} from "@/lib/video/trim-flow";
 import { Icon } from "@/components/icons";
 import { MonoCaption } from "@/components/MonoCaption";
 import { SectionTitle } from "@/components/SectionTitle";
@@ -40,7 +61,7 @@ import {
   browserDownload,
   clipFileNames,
   clipLabel,
-  doneLine,
+  doneLine as saveAllDoneLine,
   PROMPT_LINE,
   progressLine,
   type SaveClip,
@@ -55,7 +76,8 @@ import { type CutRange, cutClip, cutRange } from "@/lib/video/cut";
 import { busyText, cutFileName, cutLine, failedCutsLine, formatSeconds, prepareClip, type Prepared, saveDoneLine, shareCutLine, splitCount } from "@/lib/video/cut-lines";
 import { formatBytes } from "@/lib/video/space";
 import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/clip-range";
-import { markPoint, markRange, pendingLine, refusedLine, SAVING_LINE, savedLine, START_CLEARED_LINE, startLabel, startLine, UNDO_FAILED_LINE, undoInput, undoneLine } from "@/lib/video/clip-mark";
+import { markPoint, pendingLine, refusedLine, START_CLEARED_LINE, startLabel, startLine } from "@/lib/video/clip-mark";
+import { FIXTURE_FAILING_RANGE_ID } from "@/lib/video/clip-range";
 import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, inPickupWindow, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
@@ -92,18 +114,23 @@ const DARK_BTN = `inline-flex min-h-11 items-center justify-center gap-2 rounded
 /** Gem and Del keep their width while they read `Klipper …` / `Forbereder …` (clip-cut §7). */
 const BUSY_WIDTH = "min-w-[7.5rem]";
 /** clip-mark §1: the two marks, half the row each, Ember's 56px stepper height. */
+/** clip-trim §2.3: Gem klip, Ember's filled primary, full width, the stepper height. */
+const CUT_BTN = `inline-flex min-h-14 w-full items-center justify-center rounded-full bg-inverse-bg px-5 font-sans text-button text-inverse-text aria-disabled:opacity-60 ${BTN}`;
 const MARK_BTN = `inline-flex min-h-14 flex-1 items-center justify-center gap-1 rounded-full px-4 font-sans text-button text-text aria-disabled:opacity-60 ${BTN}`;
 const TEXT_LINK = `inline-flex min-h-11 items-center text-text underline underline-offset-4 ${BTN}`;
 
-/** The status line's button: Fjern klip's and a mark's Fortryd, or a failed write's Prøv igen (never focused by a tap, §3). */
-type RangeAction =
-  | { readonly kind: "undo-remove"; readonly old: ClipRangeS }
-  | { readonly kind: "undo-mark"; readonly prev: StoredRange }
-  | { readonly kind: "retry-mark"; readonly range: ClipRangeS; readonly prev: StoredRange }
-  | { readonly kind: "retry-undo"; readonly prev: StoredRange };
+/** The status line's button: Fjern klip's Fortryd (never focused by a tap, clip-mark §3). */
+type RangeAction = { readonly kind: "undo-remove"; readonly old: ClipRangeS };
 type RangeText = { readonly text: string; readonly warn: boolean; readonly action: RangeAction | null };
-/** A mark's Fortryd stays until the player closes or the next mark saves (§2.3). */
-const keptUndo = (t: RangeText | null): RangeAction | null => (t?.action?.kind === "undo-mark" ? t.action : null);
+const keptUndo = (t: RangeText | null): RangeAction | null => t?.action ?? null;
+
+/** DEV_FIXTURE=clips (clip-trim §6): the simulated cut, no file and no write; the keyframe 0,5 s before in, clip 3 fails. */
+function fixtureCut(id: string) {
+  return async (_file: Blob, inS: number, outS: number): Promise<CutResult> => {
+    if (id === FIXTURE_FAILING_RANGE_ID) throw new Error("fixture: the failing clip");
+    return { blob: new Blob([new Uint8Array(16)]), actual: { startS: Math.max(0, Math.round((inS - 0.5) * 10) / 10), endS: outS } };
+  };
+}
 
 type Props = {
   readonly today: IsoDate;
@@ -174,6 +201,10 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const [rest, setRest] = useState<readonly SaveClip[]>([]);
   const [running, setRunning] = useState<Running | null>(null);
   const pickupStarted = useRef(false);
+  /** clip-trim §3: each pending cut's finish timer (kept here, so closing the player never ends a window), and the bytes it freed. */
+  const trimTimers = useRef(new Map<string, number>());
+  const trimBefore = useRef(new Map<string, { readonly row: VideoClipRow | null; readonly bytes: number | null }>());
+  const [finishedTrims, setFinishedTrims] = useState<Readonly<Record<string, number | null>>>({});
   /** clip-summary: the hidden overview, with this phone's last outcomes read when it opened; null = closed. */
   const [overview, setOverview] = useState<Readonly<Record<string, AutoLast>> | null>(null);
   const titlePress = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -203,6 +234,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     try {
       if (fixture !== null) {
         store.current = { index: memoryClipIndex(fixture.local), files: memoryClipFiles() };
+        for (const e of fixture.local) await store.current.files.writeFile(clipFile(e), new Blob([new Uint8Array(32)])); // clip-trim §6: the simulated cut reads a placeholder
         setFiles(store.current.files);
         setLocal({ kind: "ready", entries: await store.current.index.all() });
         setSizes(Object.fromEntries(fixture.local.map((e) => [e.id, FIXTURE_CLIP_BYTES])));
@@ -243,6 +275,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       }
       entries = await s.index.all();
       setLocal({ kind: "ready", entries });
+      for (const e of entries) if (e.pendingTrim !== undefined) scheduleFinishRef.current(e.id, e.pendingTrim.deadline); // a window still open from before: its finish
       const sz: Record<string, number | null> = {};
       for (const e of entries) sz[e.id] = (await s.files.readFile(clipFile(e)))?.size ?? null;
       setSizes(sz);
@@ -364,6 +397,126 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const today_ = todaysClips(list, today);
   const testPrefix = fixture !== null ? "Testvisning: " : "";
 
+  /** clip-trim: the cut's deps; the fixture's cut and trim are fakes (no file, no write). */
+  function trimDeps(id: string): TrimDeps | null {
+    const s = store.current;
+    if (s === null) return null;
+    if (fixture !== null) return { index: s.index, files: s.files, trim: async (i) => ({ ok: true, dev: true, durationS: i.durationS }), cut: fixtureCut(id) };
+    return { index: s.index, files: s.files, trim: trimClip };
+  }
+
+  async function fileBytes(id: string, toS?: number, fromS?: number | null): Promise<number | null> {
+    if (fixture !== null) return toS !== undefined && fromS !== undefined && fromS !== null && fromS > 0 ? Math.round((FIXTURE_CLIP_BYTES * toS) / fromS) : FIXTURE_CLIP_BYTES;
+    const s = store.current;
+    const e = s === null ? null : await s.index.get(id);
+    return s === null || e === null ? null : ((await s.files.readFile(clipFile(e)))?.size ?? null);
+  }
+
+  function clearTrimTimer(id: string) {
+    const t = trimTimers.current.get(id);
+    if (t !== undefined) window.clearTimeout(t);
+    trimTimers.current.delete(id);
+  }
+
+  /** §3 at 0: finishTrim (the one server write), then the space line and the player's frigjort line. */
+  async function finishNow(id: string) {
+    trimTimers.current.delete(id);
+    const deps = trimDeps(id);
+    const s = store.current;
+    if (deps === null || s === null) return;
+    const r = await finishTrim(deps, id, new Date());
+    if (r === "waiting") {
+      const e = await s.index.get(id);
+      if (e?.pendingTrim !== undefined) scheduleFinishRef.current(id, e.pendingTrim.deadline);
+      return;
+    }
+    if (r === "failed") return; // pendingTrim stays: the next load's finishDueTrims retries
+    const before = trimBefore.current.get(id);
+    trimBefore.current.delete(id);
+    const e = await s.index.get(id);
+    const after = await fileBytes(id, e?.durationS ?? undefined, before?.row?.durationS ?? null);
+    setSizes((sz) => ({ ...sz, [id]: after }));
+    setLocal({ kind: "ready", entries: await s.index.all() });
+    const freed = before?.bytes !== null && before?.bytes !== undefined && after !== null ? Math.max(0, before.bytes - after) : null;
+    setFinishedTrims((f) => ({ ...f, [id]: freed }));
+  }
+  const finishRef = useRef(finishNow);
+  useEffect(() => {
+    finishRef.current = finishNow;
+  });
+
+  /** One finish timer per pending cut, at its deadline. */
+  const scheduleFinishRef = useRef((id: string, deadline: string) => {
+    const old = trimTimers.current.get(id);
+    if (old !== undefined) window.clearTimeout(old);
+    const ms = Math.max(0, Date.parse(deadline) - Date.now()) + 50;
+    trimTimers.current.set(id, window.setTimeout(() => void finishRef.current(id), ms));
+  });
+
+  // §3 lifecycle: the finish timers go on unmount and while hidden; visible again re-arms every
+  // pending window (past its deadline it finishes at once); a next mount's finishDueTrims covers the rest.
+  useEffect(() => {
+    const timers = trimTimers.current;
+    const clearAll = () => {
+      for (const t of timers.values()) window.clearTimeout(t);
+      timers.clear();
+    };
+    const onVis = () => {
+      if (document.visibilityState === "hidden") {
+        clearAll();
+        return;
+      }
+      const s = store.current;
+      if (s === null) return;
+      void s.index.all().then((all) => {
+        for (const e of all) if (e.pendingTrim !== undefined) scheduleFinishRef.current(e.id, e.pendingTrim.deadline);
+      });
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      clearAll();
+    };
+  }, []);
+
+  /** §2.3 Gem klip: startTrim; done updates the row (new file, length, no stored range) and times the finish. */
+  async function runTrim(id: string, inS: number, outS: number): Promise<StartTrimResult> {
+    const deps = trimDeps(id);
+    const s = store.current;
+    if (deps === null || s === null) return { kind: "failed", space: false };
+    setFinishedTrims((f) => {
+      const next = { ...f };
+      delete next[id];
+      return next;
+    });
+    const bytes = sizes[id] ?? null;
+    const row = serverById.get(id) ?? null;
+    const r = await startTrim(deps, id, inS, outS, new Date());
+    if (r.kind !== "done") return r;
+    if (!trimBefore.current.has(id)) trimBefore.current.set(id, { row, bytes });
+    setLocal({ kind: "ready", entries: await s.index.all() });
+    setRows((rs) => rs?.map((x) => (x.id === id ? { ...x, durationS: r.toS, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null } : x)) ?? rs);
+    scheduleFinishRef.current(id, r.deadline);
+    return r;
+  }
+
+  /** §3 Fortryd: undoTrim (local only); the row gets its length and stored range back. */
+  async function runUndoTrim(id: string): Promise<UndoTrimResult> {
+    const s = store.current;
+    if (s === null) return { kind: "failed" };
+    const r = await undoTrim({ index: s.index, files: s.files }, id, new Date());
+    if (r.kind !== "undone") return r;
+    clearTrimTimer(id);
+    const before = trimBefore.current.get(id);
+    trimBefore.current.delete(id);
+    if (before?.row != null) {
+      const prev = before.row;
+      setRows((rs) => rs?.map((x) => (x.id === id ? prev : x)) ?? rs);
+    }
+    setLocal({ kind: "ready", entries: await s.index.all() });
+    return r;
+  }
+
   /** One clip to Downloads (the player's Gem, §1). Fixture: no file, no URL. */
   function download(blob: Blob, name: string) {
     if (fixture !== null || keeper.current === null) return;
@@ -414,7 +567,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     setSaving(null);
     setRest(result.remaining);
     const failedLine = failedCutsLine(failedCuts);
-    setSaveLine(`${testPrefix}${doneLine(result, splitCount(result.sent, cutCount))}${failedLine === null ? "" : ` ${failedLine}`}`);
+    setSaveLine(`${testPrefix}${saveAllDoneLine(result, splitCount(result.sent, cutCount))}${failedLine === null ? "" : ` ${failedLine}`}`);
     await forgetMissing(result.missing.map((c) => c.id));
   }
 
@@ -478,6 +631,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const usedText = formatBytes(used ?? undefined);
   const quotaText = formatBytes(space.quota);
   const shown = showAll ? list : list.slice(0, FIRST_ROWS);
+  /** The open clip as the list has it now (a cut changes its file and length, clip-trim §2.3). */
+  const openRow = open === null ? null : (list.find((r) => r.id === open.id) ?? open);
   const line = cleanupLine(cleaned);
 
   return (
@@ -596,10 +751,13 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       <p role="status" className="sr-only">
         {status}
       </p>
-      {open !== null && (
+      {openRow !== null && open !== null && (
         <Player
           key={open.id}
-          row={open}
+          row={openRow}
+          onTrim={(inS, outS) => runTrim(open.id, inS, outS)}
+          onUndoTrim={() => runUndoTrim(open.id)}
+          finished={open.id in finishedTrims ? (finishedTrims[open.id] ?? null) : undefined}
           files={files}
           fixture={fixture !== null}
           fileName={fileNames.get(open.id) ?? null}
@@ -725,6 +883,9 @@ function AutoClipSwitch({ on }: { readonly on: boolean }) {
 
 function Player({
   row,
+  onTrim,
+  onUndoTrim,
+  finished,
   files,
   fixture,
   fileName,
@@ -743,6 +904,12 @@ function Player({
   onDelete,
 }: {
   readonly row: LibraryRow;
+  /** clip-trim §2.3: Gem klip's cut (startTrim at the library); never throws. */
+  readonly onTrim: (inS: number, outS: number) => Promise<StartTrimResult>;
+  /** §3 Fortryd (undoTrim, local only). */
+  readonly onUndoTrim: () => Promise<UndoTrimResult>;
+  /** §3 at 0: the library's finish landed (the bytes freed, null = not measured); undefined = not finished. */
+  readonly finished: number | null | undefined;
   readonly files: ClipFiles | null;
   readonly fixture: boolean;
   /** Gem's (and Del's) file name; null without a local file. */
@@ -780,17 +947,20 @@ function Player({
   const [editing, setEditing] = useState(false);
   /** clip-handles §3 / clip-mark §2: the status line under the buttons, with its Fortryd or Prøv igen. */
   const [rangeText, setRangeText] = useState<RangeText | null>(null);
-  /** clip-mark: the pending Start (s), and a mark's or its Fortryd's write in flight. */
-  const [pending, setPending] = useState<number | null>(null);
-  const [markBusy, setMarkBusy] = useState(false);
+  /** clip-trim §2: the pending points (an old stored range opens as them, §5), and whether they still are that range. */
+  const [points, setPoints] = useState<Points>(() => storedPoints(server));
+  const [fromStored, setFromStored] = useState(() => storedPoints(server).inS !== null);
+  const [trim, setTrim] = useState<TrimState>({ kind: "idle" });
+  /** §3: the polite announcement, once per cut, Fortryd and failure (the countdown is not live). */
+  const [announce, setAnnounce] = useState("");
+  const lastCut = useRef<Points>(NO_POINTS);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const markBusy = trim.kind === "cutting";
+  const pending = points.inS;
+  const cutBtn = useRef<HTMLButtonElement>(null);
   const startBtn = useRef<HTMLButtonElement>(null);
   const endBtn = useRef<HTMLButtonElement>(null);
   const statusRow = useRef<HTMLDivElement>(null);
-  /** Focus lost or about to be: on body, or on the status row's Prøv igen / Fortryd, which unmounts after this tap (review 2026-10-20). */
-  const focusOffRow = () => {
-    const a = document.activeElement;
-    return a === null || a === document.body || (statusRow.current?.contains(a) ?? false);
-  };
   const videoEl = useRef<HTMLVideoElement>(null);
   const editBtn = useRef<HTMLButtonElement>(null);
   const gone = useRef(false);
@@ -805,6 +975,28 @@ function Player({
     press.current = null;
   };
   useEffect(() => endPress, []);
+
+  // §3: Fortryd's count, once a second; cleared on close, unmount, back (the player unmounts) and while hidden.
+  const doneDeadline = trim.kind === "done" ? trim.deadline : null;
+  useEffect(() => {
+    if (doneDeadline === null) return;
+    let h: number | null = null;
+    const tick = () => setNowMs(Date.now());
+    const arm = () => {
+      if (h !== null) window.clearInterval(h);
+      h = document.visibilityState === "hidden" ? null : window.setInterval(tick, 1000);
+      if (h !== null) tick();
+    };
+    arm();
+    document.addEventListener("visibilitychange", arm);
+    return () => {
+      if (h !== null) window.clearInterval(h);
+      document.removeEventListener("visibilitychange", arm);
+    };
+  }, [doneDeadline]);
+  /** The flow as shown: a done cut whose finish landed is finished (Fortryd went). */
+  const view: TrimState = trim.kind === "done" && finished !== undefined ? trimStep(trim, { kind: "finished", freed: finished }) : trim;
+  const left = view.kind === "done" ? secondsLeft(view.deadline, nowMs) : 0;
 
   useEffect(() => {
     let made: string | null = null;
@@ -918,70 +1110,74 @@ function Player({
     return videoEl.current?.currentTime ?? Number.NaN;
   }
 
-  /** §2.1 Start her: a pending in point; no write, the video keeps playing. */
+  /** §2.1 Start her: a pending in point; no write, the video keeps playing. An out under 1,0 s after it is cleared. */
   function markStart() {
     if (markBusy || server === null) return;
     const t = playhead();
     if (!Number.isFinite(t)) return;
-    const inS = markPoint(t, server.durationS);
-    setPending(inS);
-    setRangeText((old) => ({ text: startLine(inS), warn: false, action: keptUndo(old) }));
+    const next = startAt(points, markPoint(t, server.durationS));
+    setPoints(next.points);
+    setFromStored(false);
+    const inS = next.points.inS ?? 0;
+    setRangeText((old) => ({ text: next.cleared ? OUT_CLEARED_LINE : startLine(inS), warn: false, action: keptUndo(old) }));
   }
 
-  /** §2.2 Slut her: one setClipRange by the in rule, or the refused line and no write. */
+  /** §2.2 Slut her: only a pending out point (in = the pending Start, else 0); it writes nothing. Refused: the ◆ line, nothing set. */
   function markEnd() {
     if (markBusy || server === null) return;
     const t = playhead();
     if (!Number.isFinite(t)) return;
-    const m = markRange(server, pending, t, auto);
+    const m = endAt(points, t, server.durationS);
     if (m.kind === "refused") {
       setRangeText((old) => ({ text: refusedLine(m.inS), warn: true, action: keptUndo(old) }));
       return;
     }
-    void sendMark(m.range, undoInput(server));
+    setPoints(m.points);
+    setFromStored(false);
+    setRangeText((old) => (old === null || old.warn ? null : old));
   }
 
-  /** A mark's write (and Prøv igen's, with the same values). */
-  async function sendMark(range: ClipRangeS, prev: StoredRange) {
-    setMarkBusy(true);
-    setRangeText((old) => ({ text: SAVING_LINE, warn: false, action: old?.action?.kind === "retry-mark" ? old.action : null }));
-    const r = await sendClipRange(row.id, range);
-    setMarkBusy(false);
-    setPending(null); // saved: the new range shows; failed: the old cut line keeps (§2.2)
-    if (r.ok) {
-      const stored: StoredRange = r.inS === null || r.outS === null ? { inS: null, outS: null } : { inS: r.inS, outS: r.outS };
-      onRange(row.id, stored);
-      setRangeText({ text: stored.inS === null ? "Klip gemt." : savedLine(stored), warn: false, action: { kind: "undo-mark", prev } });
-      if (focusOffRow()) endBtn.current?.focus(); // Prøv igen is gone
-      return;
-    }
-    const retry = r.reason === "failed" || r.reason === "network";
-    setRangeText({ text: rangeErrorLine(r.reason), warn: true, action: retry ? { kind: "retry-mark", range, prev } : null });
+  /** The cut's outcome (the player's Gem klip or the editor's). */
+  function cutDone(r: Extract<StartTrimResult, { kind: "done" }>) {
+    setTrim({ kind: "done", fromS: r.fromS, toS: r.toS, deadline: r.deadline });
+    setNowMs(Date.now());
+    setPoints(NO_POINTS);
+    setFromStored(false);
+    setRangeText(null);
+    setAnnounce(doneAnnouncement(r.toS));
   }
 
-  /** §2.3 Fortryd: one setClipRange back to the range stored before the mark (null/null when none). */
-  async function undoMark(prev: StoredRange) {
-    setMarkBusy(true);
-    setRangeText((old) => ({ text: SAVING_LINE, warn: false, action: old?.action?.kind === "retry-undo" ? old.action : null }));
-    const r = await sendClipRange(row.id, prev);
-    setMarkBusy(false);
-    if (r.ok) {
-      onRange(row.id, prev);
-      setRangeText({ text: undoneLine(prev), warn: false, action: null });
-      if (focusOffRow()) endBtn.current?.focus();
+  /** §2.3 Gem klip: Klipper … at once, marks disabled, the video paused; then done or failed (the points stay). */
+  async function cutNow() {
+    if (markBusy || server === null) return;
+    const c = cutPoints(points, server.durationS);
+    if (c === null) return;
+    videoEl.current?.pause();
+    lastCut.current = { inS: c.inS, outS: c.outS };
+    setTrim((st) => trimStep(st, { kind: "cut", inS: c.inS, outS: c.outS }));
+    const r = await onTrim(c.inS, c.outS);
+    if (r.kind === "done") {
+      cutDone(r);
+      setTimeout(() => endBtn.current?.focus(), 0); // Gem klip is gone; focus never lands on Fortryd (§7.12)
       return;
     }
-    setRangeText({ text: UNDO_FAILED_LINE, warn: true, action: { kind: "retry-undo", prev } });
+    setTrim((st) => trimStep(st, { kind: "result", result: r }));
+    setAnnounce(failedLine(r.space));
+  }
+
+  /** §3 Fortryd: the original is the clip again; the points come back pending; focus → Gem klip. */
+  async function undoCut() {
+    const r = await onUndoTrim();
+    if (r.kind !== "undone") return; // expired: the finish comes; failed: the window runs on
+    setTrim((st) => trimStep(st, { kind: "undone", fromS: r.durationS }));
+    setPoints(lastCut.current);
+    setAnnounce(trimUndoneLine(r.durationS));
+    setTimeout(() => cutBtn.current?.focus(), 0);
   }
 
   function runAction(a: RangeAction) {
     if (markBusy) return;
-    if (a.kind === "undo-remove") void undoRemove(a.old);
-    else if (a.kind === "undo-mark") {
-      endBtn.current?.focus(); // Fortryd goes; focus never stays on it (§3)
-      void undoMark(a.prev);
-    } else if (a.kind === "retry-mark") void sendMark(a.range, a.prev);
-    else void undoMark(a.prev);
+    void undoRemove(a.old);
   }
 
   /** Gem (§1): the blob the player loaded (as Del), else one read; fixture: no file, no URL. */
@@ -1045,16 +1241,23 @@ function Player({
           <MonoCaption uppercase={false}>{row.meta}</MonoCaption>
         </div>
       </div>
-      {pending !== null && !editing ? (
+      {(points.inS !== null || points.outS !== null) && !editing ? (
         <p className="flex flex-wrap items-center gap-x-3 pl-[60px] pr-3 font-mono text-13 text-text-muted">
-          <span>{pendingLine(pending)}</span>
+          <span>
+            {points.outS === null
+              ? pendingLine(points.inS ?? 0)
+              : fromStored
+                ? storedLine(points.inS ?? 0, points.outS)
+                : pointsLine(points.inS ?? 0, points.outS)}
+          </span>
           <button
             type="button"
             aria-disabled={markBusy || undefined}
             className={`${TEXT_LINK} font-sans aria-disabled:opacity-60`}
             onClick={() => {
-              if (markBusy) return; // Gemmer … owns the line
-              setPending(null);
+              if (markBusy) return; // Klipper … owns the line
+              setPoints(NO_POINTS); // Ryd clears both points (clip-trim §2.2)
+              setFromStored(false);
               setRangeText((old) =>
                 old === null || old.warn ? old : old.action === null ? null : { text: START_CLEARED_LINE, warn: false, action: old.action },
               );
@@ -1067,7 +1270,7 @@ function Player({
       ) : (
         cutLine(cut) !== null && <p className="pl-[60px] pr-3 font-mono text-13 text-text-muted">{cutLine(cut)}</p>
       )}
-      {autoLine !== null && pending === null && (
+      {autoLine !== null && pending === null && points.outS === null && (
         <p className="pl-[60px] pr-3 font-sans text-13 text-text-muted">
           {autoLine.words}
           {autoLine.figure !== null && (
@@ -1107,9 +1310,9 @@ function Player({
             auto={auto}
             video={videoEl}
             onCancel={closeEditor}
-            onSaved={(r) => {
-              onRange(row.id, r);
-              setRangeText({ text: "Klip gemt.", warn: false, action: null });
+            onCut={(r) => onTrim(r.inS, r.outS)}
+            onCutDone={(r) => {
+              cutDone(r);
               closeEditor();
             }}
             onRemoved={(old) => {
@@ -1154,19 +1357,22 @@ function Player({
                     </span>
                   )}
                 </button>
-                <button ref={endBtn} type="button" aria-disabled={markBusy || undefined} className={`${MARK_BTN} bg-track`} onClick={markEnd}>
-                  {markBusy ? (
-                    SAVING_LINE
+                <button ref={endBtn} type="button" aria-disabled={markBusy || undefined} className={`${MARK_BTN} ${points.outS === null ? "bg-track" : "bg-raised"}`} onClick={markEnd}>
+                  {points.outS === null ? (
+                    <span>Slut her</span>
                   ) : (
-                    <>
-                      <span>Slut her</span>
-                      <span aria-hidden="true" className="font-mono">
-                        ]
-                      </span>
-                    </>
+                    <span className="tabular-nums">Slut {formatSeconds(points.outS)}</span>
                   )}
+                  <span aria-hidden="true" className="font-mono">
+                    ]
+                  </span>
                 </button>
               </div>
+            )}
+            {canEdit && server !== null && (markBusy || (cutPoints(points, server.durationS) !== null && view.kind !== "done")) && (
+              <button ref={cutBtn} type="button" aria-disabled={markBusy || undefined} className={CUT_BTN} onClick={() => void cutNow()}>
+                {markBusy ? CUTTING_LINE : GEM_KLIP}
+              </button>
             )}
             <div className="flex flex-wrap gap-2">
               {row.kind === "clip" && (
@@ -1194,7 +1400,8 @@ function Player({
                   className={DARK_BTN}
                   onClick={() => {
                     setRangeText(null);
-                    setPending(null); // clip-mark §1: opening the editor clears a pending Start
+                    setPoints(NO_POINTS); // clip-mark §1: opening the editor clears the pending points
+                    setFromStored(false);
                     setEditing(true);
                   }}
                 >
@@ -1212,6 +1419,41 @@ function Player({
             <p role="status" className="font-sans text-13 text-text-muted">
               {saveText}
             </p>
+            {view.kind !== "idle" && view.kind !== "cutting" && (
+              <p className="flex flex-wrap items-center gap-x-3 font-sans text-13 text-text-muted">
+                {view.kind === "done" && (
+                  <>
+                    <span className="tabular-nums">
+                      {doneLine(view.toS, view.fromS)}
+                      {left > 0 ? " ·" : "."}
+                    </span>
+                    {left > 0 && (
+                      <button type="button" className={`${DARK_BTN} min-h-11`} onClick={() => void undoCut()}>
+                        Fortryd <span className="font-mono tabular-nums">{left}</span>
+                      </button>
+                    )}
+                  </>
+                )}
+                {view.kind === "finished" && <span className="tabular-nums">{finishedLine(view.toS, view.freed)}</span>}
+                {view.kind === "undone" && <span className="tabular-nums">{trimUndoneLine(view.fromS)}</span>}
+                {view.kind === "failed" && (
+                  <>
+                    <span>
+                      <span aria-hidden="true" className="text-warning">
+                        ◆{" "}
+                      </span>
+                      {failedLine(view.space)}
+                    </span>
+                    <button type="button" className={`min-h-11 text-text underline underline-offset-4 ${BTN}`} onClick={() => void cutNow()}>
+                      Prøv igen
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
+            <p role="status" className="sr-only">
+              {announce}
+            </p>
             <div ref={statusRow} role="status" className="font-sans text-13 text-text-muted">
               {rangeText !== null && (
                 <span className="flex flex-wrap items-center gap-x-3">
@@ -1225,7 +1467,7 @@ function Player({
                   </span>
                   {rangeText.action !== null && (
                     <button
-                      key={rangeText.action.kind.startsWith("undo") ? "fortryd" : "retry"}
+                      key="fortryd"
                       type="button"
                       aria-disabled={markBusy || undefined}
                       className={`min-h-11 text-text underline underline-offset-4 aria-disabled:opacity-60 ${BTN}`}
@@ -1233,7 +1475,7 @@ function Player({
                         if (rangeText.action !== null) runAction(rangeText.action);
                       }}
                     >
-                      {rangeText.action.kind.startsWith("undo") ? "Fortryd" : "Prøv igen"}
+                      Fortryd
                     </button>
                   )}
                 </span>

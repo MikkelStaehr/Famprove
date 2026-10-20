@@ -17,6 +17,8 @@ import {
 } from "@/lib/video/clip-range";
 import type { VideoClipRow } from "@/lib/video/clips";
 import { formatSeconds } from "@/lib/video/cut-lines";
+import type { StartTrimResult } from "@/lib/video/trim";
+import { CANCEL, CUTTING_LINE, failedLine, GEM_KLIP } from "@/lib/video/trim-flow";
 
 const BTN = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 const DARK_BTN = `inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-track px-4 font-sans text-14 font-medium text-text disabled:opacity-50 ${BTN}`;
@@ -55,14 +57,16 @@ type Failure = "invalid" | "range" | "not_found" | "not_allowed" | "failed" | "n
 
 /**
  * The clip editor (slice clip-handles, design/specs/clip-handles.md §2–3): two handles on a strip,
- * the readout, Gem klip / Afspil klip / Fortryd / Fjern klip. Every rAF is cancelled on unmount; the
+ * the readout, Gem klip / Afspil klip / Annullér / Fjern klip. Gem klip cuts the file (clip-trim §4:
+ * `onCut`, i.e. startTrim, never setClipRange); Fjern klip clears an old stored range. Every rAF is cancelled on unmount; the
  * drag uses pointer capture on the handle itself, so no window listener is added.
  */
 export function ClipEditor({
   clip,
   auto = true,
   video,
-  onSaved,
+  onCut,
+  onCutDone,
   onRemoved,
   onCancel,
 }: {
@@ -71,14 +75,19 @@ export function ClipEditor({
   readonly auto?: boolean;
   /** The player's video (null in the fixture: no file). */
   readonly video: RefObject<HTMLVideoElement | null>;
-  readonly onSaved: (range: StoredRange) => void;
+  /** clip-trim §4: Gem klip's cut (the library's startTrim); never throws. */
+  readonly onCut: (range: ClipRangeS) => Promise<StartTrimResult>;
+  /** The cut is done: the player shows its done line and Fortryd; the editor closes. */
+  readonly onCutDone: (done: Extract<StartTrimResult, { kind: "done" }>) => void;
   /** Fjern klip landed; `old` is the user's range it removed (for the status line's Fortryd). */
   readonly onRemoved: (old: ClipRangeS) => void;
   readonly onCancel: () => void;
 }) {
   const duration = clip.durationS;
   const [range, setRange] = useState<ClipRangeS>(() => startRange(clip, auto));
-  const [saving, setSaving] = useState<"save" | "remove" | null>(null);
+  const [saving, setSaving] = useState<"cut" | "remove" | null>(null);
+  /** clip-trim §2.3: a failed cut (the points stay; Prøv igen cuts them again). */
+  const [cutFailed, setCutFailed] = useState<{ readonly space: boolean } | null>(null);
   const [failure, setFailure] = useState<{ readonly reason: Failure; readonly retry: StoredRange } | null>(null);
   const [playT, setPlayT] = useState<number | null>(null);
   const strip = useRef<HTMLDivElement>(null);
@@ -183,19 +192,32 @@ export function ClipEditor({
     move(applyKey(range, handle, m, duration), handle);
   }
 
-  async function send(kind: "save" | "remove", values: StoredRange) {
+  /** Fjern klip (§5: only for an old stored range): one setClipRange of null/null. */
+  async function remove(values: StoredRange) {
     if (playT !== null) stopPlay();
-    setSaving(kind);
+    setSaving("remove");
     setFailure(null);
+    setCutFailed(null);
     const r = await sendClipRange(clip.id, values);
     setSaving(null);
     if (!r.ok) {
       setFailure({ reason: r.reason, retry: values });
       return;
     }
-    const stored: StoredRange = r.inS === null || r.outS === null ? { inS: null, outS: null } : { inS: r.inS, outS: r.outS };
-    if (kind === "remove" && clip.clipInS !== null && clip.clipOutS !== null) onRemoved({ inS: clip.clipInS, outS: clip.clipOutS });
-    else onSaved(stored);
+    if (clip.clipInS !== null && clip.clipOutS !== null) onRemoved({ inS: clip.clipInS, outS: clip.clipOutS });
+  }
+
+  /** clip-trim §4 Gem klip: the same cut as the player's (startTrim through onCut). */
+  async function cut(r: ClipRangeS) {
+    if (playT !== null) stopPlay();
+    video.current?.pause();
+    setSaving("cut");
+    setFailure(null);
+    setCutFailed(null);
+    const out = await onCut(r);
+    setSaving(null);
+    if (out.kind === "done") onCutDone(out);
+    else setCutFailed({ space: out.space });
   }
 
   const pct = (t: number) => `${(t / duration) * 100}%`;
@@ -247,22 +269,35 @@ export function ClipEditor({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={PRIMARY} disabled={saving !== null} onClick={() => void send("save", range)}>
-          {saving === "save" ? "Gemmer …" : "Gem klip"}
+        <button type="button" className={PRIMARY} disabled={saving !== null} onClick={() => void cut(range)}>
+          {saving === "cut" ? CUTTING_LINE : GEM_KLIP}
         </button>
         <button type="button" className={DARK_BTN} disabled={saving !== null} onClick={play}>
           {playT !== null ? "Stop" : "Afspil klip"}
         </button>
         <button type="button" className={DARK_BTN} disabled={saving !== null} onClick={onCancel}>
-          Fortryd
+          {CANCEL}
         </button>
         {hasUserRange && (
-          <button type="button" className={DARK_BTN} disabled={saving !== null} onClick={() => void send("remove", { inS: null, outS: null })}>
+          <button type="button" className={DARK_BTN} disabled={saving !== null} onClick={() => void remove({ inS: null, outS: null })}>
             Fjern klip
           </button>
         )}
       </div>
       <div role="status" className="font-sans text-13 text-text-muted">
+        {cutFailed !== null && (
+          <span className="flex flex-wrap items-center gap-x-3">
+            <span>
+              <span aria-hidden="true" className="text-warning">
+                ◆{" "}
+              </span>
+              {failedLine(cutFailed.space)}
+            </span>
+            <button type="button" className={`min-h-11 text-text underline underline-offset-4 ${BTN}`} disabled={saving !== null} onClick={() => void cut(range)}>
+              Prøv igen
+            </button>
+          </span>
+        )}
         {failure !== null && (
           <span className="flex flex-wrap items-center gap-x-3">
             <span>
@@ -272,7 +307,7 @@ export function ClipEditor({
               {rangeErrorLine(failure.reason)}
             </span>
             {(failure.reason === "failed" || failure.reason === "network") && (
-              <button type="button" className={`min-h-11 text-text underline underline-offset-4 ${BTN}`} onClick={() => void send(failure.retry.inS === null ? "remove" : "save", failure.retry)}>
+              <button type="button" className={`min-h-11 text-text underline underline-offset-4 ${BTN}`} onClick={() => void remove(failure.retry)}>
                 Prøv igen
               </button>
             )}
