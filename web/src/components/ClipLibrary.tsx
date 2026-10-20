@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 
 import { deleteClip, saveClip, starClip } from "@/app/actions";
@@ -293,6 +294,11 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         <button type="button" className={`mt-2 min-h-11 font-sans text-14 text-text underline-offset-4 hover:underline ${BTN}`} onClick={() => setShowAll(true)}>
           Vis alle {list.length}
         </button>
+      )}
+      {canRecord && (
+        <Link href="/kamera" className={`mt-2 inline-block font-sans text-13 text-text-muted underline-offset-4 hover:underline ${BTN}`}>
+          Kameratest
+        </Link>
       )}
       <p role="status" className="sr-only">
         {status}
