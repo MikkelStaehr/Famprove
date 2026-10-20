@@ -54,7 +54,7 @@ contain personal training data: write them to the session scratchpad or `%TEMP%`
 reference: `--base file://$PWD/design/reference/ --path belastning-mockup.html --width 1400`; a bundle that
 renders inside a frame never matches, so the shot waits 30 s, exits 1 and still writes the PNG) · `--timeout 90` (seconds for the whole shot: a hung browser is killed
 and the shot exits 1, never waited on; one stalled a run for hours on 2026-10-13). It prints one JSON line (height, horizontal overflow, console
-errors, `offOrigin`: every request that left the page's origin, from CDP's Network log) and exits 1 on overflow, console errors or a page that never got ready. Then **Read the
+errors, `offOrigin`: every request that left the page's origin, from CDP's Network log; `cspBlocked`: every request the page's CSP blocked, `{ blockedURI, violatedDirective }` from a `securitypolicyviolation` listener added with `Page.addScriptToEvaluateOnNewDocument`, top document only, listed and never a failure, e.g. MediaPipe's usage logger to odml.pa.googleapis.com that `connect-src 'self'` blocks) and exits 1 on overflow, console errors or a page that never got ready. Then **Read the
 PNG** — a screenshot you haven't looked at proves nothing.
 
 `serve.ps1 -Mode prod` serves the last `pnpm build` with `next start`. Building rewrites `web/.next`,

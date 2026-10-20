@@ -1,16 +1,21 @@
 /**
  * MediaPipe Pose lite on the phone (slice clip-pose): the risk check before clip-auto. Self-hosted:
  * the WASM is copied to /mediapipe/<version>/wasm by scripts/copy-mediapipe.mjs and the model is
- * committed under /mediapipe/models, so every request stays on this origin (no CDN default path).
- * The package is loaded only by dynamic import(), never in the initial bundle. Landmarks stay in
- * memory; nothing is stored or sent.
+ * committed under /mediapipe/models/<name>/<precision>/<version>/ (its source URL's path), so the
+ * WASM and the model load from this origin (no CDN default path). Not every request stays here:
+ * MediaPipe 1.1.0 has a built-in usage logger that can't be turned off; on close() and every 60 s it
+ * POSTs OS family, version, task and latency (no frames, no landmarks) to
+ * https://odml.pa.googleapis.com/v1/log. The CSP's connect-src 'self' blocks it (next.config.ts);
+ * never loosen connect-src. The package is loaded only by dynamic import(), never in the initial
+ * bundle. Landmarks stay in memory; this code stores and sends nothing.
  */
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 
 /** The installed @mediapipe/tasks-vision version (a test holds it equal to package.json). */
 export const MEDIAPIPE_VERSION = "1.1.0";
 export const WASM_BASE = `/mediapipe/${MEDIAPIPE_VERSION}/wasm`;
-export const MODEL_PATH = "/mediapipe/models/pose_landmarker_lite.task";
+/** Versioned like its source, storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/. */
+export const MODEL_PATH = "/mediapipe/models/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 /** The wall-time cap of one run, load included. */
 export const POSE_CAP_MS = 90_000;
 
@@ -95,13 +100,28 @@ function mediaEvent(video: HTMLVideoElement, name: string, ms: number): Promise<
   });
 }
 
-/** The clip's length (s). A MediaRecorder file may report Infinity until the end has been seeked to. */
+/**
+ * The clip's length (s). A MediaRecorder file may report Infinity until the end has been seeked to.
+ * The probe's seek is waited out (its seeked) before returning, so the first frame's seek can't be
+ * answered by the probe's seeked and detect frame 0 at the clip's end.
+ */
 async function durationOf(video: HTMLVideoElement): Promise<number> {
   if (Number.isFinite(video.duration) && video.duration > 0) return video.duration;
   const changed = mediaEvent(video, "durationchange", 5000);
+  const settled = mediaEvent(video, "seeked", 5000);
+  settled.catch(() => undefined); // unawaited when the seek already settled or durationchange failed
   video.currentTime = 1e7;
   await changed;
+  if (video.seeking) await settled;
   return Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+}
+
+/** Frame times (s, ms-rounded) at i / fps from 0, stopping before the duration; never a running sum. */
+export function frameTimes(duration: number, fps: number): number[] {
+  if (!Number.isFinite(fps) || fps <= 0) throw new PoseError("video", `ugyldig fps: ${fps}`);
+  const times: number[] = [];
+  for (let i = 0; i / fps < duration; i++) times.push(Math.round((i / fps) * 1000) / 1000);
+  return times;
 }
 
 /**
@@ -114,6 +134,7 @@ export async function runPose(
   opts: { readonly fps?: number; readonly signal?: AbortSignal; readonly onProgress?: (done: number, of: number) => void } = {},
 ): Promise<PoseResult> {
   const fps = opts.fps ?? 5;
+  if (!Number.isFinite(fps) || fps <= 0) throw new PoseError("video", `ugyldig fps: ${fps}`);
   const started = performance.now();
   const ctrl = new AbortController();
   const cap = setTimeout(() => ctrl.abort(new PoseError("timeout", `over ${POSE_CAP_MS / 1000} s`)), POSE_CAP_MS);
@@ -152,8 +173,7 @@ export async function runPose(
     const duration = await untilAbort(durationOf(video), signal);
     if (duration <= 0) throw new PoseError("video", "ingen længde");
 
-    const times: number[] = [];
-    for (let t = 0; t < duration; t += 1 / fps) times.push(Math.round(t * 1000) / 1000);
+    const times = frameTimes(duration, fps);
     const frames: PoseFrame[] = [];
     let detectMs = 0;
     const pass = performance.now();

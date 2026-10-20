@@ -7,7 +7,10 @@
 //   [--webgl]  (software WebGL2 instead of --disable-gpu: MediaPipe needs it)
 //   [--wait-seconds 30]  (how long --wait-text waits, inside --timeout)
 // The JSON line lists every request that left the page's origin (offOrigin: the URLs, from CDP's
-// Network domain), so a self-hosted asset is proven local (slice clip-pose: MediaPipe).
+// Network domain), so a self-hosted asset is proven local (slice clip-pose: MediaPipe), and every
+// request the page's CSP blocked (cspBlocked: { blockedURI, violatedDirective }, from a
+// securitypolicyviolation listener added before the page's own scripts). Listed only, never a failure:
+// e.g. MediaPipe's usage logger to odml.pa.googleapis.com, which connect-src 'self' is there to block.
 //   [--ready "<css selector>"]  (default: the app's own readiness; a selector for a page outside the app,
 //   e.g. a design reference opened with --base file:///…/design/reference/ --path mockup.html)
 // Prints one JSON line; exits 1 on horizontal overflow, console errors, a page that never got ready,
@@ -121,6 +124,12 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Network.enable");
+  // CSP violations of the top document, kept on window for the JSON line (a page reload starts over).
+  await send("Page.addScriptToEvaluateOnNewDocument", {
+    source:
+      "window.__cspBlocked = []; document.addEventListener('securitypolicyviolation', (e) => " +
+      "window.__cspBlocked.push({ blockedURI: e.blockedURI, violatedDirective: e.violatedDirective }));",
+  });
   // Exact viewport: --window-size is clamped to ~516 px on Windows; device metrics are not.
   const metrics = (height) =>
     send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 600 });
@@ -202,7 +211,10 @@ try {
   writeFileSync(opt.out, Buffer.from(shot.data, "base64"));
 
   const horizontalOverflow = page.scrollWidth > page.clientWidth || page.innerOverflow;
-  console.log(JSON.stringify({ out: opt.out, width, height: page.height, horizontalOverflow, consoleErrors: errors, offOrigin: [...offOrigin] }));
+  const cspBlocked = (await evaluate("JSON.stringify(window.__cspBlocked ?? [])")) ?? "[]";
+  console.log(
+    JSON.stringify({ out: opt.out, width, height: page.height, horizontalOverflow, consoleErrors: errors, offOrigin: [...offOrigin], cspBlocked: JSON.parse(cspBlocked) }),
+  );
   if (horizontalOverflow || errors.length > 0) exitCode = 1;
   ws.close();
 } finally {

@@ -228,11 +228,11 @@ export type PoseOutcome =
     }
   | { readonly ok: false; readonly reason: string };
 
-/** `Pose: 20 billeder på 1,4 s (70 ms pr. billede, indlæsning 2,1 s) · led set i 85 % af billederne`, or the failure line. */
+/** `Pose: 20 billeder på 1,4 s (70 ms pr. billede, indlæsning 2,1 s) · led set i 85 % af billederne (hofte, knæ, håndled eller albue)`, or the failure line. */
 export function poseLine(o: PoseOutcome): string {
   if (!o.ok) return `Pose kunne ikke køre (${o.reason})`;
   const { frames, totalMs, msPerFrame, loadMs } = o.timing;
-  const seen = o.seenShare === null ? "" : ` · led set i ${Math.round(o.seenShare * 100)} % af billederne`;
+  const seen = o.seenShare === null ? "" : ` · led set i ${Math.round(o.seenShare * 100)} % af billederne (hofte, knæ, håndled eller albue)`;
   return `Pose: ${frames} ${frames === 1 ? "billede" : "billeder"} på ${formatSeconds(totalMs / 1000)} (${Math.round(msPerFrame)} ms pr. billede, indlæsning ${formatSeconds(loadMs / 1000)})${seen}`;
 }
 
