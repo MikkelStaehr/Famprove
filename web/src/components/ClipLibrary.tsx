@@ -546,7 +546,11 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
 
   useEffect(() => () => delTimers().clearAll(), [delTimers]); // unmount: the next load's finishDueDeletes finishes them
   // §3: Fortryd's text countdown (10 → 1) while a window is open.
-  const trimWaiting = local.kind === "ready" && local.entries.some((e) => e.pendingTrim !== undefined && e.id !== open?.id); // clip-line §3: a cut's window on the line
+  // clip-line §3: a cut's window on the line, only while its deadline is ahead (a finish that failed
+  // leaves pendingTrim set; it retries on the next load and must not keep the 250 ms tick alive; review).
+  const trimWaiting =
+    local.kind === "ready" &&
+    local.entries.some((e) => e.pendingTrim !== undefined && e.id !== open?.id && (nowMs === 0 || secondsLeft(e.pendingTrim.deadline, nowMs) > 0));
   const windowOpen = delLine?.kind === "window" || trimWaiting;
   useEffect(() => {
     if (!windowOpen) return;
