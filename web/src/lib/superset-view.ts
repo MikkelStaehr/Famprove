@@ -5,8 +5,8 @@
  * pair line. The pairs themselves come from lib/supersets.ts (the server's rules).
  */
 
-import { isWarmup, type LoggedSet, type PairRef, runStartRows, type RunSet, sessionOrderWithWarmups, type SetRef, setKey, withSessionOrder } from "./set-taps.ts";
-import { type EffectivePair, type PairSlot, pairSlots, type PairSource, sessionRuns, type SupersetRefusal, type SupersetResult } from "./supersets.ts";
+import { isWarmup, type LoggedSet, type PairRef, runStartRows, type RunSet, sessionOrderWithAnyPairs, type SetRef, setKey, withSessionOrder } from "./set-taps.ts";
+import { type EffectivePair, orderedPairSlots, type PairSlot, type PairSource, sessionRuns, type SupersetRefusal, type SupersetResult } from "./supersets.ts";
 import { type ExerciseView, titleName } from "./training-view.ts";
 
 type Named = Pick<ExerciseView, "name" | "variant" | "variantId" | "row" | "sets">;
@@ -103,7 +103,7 @@ export function orderPairs(
  */
 export function clientOrder(exercises: readonly Named[], pairs: readonly PairRef[], runRows: readonly number[] | null = null): SetRef[] {
   const sets = runSetsOf(exercises);
-  return withSessionOrder(sessionOrderWithWarmups(sets, pairs), sets, pairs, runRows);
+  return withSessionOrder(sessionOrderWithAnyPairs(sets, pairs), sets, pairs, runRows);
 }
 
 export type SeamView = {
@@ -127,6 +127,8 @@ export function seamViews(
   serverSlots: readonly PairSlot[],
   pairs: readonly (PairRef & { readonly source: PairSource })[],
   log: Iterable<SetRef | LoggedSet>,
+  /** The session's stored run order (slice superset-any: a picked partner sits right after A); null = the sheet's. */
+  runRows: readonly number[] | null = null,
 ): SeamView[] {
   const logged = [...log];
   // Every run gets a placeholder id: the server already dropped the boundaries without one.
@@ -137,7 +139,7 @@ export function seamViews(
     const e = exercises.find((x) => x.row === row);
     return e === undefined ? "" : titleName(e);
   };
-  return pairSlots(runs, effective, logged)
+  return orderedPairSlots(runs, effective, logged, runRows)
     .filter((s) => offered.has(slotKey(s)))
     .map((s) => {
       const a = runs.find((r) => r.row === s.rowA);

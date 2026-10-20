@@ -36,7 +36,8 @@ import {
   progress,
   type Progress,
   type RunSet,
-  sessionOrderWithWarmups,
+  sessionOrderWithAnyPairs,
+  type SetRef as PartnerSetRef,
   withSessionOrder,
   setKey,
   type SetRef,
@@ -44,7 +45,7 @@ import {
   stateOf,
   type JumpMark,
 } from "./set-taps.ts";
-import { effectivePairs, exerciseIdMap, type PairSlot, pairSlots, type PairSource, sessionRuns } from "./supersets.ts";
+import { exerciseIdMap, orderedEffectivePairs, orderedPairSlots, type PairSlot, type PairSource, runsInOrder, sessionRuns, supersetHistoryRows, supersetPartners } from "./supersets.ts";
 import type { ZoneKey } from "./zone-scale.ts";
 
 export const LOCAL_TZ = "Europe/Copenhagen";
@@ -203,7 +204,64 @@ export type StrengthSession = {
   readonly runRows: readonly number[] | null;
   /** The latest jump's undo mark (session_order's previous_rows, jumped_at, moved_start); null = none. */
   readonly jump: JumpMark | null;
+  /** ⇄'s partner lists at load (slice superset-any), per A where ⇄ is offered, in A's session order. */
+  readonly partners: readonly PartnerList[];
+  /** What partnerViews needs to re-read the lists live (Fokus): runs with an exercise id and "Som sidst". */
+  readonly partnerData: PartnerData;
 };
+
+/** One partner ⇄ offers for A (slice superset-any): its run's first row, title, the exercise under a variant, working sets, today's kg. */
+export type PartnerView = {
+  readonly row: number;
+  readonly name: string;
+  /** The exercise's name muted under a variant's title; null without a variant. */
+  readonly under: string | null;
+  readonly sets: number;
+  /** The run's first row's today kg (planned_sets.today_kg); null = none. */
+  readonly kg: number | null;
+  /** "Som sidst": the latest earlier pair for A's exercise was with this one (first in the list). */
+  readonly lastTime: boolean;
+};
+
+export type PartnerList = { readonly rowA: number; readonly partners: readonly PartnerView[] };
+
+/** The runs (first rows) with a public.exercises id, and per A the "Som sidst" B rows, latest first. */
+export type PartnerData = {
+  readonly runs: readonly number[];
+  readonly history: readonly { readonly rowA: number; readonly rowsB: readonly number[] }[];
+};
+
+export const NO_PARTNERS: PartnerData = { runs: [], history: [] };
+
+type PartnerRow = Pick<ExerciseView, "name" | "variant" | "variantId" | "row" | "sets" | "todayKg">;
+
+/**
+ * ⇄'s partners for A (lib/supersets.ts supersetPartners) as the screens show them, re-read from
+ * the live log, pairs and order. Null when ⇄ isn't offered for A (or no run can be its partner).
+ */
+export function partnerViews(
+  exercises: readonly PartnerRow[],
+  data: PartnerData,
+  runRows: readonly number[] | null,
+  pairs: readonly { readonly rowA: number; readonly rowB: number }[],
+  log: Iterable<PartnerSetRef | LoggedSet>,
+  rowA: number,
+): PartnerView[] | null {
+  const runSets = exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name, variantId: e.variantId })));
+  const known = new Set(data.runs);
+  const runs = sessionRuns(runSets, new Map(exercises.map((e) => [e.name.trim().toLowerCase(), 1]))).map((r) => ({
+    ...r,
+    exerciseId: known.has(r.row) ? r.exerciseId : null,
+  }));
+  const list = supersetPartners(runs, runRows, pairs, log, rowA, data.history.find((h) => h.rowA === rowA)?.rowsB ?? []);
+  if (list === null || list.length === 0) return null;
+  return list.flatMap((p) => {
+    const e = exercises.find((x) => x.row === p.row);
+    const run = runs.find((r) => r.row === p.row);
+    if (e === undefined || run === undefined) return [];
+    return [{ row: p.row, name: titleName(e), under: e.variant === null ? null : e.name.trim(), sets: run.sets, kg: e.todayKg, lastTime: p.lastTime }];
+  });
+}
 
 /** A superset in force: the runs' first sheet rows, why (chosen today or suggested), and whether it can still be switched. */
 export type SupersetView = {
@@ -420,9 +478,13 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
   );
   const runSets = exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name, variantId: e.variantId })));
   const log = data.setLog.filter((l) => l.date === today && l.session === slot.session);
-  const supersets = sessionSupersets(data, today, slot.session, runSets, log);
   const stored = data.sessionOrders?.find((r) => r.date === today && r.session === slot.session);
   const runRows = stored?.runRows ?? null;
+  const supersets = sessionSupersets(data, today, slot.session, runSets, log, runRows);
+  const partners = supersets.partnerData.runs.flatMap((rowA) => {
+    const list = partnerViews(exercises, supersets.partnerData, runRows, supersets.pairs, log, rowA);
+    return list === null ? [] : [{ rowA, partners: list }];
+  });
   return {
     ...base,
     state: "next",
@@ -432,13 +494,15 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
       block: slot.block,
       week: slot.week,
       exercises,
-      order: withSessionOrder(sessionOrderWithWarmups(runSets, supersets.pairs), runSets, supersets.pairs, runRows),
+      order: withSessionOrder(sessionOrderWithAnyPairs(runSets, supersets.pairs), runSets, supersets.pairs, runRows),
       log,
       logFailed: data.setLogFailed,
       pairs: supersets.pairs,
       pairSlots: supersets.slots,
       runRows,
       jump: stored?.jump ?? null,
+      partners,
+      partnerData: supersets.partnerData,
     },
   };
 }
@@ -454,21 +518,30 @@ export function sessionSupersets(
   session: number,
   runSets: readonly RunSet[],
   log: readonly LoggedSet[],
-): { readonly pairs: SupersetView[]; readonly slots: PairSlot[] } {
+  runRows: readonly number[] | null = null,
+): { readonly pairs: SupersetView[]; readonly slots: PairSlot[]; readonly partnerData: PartnerData } {
   const rows = data.supersetPairs ?? [];
   const runs = sessionRuns(runSets, exerciseIdMap(data.exerciseIds ?? []));
-  const effective = effectivePairs(
+  const history = rows.filter((r) => r.date < today);
+  // Consecutive in the session's order (slice superset-any): a picked partner sits right after A.
+  const effective = orderedEffectivePairs(
     runs,
     rows.filter((r) => r.date === today && r.session === session),
-    rows.filter((r) => r.date < today),
+    history,
+    runRows,
   );
-  const slots = pairSlots(runs, effective, log);
+  const slots = orderedPairSlots(runs, effective, log, runRows);
+  const partnerData: PartnerData = {
+    runs: runsInOrder(runs, runRows).flatMap((r) => (r.exerciseId === null ? [] : [r.row])),
+    history: supersetHistoryRows(runs, history),
+  };
   const pairs = effective.map((p) => ({
     ...p,
     locked: slots.find((s) => s.rowA === p.rowA && s.rowB === p.rowB)?.locked ?? true,
   }));
-  return { pairs, slots };
+  return { pairs, slots, partnerData };
 }
+
 
 function nextDay(data: TrainingPlanData, today: IsoDate): NextDay | null {
   const dates = data.upcomingRides.map((r) => r.date).filter((d) => d > today);

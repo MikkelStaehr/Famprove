@@ -53,6 +53,9 @@
  *          session_order row the jump writes; no supersets (the pairs are cleared).
  *   superset-offer  (fokus-superset.md) per session, Begynd just tapped: the first run's warm-up
  *          current, nothing else logged, no pair today or before (the offer shows, off).
+ *   superset-pick  (slice superset-any) superset-offer's Begynd, plus "Som sidst": a pair from 7
+ *          days ago of the first run with the third (not its neighbour, so never applied): ⇄'s
+ *          partner list shows it first. Picking writes nothing (the action answers the new order).
  *   combo  (combo-parts.md) midsession with the row of each session's last done set given an
  *          illustrative combined variant (two parts, a name with "+"), its parts pre-filled from an
  *          earlier session (comboParts); setSetParts writes nothing.
@@ -130,7 +133,8 @@ export type DevFixture =
   | "combo"
   | "recording"
   | "camera-denied"
-  | "clips";
+  | "clips"
+  | "superset-pick";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -159,6 +163,7 @@ const FIXTURES: readonly DevFixture[] = [
   "recording",
   "camera-denied",
   "clips",
+  "superset-pick",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
@@ -632,6 +637,37 @@ export function supersetOfferLog(sets: readonly PrescribedSetRow[], today: IsoDa
     const first = firstOpen(order, new Map());
     return first === null ? [] : logRows(applyTap(order, new Map(), "begin", first, at), today, session, at);
   });
+}
+
+/**
+ * DEV_FIXTURE=superset-pick (slice superset-any): superset-offer's log (Begynd through the shared
+ * transition, 40 s ago) and, per session with 3+ runs, a paired row from 7 days ago of the first
+ * run with the third (a non-neighbour: "Som sidst", never applied). Names without a
+ * public.exercises id get an illustrative negative id, as supersetFixture. Never written anywhere.
+ */
+export function supersetPickFixture(
+  data: { readonly sets: readonly PrescribedSetRow[]; readonly exerciseIds?: readonly ExerciseIdRow[] },
+  today: IsoDate,
+  now: Date,
+): { supersetPairs: SupersetPairRow[]; exerciseIds: ExerciseIdRow[]; setLog: SetLogRow[] } {
+  const exerciseIds = [...(data.exerciseIds ?? [])];
+  const known = exerciseIdMap(exerciseIds);
+  for (const s of data.sets) {
+    if (exerciseIdOf(known, s.name) === null) {
+      const id = -(exerciseIds.length + 1);
+      exerciseIds.push({ id, name: s.name.trim(), aliases: [] });
+      known.set(s.name.trim().toLowerCase(), id);
+    }
+  }
+  const pairs: SupersetPairRow[] = [];
+  const at = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+  for (const [session, rows] of bySession(data.sets)) {
+    const runs = sessionRuns(sessionShape(rows).sets, known);
+    const [a, , c] = runs;
+    if (c === undefined || a.exerciseId === null || c.exerciseId === null) continue;
+    pairs.push({ date: addDaysIso(today, -7), session, rowA: a.row, rowB: c.row, exerciseA: a.exerciseId, variantA: a.variantId, exerciseB: c.exerciseId, variantB: c.variantId, paired: true, updatedAt: at });
+  }
+  return { supersetPairs: pairs, exerciseIds, setLog: supersetOfferLog(data.sets, today, now) };
 }
 
 /** DEV_FIXTURE=combo's illustrative combined variant (a name with "+": two parts). Never a real variant. */

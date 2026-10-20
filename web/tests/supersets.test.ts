@@ -4,13 +4,18 @@ import { test } from "node:test";
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
 import { recordSetTap } from "../src/lib/db/set-log.ts";
 import { recordSupersetPair, type SupersetOptions } from "../src/lib/db/superset-pairs.ts";
-import { applyTap, type LoggedSet, nextOpen, sessionOrderWithWarmups, setKey, type SetRef, type SetTapInput } from "../src/lib/set-taps.ts";
+import { applyTap, type LoggedSet, nextOpen, sessionOrderWithAnyPairs, sessionOrderWithWarmups, setKey, type SetRef, type SetTapInput, shapeOrder } from "../src/lib/set-taps.ts";
 import {
   effectivePairs,
+  orderedEffectivePairs,
   type PairDecision,
   parseSupersetInput,
+  pickRunRows,
   type SessionRun,
+  sessionRuns,
   type SupersetInput,
+  supersetHistoryRows,
+  supersetPartners,
 } from "../src/lib/supersets.ts";
 
 // --- order -----------------------------------------------------------------------------------
@@ -92,7 +97,7 @@ test("effectivePairs: first pair wins on overlap; a stale row_b is ignored", () 
 
 test("parseSupersetInput: exact shape only", () => {
   assert.deepEqual(parseSupersetInput({ date: "2026-10-12", sessionNo: 1, rowA: 11, rowB: 12, paired: true }), { date: "2026-10-12", sessionNo: 1, rowA: 11, rowB: 12, paired: true });
-  for (const bad of [null, {}, { date: "2026-10-12", sessionNo: 1, rowA: 12, rowB: 11, paired: true }, { date: "x", sessionNo: 1, rowA: 11, rowB: 12, paired: true }, { date: "2026-10-12", sessionNo: 1, rowA: 11, rowB: 12, paired: "yes" }]) {
+  for (const bad of [null, {}, { date: "2026-10-12", sessionNo: 1, rowA: 11, rowB: 11, paired: true }, { date: "x", sessionNo: 1, rowA: 11, rowB: 12, paired: true }, { date: "2026-10-12", sessionNo: 1, rowA: 11, rowB: 12, paired: "yes" }]) {
     assert.equal(parseSupersetInput(bad), null);
   }
 });
@@ -163,6 +168,11 @@ function fetchFor(db: FakeDb): FetchLike {
       const hit = rows.find((r) => pk.every((k) => r[k] === body[k]));
       if (hit === undefined) rows.push({ ...body });
       else Object.assign(hit, body);
+    } else if (method === "POST" && table === "session_order") {
+      const pk = ["date", "session_no"];
+      const hit = rows.find((r) => pk.every((k) => r[k] === body[k]));
+      if (hit === undefined) rows.push({ previous_rows: null, jumped_at: null, moved_start: null, ...body });
+      else Object.assign(hit, body);
     } else if (method === "POST") {
       const pk = ["date", "session_no", "row_no", "set_no"];
       if (!rows.some((r) => pk.every((k) => r[k] === body[k]))) rows.push({ started_at: null, ended_at: null, skipped: false, felt_rpe: null, reps_done: null, ...body });
@@ -206,8 +216,9 @@ test("setSupersetPair: every refusal writes nothing", async () => {
   const cases: [string, SupersetInput, (db: FakeDb) => void, Record<string, string>?][] = [
     ["not_today", { ...pairInput(true), date: "2026-10-13" }, () => {}],
     ["no_session", { ...pairInput(true), sessionNo: 2 }, () => {}],
-    ["not_consecutive", pairInput(true, 10, 12), () => {}],
-    ["not_consecutive", pairInput(true, 11, 13), () => {}],
+    // Since slice superset-any a non-neighbour (10 -> 12, 11 -> 13) is a pick: B = A or a row that starts no run is refused.
+    ["not_consecutive", pairInput(true, 11, 11), () => {}],
+    ["not_consecutive", pairInput(true, 11, 14), () => {}],
     ["started", pairInput(true), (db) => db.tables.exercise_set_log.push({ date: "2026-10-12", session_no: 1, row_no: 12, set_no: 0, kind: "warmup", started_at: NOW.toISOString(), ended_at: null, skipped: false, updated_at: NOW.toISOString(), felt_rpe: null, reps_done: null })],
     ["overlap", pairInput(true, 12, 13), (db) => db.tables.superset_pairs.push({ date: "2026-10-12", session_no: 1, row_a: 11, row_b: 12, exercise_a: 2, variant_a: null, exercise_b: 3, variant_b: null, paired: true, updated_at: NOW.toISOString() })],
   ];
@@ -299,4 +310,109 @@ test("set log with a pair: A1's done cut at every request and retried -> A1 ende
     assert.equal(log.get("11#2"), undefined, `split ${n}: A2 not started`);
     for (const l of log.values()) assert.ok(l.startedAt === null || l.endedAt === null || Date.parse(l.endedAt) >= Date.parse(l.startedAt), `split ${n}: span`);
   }
+});
+
+// --- any partner (slice superset-any, 2026-10-20) -------------------------------------------------
+
+const SHEET_SETS = ([[10, 2, "Squat"], [11, 3, "Curl"], [12, 3, "Pushdown"], [13, 1, "Dips"]] as const).flatMap(([row, n, name]) =>
+  Array.from({ length: n }, (_, k) => ({ ref: { row, set: k + 1 }, name, variantId: null })),
+);
+const IDS = new Map([["squat", 1], ["curl", 2], ["pushdown", 3], ["dips", 4]]);
+
+const orderOf = (db: FakeDb) => db.tables.session_order.find((r) => r.date === "2026-10-12" && r.session_no === 1)?.run_rows ?? null;
+
+test("superset-any: a non-neighbour moves right after A (A, B, then the old neighbour), the pair in force", async () => {
+  const db = fakeDb();
+  const want = { ok: true, pairs: [{ rowA: 10, rowB: 12, source: "today" }], runRows: [10, 12, 11, 13] };
+  assert.deepEqual(await recordSupersetPair(pairInput(true, 10, 12), NOW, opts(db)), want);
+  assert.deepEqual(orderOf(db), [10, 12, 11, 13]);
+  assert.equal(db.writes, 2); // the order, then the pair
+  // A reload (the same request again, read from the stored state) gives the same state and writes only the idempotent pair.
+  assert.deepEqual(await recordSupersetPair(pairInput(true, 10, 12), at(1), opts(db)), want);
+  assert.equal(db.writes, 3);
+  // The server's tap order follows it: A0, B0, A1, B1, A2, B2, B3, then Curl, Dips.
+  await recordSetTap(tap("begin", 10, 0), at(2), tapOpts(db));
+  await recordSetTap(tap("done", 10, 0), at(3), tapOpts(db));
+  const started = db.tables.exercise_set_log.filter((r) => r.started_at !== null).map((r) => `${r.row_no}/${r.set_no}`);
+  assert.deepEqual(started, ["10/0", "12/0"]);
+  // B before A in the sheet: Pushdown (12) with Squat (10) -> Curl, Pushdown, Squat, Dips.
+  const other = fakeDb();
+  assert.deepEqual(await recordSupersetPair(pairInput(true, 12, 10), NOW, opts(other)), { ok: true, pairs: [{ rowA: 12, rowB: 10, source: "today" }], runRows: [11, 12, 10, 13] });
+});
+
+test("superset-any: refusals (started, B = A, in another pair, not today) write nothing", async () => {
+  const log = (row: number, set: number) => ({ date: "2026-10-12", session_no: 1, row_no: row, set_no: set, kind: set === 0 ? "warmup" : "set", started_at: NOW.toISOString(), ended_at: null, skipped: false, updated_at: NOW.toISOString(), felt_rpe: null, reps_done: null });
+  const pair = (a: number, b: number, ea: number, eb: number) => ({ date: "2026-10-12", session_no: 1, row_a: a, row_b: b, exercise_a: ea, variant_a: null, exercise_b: eb, variant_b: null, paired: true, updated_at: NOW.toISOString() });
+  const cases: [string, SupersetInput, (db: FakeDb) => void][] = [
+    ["started", pairInput(true, 10, 12), (db) => db.tables.exercise_set_log.push(log(12, 0))],
+    ["started", pairInput(true, 10, 12), (db) => db.tables.exercise_set_log.push(log(10, 1))],
+    ["not_consecutive", pairInput(true, 12, 12), () => {}],
+    ["overlap", pairInput(true, 10, 12), (db) => db.tables.superset_pairs.push(pair(11, 12, 2, 3))],
+    ["not_today", { ...pairInput(true, 10, 12), date: "2026-10-11" }, () => {}],
+  ];
+  for (const [reason, input, setup] of cases) {
+    const db = fakeDb();
+    setup(db);
+    assert.deepEqual(await recordSupersetPair(input, NOW, opts(db)), { ok: false, reason }, reason);
+    assert.equal(db.writes, 0, reason);
+  }
+});
+
+test("superset-any: unpairing writes paired false only and keeps the order", async () => {
+  const db = fakeDb();
+  await recordSupersetPair(pairInput(true, 10, 12), NOW, opts(db));
+  const writes = db.writes;
+  assert.deepEqual(await recordSupersetPair(pairInput(false, 10, 12), at(1), opts(db)), { ok: true, pairs: [], runRows: [10, 12, 11, 13] });
+  assert.equal(db.writes, writes + 1);
+  assert.deepEqual(orderOf(db), [10, 12, 11, 13]);
+  assert.equal(db.tables.superset_pairs[0].paired, false);
+});
+
+test("superset-any: a jump's undo mark stays as it is when a pick moves the order", async () => {
+  const db = fakeDb();
+  db.tables.session_order.push({ date: "2026-10-12", session_no: 1, run_rows: [11, 10, 12, 13], previous_rows: [10, 11, 12, 13], jumped_at: NOW.toISOString(), moved_start: null, updated_at: NOW.toISOString() });
+  assert.equal((await recordSupersetPair(pairInput(true, 11, 13), at(1), opts(db))).ok, true);
+  const row = db.tables.session_order[0];
+  assert.deepEqual([row.run_rows, row.previous_rows, row.jumped_at], [[11, 13, 10, 12], [10, 11, 12, 13], NOW.toISOString()]);
+});
+
+test("superset-any: cut at each request, then retried, reaches the order and the pair", async () => {
+  for (let n = 1; n <= 9; n++) {
+    const db = fakeDb();
+    db.failAt = n;
+    await recordSupersetPair(pairInput(true, 10, 12), NOW, opts(db));
+    db.failAt = undefined;
+    assert.deepEqual(await recordSupersetPair(pairInput(true, 10, 12), at(1), opts(db)), { ok: true, pairs: [{ rowA: 10, rowB: 12, source: "today" }], runRows: [10, 12, 11, 13] }, `split ${n}`);
+    assert.deepEqual(orderOf(db), [10, 12, 11, 13], `split ${n}`);
+    assert.equal(db.tables.superset_pairs.length, 1, `split ${n}`);
+    assert.equal(db.tables.superset_pairs[0].paired, true, `split ${n}`);
+  }
+});
+
+test("superset-any: partners list every unstarted run not in a pair, Som sidst first, in the session's order", () => {
+  const runs = sessionRuns(SHEET_SETS, IDS);
+  const history = [
+    { date: "2026-10-05", session: 1, rowA: 10, rowB: 13, exerciseA: 1, variantA: null, exerciseB: 4, variantB: null, paired: true, updatedAt: "2026-10-05T08:00:00Z" },
+    { date: "2026-09-28", session: 1, rowA: 10, rowB: 11, exerciseA: 1, variantA: null, exerciseB: 2, variantB: null, paired: true, updatedAt: "2026-09-28T08:00:00Z" },
+  ];
+  const last = supersetHistoryRows(runs, history).find((h) => h.rowA === 10)?.rowsB ?? [];
+  assert.deepEqual(last, [13, 11]);
+  assert.deepEqual(supersetPartners(runs, null, [], [], 10, last), [{ row: 13, lastTime: true }, { row: 11, lastTime: false }, { row: 12, lastTime: false }]);
+  // Som sidst is never applied unless B is A's neighbour: 13 is not, so no pair in force.
+  assert.deepEqual(orderedEffectivePairs(runs, [], history.slice(0, 1), null), []);
+  // A started run (Curl) and a run in a pair drop out; A started: no list.
+  assert.deepEqual(supersetPartners(runs, null, [{ rowA: 12, rowB: 13 }], [{ row: 11, set: 1 }], 10, last), []);
+  assert.equal(supersetPartners(runs, null, [], [{ row: 10, set: 1 }], 10, last), null);
+  assert.notEqual(supersetPartners(runs, null, [], [{ row: 10, set: 0 }], 10, last), null); // A's warm-up begun is fine
+  // In the session's order after a pick.
+  assert.deepEqual(supersetPartners(runs, [10, 12, 11, 13], [], [], 11, []), [{ row: 10, lastTime: false }, { row: 12, lastTime: false }, { row: 13, lastTime: false }]);
+});
+
+test("superset-any: the tap order interleaves a pair apart in the sheet; neighbours as before", () => {
+  const pairsApart = [{ rowA: 10, rowB: 12 }];
+  const order = shapeOrder({ sets: SHEET_SETS, pairs: pairsApart, runRows: [10, 12, 11, 13] }).map((r) => `${r.row}/${r.set}`);
+  assert.deepEqual(order, ["10/0", "12/0", "10/1", "12/1", "10/2", "12/2", "12/3", "11/0", "11/1", "11/2", "11/3", "13/0", "13/1"]);
+  const neighbours = [{ rowA: 11, rowB: 12 }];
+  assert.deepEqual(sessionOrderWithAnyPairs(SHEET_SETS, neighbours), sessionOrderWithWarmups(SHEET_SETS, neighbours));
+  assert.deepEqual(pickRunRows(sessionRuns(SHEET_SETS, IDS), null, 11, 12), null); // already next to A: no order write
 });

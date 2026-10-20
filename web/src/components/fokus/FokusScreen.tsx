@@ -240,7 +240,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const lastLine = view.undo?.line ?? null;
 
   // fokus-superset.md: the seams (sheet) and the set screen's button read the same views.
-  const seams = seamViews(session.exercises, slots, supersets.pairs, log.values());
+  const seams = seamViews(session.exercises, slots, supersets.pairs, log.values(), session.runRows ?? null);
   const current = view.kind === "set" ? view.next : view.kind === "warmup" ? view.warmup : null;
   const offer = current === null ? null : supersetOffer(session.exercises, seams, current);
   const seamAfter = (rowA: number, rowB: number): ReactNode => {

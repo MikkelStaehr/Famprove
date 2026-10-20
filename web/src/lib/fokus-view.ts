@@ -27,6 +27,9 @@ import {
 import {
   type ExerciseView,
   lastWeekItem,
+  type PartnerData,
+  type PartnerView,
+  partnerViews,
   type LastWeekItem,
   type Reference,
   todayKgView,
@@ -36,7 +39,7 @@ import {
   spokenName,
   titleName,
 } from "./training-view.ts";
-import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf, runSetsOf } from "./superset-view.ts";
+import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf, runSetsOf, runStartOf } from "./superset-view.ts";
 import { type FokusParts, NO_PARTS, partsFor, type PartsData } from "./set-parts.ts";
 
 /** What Fokus needs of one sheet row (a subset of ExerciseView, so fixtures stay small). */
@@ -122,6 +125,8 @@ export type FokusInput = {
   readonly parts?: PartsData;
   /** The session's shape with the latest jump's undo mark (slice jump-undo): Fortryd may undo the jump. Absent = none. */
   readonly shape?: SessionShape;
+  /** ⇄'s partner data (slice superset-any, StrengthSession.partnerData); absent = no partner list. */
+  readonly partnerData?: PartnerData;
 };
 
 /** A rest window: the recommended span in seconds (null = none) and whether it is a superset's (R3, S14). */
@@ -157,6 +162,11 @@ type Common = {
    * has parts (the feel row's set), pre-filled logged > last time > the variant's default.
    */
   readonly parts?: FokusParts;
+  /**
+   * ⇄'s partners (slice superset-any) on A's warm-up while ⇄ is offered for A: "Som sidst" first,
+   * then the session's order. Present only when the input has partnerData; null = not offered.
+   */
+  readonly partners?: readonly PartnerView[] | null;
 };
 
 /**
@@ -227,6 +237,14 @@ export function fokusView(input: FokusInput, log: ReadonlyMap<string, LoggedSet>
     undo,
     sheet: sessionSheet(exercises, pairs, order, log, tick),
     ...(parts === null ? {} : { parts }),
+    ...(input.partnerData === undefined
+      ? {}
+      : {
+          partners:
+            state.kind === "warmup"
+              ? partnerViews(exercises, input.partnerData, input.shape?.runRows ?? null, pairs, log.values(), runStartOf(exercises, state.warmup.row) ?? state.warmup.row)
+              : null,
+        }),
   };
   if (state.kind === "finished") return { ...common, kind: "finished", feel: feelOf(null), tick: null, card: finishCard(session, p, log) };
   if (state.kind === "warmup") {

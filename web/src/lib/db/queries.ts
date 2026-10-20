@@ -23,6 +23,7 @@ import {
   comboSets,
   jumpedFixture,
   supersetOfferLog,
+  supersetPickFixture,
   supersetFixture,
   illustrativeToday,
   midsessionPlanned,
@@ -495,6 +496,7 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     const mid = midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets));
     return { ...base, ...mid, ...jumpedFixture(mid.sets, today, new Date()), supersetPairs: [] };
   }
+  if (fixture === "superset-pick") return { ...base, ...supersetPickFixture(base, today, new Date()), sessionOrders: [] };
   if (fixture === "superset-offer") return { ...base, setLog: supersetOfferLog(sets, today, new Date()), supersetPairs: [] };
   const pauseLike = videoFixture(fixture) !== null ? "pause" : fixture;
   if (isPauseFixture(pauseLike)) {

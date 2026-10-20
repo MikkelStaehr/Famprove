@@ -174,6 +174,43 @@ export function sessionOrderWithWarmups(sets: readonly RunSet[], pairs: readonly
   return out;
 }
 
+/**
+ * A sibling of sessionOrderWithWarmups (which keeps its meaning) for slice superset-any: a pair's
+ * runs interleave at A's place wherever B is in the sheet (B may be any run, before or after A),
+ * and B's own place is left out. A pair of runs next to each other in the sheet gives exactly
+ * sessionOrderWithWarmups' order. The stored session order (withSessionOrder) then places the unit.
+ */
+export function sessionOrderWithAnyPairs(sets: readonly RunSet[], pairs: readonly PairRef[] = []): SetRef[] {
+  if (pairs.length === 0) return sessionOrderWithWarmups(sets, pairs);
+  const flat = sessionOrderWithWarmups(sets, []);
+  const starts = runStartRows(sets);
+  const runs: SetRef[][] = [];
+  for (const ref of flat) {
+    const last = runs.at(-1);
+    if (last === undefined || (starts.has(ref.row) && last[0].row !== ref.row)) runs.push([ref]);
+    else last.push(ref);
+  }
+  const byStart = new Map(runs.map((r) => [r[0].row, r]));
+  const out: SetRef[] = [];
+  for (const a of runs) {
+    if (pairs.some((p) => p.rowB === a[0].row && byStart.has(p.rowA))) continue; // taken at A's place
+    const pair = pairs.find((p) => p.rowA === a[0].row);
+    const b = pair === undefined ? undefined : byStart.get(pair.rowB);
+    if (b === undefined) {
+      out.push(...a);
+      continue;
+    }
+    out.push(...a.filter(isWarmup), ...b.filter(isWarmup));
+    const aw = a.filter((r) => !isWarmup(r));
+    const bw = b.filter((r) => !isWarmup(r));
+    for (let k = 0; k < Math.max(aw.length, bw.length); k += 1) {
+      if (k < aw.length) out.push(aw[k]);
+      if (k < bw.length) out.push(bw[k]);
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- the session order (jumps)
 
 /**
@@ -279,7 +316,9 @@ export function withSessionOrder(
 
 /** The session's tap order: the sheet's, the pairs interleaved, the stored session order on top. */
 export function shapeOrder(shape: SessionShape): SetRef[] {
-  return withSessionOrder(sessionOrderWithWarmups(shape.sets, shape.pairs), shape.sets, shape.pairs, shape.runRows);
+  // sessionOrderWithAnyPairs: a superset-any pair's runs may be apart in the sheet (equal to
+  // sessionOrderWithWarmups for neighbours).
+  return withSessionOrder(sessionOrderWithAnyPairs(shape.sets, shape.pairs), shape.sets, shape.pairs, shape.runRows);
 }
 
 /**

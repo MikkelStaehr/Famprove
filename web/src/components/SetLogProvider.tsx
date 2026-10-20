@@ -53,8 +53,8 @@ export function SetLogProvider({ session, date, devSwitches, children }: Provide
   const setLog = useSetLog(session.log, order, date, session.session, session.exercises);
   const view = useMemo(() => checklistView(session.exercises, order, setLog.log), [session.exercises, order, setLog.log]);
   const views = useMemo(
-    () => seamViews(session.exercises, session.pairSlots, pairs, setLog.log.values()),
-    [session.exercises, session.pairSlots, pairs, setLog.log],
+    () => seamViews(session.exercises, session.pairSlots, pairs, setLog.log.values(), session.runRows ?? null),
+    [session.exercises, session.pairSlots, pairs, setLog.log, session.runRows],
   );
   const toggle = useCallback((v: SeamView, paired: boolean) => save(v, paired, seamSentence(v, paired)), [save]);
 

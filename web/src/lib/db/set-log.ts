@@ -16,7 +16,7 @@ import {
   shapeOrder,
   transition,
 } from "../set-taps.ts";
-import { effectivePairs, exerciseIdMap, type SessionRun, sessionRuns } from "../supersets.ts";
+import { exerciseIdMap, orderedEffectivePairs, type SessionRun, sessionRuns } from "../supersets.ts";
 import { localToday } from "../training-view.ts";
 import { devSwitchOn } from "./dev-fixture.ts";
 import { EnvError, readSupabaseEnv } from "./env.ts";
@@ -327,7 +327,7 @@ export async function recordSetTap(input: SetTapInput, now: Date, options: Recor
       sessionPairRows(c, input.date, input.session, runs),
       sessionRunRows(c, input.date, input.session),
     ]);
-    const shape: SessionShape = { sets, pairs: effectivePairs(runs, pairRows.today, pairRows.history), runRows: stored.runRows, jump: stored.jump };
+    const shape: SessionShape = { sets, pairs: orderedEffectivePairs(runs, pairRows.today, pairRows.history, stored.runRows), runRows: stored.runRows, jump: stored.jump };
     const order = shapeOrder(shape);
     const inOrder = new Set(order.map(setKey)); // the sheet's sets and their exercises' warm-ups
     const names = new Map(sets.map((s) => [setKey(s.ref), s.name]));

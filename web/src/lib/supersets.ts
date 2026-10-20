@@ -172,7 +172,12 @@ export type SupersetInput = {
 
 export type SupersetRefusal = "dev" | "invalid" | "not_today" | "no_session" | "not_consecutive" | "started" | "overlap" | "failed";
 export type SupersetResult =
-  | { readonly ok: true; readonly pairs: readonly EffectivePair[] }
+  | {
+      readonly ok: true;
+      readonly pairs: readonly EffectivePair[];
+      /** The session's run order after the write (session_order run_rows; null = the sheet's), slice superset-any. */
+      readonly runRows?: readonly number[] | null;
+    }
   | { readonly ok: false; readonly reason: SupersetRefusal };
 
 const MAX_SESSION = 14;
@@ -195,10 +200,120 @@ export function parseSupersetInput(raw: unknown): SupersetInput | null {
     sessionNo === null ||
     rowA === null ||
     rowB === null ||
-    rowB <= rowA ||
+    rowB === rowA || // since 2026-10-20 (slice superset-any) B may be before A in the sheet
     typeof r.paired !== "boolean"
   ) {
     return null;
   }
   return { date: r.date, sessionNo, rowA, rowB, paired: r.paired };
+}
+
+// ---------------------------------------------------------------- any partner (slice superset-any)
+
+/**
+ * The session's runs in the session's order (user, 2026-10-20, slice superset-any): `runRows`
+ * (public.session_order) on top of the sheet's, placed as withSessionOrder places units: a row that
+ * starts no run is ignored, a run runRows doesn't name keeps its place after the run before it in
+ * the sheet. runRows null (or none that apply): the sheet's order, so the siblings below equal
+ * effectivePairs / pairSlots on the sheet's runs.
+ */
+export function runsInOrder(runs: readonly SessionRun[], runRows: readonly number[] | null): SessionRun[] {
+  if (runRows === null || runRows.length === 0) return [...runs];
+  const byRow = new Map(runs.map((r) => [r.row, r]));
+  const placed: number[] = [];
+  for (const row of runRows) if (byRow.has(row) && !placed.includes(row)) placed.push(row);
+  if (placed.length === 0) return [...runs];
+  for (let i = 0; i < runs.length; i += 1) {
+    if (placed.includes(runs[i].row)) continue;
+    const before = i === 0 ? -1 : placed.indexOf(runs[i - 1].row);
+    placed.splice(before + 1, 0, runs[i].row);
+  }
+  return placed.flatMap((row) => byRow.get(row) ?? []);
+}
+
+/** effectivePairs with "consecutive" read in the session's order (runsInOrder), not the sheet's. */
+export function orderedEffectivePairs(
+  runs: readonly SessionRun[],
+  todayRows: readonly PairDecision[],
+  history: readonly PairDecision[],
+  runRows: readonly number[] | null,
+): EffectivePair[] {
+  return effectivePairs(runsInOrder(runs, runRows), todayRows, history);
+}
+
+/** pairSlots over the session's order (runsInOrder): the boundaries between consecutive runs as they are taken. */
+export function orderedPairSlots(
+  runs: readonly SessionRun[],
+  pairs: readonly EffectivePair[],
+  log: Iterable<SetRef | LoggedSet>,
+  runRows: readonly number[] | null,
+): PairSlot[] {
+  return pairSlots(runsInOrder(runs, runRows), pairs, log);
+}
+
+/**
+ * The run order after picking B as A's partner: B's run moved right after A's, every other run in
+ * its order; every run's first row. Null when B is already right after A (no order write), or
+ * when A or B is not a run of the session or B = A. Computed from the stored order, so a retry of
+ * a pick whose order landed writes nothing more.
+ */
+export function pickRunRows(runs: readonly SessionRun[], runRows: readonly number[] | null, rowA: number, rowB: number): number[] | null {
+  const rows = runsInOrder(runs, runRows).map((r) => r.row);
+  const i = rows.indexOf(rowA);
+  if (i === -1 || rowA === rowB || !rows.includes(rowB) || rows[i + 1] === rowB) return null;
+  const rest = rows.filter((r) => r !== rowB);
+  rest.splice(rest.indexOf(rowA) + 1, 0, rowB);
+  return rest;
+}
+
+/** A run with a logged set (A's own warm-up excepted when `own` is A, as pairLocked). */
+function started(run: SessionRun, log: readonly (SetRef | LoggedSet)[], warmupOk: boolean): boolean {
+  return log.some((l) => run.rows.includes(l.row) && !(warmupOk && l.row === run.row && l.set === 0));
+}
+
+/**
+ * The partners ⇄ offers for A (slice superset-any): every run of the session with an exercise id,
+ * no logged set and in no pair in force, except A; in the session's order, "Som sidst" first.
+ * `lastTime`: B rows for A latest first (supersetHistoryRows). Null when ⇄ isn't offered for A:
+ * A unknown, A started (its warm-up excepted), or A already in a pair (its switch turns it off).
+ */
+export function supersetPartners(
+  runs: readonly SessionRun[],
+  runRows: readonly number[] | null,
+  pairs: readonly PairRef[],
+  log: Iterable<SetRef | LoggedSet>,
+  rowA: number,
+  lastTime: readonly number[],
+): { readonly row: number; readonly lastTime: boolean }[] | null {
+  const logged = [...log];
+  const ordered = runsInOrder(runs, runRows);
+  const a = ordered.find((r) => r.row === rowA);
+  const inPair = new Set(pairs.flatMap((p) => [p.rowA, p.rowB]));
+  if (a === undefined || a.exerciseId === null || inPair.has(a.row) || started(a, logged, true)) return null;
+  const candidates = ordered.filter((r) => r.row !== a.row && r.exerciseId !== null && !inPair.has(r.row) && !started(r, logged, false));
+  const first = lastTime.find((row) => candidates.some((c) => c.row === row)) ?? null;
+  const list = candidates.map((c) => ({ row: c.row, lastTime: c.row === first }));
+  return [...list.filter((p) => p.lastTime), ...list.filter((p) => !p.lastTime)];
+}
+
+/**
+ * "Som sidst" per run (slice superset-any): for each run A, the session's runs B whose latest
+ * earlier superset_pairs row for the ordered (A, B) exercises and variants says paired, latest
+ * first (date, then updated_at). `history` = rows of earlier days (any session).
+ */
+export function supersetHistoryRows(runs: readonly SessionRun[], history: readonly PairDecision[]): { readonly rowA: number; readonly rowsB: readonly number[] }[] {
+  const out: { rowA: number; rowsB: number[] }[] = [];
+  for (const a of runs) {
+    if (a.exerciseId === null) continue;
+    const found: { row: number; d: PairDecision }[] = [];
+    for (const b of runs) {
+      if (b.row === a.row || b.exerciseId === null) continue;
+      const d = latest(history.filter((r) => sameRunPair(r, a, b)));
+      if (d?.paired === true) found.push({ row: b.row, d });
+    }
+    if (found.length === 0) continue;
+    const sorted = found.toSorted((x, y) => (x.d.date === y.d.date ? Date.parse(y.d.updatedAt) - Date.parse(x.d.updatedAt) : x.d.date < y.d.date ? 1 : -1));
+    out.push({ rowA: a.row, rowsB: sorted.map((f) => f.row) });
+  }
+  return out;
 }
