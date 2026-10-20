@@ -24,9 +24,9 @@ export function roundTenth(s: number): number {
 
 const tenths = (s: number): number => Math.round(s * 10);
 
-/** §1's start rule: the user's in/out, else the clipped auto range, else 0 and the duration; clamped to the duration. */
-export function startRange(row: Pick<VideoClipRow, "clipInS" | "clipOutS" | "autoInS" | "autoOutS" | "autoStatus" | "durationS">): ClipRangeS {
-  const r = cutRange(row, "mp4").range;
+/** §1's start rule: the user's in/out, else the clipped auto range (only while `auto`, clip-auto-park), else 0 and the duration; clamped to the duration. */
+export function startRange(row: Pick<VideoClipRow, "clipInS" | "clipOutS" | "autoInS" | "autoOutS" | "autoStatus" | "durationS">, auto = true): ClipRangeS {
+  const r = cutRange(row, "mp4", { auto }).range;
   const dur = roundTenth(row.durationS);
   if (r === null) return { inS: 0, outS: dur };
   const outS = Math.min(roundTenth(r.outS), dur);

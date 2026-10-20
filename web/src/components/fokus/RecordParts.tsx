@@ -4,6 +4,8 @@ import { type RefObject, useEffect, useState, useSyncExternalStore } from "react
 
 import { Icon } from "@/components/icons";
 import { pickRecorderType } from "@/lib/video/mime";
+import { analysesAfterStop, autoClipOn, subscribeAutoClip } from "@/lib/video/auto-switch";
+import { browserStore } from "@/lib/video/auto-version";
 import { clock, DENIED_HELP, DENIED_TITLE, WAITING_LABEL } from "@/lib/video/recording";
 import { CAPTION, FokusWarning, OUTLINED } from "./Instrument";
 
@@ -58,10 +60,11 @@ export function DeniedLine() {
   );
 }
 
-const noSubscribe = () => () => undefined;
-/** The recorder this browser picks makes MP4 (clip-auto analyses only MP4). */
-const recordsMp4 = () =>
-  pickRecorderType(typeof MediaRecorder === "undefined" ? undefined : (t) => MediaRecorder.isTypeSupported(t))?.ext === "mp4";
+/** The recorder this browser picks makes MP4 (clip-auto analyses only MP4) and the automatic clip is switched on (clip-auto-park). */
+const analysesHere = () => {
+  const ext = pickRecorderType(typeof MediaRecorder === "undefined" ? undefined : (t) => MediaRecorder.isTypeSupported(t))?.ext;
+  return ext !== undefined && analysesAfterStop(ext, autoClipOn(browserStore()));
+};
 
 /**
  * §5–§6: the recording strip in the rest strip's slot (Card 22, padding 16): OPTAGER ↔ SÆT n · UDEN
@@ -95,10 +98,11 @@ export function RecordStrip({
   );
   // clip-auto §1: an MP4 clip gets the analysis slot (--h-fokus-auto-slot) in the rest card after
   // Stop; reserving it here (--h-fokus-strip-clip) keeps the hero card still at Stop, so the only
-  // change is the Optag tap. WebM gets no analysis, so no slot (design-lead, 2026-10-20).
+  // change is the Optag tap. WebM gets no analysis, so no slot (design-lead, 2026-10-20), and
+  // neither does any clip while the automatic clip is switched off (clip-auto-park).
   // The server has no MediaRecorder: its snapshot is false, the client's is read after hydration
   // (useSyncExternalStore re-renders without a mismatch; a dev fixture is server-rendered).
-  const slotted = useSyncExternalStore(noSubscribe, recordsMp4, () => false);
+  const slotted = useSyncExternalStore(subscribeAutoClip, analysesHere, () => false);
   return (
     // acceptance 2: --h-fokus-strip is the rest card's min-height too, so the hero card under it stays
     // put when recording starts. §5: the left column is 12px from the preview.

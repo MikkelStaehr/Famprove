@@ -60,12 +60,15 @@ type Failure = "invalid" | "range" | "not_found" | "not_allowed" | "failed" | "n
  */
 export function ClipEditor({
   clip,
+  auto = true,
   video,
   onSaved,
   onRemoved,
   onCancel,
 }: {
   readonly clip: VideoClipRow;
+  /** clip-auto-park: the automatic clip's switch; off = the start rule ignores the auto range. Default on. */
+  readonly auto?: boolean;
   /** The player's video (null in the fixture: no file). */
   readonly video: RefObject<HTMLVideoElement | null>;
   readonly onSaved: (range: StoredRange) => void;
@@ -74,7 +77,7 @@ export function ClipEditor({
   readonly onCancel: () => void;
 }) {
   const duration = clip.durationS;
-  const [range, setRange] = useState<ClipRangeS>(() => startRange(clip));
+  const [range, setRange] = useState<ClipRangeS>(() => startRange(clip, auto));
   const [saving, setSaving] = useState<"save" | "remove" | null>(null);
   const [failure, setFailure] = useState<{ readonly reason: Failure; readonly retry: StoredRange } | null>(null);
   const [playT, setPlayT] = useState<number | null>(null);

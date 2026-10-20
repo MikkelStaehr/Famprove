@@ -104,3 +104,6 @@ Web dependencies beyond Next/React/Tailwind: `recharts` (charts), `lucide-react`
 Strength session rule → `domain/sessions.py` · ride-analysis thresholds and the EF intensity basis → `domain/ride_analysis.py` · program phases, competition-lift names and e1RM rules → `domain/strength_analysis.py` · Decay variant → `domain/load.py` `DECAY` · form-zone bands → `domain/form.py` + `web/src/lib/zone-scale.ts` (drawing only; `web/tests/zone-scale.test.ts` fails if they drift) · strength formula →
 don't (it's the coach's, in `sources/strength_sheet.py`) · muscle factor / bodyweight fraction per exercise → `public.exercises` rows (Supabase table editor) · `STRENGTH_K` / `BODYWEIGHT` → env ·
 tokens and layout rules → `DESIGN.md` (Part B = the Ember direction, the visual reset of 2026-10-14) and `web/src/app/globals.css` · zone labels shown in the UI → `web/src/lib/dashboard-view.ts`.
+
+## Parkeret
+Automatic clip (MediaPipe Pose on the phone, slices clip-pose/clip-auto/clip-auto-2/-3/clip-debug/clip-summary): switched off by default with a switch under Optagelser (`web/src/lib/video/auto-switch.ts`, localStorage `famprove.clips.autoClip`); the code and the debug panel are kept. Automatic clipping and analysis of technique and bar speed are taken up again on the move to a native app (Capacitor). No further tuning of thresholds until then.

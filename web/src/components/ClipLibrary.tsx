@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 
@@ -59,6 +59,7 @@ import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, inPickupWindow, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
 import { browserStore, readAutoVersions } from "@/lib/video/auto-version";
+import { autoClipOn, setAutoClipOn, subscribeAutoClip, switchStore } from "@/lib/video/auto-switch";
 import { type AutoLast, readAutoLast, recordRun } from "@/lib/video/auto-last";
 import { ClipSummary, type SummaryItem } from "@/components/ClipSummary";
 import { isSummaryEntry } from "@/lib/video/clip-summary";
@@ -287,6 +288,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   // local file, the last 7 days), one at a time, newest first, through the same analyseClip. Unmount aborts
   // the run (nothing written for that clip); the fixture never runs one.
   // Keyed on the index being read, never on rows: the run's own outcome updates rows.
+  // clip-auto-park: the switch (off by default), read after hydration (the server's snapshot is off).
+  const autoOn = useSyncExternalStore(subscribeAutoClip, readAutoClip, () => false);
   const readyEntries = local.kind === "ready" ? local.entries : null;
   const ready = readyEntries !== null;
   const entriesNow = useRef<readonly ClipIndexEntry[] | null>(null);
@@ -295,8 +298,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   }, [readyEntries]);
   useEffect(() => {
     const found = entriesNow.current;
-    if (fixture !== null || !ready || found === null || initialRows === null || store.current === null || pickupStarted.current) return;
-    const queue = pickupQueue(found, initialRows, new Date(), readAutoVersions(browserStore())).filter((r) => lifts[r.id] !== undefined);
+    if (!autoOn || fixture !== null || !ready || found === null || initialRows === null || store.current === null || pickupStarted.current) return;
+    const queue = pickupQueue(found, initialRows, new Date(), readAutoVersions(browserStore()), autoOn).filter((r) => lifts[r.id] !== undefined);
     if (queue.length === 0) return;
     pickupStarted.current = true;
     const s = store.current;
@@ -339,7 +342,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       ctrl.abort();
       pickupStarted.current = false;
     };
-  }, [fixture, ready, initialRows, lifts]);
+  }, [autoOn, fixture, ready, initialRows, lifts]);
 
   // clip-auto-3: the screen stays on while a pickup run is on (released after it; the hook re-requests when visible).
   useWakeLock(running !== null);
@@ -353,7 +356,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const cutOf = (r: Pick<LibraryRow, "id" | "ext">): CutRange => {
     const server = serverById.get(r.id);
     if (r.ext === null || server === undefined) return { reason: "none", range: null };
-    return cutRange(server, r.ext);
+    return cutRange(server, r.ext, { auto: autoOn });
   };
   const today_ = todaysClips(list, today);
   const testPrefix = fixture !== null ? "Testvisning: " : "";
@@ -499,6 +502,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           <span className="sr-only">stjernemarkerede</span> beholdes)
         </p>
       )}
+      <AutoClipSwitch on={autoOn} />
       {overview !== null && <ClipSummary items={summaryItems(list, serverById, overview)} onClose={closeOverview} />}
       {space.persisted === false && entries !== null && (
         <div className="mt-2">
@@ -565,7 +569,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
             <ClipRow
               key={row.id}
               row={row}
-              word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id, inPickupWindow(row.recordedAt, new Date())) : null}
+              word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id, inPickupWindow(row.recordedAt, new Date()), autoOn) : null}
               onOpen={(el) => {
                 opener.current = el;
                 setOpen(row);
@@ -600,6 +604,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           server={serverById.get(open.id) ?? null}
           running={running?.id === open.id ? running : null}
           lift={lifts[open.id] ?? null}
+          auto={autoOn}
           onAuto={(out) => {
             if (out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") {
               const auto = out.kind === "clipped" ? { autoStatus: out.kind, autoInS: out.inS, autoOutS: out.outS } : { autoStatus: out.kind, autoInS: null, autoOutS: null };
@@ -684,6 +689,37 @@ function ClipRow({
   );
 }
 
+/** clip-auto-park: the switch's snapshot (this phone's localStorage). */
+function readAutoClip(): boolean {
+  return autoClipOn(browserStore());
+}
+
+/**
+ * clip-auto-park: the parked automatic clip's switch, a native checkbox in a 44px label row, and
+ * the muted line while it is off.
+ */
+function AutoClipSwitch({ on }: { readonly on: boolean }) {
+  return (
+    <div className="mt-2">
+      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
+        <span className="font-sans text-15 text-text">Automatisk klip</span>
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => setAutoClipOn(switchStore(), e.currentTarget.checked)}
+          aria-describedby={on ? undefined : "auto-clip-off"}
+          className="size-5 shrink-0 cursor-pointer accent-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        />
+      </label>
+      {!on && (
+        <p id="auto-clip-off" className="font-sans text-13 text-text-muted">
+          Slået fra. Klip med Start her og Slut her i afspilleren.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Player({
   row,
   files,
@@ -693,6 +729,7 @@ function Player({
   server,
   running,
   lift,
+  auto,
   onAuto,
   onRange,
   onDownload,
@@ -715,6 +752,8 @@ function Player({
   readonly running: Running | null;
   /** clip-debug: the lift's family and reps (null when the clip has none); Analysér igen's outcome. */
   readonly lift: ClipLiftMeta | null;
+  /** clip-auto-park: the automatic clip's switch; off = no auto line, `Klip`, auto ranges ignored. */
+  readonly auto: boolean;
   readonly onAuto: (out: AutoOutcome) => void;
   /** The user's range was stored (or removed): the row in memory follows the server's reply. */
   readonly onRange: (id: string, range: StoredRange) => void;
@@ -849,7 +888,7 @@ function Player({
   }, []);
 
   /** clip-auto §2: the player's line when there is no cut to show (running, waiting, low_confidence, failed); waiting needs a server row. */
-  const autoLine = cut.range === null && cut.reason !== "webm" && (server !== null || running !== null) ? playerAutoLine(server?.autoStatus ?? null, running, inPickupWindow(row.recordedAt, new Date())) : null;
+  const autoLine = cut.range === null && cut.reason !== "webm" && (server !== null || running !== null) ? playerAutoLine(server?.autoStatus ?? null, running, inPickupWindow(row.recordedAt, new Date()), auto) : null;
 
   /** clip-handles §1: Klip / Ret klip on an MP4 clip with a server row; never WebM, afbrudt or missing. */
   const canEdit = row.kind === "clip" && row.ext === "mp4" && server !== null;
@@ -891,7 +930,7 @@ function Player({
     if (markBusy || server === null) return;
     const t = playhead();
     if (!Number.isFinite(t)) return;
-    const m = markRange(server, pending, t);
+    const m = markRange(server, pending, t, auto);
     if (m.kind === "refused") {
       setRangeText((old) => ({ text: refusedLine(m.inS), warn: true, action: keptUndo(old) }));
       return;
@@ -1062,6 +1101,7 @@ function Player({
         {editing && server !== null ? (
           <ClipEditor
             clip={server}
+            auto={auto}
             video={videoEl}
             onCancel={closeEditor}
             onSaved={(r) => {
@@ -1156,7 +1196,7 @@ function Player({
                   }}
                 >
                   <Icon name="scissors" size={18} />
-                  {server === null ? "Klip" : editLabel(server)}
+                  {server === null ? "Klip" : editLabel(server, auto)}
                 </button>
               )}
               <button type="button" className={DARK_BTN} onClick={() => setConfirm(true)}>

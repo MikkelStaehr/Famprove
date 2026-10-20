@@ -60,10 +60,12 @@ export function hasOwnRange(row: Pick<VideoClipRow, "clipInS" | "clipOutS">): bo
 /**
  * §2's row meta word after the duration; null = none (WebM, no server row). Not run yet:
  * `venter på klip`, but only while the pickup will take it (`waiting`: within PICKUP_DAYS), so an
- * older clip never waits for good (review 2026-10-20).
+ * older clip never waits for good (review 2026-10-20). `auto` false (the switch off, clip-auto-park):
+ * only `klippet` for the user's own range.
  */
-export function autoMetaWord(ext: "mp4" | "webm" | null, server: CutCols | null, running: boolean, waiting = true): string | null {
+export function autoMetaWord(ext: "mp4" | "webm" | null, server: CutCols | null, running: boolean, waiting = true, auto = true): string | null {
   if (ext === "webm") return null;
+  if (!auto) return server !== null && hasOwnRange(server) ? "klippet" : null; // clip-auto-park: only the user's own range
   if (running) return "klipper …";
   if (server === null) return null;
   if (hasOwnRange(server)) return "klippet";
@@ -76,7 +78,8 @@ export function autoMetaWord(ext: "mp4" | "webm" | null, server: CutCols | null,
  * §2's player line for an MP4 clip (the caller never asks for WebM) without the user's range and
  * without a clipped cut; null = clip-cut's line (or none). auto_status null: `Venter på klip`.
  */
-export function playerAutoLine(status: AutoStatus | null, running: { readonly pct: number } | null, waiting = true): { readonly words: string; readonly figure: string | null } | null {
+export function playerAutoLine(status: AutoStatus | null, running: { readonly pct: number } | null, waiting = true, auto = true): { readonly words: string; readonly figure: string | null } | null {
+  if (!auto) return null; // clip-auto-park: the switch is off, no auto line
   if (running !== null) return { words: "Klipper video …", figure: `${running.pct} %` };
   if (status === "low_confidence") return { words: PLAYER_LOW_LINE, figure: null };
   if (status === "failed") return { words: PLAYER_FAILED_LINE, figure: null };
@@ -85,8 +88,9 @@ export function playerAutoLine(status: AutoStatus | null, running: { readonly pc
 }
 
 /** §2: `Klip` reads `Klip selv` on low_confidence and failed (never while waiting: null reads `Klip`); an own range reads `Ret klip`. */
-export function editLabel(server: CutCols): "Ret klip" | "Klip selv" | "Klip" {
+export function editLabel(server: CutCols, auto = true): "Ret klip" | "Klip selv" | "Klip" {
   if (hasOwnRange(server)) return "Ret klip";
+  if (!auto) return "Klip"; // clip-auto-park: never Klip selv while the switch is off
   return server.autoStatus === "low_confidence" || server.autoStatus === "failed" ? "Klip selv" : "Klip";
 }
 
@@ -108,7 +112,8 @@ export function inPickupWindow(recordedAt: string, now: Date): boolean {
   return at >= now.getTime() - PICKUP_DAYS * 86_400_000 && at <= now.getTime() + 60_000;
 }
 
-export function pickupQueue(local: readonly ClipIndexEntry[], rows: readonly VideoClipRow[], now: Date, versions: AutoVersions = {}): VideoClipRow[] {
+export function pickupQueue(local: readonly ClipIndexEntry[], rows: readonly VideoClipRow[], now: Date, versions: AutoVersions = {}, auto = true): VideoClipRow[] {
+  if (!auto) return []; // clip-auto-park: the switch is off, the pickup takes nothing
   const files = new Map(local.filter((e) => e.state === "done" && e.ext === "mp4").map((e) => [e.id, e]));
   const due = (r: VideoClipRow): boolean => r.autoStatus === null || versionOf(versions, r.id) < ALGO_VERSION;
   return rows

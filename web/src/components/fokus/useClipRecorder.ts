@@ -15,6 +15,7 @@ import type { LiftFamily } from "@/lib/video/auto-clip";
 import { analyseClip } from "@/lib/video/auto-run";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
 import { browserStore } from "@/lib/video/auto-version";
+import { analysesAfterStop, autoClipOn } from "@/lib/video/auto-switch";
 import { recordRun } from "@/lib/video/auto-last";
 import { type FokusAutoPhase, fokusAutoLine, isOutcome } from "@/lib/video/auto-lines";
 import type { SetRef } from "@/lib/set-taps";
@@ -132,7 +133,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFix
    * only while the slot is still this clip's (a done clears the line, the run carries on).
    */
   const analyse = useCallback(async (l: Live, durationS: number) => {
-    if (l.type.ext !== "mp4") return; // WebM: no analysis and no line
+    if (!analysesAfterStop(l.type.ext, autoClipOn(browserStore()))) return; // WebM or the switch off (clip-auto-park): no analysis and no line
     stopAuto();
     const ctrl = new AbortController();
     autoRun.current = ctrl;
@@ -341,8 +342,9 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFix
       live.current = null;
       const d = duration(l);
       dispatch({ type: "stop" });
-      // §1: the slot is reserved from Stop (no line until saveClip succeeds; WebM never gets one).
-      if (l.type.ext === "mp4") setAuto({ id: l.id, phase: null, spoken: "" });
+      // §1: the slot is reserved from Stop (no line until saveClip succeeds; WebM never gets one, nor
+      // anything while the automatic clip is switched off, clip-auto-park).
+      if (analysesAfterStop(l.type.ext, autoClipOn(browserStore()))) setAuto({ id: l.id, phase: null, spoken: "" });
       void stopThenDone({
         stopRecorder: () => stopRecorder(l),
         done,

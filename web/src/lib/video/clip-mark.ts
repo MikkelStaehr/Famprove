@@ -15,10 +15,10 @@ export function markPoint(t: number, durationS: number): number {
   return roundTenth(Math.min(Math.max(0, t), durationS));
 }
 
-/** §2.2: the in point Slut uses: the pending Start, else the user's in, else the clipped auto in, else 0. */
-export function markIn(row: MarkRow, pendingInS: number | null): number {
+/** §2.2: the in point Slut uses: the pending Start, else the user's in, else the clipped auto in (only while `auto`, clip-auto-park), else 0. */
+export function markIn(row: MarkRow, pendingInS: number | null, auto = true): number {
   if (pendingInS !== null) return markPoint(pendingInS, row.durationS);
-  const r = cutRange(row, "mp4").range;
+  const r = cutRange(row, "mp4", { auto }).range;
   return r === null ? 0 : markPoint(r.inS, row.durationS);
 }
 
@@ -27,8 +27,8 @@ export type MarkResult =
   | { readonly kind: "refused"; readonly inS: number };
 
 /** §2.2: Slut her at `nowS`: the range to send, or refused (out ≤ in or shorter than MIN_LEN_S); nothing is written when refused. */
-export function markRange(row: MarkRow, pendingInS: number | null, nowS: number): MarkResult {
-  const inS = markIn(row, pendingInS);
+export function markRange(row: MarkRow, pendingInS: number | null, nowS: number, auto = true): MarkResult {
+  const inS = markIn(row, pendingInS, auto);
   if (!Number.isFinite(nowS)) return { kind: "refused", inS };
   const outS = markPoint(nowS, row.durationS);
   const v = validateClipRange(inS, outS, row.durationS);
