@@ -43,9 +43,12 @@ test("video_clips: service_role has select, insert and delete; update only throu
   assert.match(sql, /grant update \(starred, clip_in_s, clip_out_s\) on table public\.video_clips to service_role;/);
 });
 
-test("git tracks no video file", () => {
+// The one exception (slice clip-cut): the cut's fixture, Chrome's fake-camera test pattern (no personal data).
+const VIDEO_FIXTURES = ["web/tests/fixtures/video/fake-kf.mp4"];
+
+test("git tracks no video file except the cut's fake-camera fixture", () => {
   const files = execFileSync("git", ["ls-files"], { cwd: repo, encoding: "utf8" }).split("\n");
-  assert.deepEqual(files.filter((f) => /\.(mp4|webm|mov|mkv)$/i.test(f)), []);
+  assert.deepEqual(files.filter((f) => /\.(mp4|webm|mov|mkv)$/i.test(f) && !VIDEO_FIXTURES.includes(f)), []);
 });
 
 test("python/src names neither video_clips nor session_order", () => {
