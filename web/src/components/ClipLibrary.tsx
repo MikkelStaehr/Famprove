@@ -50,6 +50,8 @@ import {
   urlKeeper,
 } from "@/lib/video/save";
 import { shareClip, shareData } from "@/lib/video/share";
+import { type CutRange, cutClip, cutRange } from "@/lib/video/cut";
+import { busyText, cutFileName, cutLine, prepareClip, type Prepared, saveDoneLine, shareCutLine, splitCount } from "@/lib/video/cut-lines";
 import { formatBytes } from "@/lib/video/space";
 
 const CLEANUP_KEY = "famprove.clips.cleanup";
@@ -201,6 +203,13 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const list = local.kind === "ready" || local.kind === "none" ? libraryRows(entries, rows, names, runSets) : [];
 
   const fileNames = clipFileNames(list);
+  const serverById = new Map((rows ?? []).map((r) => [r.id, r]));
+  /** The clip's cut (clip-cut): the user's in/out, else the automatic one, else none; WebM never. */
+  const cutOf = (r: Pick<LibraryRow, "id" | "ext">): CutRange => {
+    const server = serverById.get(r.id);
+    if (r.ext === null || server === undefined) return { reason: "none", range: null };
+    return cutRange(server, r.ext);
+  };
   const today_ = todaysClips(list, today);
   const testPrefix = fixture !== null ? "Testvisning: " : "";
 
@@ -223,6 +232,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     stop.current = false;
     const s = store.current;
     const byId = new Map(list.map((r) => [r.id, r]));
+    let cutCount = 0;
     const result: SaveResult = await saveSequence(clips, {
       read: async (id) => {
         if (fixture !== null) return new Blob([]);
@@ -237,10 +247,20 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         setSaveLine(`${testPrefix}${progressLine(k, total)}${total >= 2 ? ` ${PROMPT_LINE}` : ""}`);
       },
       aborted: () => stop.current,
+      prepare: async (clip, blob) => {
+        const r = byId.get(clip.id);
+        const cut = r === undefined ? ({ reason: "none", range: null } as const) : cutOf(r);
+        if (fixture !== null) return { blob, name: cut.range === null ? clip.name : cutFileName(clip.name), cut: cut.range !== null };
+        const p = await prepareClip(blob, clip.name, cut, cutClip);
+        return { blob: p.blob, name: p.name, cut: p.kind === "cut" };
+      },
+      onSent: (cut) => {
+        if (cut) cutCount += 1;
+      },
     });
     setSaving(null);
     setRest(result.remaining);
-    setSaveLine(`${testPrefix}${doneLine(result)}`);
+    setSaveLine(`${testPrefix}${doneLine(result, splitCount(result.sent, cutCount))}`);
     await forgetMissing(result.missing.map((c) => c.id));
   }
 
@@ -413,6 +433,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           files={files}
           fixture={fixture !== null}
           fileName={fileNames.get(open.id) ?? null}
+          cut={cutOf(open)}
           onDownload={download}
           onMissing={() => void forgetMissing([open.id])}
           onClose={requestClose}
@@ -491,6 +512,7 @@ function Player({
   files,
   fixture,
   fileName,
+  cut,
   onDownload,
   onMissing,
   onClose,
@@ -503,6 +525,8 @@ function Player({
   readonly fixture: boolean;
   /** Gem's (and Del's) file name; null without a local file. */
   readonly fileName: string | null;
+  /** The clip's cut (clip-cut): Gem and Del hand it over; the line under the title shows it. */
+  readonly cut: CutRange;
   readonly onDownload: (blob: Blob, name: string) => void;
   /** The file is gone (§10): the row turns fil mangler on close. */
   readonly onMissing: () => void;
@@ -584,9 +608,18 @@ function Player({
     if (blob === null || row.ext === null) return;
     setPreparing(true);
     const name = fileName ?? clipFileNames([row]).get(row.id) ?? `${row.date} sæt ${row.set}.${row.ext}`;
-    const outcome = await shareClip(navigator, shareData(blob, name, row.ext));
+    const p = await prepareClip(blob, name, cut, cutClip); // clip-cut: Del uses Gem's name
+    const outcome = await shareClip(navigator, shareData(p.blob, p.name, row.ext));
     setPreparing(false);
-    setShareText(outcome === "failed" ? "Kunne ikke dele videoen. Prøv igen." : outcome === "unsupported" ? "Deling af video virker ikke i denne browser." : null);
+    setShareText(
+      outcome === "failed"
+        ? "Kunne ikke dele videoen. Prøv igen."
+        : outcome === "unsupported"
+          ? "Deling af video virker ikke i denne browser."
+          : outcome === "shared"
+            ? shareCutLine(p)
+            : null,
+    );
   }
 
   // §10: a file found gone turns the row fil mangler when the player closes.
@@ -602,13 +635,20 @@ function Player({
   async function save() {
     if (fileName === null || row.ext === null) return;
     if (fixture) {
-      setSaveText(`Testvisning: Sendt til Downloads som ${fileName}.`);
+      const shown: Prepared =
+        cut.range === null
+          ? { kind: "whole", blob: new Blob([]), name: fileName }
+          : { kind: "cut", blob: new Blob([]), name: cutFileName(fileName), actual: { startS: cut.range.inS, endS: cut.range.outS } };
+      setSaveText(`Testvisning: ${saveDoneLine(shown)}`);
       return;
     }
+    setSaveReading(true); // from the tap until the file is handed over (§7)
     let b: Blob | null = blob;
     if (b === null) {
-      if (files === null) return;
-      setSaveReading(true);
+      if (files === null) {
+        setSaveReading(false);
+        return;
+      }
       try {
         b = await files.read(row.id, row.ext);
       } catch {
@@ -616,15 +656,17 @@ function Player({
         setSaveText("Videoen kunne ikke læses på telefonen.");
         return;
       }
-      setSaveReading(false);
     }
     if (b === null) {
+      setSaveReading(false);
       gone.current = true;
       setSaveText("Videoen findes ikke længere på telefonen.");
       return;
     }
-    onDownload(b, fileName);
-    setSaveText(`Sendt til Downloads som ${fileName}.`);
+    const p = await prepareClip(b, fileName, cut, cutClip); // a failed cut gives the original, whole (§4)
+    onDownload(p.blob, p.name);
+    setSaveReading(false);
+    setSaveText(saveDoneLine(p));
   }
 
   return createPortal(
@@ -638,6 +680,7 @@ function Player({
           <MonoCaption uppercase={false}>{row.meta}</MonoCaption>
         </div>
       </div>
+      {cutLine(cut) !== null && <p className="px-3 font-mono text-13 text-text-muted">{cutLine(cut)}</p>}
       <div className="flex min-h-0 flex-1 items-center justify-center p-2">
         {fixture || (url === null && files === null) ? (
           <div className="flex aspect-[9/16] max-h-full w-full max-w-xs items-center justify-center rounded-card bg-track">
@@ -674,13 +717,13 @@ function Player({
               {canShare && (
                 <button type="button" className={DARK_BTN} disabled={blob === null || preparing} onClick={() => void share()}>
                   <Icon name="share" size={18} />
-                  {preparing ? "Forbereder …" : "Del"}
+                  {preparing ? busyText(cut) : "Del"}
                 </button>
               )}
               {fileName !== null && (
                 <button type="button" className={DARK_BTN} disabled={saveReading} onClick={() => void save()}>
                   <Icon name="download" size={18} />
-                  {saveReading ? "Forbereder …" : "Gem"}
+                  {saveReading ? busyText(cut) : "Gem"}
                 </button>
               )}
               <button type="button" className={DARK_BTN} onClick={() => setConfirm(true)}>

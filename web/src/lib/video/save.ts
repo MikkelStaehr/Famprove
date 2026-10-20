@@ -113,6 +113,9 @@ export function urlKeeper(revoke: (url: string) => void, timers: Timers): UrlKee
 
 export type SaveClip = { readonly id: string; readonly name: string; readonly label: string };
 
+/** A clip's file as handed over (slice clip-cut): the cut or the original, and its name. */
+export type Handed = { readonly blob: Blob; readonly name: string; readonly cut: boolean };
+
 export type SaveDeps = {
   /** The clip's file; null = no such file (§10); a throw = the storage didn't answer (§11). */
   readonly read: (id: string) => Promise<Blob | null>;
@@ -123,6 +126,10 @@ export type SaveDeps = {
   readonly onProgress: (k: number, total: number) => void;
   /** True once the page is hidden or the card is gone: stop after the current clip (§9). */
   readonly aborted: () => boolean;
+  /** Optional (clip-cut): the cut, or the original when there is none or it fails. Without it the file goes whole. */
+  readonly prepare?: (clip: SaveClip, blob: Blob) => Promise<Handed>;
+  /** Called once per file sent with whether it was cut (Gem alle's split line, clip-cut §5). */
+  readonly onSent?: (cut: boolean) => void;
 };
 
 export type SaveResult = {
@@ -154,7 +161,9 @@ export async function saveSequence(clips: readonly SaveClip[], deps: SaveDeps): 
       missing.push(clip);
       continue;
     }
-    deps.download(blob, clip.name);
+    const handed = deps.prepare === undefined ? { blob, name: clip.name, cut: false } : await deps.prepare(clip, blob);
+    deps.download(handed.blob, handed.name);
+    deps.onSent?.(handed.cut);
     sent += 1;
     if (i < clips.length - 1) await deps.sleep(DOWNLOAD_GAP_MS);
   }
@@ -174,10 +183,10 @@ export function progressLine(k: number, total: number): string {
   return `Gemmer ${k} af ${total} …`;
 }
 
-/** §8–§11: the line after a run. */
-export function doneLine(r: SaveResult): string {
+/** §8–§11: the line after a run. `countLine` (clip-cut §5) replaces the count sentence when given. */
+export function doneLine(r: SaveResult, countLine: string | null = null): string {
   const stopped = r.remaining.length > 0;
-  const parts = [stopped ? `Stoppet ved ${r.total - r.remaining.length} af ${r.total}.` : `${r.sent} klip sendt til Downloads.`];
+  const parts = [stopped ? `Stoppet ved ${r.total - r.remaining.length} af ${r.total}.` : (countLine ?? `${r.sent} klip sendt til Downloads.`)];
   if (r.total >= 2 && !stopped) {
     parts.push(
       "Mangler nogle, har Chrome blokeret flere filer: Chrome › Indstillinger › Websiteindstillinger › Automatiske downloads › Tillad. Ellers tryk Gem på det enkelte klip.",

@@ -33,6 +33,15 @@ export function fixtureRunSets(today: IsoDate): RunSets {
   return runSetNumbers([set(25, 1), set(26, 1), set(27, 1), set(27, 2)]);
 }
 
+type Cut = Pick<VideoClipRow, "clipInS" | "clipOutS" | "autoInS" | "autoOutS" | "autoStatus">;
+const NO_CUT: Cut = { clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null };
+/** clip-cut's player lines: the newest clip has the user's in/out, the next an automatic one; the third is WebM. */
+const CUTS: readonly Cut[] = [
+  { ...NO_CUT, clipInS: 12.3, clipOutS: 48 },
+  { ...NO_CUT, autoInS: 4.2, autoOutS: 39.6, autoStatus: "clipped" },
+];
+const WEBM_INDEX = 2;
+
 function id(n: number): string {
   return `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 }
@@ -40,13 +49,14 @@ function id(n: number): string {
 export function clipsFixture(today: IsoDate): { readonly rows: VideoClipRow[]; readonly local: ClipIndexEntry[] } {
   const rows: VideoClipRow[] = SPECS.map((s, i) => {
     const date = addDays(today, s.day);
+    const cut = CUTS[i] ?? NO_CUT;
     return {
       id: id(i + 1), date, session: 1, row: s.row, set: s.set, exerciseId: s.ex, variantId: s.variant,
-      recordedAt: `${date}T${s.hour}:00+02:00`, durationS: s.dur, starred: s.starred, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null,
+      recordedAt: `${date}T${s.hour}:00+02:00`, durationS: s.dur, starred: s.starred, ...cut,
     };
   });
-  const local: ClipIndexEntry[] = rows.map((r) => ({
-    id: r.id, setKey: { date: r.date, sessionNo: r.session, row: r.row, set: r.set }, ext: "mp4",
+  const local: ClipIndexEntry[] = rows.map((r, i) => ({
+    id: r.id, setKey: { date: r.date, sessionNo: r.session, row: r.row, set: r.set }, ext: i === WEBM_INDEX ? "webm" : "mp4",
     recordedAt: r.recordedAt, durationS: r.durationS, starred: r.starred, starSynced: true, state: "done",
   }));
   const afbrudtDate = addDays(today, -1);

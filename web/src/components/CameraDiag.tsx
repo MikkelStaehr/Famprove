@@ -14,6 +14,61 @@ import {
   pickDiag,
   zoomMinOf,
 } from "@/lib/video/camera-diag";
+import { keyframeLines, type KeyframeLines } from "@/lib/video/cut-lines";
+import { pickRecorderType, recorderOptions } from "@/lib/video/mime";
+
+/** The keyframe test clip's length (clip-cut §6). */
+const TEST_CLIP_MS = 4000;
+
+/**
+ * clip-cut §6: a 4 s clip at 960×720 with the recorder's options, its keyframe spacing measured on
+ * the recording. The tracks go into the run's resources (released on every way out); the recording
+ * lives only in this function and is dropped once measured. null = the run was released.
+ */
+async function keyframeTest(devices: readonly MediaDeviceInfo[], run: DiagResources): Promise<KeyframeLines | null> {
+  const type = pickRecorderType(typeof MediaRecorder === "undefined" ? undefined : (t) => MediaRecorder.isTypeSupported(t));
+  if (type === null) return { line: "Afstanden kunne ikke måles.", warning: null };
+  const device = devices.find((d) => /back|rear|environment|bag/i.test(d.label)) ?? devices[0];
+  if (device === undefined) return null;
+  let stream: MediaStream;
+  try {
+    stream = await withTimeout(
+      navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: device.deviceId }, width: { ideal: 960 }, height: { ideal: 720 } }, audio: false }),
+      10_000,
+      "getUserMedia",
+    );
+  } catch {
+    return run.released ? null : { line: "Afstanden kunne ikke måles.", warning: null };
+  }
+  if (!run.addTracks(stream.getTracks())) return null;
+  let chunks: Blob[] = [];
+  try {
+    const rec = new MediaRecorder(stream, recorderOptions(type));
+    const stopped = new Promise<void>((resolve) => {
+      rec.onstop = () => resolve();
+    });
+    rec.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    rec.start(1000);
+    for (let waited = 0; waited < TEST_CLIP_MS && !run.released; waited += 200) await new Promise((r) => setTimeout(r, 200));
+    if (rec.state !== "inactive") rec.stop();
+    await withTimeout(stopped, 5_000, "MediaRecorder.stop");
+  } catch {
+    chunks = [];
+  }
+  run.stopTracks();
+  if (run.released) return null;
+  const recording = new Blob(chunks, { type: type.fileType });
+  chunks = [];
+  if (type.ext === "webm") return keyframeLines(null, type.mimeType);
+  try {
+    const { keyframeTimes } = await import("@/lib/video/cut");
+    return keyframeLines(await keyframeTimes(recording), type.mimeType);
+  } catch {
+    return keyframeLines(null, type.mimeType);
+  }
+}
 
 const BTN = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 const PRIMARY = `inline-flex min-h-11 items-center justify-center rounded-full bg-inverse-bg px-5 font-sans text-14 font-medium text-inverse-text disabled:opacity-50 ${BTN}`;
@@ -134,6 +189,7 @@ export function CameraDiag() {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [cameras, setCameras] = useState<Shown[]>([]);
   const [copied, setCopied] = useState<string>("");
+  const [keyframes, setKeyframes] = useState<KeyframeLines | null>(null);
   const res = useRef<DiagResources | null>(null);
 
   // Every way out (CLAUDE.md lifecycles): unmount, page hidden (incl. bfcache) and back.
@@ -165,6 +221,7 @@ export function CameraDiag() {
     res.current = run;
     setCameras([]);
     setCopied("");
+    setKeyframes(null);
     if (navigator.mediaDevices?.getUserMedia === undefined) {
       setPhase({ kind: "error", text: "Denne browser giver ikke adgang til kameraet." });
       return;
@@ -188,12 +245,19 @@ export function CameraDiag() {
       if (result === null || run.released) return;
       setCameras((list) => [...list, result]);
     }
+    if (devices.length > 0 && !run.released) {
+      setPhase({ kind: "running", at: devices.length, of: devices.length });
+      const kf = await keyframeTest(devices, run);
+      if (kf === null || run.released) return;
+      setKeyframes(kf);
+    }
     if (!run.released) setPhase(devices.length === 0 ? { kind: "error", text: "Browseren viser ingen kameraer." } : { kind: "done" });
   }
 
   async function copyAll() {
     try {
-      await navigator.clipboard.writeText(formatReport(cameras, new Date()));
+      const kf = keyframes === null ? "" : `\n\n${keyframes.line}${keyframes.warning === null ? "" : `\n${keyframes.warning}`}`;
+      await navigator.clipboard.writeText(`${formatReport(cameras, new Date())}${kf}`);
       setCopied("Kopieret.");
     } catch {
       setCopied("Kunne ikke kopiere. Markér teksten, og kopiér selv.");
@@ -225,6 +289,12 @@ export function CameraDiag() {
               : ""}
         {copied !== "" && ` ${copied}`}
       </p>
+      {keyframes !== null && (
+        <div className="flex flex-col gap-1">
+          <p className={`font-mono text-13 ${keyframes.line.startsWith("◆") ? "text-warning" : "text-text-muted"}`}>{keyframes.line}</p>
+          {keyframes.warning !== null && <p className="font-mono text-13 text-warning">{keyframes.warning}</p>}
+        </div>
+      )}
       {phase.kind === "error" && (
         <p role="alert" className="font-sans text-14 text-text">
           {phase.text}

@@ -133,6 +133,11 @@ export function keptRange(samples: readonly CutSample[], timescale: number, inS:
  * empty range); the caller then gives the original.
  */
 export async function cutMp4(file: Blob, inS: number, outS: number): Promise<Blob> {
+  return (await cutClip(file, inS, outS)).blob;
+}
+
+/** cutMp4 plus the cut's actual start and end in the original (s), for Gem's done line (clip-cut §2). */
+export async function cutClip(file: Blob, inS: number, outS: number): Promise<{ blob: Blob; actual: { startS: number; endS: number } }> {
   const { mp4, timescale, width, height, avcC, samples } = await parse(file);
   const { first, end } = keptRange(samples, timescale, inS, outS);
   const kept = samples.slice(first, end);
@@ -199,7 +204,9 @@ export async function cutMp4(file: Blob, inS: number, outS: number): Promise<Blo
     runEnd = s.offset + s.size;
   }
   parts.push(file.slice(runStart, runEnd));
-  return new Blob([head, mdat, ...parts], { type: "video/mp4" });
+  const lastKept = kept[kept.length - 1] as CutSample;
+  const actual = { startS: kept[0].cts / timescale, endS: (lastKept.cts + lastKept.duration) / timescale };
+  return { blob: new Blob([head, mdat, ...parts], { type: "video/mp4" }), actual };
 }
 
 /** Where a clip's cut comes from: the user's points, the automatic ones, none, or none because WebM. */
