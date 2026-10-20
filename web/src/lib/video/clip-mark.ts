@@ -42,6 +42,9 @@ export function undoInput(row: Pick<VideoClipRow, "clipInS" | "clipOutS">): Stor
 }
 
 /** Start her's label after a tap (the bracket is a separate aria-hidden span). */
+/** §2.1: Ryd while a mark's Fortryd is still on the line. */
+export const START_CLEARED_LINE = "Start ryddet.";
+
 export function startLabel(pendingInS: number | null): string {
   return pendingInS === null ? "Start her" : `Start ${formatSeconds(pendingInS)}`;
 }

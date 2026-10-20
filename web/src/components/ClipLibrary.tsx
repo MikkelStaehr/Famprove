@@ -51,10 +51,10 @@ import {
 } from "@/lib/video/save";
 import { shareClip, shareData } from "@/lib/video/share";
 import { type CutRange, cutClip, cutRange } from "@/lib/video/cut";
-import { busyText, cutFileName, cutLine, failedCutsLine, prepareClip, type Prepared, saveDoneLine, shareCutLine, splitCount } from "@/lib/video/cut-lines";
+import { busyText, cutFileName, cutLine, failedCutsLine, formatSeconds, prepareClip, type Prepared, saveDoneLine, shareCutLine, splitCount } from "@/lib/video/cut-lines";
 import { formatBytes } from "@/lib/video/space";
 import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/clip-range";
-import { markPoint, markRange, pendingLine, refusedLine, SAVING_LINE, savedLine, startLabel, startLine, UNDO_FAILED_LINE, undoInput, undoneLine } from "@/lib/video/clip-mark";
+import { markPoint, markRange, pendingLine, refusedLine, SAVING_LINE, savedLine, START_CLEARED_LINE, startLabel, startLine, UNDO_FAILED_LINE, undoInput, undoneLine } from "@/lib/video/clip-mark";
 import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, inPickupWindow, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
@@ -591,6 +591,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       </p>
       {open !== null && (
         <Player
+          key={open.id}
           row={open}
           files={files}
           fixture={fixture !== null}
@@ -742,6 +743,12 @@ function Player({
   const [markBusy, setMarkBusy] = useState(false);
   const startBtn = useRef<HTMLButtonElement>(null);
   const endBtn = useRef<HTMLButtonElement>(null);
+  const statusRow = useRef<HTMLDivElement>(null);
+  /** Focus lost or about to be: on body, or on the status row's Prøv igen / Fortryd, which unmounts after this tap (review 2026-10-20). */
+  const focusOffRow = () => {
+    const a = document.activeElement;
+    return a === null || a === document.body || (statusRow.current?.contains(a) ?? false);
+  };
   const videoEl = useRef<HTMLVideoElement>(null);
   const editBtn = useRef<HTMLButtonElement>(null);
   const gone = useRef(false);
@@ -903,7 +910,7 @@ function Player({
       const stored: StoredRange = r.inS === null || r.outS === null ? { inS: null, outS: null } : { inS: r.inS, outS: r.outS };
       onRange(row.id, stored);
       setRangeText({ text: stored.inS === null ? "Klip gemt." : savedLine(stored), warn: false, action: { kind: "undo-mark", prev } });
-      if (document.activeElement === null || document.activeElement === document.body) endBtn.current?.focus(); // Prøv igen is gone
+      if (focusOffRow()) endBtn.current?.focus(); // Prøv igen is gone
       return;
     }
     const retry = r.reason === "failed" || r.reason === "network";
@@ -919,7 +926,7 @@ function Player({
     if (r.ok) {
       onRange(row.id, prev);
       setRangeText({ text: undoneLine(prev), warn: false, action: null });
-      if (document.activeElement === null || document.activeElement === document.body) endBtn.current?.focus();
+      if (focusOffRow()) endBtn.current?.focus();
       return;
     }
     setRangeText({ text: UNDO_FAILED_LINE, warn: true, action: { kind: "retry-undo", prev } });
@@ -1001,10 +1008,14 @@ function Player({
           <span>{pendingLine(pending)}</span>
           <button
             type="button"
-            className={`${TEXT_LINK} font-sans`}
+            aria-disabled={markBusy || undefined}
+            className={`${TEXT_LINK} font-sans aria-disabled:opacity-60`}
             onClick={() => {
+              if (markBusy) return; // Gemmer … owns the line
               setPending(null);
-              setRangeText((old) => (old !== null && old.action === null && !old.warn ? null : old));
+              setRangeText((old) =>
+                old === null || old.warn ? old : old.action === null ? null : { text: START_CLEARED_LINE, warn: false, action: old.action },
+              );
               startBtn.current?.focus();
             }}
           >
@@ -1092,7 +1103,13 @@ function Player({
                   <span aria-hidden="true" className="font-mono">
                     [
                   </span>
-                  <span className="tabular-nums">{startLabel(pending)}</span>
+                  {pending === null ? (
+                    <span>{startLabel(null)}</span>
+                  ) : (
+                    <span className="tabular-nums">
+                      Start <span className="normal-case">{formatSeconds(pending)}</span>
+                    </span>
+                  )}
                 </button>
                 <button ref={endBtn} type="button" aria-disabled={markBusy || undefined} className={`${MARK_BTN} bg-track`} onClick={markEnd}>
                   {markBusy ? (
@@ -1152,7 +1169,7 @@ function Player({
             <p role="status" className="font-sans text-13 text-text-muted">
               {saveText}
             </p>
-            <div role="status" className="font-sans text-13 text-text-muted">
+            <div ref={statusRow} role="status" className="font-sans text-13 text-text-muted">
               {rangeText !== null && (
                 <span className="flex flex-wrap items-center gap-x-3">
                   <span>
