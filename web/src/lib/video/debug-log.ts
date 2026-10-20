@@ -28,7 +28,7 @@ export type DebugLogInput = {
 };
 
 const n2 = (v: number | null): string => (v === null || !Number.isFinite(v) ? "–" : v.toFixed(2));
-const pct = (v: number | null): string => (v === null || !Number.isFinite(v) ? "–" : `${Math.round(v * 100)} %`);
+export const pct = (v: number | null): string => (v === null || !Number.isFinite(v) ? "–" : `${Math.round(v * 100)} %`);
 const s1 = (v: number | null): string => (v === null || !Number.isFinite(v) ? "–" : `${v.toFixed(1)} s`);
 const side = (name: string, v: SideVisibility): string => `${name} L ${n2(v.l)} R ${n2(v.r)}`;
 

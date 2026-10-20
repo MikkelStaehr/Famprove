@@ -4,6 +4,7 @@
  * clip's reason can be read and copied at once. Local only (aggregates, never a landmark). Pure.
  */
 import { type AutoLast, runText } from "./auto-last.ts";
+import { pct } from "./debug-log.ts";
 
 /** What a line needs of a clip: the shown name, the set (Fokus's "Sæt n"), its length and the server's status. */
 export type SummaryClip = {
@@ -25,7 +26,7 @@ function localPart(last: AutoLast): string {
   const s = last.summary;
   if (s !== undefined) {
     const found = s.chosen === 1 ? s.peaksUp : s.chosen === -1 ? s.peaksDown : null;
-    parts.push(`fundet ${dash(found)}/${dash(s.expected)}`, s.joint ?? "–", `gyldige ${s.validShare === null ? "–" : `${Math.round(s.validShare * 100)} %`}`);
+    parts.push(`fundet ${dash(found)}/${dash(s.expected)}`, s.joint ?? "–", `gyldige ${pct(s.validShare)}`);
   }
   if (last.mode !== null) parts.push(last.mode);
   if (last.runMs !== null) parts.push(runText(last.runMs));
