@@ -55,7 +55,7 @@ import { busyText, cutFileName, cutLine, failedCutsLine, prepareClip, type Prepa
 import { formatBytes } from "@/lib/video/space";
 import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/clip-range";
 import { ClipEditor, sendClipRange } from "./ClipEditor";
-import { autoMetaWord, type ClipLiftMeta, editLabel, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
+import { autoMetaWord, type ClipLiftMeta, editLabel, inPickupWindow, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
 import { browserStore, readAutoVersions, recordIfSaved } from "@/lib/video/auto-version";
 import { ClipDebug } from "@/components/ClipDebug";
@@ -475,7 +475,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
             <ClipRow
               key={row.id}
               row={row}
-              word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id) : null}
+              word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id, inPickupWindow(row.recordedAt, new Date())) : null}
               onOpen={(el) => {
                 opener.current = el;
                 setOpen(row);
@@ -747,7 +747,7 @@ function Player({
   }, []);
 
   /** clip-auto §2: the player's line when there is no cut to show (running, waiting, low_confidence, failed); waiting needs a server row. */
-  const autoLine = cut.range === null && cut.reason !== "webm" && (server !== null || running !== null) ? playerAutoLine(server?.autoStatus ?? null, running) : null;
+  const autoLine = cut.range === null && cut.reason !== "webm" && (server !== null || running !== null) ? playerAutoLine(server?.autoStatus ?? null, running, inPickupWindow(row.recordedAt, new Date())) : null;
 
   /** clip-handles §1: Klip / Ret klip on an MP4 clip with a server row; never WebM, afbrudt or missing. */
   const canEdit = row.kind === "clip" && row.ext === "mp4" && server !== null;

@@ -164,10 +164,17 @@ export function frameTimes(duration: number, fps: number): number[] {
   return times;
 }
 
+/** How long play() may take to start playing (play mode). */
+const PLAY_START_MS = 10_000;
+/** A play pass with fewer frames than this share of the expected count failed (play mode). */
+const PLAY_MIN_SHARE = 0.3;
+
 /** The offscreen element of a play run: in the DOM (a detached element may not play), never seen or reached. */
 function attachOffscreen(video: HTMLVideoElement): void {
   video.setAttribute("aria-hidden", "true");
   video.tabIndex = -1;
+  video.disablePictureInPicture = true;
+  video.disableRemotePlayback = true;
   Object.assign(video.style, { position: "fixed", left: "0", top: "0", width: "1px", height: "1px", opacity: "0", pointerEvents: "none" });
   document.body.appendChild(video);
 }
@@ -233,12 +240,25 @@ async function playPass(video: HTMLVideoElement, of: number, fps: number, detect
     video.playbackRate = PLAY_RATE;
     begun = true;
     try {
-      await untilAbort(video.play(), signal);
+      // A play() that never settles fails after PLAY_START_MS rather than waiting for the cap.
+      let startTimer: ReturnType<typeof setTimeout> | undefined;
+      const late = new Promise<never>((_, reject) => {
+        startTimer = setTimeout(() => reject(new PoseError("video", `afspilningen startede ikke inden for ${PLAY_START_MS / 1000} s`)), PLAY_START_MS);
+      });
+      try {
+        await untilAbort(Promise.race([video.play(), late]), signal);
+      } finally {
+        clearTimeout(startTimer);
+      }
     } catch (error) {
       if (error instanceof PoseError) throw error;
       throw new PoseError("video", error instanceof Error ? error.message : String(error));
     }
     await untilAbort(ended, signal);
+    // A browser that throttles the offscreen element hands over few frames or none (review
+    // 2026-10-20): a video error, so analyseClip retries in seek mode rather than storing a
+    // low_confidence that is never re-run.
+    if (frames.length < PLAY_MIN_SHARE * of) throw new PoseError("video", `afspilning gav kun ${frames.length} af ${of} billeder`);
   } finally {
     video.removeEventListener("ended", endedListener);
     video.cancelVideoFrameCallback?.(handle);

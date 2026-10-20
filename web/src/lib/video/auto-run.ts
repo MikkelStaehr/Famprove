@@ -138,11 +138,12 @@ export async function analyseClip(clipId: string, blob: Blob, meta: ClipMeta, op
     try {
       pose = await run(choice.mode);
     } catch (error) {
-      if (choice.mode !== "seek" || signal.aborted || !(error instanceof PoseError) || error.reason !== "video") throw error;
-      choice = { mode: "play", why: "afspil: søgning fejlede" };
+      if (signal.aborted || !(error instanceof PoseError) || error.reason !== "video") throw error;
+      // One retry in the other mode: seek fails on far keyframes, play on a throttled element.
+      choice = choice.mode === "seek" ? { mode: "play", why: "afspil: søgning fejlede" } : { mode: "seek", why: "søg: afspilning fejlede" };
       lastPct = null;
       report({ kind: "running", pct: 0 });
-      pose = await run("play");
+      pose = await run(choice.mode);
     }
     if (signal.aborted) return { kind: "aborted" };
     step = "lift";

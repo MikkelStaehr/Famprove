@@ -27,7 +27,7 @@ export function parseAutoVersions(raw: string | null): AutoVersions {
 }
 
 export function versionOf(versions: AutoVersions, id: string): number {
-  return versions[id] ?? UNRECORDED_VERSION;
+  return Object.hasOwn(versions, id) ? versions[id]! : UNRECORDED_VERSION;
 }
 
 export function readAutoVersions(store: KeyStore | null): AutoVersions {

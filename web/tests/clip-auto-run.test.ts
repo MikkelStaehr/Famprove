@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { SetClipAutoInput, SetClipAutoResult } from "../src/lib/video/auto-clip.ts";
-import { autoMetaWord, editLabel, FAILED_LINE, fokusAutoLine, LOW_LINE, pickupQueue, PLAYER_FAILED_LINE, PLAYER_LOW_LINE, PLAYER_WAITING_LINE, playerAutoLine } from "../src/lib/video/auto-lines.ts";
+import { autoMetaWord, editLabel, FAILED_LINE, fokusAutoLine, inPickupWindow, LOW_LINE, pickupQueue, PLAYER_FAILED_LINE, PLAYER_LOW_LINE, PLAYER_WAITING_LINE, playerAutoLine } from "../src/lib/video/auto-lines.ts";
 import { analyseClip, type AutoDeps, type AutoProgress, bytePct, chooseMode, type ClipMeta, stepPct } from "../src/lib/video/auto-run.ts";
 import { AUTO_VERSION_KEY, parseAutoVersions, readAutoVersions, recordAutoVersion } from "../src/lib/video/auto-version.ts";
 import { ALGO_VERSION } from "../src/lib/video/auto-clip.ts";
@@ -295,6 +295,13 @@ test("mode: analyseClip reads the keyframes, seeks or plays, and retries a seek 
   const gone = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...hidden.deps, keyframeTimes: async () => [0, 5] } });
   assert.deepEqual(gone, { kind: "aborted" }, "a hidden page aborts the play run: nothing written");
   assert.equal(hidden.writes.length, 0);
+  modes.length = 0;
+  // review 2026-10-20: a throttled offscreen element gives too few frames (a video error): one retry in seek.
+  const throttled = recorder((m) => (m === "play" ? new PoseError("video", "afspilning gav kun 0 af 200 billeder") : null));
+  const back = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...throttled.deps, keyframeTimes: async () => [0, 5] } });
+  assert.deepEqual(modes, ["play", "seek"], "one retry, in seek");
+  assert.ok(back.kind === "clipped" && back.mode?.why === "søg: afspilning fejlede");
+  assert.equal(throttled.writes.length, 1);
 });
 
 test("the cap scales with the clip: max(90 s, duration × 1.5 + 30 s)", () => {
@@ -331,4 +338,14 @@ test("analyseClip: a failure keeps its step and message on the phone, and writes
   });
   const outP = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: p.deps });
   assert.ok(outP.kind === "failed" && outP.error.step === "pose");
+});
+
+test("clip-auto-2 review: Venter på klip only inside the pickup window; play retries in seek mode", async () => {
+  const now = new Date("2026-10-27T12:00:00Z");
+  assert.equal(inPickupWindow("2026-10-21T10:00:00Z", now), true);
+  assert.equal(inPickupWindow("2026-10-19T10:00:00Z", now), false);
+  const waiting = { clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null } as const;
+  assert.equal(autoMetaWord("mp4", waiting, false, true), "venter på klip");
+  assert.equal(autoMetaWord("mp4", waiting, false, false), null);
+  assert.equal(playerAutoLine(null, null, false), null);
 });

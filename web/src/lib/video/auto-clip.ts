@@ -64,7 +64,7 @@ export const AUTO_CLIP = {
    * becomes the rest level. With one rep there is no inner side: OUTER_SPAN_ONE_REP_S.
    */
   OUTER_SPAN_FACTOR: 1.5,
-  OUTER_SPAN_ONE_REP_S: 3,
+  OUTER_SPAN_ONE_REP_S: 3, // kept (review 2026-10-20): 4–5 s reached into a walk-out 2 s before the rep; a 6–8 s single rep may end early; clip-accuracy decides
   /** low_confidence (count off by COUNT_TOLERANCE): a rep shorter or longer than these shares of the median rep length. */
   REP_REL_MIN: 0.5,
   REP_REL_MAX: 2.0,

@@ -57,26 +57,30 @@ export function hasOwnRange(row: Pick<VideoClipRow, "clipInS" | "clipOutS">): bo
   return row.clipInS !== null && row.clipOutS !== null;
 }
 
-/** §2's row meta word after the duration; null = none (WebM, no server row). Not run yet: `venter på klip`. */
-export function autoMetaWord(ext: "mp4" | "webm" | null, server: CutCols | null, running: boolean): string | null {
+/**
+ * §2's row meta word after the duration; null = none (WebM, no server row). Not run yet:
+ * `venter på klip`, but only while the pickup will take it (`waiting`: within PICKUP_DAYS), so an
+ * older clip never waits for good (review 2026-10-20).
+ */
+export function autoMetaWord(ext: "mp4" | "webm" | null, server: CutCols | null, running: boolean, waiting = true): string | null {
   if (ext === "webm") return null;
   if (running) return "klipper …";
   if (server === null) return null;
   if (hasOwnRange(server)) return "klippet";
   if (server.autoStatus === "clipped") return "auto-klippet";
   if (server.autoStatus === "low_confidence" || server.autoStatus === "failed") return "klip selv";
-  return ext === "mp4" ? "venter på klip" : null;
+  return ext === "mp4" && waiting ? "venter på klip" : null;
 }
 
 /**
  * §2's player line for an MP4 clip (the caller never asks for WebM) without the user's range and
  * without a clipped cut; null = clip-cut's line (or none). auto_status null: `Venter på klip`.
  */
-export function playerAutoLine(status: AutoStatus | null, running: { readonly pct: number } | null): { readonly words: string; readonly figure: string | null } | null {
+export function playerAutoLine(status: AutoStatus | null, running: { readonly pct: number } | null, waiting = true): { readonly words: string; readonly figure: string | null } | null {
   if (running !== null) return { words: "Klipper video …", figure: `${running.pct} %` };
   if (status === "low_confidence") return { words: PLAYER_LOW_LINE, figure: null };
   if (status === "failed") return { words: PLAYER_FAILED_LINE, figure: null };
-  if (status === null) return { words: PLAYER_WAITING_LINE, figure: null };
+  if (status === null) return waiting ? { words: PLAYER_WAITING_LINE, figure: null } : null;
   return null;
 }
 
@@ -98,11 +102,16 @@ export const PICKUP_DAYS = 7;
  * below ALGO_VERSION (`versions`; none recorded = 1). An own range doesn't exclude it (slice
  * clip-auto-2): it still wins in cutRange, and the auto values are kept for the accuracy comparison.
  */
+/** Recorded within the pickup's window of `now` (and not in the future beyond a minute's skew). */
+export function inPickupWindow(recordedAt: string, now: Date): boolean {
+  const at = Date.parse(recordedAt);
+  return at >= now.getTime() - PICKUP_DAYS * 86_400_000 && at <= now.getTime() + 60_000;
+}
+
 export function pickupQueue(local: readonly ClipIndexEntry[], rows: readonly VideoClipRow[], now: Date, versions: AutoVersions = {}): VideoClipRow[] {
   const files = new Map(local.filter((e) => e.state === "done" && e.ext === "mp4").map((e) => [e.id, e]));
-  const since = now.getTime() - PICKUP_DAYS * 86_400_000;
   const due = (r: VideoClipRow): boolean => r.autoStatus === null || versionOf(versions, r.id) < ALGO_VERSION;
   return rows
-    .filter((r) => due(r) && files.has(r.id) && Date.parse(r.recordedAt) >= since && Date.parse(r.recordedAt) <= now.getTime() + 60_000)
+    .filter((r) => due(r) && files.has(r.id) && inPickupWindow(r.recordedAt, now))
     .toSorted((a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt));
 }
