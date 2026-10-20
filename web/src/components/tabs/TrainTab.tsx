@@ -247,7 +247,7 @@ function DayCards({ plan, today, form }: { readonly plan: TrainingPlan; readonly
 }
 
 /**
- * The Optagelser card (video-library.md): under the session block (desktop: left column). Rows and
+ * The Optagelser line (clip-line.md; video-library.md): under the day card (desktop: left column). Rows and
  * names are read server-side; a failed read shows the local clips with the rows warning.
  */
 async function VideoLibrary({ today }: { readonly today: IsoDate }) {
