@@ -260,10 +260,20 @@ async function VideoLibrary({ today }: { readonly today: IsoDate }) {
   try {
     const now = new Date();
     [rows, names] = await Promise.all([readVideoClips(now), devFixture() === null ? readClipNames() : Promise.resolve(names)]);
-    if (devFixture() === null) [runSets, lifts] = await Promise.all([readClipRunSets(rows, now), readClipLifts(rows, now)]);
+    if (devFixture() === null) runSets = await readClipRunSets(rows, now);
   } catch (error) {
     if (!isDataError(error)) throw error;
     console.error("træning: reading video clips failed", error);
+  }
+  // clip-auto's lift data on its own: if it fails, the clips keep their set numbers and only the
+  // pickup waits (review 2026-10-20).
+  if (rows !== null && devFixture() === null) {
+    try {
+      lifts = await readClipLifts(rows, new Date());
+    } catch (error) {
+      if (!isDataError(error)) throw error;
+      console.error("træning: reading the clips' lifts failed", error);
+    }
   }
   return <ClipLibrary today={today} rows={rows} names={names} runSets={runSets} canRecord={canRecord} fixture={null} lifts={lifts} />;
 }
