@@ -6,7 +6,9 @@
  *  - missing: a row with no file on this phone ("fil mangler", Slet only, R2);
  *  - remote: a browser with no clip index (the desktop) lists rows read-only, "på telefonen".
  */
+import { isoWeekStart } from "../dates.ts";
 import type { IsoDate } from "../db/rows.ts";
+import { runPositions } from "../training-view.ts";
 import type { VideoClipRow } from "./clips.ts";
 import type { ClipIndexEntry, ClipNameStack } from "./index-store.ts";
 import type { ClipExt } from "./mime.ts";
@@ -25,7 +27,7 @@ export type LibraryRow = {
   readonly exercise: string; // the exercise's name ("Optagelse" when unknown: a clip with no row yet)
   readonly variant: string | null; // display name, shown above the exercise name
   readonly date: IsoDate;
-  readonly set: number;
+  readonly set: number; // across the exercise's run, as Fokus's "Sæt n" (RunSets); else the sheet row's set_no
   readonly durationS: number | null;
   readonly starred: boolean; // the local ★ wins over the server's
   readonly starUnsynced: boolean;
@@ -33,6 +35,54 @@ export type LibraryRow = {
   readonly meta: string; // MonoCaption under the name stack
   readonly sr: string; // the row button's accessible name
 };
+
+/**
+ * A clip's set as Fokus numbers it (slice clip-set-no; traening.md D11 "Sæt n af N"): across the
+ * exercise's run, keyed by runSetKey. A set whose week is not in strength_sets (an old week gone
+ * from the sheet) has no entry: the card shows the sheet row's set_no, as before.
+ */
+export type RunSets = Readonly<Record<string, number>>;
+
+/** One strength_sets row of a session, as the run numbering needs it. */
+export type SessionSetRow = {
+  readonly weekStart: IsoDate;
+  readonly session: number;
+  readonly block: string;
+  readonly row: number;
+  readonly set: number;
+  readonly name: string;
+  readonly variantId: number | null;
+};
+
+export function runSetKey(date: IsoDate, session: number, row: number, set: number): string {
+  return `${isoWeekStart(date)}#${session}#${row}#${set}`;
+}
+
+/** Every set's run number per (week, session): Fokus's rows (block, sheet row, set order) through runPositions. */
+export function runSetNumbers(sets: readonly SessionSetRow[]): Record<string, number> {
+  const sessions = new Map<string, SessionSetRow[]>();
+  for (const s of sets) {
+    const k = `${s.weekStart}#${s.session}`;
+    sessions.set(k, [...(sessions.get(k) ?? []), s]);
+  }
+  const out: Record<string, number> = {};
+  for (const rows of sessions.values()) {
+    const ordered = rows.toSorted((a, b) => a.block.localeCompare(b.block) || a.row - b.row || a.set - b.set);
+    const exercises: { name: string; variantId: number | null; sets: { row: number; set: number }[]; key: string }[] = [];
+    for (const s of ordered) {
+      const key = `${s.block}#${s.row}`;
+      const last = exercises.at(-1);
+      if (last !== undefined && last.key === key) last.sets.push({ row: s.row, set: s.set });
+      else exercises.push({ key, name: s.name, variantId: s.variantId, sets: [{ row: s.row, set: s.set }] });
+    }
+    const positions = runPositions(exercises);
+    for (const s of ordered) {
+      const p = positions.get(`${s.row}#${s.set}`);
+      if (p !== undefined) out[runSetKey(s.weekStart, s.session, s.row, s.set)] = p.index;
+    }
+  }
+  return out;
+}
 
 /** Unknown name: a clip whose row isn't on the server (yet). */
 export const UNKNOWN_NAME = "Optagelse";
@@ -97,18 +147,22 @@ export function libraryRows(
   local: readonly ClipIndexEntry[] | null,
   server: readonly VideoClipRow[] | null,
   n: ClipNames,
+  runSets: RunSets = {},
 ): LibraryRow[] {
   const rows = new Map((server ?? []).map((r) => [r.id, r]));
+  // The run's set number (Fokus's "Sæt n"); without the week's rows the sheet row's set_no.
+  const shownSet = (date: IsoDate, session: number, row: number, set: number): number => runSets[runSetKey(date, session, row, set)] ?? set;
   const out: LibraryRow[] = [];
   if (local === null) {
     for (const r of server ?? []) {
       const nm = names(r, n);
       const label = shownName(nm);
+      const set = shownSet(r.date, r.session, r.row, r.set);
       out.push({
-        id: r.id, kind: "remote", ext: null, ...nm, date: r.date, set: r.set, durationS: r.durationS,
+        id: r.id, kind: "remote", ext: null, ...nm, date: r.date, set, durationS: r.durationS,
         starred: r.starred, starUnsynced: false, recordedAt: r.recordedAt,
-        meta: `${clipDay(r.date)} · sæt ${r.set} · ${clipDuration(r.durationS)} · på telefonen`,
-        sr: `${label}, sæt ${r.set}, ${clipDayLong(r.date)}, på telefonen.`,
+        meta: `${clipDay(r.date)} · sæt ${set} · ${clipDuration(r.durationS)} · på telefonen`,
+        sr: `${label}, sæt ${set}, ${clipDayLong(r.date)}, på telefonen.`,
       });
     }
   } else {
@@ -119,7 +173,7 @@ export function libraryRows(
       const nm = names(r, n, e.names);
       const label = shownName(nm);
       const date = r?.date ?? e.setKey.date;
-      const set = r?.set ?? e.setKey.set;
+      const set = r === undefined ? shownSet(e.setKey.date, e.setKey.sessionNo, e.setKey.row, e.setKey.set) : shownSet(r.date, r.session, r.row, r.set);
       const durationS = r?.durationS ?? e.durationS;
       const dur = durationS === null ? null : clipDuration(durationS);
       const afbrudt = e.state === "afbrudt";
@@ -136,10 +190,11 @@ export function libraryRows(
     for (const r of server ?? []) {
       if (localIds.has(r.id)) continue;
       const nm = names(r, n);
+      const set = shownSet(r.date, r.session, r.row, r.set);
       out.push({
-        id: r.id, kind: "missing", ext: null, ...nm, date: r.date, set: r.set, durationS: r.durationS,
+        id: r.id, kind: "missing", ext: null, ...nm, date: r.date, set, durationS: r.durationS,
         starred: r.starred, starUnsynced: false, recordedAt: r.recordedAt, meta: "fil mangler",
-        sr: `Slet oplysningen om ${shownName(nm)}, sæt ${r.set}, ${clipDayLong(r.date)}`,
+        sr: `Slet oplysningen om ${shownName(nm)}, sæt ${set}, ${clipDayLong(r.date)}`,
       });
     }
   }

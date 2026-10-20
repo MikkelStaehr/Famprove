@@ -9,7 +9,7 @@ import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
 import { pickRecorderType, type RecorderType } from "@/lib/video/mime";
 import type { ClipFiles, ClipWriter } from "@/lib/video/opfs";
 import { opfsClipFiles, persistStorage } from "@/lib/video/opfs-browser";
-import { type AfbrudtReason, clipOutcome, IDLE, lowSpace, openGuard, recReducer, type RecState, stopThenDone } from "@/lib/video/recording";
+import { type AfbrudtReason, clipEntryFor, clipOutcome, IDLE, lowSpace, openGuard, recReducer, type RecState, saveInputOf, stopThenDone } from "@/lib/video/recording";
 import { MAX_DURATION_S } from "@/lib/video/clips";
 import type { SetRef } from "@/lib/set-taps";
 
@@ -88,10 +88,9 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
   const fs = (): ClipFiles => (files.current ??= opfsClipFiles());
 
   const sync = useCallback(async (entry: ClipIndexEntry, durationS: number) => {
-    const { date, sessionNo, row, set } = entry.setKey;
     let ok = false;
     try {
-      const r = await saveClip({ id: entry.id, date, sessionNo, row, set, durationS });
+      const r = await saveClip(saveInputOf(entry, durationS));
       ok = r.ok;
     } catch {
       ok = false;
@@ -202,18 +201,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
           }
           const id = crypto.randomUUID();
           const writer = await fs().create(id, type.ext);
-          const entry: ClipIndexEntry = {
-            id,
-            setKey: { date, sessionNo, row: ref.row, set: ref.set },
-            ext: type.ext,
-            recordedAt: new Date().toISOString(),
-            durationS: null,
-            starred: false,
-            starSynced: true,
-            state: "recording",
-            synced: false,
-            names,
-          };
+          const entry = clipEntryFor({ id, ref, date, sessionNo, ext: type.ext, names, recordedAt: new Date().toISOString() });
           await ix().put(entry);
           if (!opening.current.keep(attempt, stream)) {
             await writer.abort();

@@ -1,28 +1,37 @@
 /**
- * DEV_FIXTURE=clips (video-library.md §States): 5 clips (2 today, 1 starred), 1 afbrudt and 1
+ * DEV_FIXTURE=clips (video-library.md §States): 7 clips (4 today, one per set of a multi-row run; 1 starred), 1 afbrudt and 1
  * "fil mangler", relative to the shown day. Illustrative, never real; no video file exists, so
  * the player shows "Testvisning: ingen video". Nothing is written, deleted or shared.
  */
-import { addDays } from "../dates.ts";
+import { addDays, isoWeekStart } from "../dates.ts";
 import type { IsoDate } from "../db/rows.ts";
 import type { VideoClipRow } from "./clips.ts";
 import type { ClipIndexEntry } from "./index-store.ts";
-import type { ClipNames } from "./library-view.ts";
+import { type ClipNames, type RunSets, runSetNumbers } from "./library-view.ts";
 
 export const FIXTURE_NAMES: ClipNames = {
   exercises: { 1: "Squat", 2: "Bench Press", 3: "Deadlift" },
   variants: { 10: "Pause Squat" },
 };
 
-type Spec = { day: number; hour: string; ex: number; variant: number | null; set: number; dur: number; starred: boolean };
+type Spec = { day: number; hour: string; ex: number; variant: number | null; row: number; set: number; dur: number; starred: boolean };
 
+// Today: one clip per set of a multi-row run like 19 Oct (rows 25: 1 set, 26: 1, 27: 2), shown sæt 1–4.
 const SPECS: readonly Spec[] = [
-  { day: 0, hour: "10:42", ex: 1, variant: 10, set: 2, dur: 48, starred: false },
-  { day: 0, hour: "10:31", ex: 1, variant: 10, set: 1, dur: 41, starred: false },
-  { day: -2, hour: "17:05", ex: 2, variant: null, set: 3, dur: 52, starred: true },
-  { day: -5, hour: "09:20", ex: 3, variant: null, set: 1, dur: 37, starred: false },
-  { day: -9, hour: "18:12", ex: 2, variant: null, set: 2, dur: 44, starred: false },
+  { day: 0, hour: "10:42", ex: 1, variant: 10, row: 27, set: 2, dur: 48, starred: false },
+  { day: 0, hour: "10:37", ex: 1, variant: 10, row: 27, set: 1, dur: 45, starred: false },
+  { day: 0, hour: "10:34", ex: 1, variant: 10, row: 26, set: 1, dur: 43, starred: false },
+  { day: 0, hour: "10:31", ex: 1, variant: 10, row: 25, set: 1, dur: 41, starred: false },
+  { day: -2, hour: "17:05", ex: 2, variant: null, row: 12, set: 3, dur: 52, starred: true },
+  { day: -5, hour: "09:20", ex: 3, variant: null, row: 13, set: 1, dur: 37, starred: false },
+  { day: -9, hour: "18:12", ex: 2, variant: null, row: 14, set: 2, dur: 44, starred: false },
 ];
+
+/** Today's session rows behind the run (illustrative): Pause Squat on rows 25, 26 and 27 (2 sets). */
+export function fixtureRunSets(today: IsoDate): RunSets {
+  const set = (row: number, s: number) => ({ weekStart: isoWeekStart(today), session: 1, block: "fixture", row, set: s, name: "Squat", variantId: 10 });
+  return runSetNumbers([set(25, 1), set(26, 1), set(27, 1), set(27, 2)]);
+}
 
 function id(n: number): string {
   return `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -32,7 +41,7 @@ export function clipsFixture(today: IsoDate): { readonly rows: VideoClipRow[]; r
   const rows: VideoClipRow[] = SPECS.map((s, i) => {
     const date = addDays(today, s.day);
     return {
-      id: id(i + 1), date, session: 1, row: 10 + i, set: s.set, exerciseId: s.ex, variantId: s.variant,
+      id: id(i + 1), date, session: 1, row: s.row, set: s.set, exerciseId: s.ex, variantId: s.variant,
       recordedAt: `${date}T${s.hour}:00+02:00`, durationS: s.dur, starred: s.starred, clipInS: null, clipOutS: null,
     };
   });
@@ -42,12 +51,12 @@ export function clipsFixture(today: IsoDate): { readonly rows: VideoClipRow[]; r
   }));
   const afbrudtDate = addDays(today, -1);
   local.push({
-    id: id(6), setKey: { date: afbrudtDate, sessionNo: 1, row: 20, set: 2 }, ext: "mp4",
+    id: id(8), setKey: { date: afbrudtDate, sessionNo: 1, row: 20, set: 2 }, ext: "mp4",
     recordedAt: `${afbrudtDate}T16:40:00+02:00`, durationS: 31, starred: false, starSynced: true, state: "afbrudt",
   });
   const missingDate = addDays(today, -12);
   rows.push({
-    id: id(7), date: missingDate, session: 2, row: 12, set: 2, exerciseId: 1, variantId: null,
+    id: id(9), date: missingDate, session: 2, row: 12, set: 2, exerciseId: 1, variantId: null,
     recordedAt: `${missingDate}T17:30:00+02:00`, durationS: 50, starred: false, clipInS: null, clipOutS: null,
   });
   return { rows, local };

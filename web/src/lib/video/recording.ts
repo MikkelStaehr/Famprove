@@ -7,7 +7,10 @@
  * space, failure) | limit (15:00 reached: kept, saved with the set's done). denied: the camera is
  * blocked (Optag stays, a tap retries).
  */
-import { MAX_DURATION_S } from "./clips.ts";
+import type { SetRef } from "../set-taps.ts";
+import { MAX_DURATION_S, type SaveClipInput } from "./clips.ts";
+import type { ClipIndexEntry, ClipNameStack } from "./index-store.ts";
+import type { ClipExt } from "./mime.ts";
 
 /** §3: below this much free space (quota − usage) the Optag button gives way to a line. */
 export const MIN_FREE_MB = 300;
@@ -192,4 +195,31 @@ export function openGuard() {
  */
 export function clipOutcome(stopFired: boolean, failed: AfbrudtReason | null): AfbrudtReason | null {
   return failed ?? (stopFired ? null : "failed");
+}
+
+/**
+ * The index entry made at Optag (slice clip-set-no): keyed by its own uuid, for the set Optag was
+ * tapped on (the set card's or the pause's "Næste · sæt n" ref), never the set before it.
+ */
+export function clipEntryFor(
+  at: { readonly id: string; readonly ref: SetRef; readonly date: string; readonly sessionNo: number; readonly ext: ClipExt; readonly names: ClipNameStack; readonly recordedAt: string },
+): ClipIndexEntry {
+  return {
+    id: at.id,
+    setKey: { date: at.date, sessionNo: at.sessionNo, row: at.ref.row, set: at.ref.set },
+    ext: at.ext,
+    recordedAt: at.recordedAt,
+    durationS: null,
+    starred: false,
+    starSynced: true,
+    state: "recording",
+    synced: false,
+    names: at.names,
+  };
+}
+
+/** saveClip's input for a finished entry: its own id and the set it was recorded for. */
+export function saveInputOf(entry: ClipIndexEntry, durationS: number): SaveClipInput {
+  const { date, sessionNo, row, set } = entry.setKey;
+  return { id: entry.id, date, sessionNo, row, set, durationS };
 }

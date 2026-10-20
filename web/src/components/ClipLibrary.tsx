@@ -18,6 +18,7 @@ import {
   cleanupDue,
   cleanupLine,
   type ClipNames,
+  type RunSets,
   clipCount,
   FIRST_ROWS,
   type LibraryRow,
@@ -45,6 +46,7 @@ type Props = {
   /** null: the rows could not be read (Error, rows). */
   readonly rows: readonly VideoClipRow[] | null;
   readonly names: ClipNames;
+  readonly runSets: RunSets; // the clips' run set numbers (Fokus's "Sæt n"); {} = set_no
   /** Recording possible on this host (not a preview URL). */
   readonly canRecord: boolean;
   /** DEV_FIXTURE=clips: the fake index; nothing is written, deleted or shared. */
@@ -73,7 +75,7 @@ async function hasIndex(): Promise<boolean> {
 }
 
 /** The Optagelser card on Træning (design/specs/video-library.md). */
-export function ClipLibrary({ today, rows: initialRows, names, canRecord, fixture }: Props) {
+export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecord, fixture }: Props) {
   const store = useRef<Store | null>(null);
   const [local, setLocal] = useState<Local>({ kind: "loading" });
   const [rows, setRows] = useState<readonly VideoClipRow[] | null>(initialRows);
@@ -155,7 +157,7 @@ export function ClipLibrary({ today, rows: initialRows, names, canRecord, fixtur
   }, [load, canRecord, fixture]);
 
   const entries = local.kind === "ready" ? local.entries : null;
-  const list = local.kind === "ready" || local.kind === "none" ? libraryRows(entries, rows, names) : [];
+  const list = local.kind === "ready" || local.kind === "none" ? libraryRows(entries, rows, names, runSets) : [];
 
   async function toggleStar(row: LibraryRow) {
     const s = store.current;

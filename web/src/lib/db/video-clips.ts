@@ -19,7 +19,7 @@ import { EnvError, readSupabaseEnv } from "./env.ts";
 import { createClient, patchCount, type PostgrestClient, PostgrestError, selectAll, write } from "./postgrest.ts";
 import { parseVideoClipRow, RowError, VIDEO_CLIPS_SELECT } from "./rows.ts";
 import { exerciseIds, sessionSets } from "./set-log.ts";
-import type { ClipNames } from "../video/library-view.ts";
+import { type ClipNames, type RunSets, runSetNumbers, type SessionSetRow } from "../video/library-view.ts";
 
 /**
  * The app's fifth write path (user, 2026-10-17, slice video-record): a working set's clip recorded
@@ -149,4 +149,29 @@ export async function readClipNames(options: VideoClipOptions = {}): Promise<Cli
     });
   const [ex, va] = await Promise.all([named("exercises", "name"), named("exercise_variants", "display_name")]);
   return { exercises: Object.fromEntries(ex), variants: Object.fromEntries(va) };
+}
+
+/**
+ * The run numbers of the clips' sets (slice clip-set-no): one read of strength_sets for every ISO
+ * week holding a clip row, plus today's week (a clip not yet synced). A week no longer in the sheet
+ * has no rows, so its clips keep set_no. Errors propagate.
+ */
+export async function readClipRunSets(rows: readonly VideoClipRow[], now: Date, options: VideoClipOptions = {}): Promise<RunSets> {
+  const { client: makeClient = client } = options;
+  const weeks = [...new Set([...rows.map((r) => isoWeekStart(r.date)), isoWeekStart(localToday(now))])].toSorted();
+  const sets = await selectAll(
+    makeClient(),
+    "strength_sets",
+    { columns: "week_start,session,block,sheet_row,set_no,name,variant_id", order: "week_start,session,block,sheet_row,set_no", filters: [["week_start", `in.(${weeks.join(",")})`], ["session", "not.is.null"]] },
+    (raw): SessionSetRow => {
+      if (typeof raw !== "object" || raw === null) throw new RowError("strength_sets: expected an object");
+      const r = raw as Record<string, unknown>; // checked field by field below
+      if (typeof r.week_start !== "string" || typeof r.session !== "number" || typeof r.block !== "string" || typeof r.sheet_row !== "number" || typeof r.set_no !== "number" || typeof r.name !== "string") {
+        throw new RowError("strength_sets row must have week_start, session, block, sheet_row, set_no and name");
+      }
+      if (r.variant_id !== null && r.variant_id !== undefined && typeof r.variant_id !== "number") throw new RowError("strength_sets.variant_id must be a number or null");
+      return { weekStart: r.week_start, session: r.session, block: r.block, row: r.sheet_row, set: r.set_no, name: r.name, variantId: typeof r.variant_id === "number" ? r.variant_id : null };
+    },
+  );
+  return runSetNumbers(sets);
 }

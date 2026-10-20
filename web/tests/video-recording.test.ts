@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { afbrudtLine, clipOutcome, IDLE, isLive, lowSpace, openGuard, recReducer, type RecState, stopInDock, stopSpoken, stopThenDone } from "../src/lib/video/recording.ts";
+import { type FokusExercise, fokusView } from "../src/lib/fokus-view.ts";
+import { applyTap, type LoggedSet, type SetRef } from "../src/lib/set-taps.ts";
+import { memoryClipIndex } from "../src/lib/video/index-store.ts";
+import { memoryClipFiles } from "../src/lib/video/opfs.ts";
+import { afbrudtLine, clipEntryFor, clipOutcome, saveInputOf, IDLE, isLive, lowSpace, openGuard, recReducer, type RecState, stopInDock, stopSpoken, stopThenDone } from "../src/lib/video/recording.ts";
 
 test("idle → requesting → recording → stopping → saved", () => {
   let s: RecState = recReducer(IDLE, { type: "optag" });
@@ -110,4 +114,49 @@ test("a clip whose stop event came after the 800 ms cap misses its last chunk: a
   assert.equal(clipOutcome(true, "space"), "space");
   // §14: the line the strip shows for it
   assert.equal(recReducer({ kind: "stopping", startedAt: 0 }, { type: "abort", reason: "failed", durationS: 40 }).kind, "afbrudt");
+});
+
+const names = { exercise: "Squat", variant: null };
+
+test("recording on sets 2 and 3: saveClip gets the set Optag was tapped on, by its own uuid", () => {
+  for (const set of [2, 3]) {
+    const e = clipEntryFor({ id: `id-${set}`, ref: { row: 25, set }, date: "2026-10-19", sessionNo: 1, ext: "mp4", names, recordedAt: "2026-10-19T17:46:35Z" });
+    assert.deepEqual(saveInputOf({ ...e, state: "done" }, 52), { id: `id-${set}`, date: "2026-10-19", sessionNo: 1, row: 25, set, durationS: 52 });
+  }
+});
+
+test("three clips of one set: three files and three index entries, keyed by uuid", async () => {
+  const files = memoryClipFiles();
+  const index = memoryClipIndex();
+  for (const id of ["a", "b", "c"]) {
+    const w = await files.create(id, "mp4");
+    await w.append(new Blob(["x"]));
+    await w.close();
+    await index.put(clipEntryFor({ id, ref: { row: 27, set: 2 }, date: "2026-10-19", sessionNo: 1, ext: "mp4", names, recordedAt: "2026-10-19T17:50:00Z" }));
+  }
+  assert.equal((await files.names()).length, 3);
+  const all = await index.all();
+  assert.deepEqual(all.map((e) => e.id).toSorted(), ["a", "b", "c"]);
+  assert.ok(all.every((e) => e.setKey.row === 27 && e.setKey.set === 2));
+});
+
+test("Optag on the pause's Næste · sæt n card records set n (the ref FokusScreen passes is view.next), not the set just done", () => {
+  const ex = (row: number, n: number): FokusExercise => ({
+    name: "Squat", variant: null, variantId: null, repsText: "5", prescribed: null, bodyweight: false, reference: null, row,
+    suggestedKg: null, suggestionBasis: null, suggestionCapped: false, adjustmentKg: null, adjustmentReason: null,
+    restMinS: 180, restMaxS: 300, ramp: null, todayKg: 100, todayBasis: "sheet", sets: Array.from({ length: n }, (_, k) => ({ row, set: k + 1 })),
+  });
+  const exercises = [ex(25, 1), ex(26, 1), ex(27, 2)];
+  const order: SetRef[] = [{ row: 25, set: 0 }, { row: 25, set: 1 }, { row: 26, set: 1 }, { row: 27, set: 1 }, { row: 27, set: 2 }];
+  let log: ReadonlyMap<string, LoggedSet> = new Map();
+  const taps: [string, SetRef][] = [["begin", { row: 25, set: 0 }], ["done", { row: 25, set: 0 }], ["done", { row: 25, set: 1 }], ["done", { row: 26, set: 1 }]];
+  taps.forEach(([kind, ref], k) => {
+    log = applyTap(order, log, kind as "done", ref, `2026-10-19T17:${String(40 + k).padStart(2, "0")}:00.000Z`, null, new Map());
+  });
+  const v = fokusView({ exercises, pairs: [], order, week: 2, session: 1 }, log);
+  assert.equal(v.kind, "set");
+  if (v.kind !== "set") return;
+  assert.deepEqual(v.next, { row: 27, set: 1 }); // the pause after run set 2 shows run set 3
+  const e = clipEntryFor({ id: "p1", ref: v.next, date: "2026-10-19", sessionNo: 1, ext: "mp4", names, recordedAt: "2026-10-19T17:44:00Z" });
+  assert.deepEqual([saveInputOf(e, 40).row, saveInputOf(e, 40).set], [27, 1]);
 });

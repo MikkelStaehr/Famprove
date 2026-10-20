@@ -15,10 +15,10 @@ import { type WeekBody, WeekCard } from "@/components/WeekCard";
 import { dayDetails, weekView } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { devFixture, devSwitchOn } from "@/lib/db/dev-fixture";
-import { readClipNames, readVideoClips } from "@/lib/db/video-clips";
+import { readClipNames, readClipRunSets, readVideoClips } from "@/lib/db/video-clips";
 import { recordingAllowed, type VideoClipRow } from "@/lib/video/clips";
-import { clipsFixture, FIXTURE_NAMES } from "@/lib/video/library-fixture";
-import type { ClipNames } from "@/lib/video/library-view";
+import { clipsFixture, FIXTURE_NAMES, fixtureRunSets } from "@/lib/video/library-fixture";
+import type { ClipNames, RunSets } from "@/lib/video/library-view";
 import { loadDashboardData, loadTrainingForm, loadTrainingPlan, loadWeekDetail, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { addDays, isoWeek, isoWeekStart } from "@/lib/dates";
@@ -250,17 +250,20 @@ async function VideoLibrary({ today }: { readonly today: IsoDate }) {
   const canRecord = recordingAllowed(process.env, process.env.NODE_ENV);
   if (devFixture() === "clips") {
     const f = clipsFixture(today);
-    return <ClipLibrary today={today} rows={f.rows} names={FIXTURE_NAMES} canRecord={canRecord} fixture={{ local: f.local }} />;
+    return <ClipLibrary today={today} rows={f.rows} names={FIXTURE_NAMES} runSets={fixtureRunSets(today)} canRecord={canRecord} fixture={{ local: f.local }} />;
   }
   let rows: VideoClipRow[] | null = null;
   let names: ClipNames = { exercises: {}, variants: {} };
+  let runSets: RunSets = {};
   try {
-    [rows, names] = await Promise.all([readVideoClips(new Date()), devFixture() === null ? readClipNames() : Promise.resolve(names)]);
+    const now = new Date();
+    [rows, names] = await Promise.all([readVideoClips(now), devFixture() === null ? readClipNames() : Promise.resolve(names)]);
+    if (devFixture() === null) runSets = await readClipRunSets(rows, now);
   } catch (error) {
     if (!isDataError(error)) throw error;
     console.error("træning: reading video clips failed", error);
   }
-  return <ClipLibrary today={today} rows={rows} names={names} canRecord={canRecord} fixture={null} />;
+  return <ClipLibrary today={today} rows={rows} names={names} runSets={runSets} canRecord={canRecord} fixture={null} />;
 }
 
 function PlanError({ error, at }: { readonly error: DataError; readonly at: Date }) {
