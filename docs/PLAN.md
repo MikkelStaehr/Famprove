@@ -162,5 +162,6 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | clip-auto | Automatic clip: MediaPipe Pose lite on the phone after Stop finds in and out from hip/knee movement and the rep count (0.5 s margin) | L |
 | clip-debug | A local debug panel per clip (hidden in the player): why the automatic clip failed or had low confidence, the video's rotation and seek times, 3 frames with the skeleton, Analysér igen | M |
 | clip-auto-2 | Automatic clip, round 2 from the 19 Oct log: count = expected is high confidence, bounded outer rep edges, relative rep length, rep lengths in the log; playback instead of seeking when keyframes are > 1 s apart; Venter på klip; re-run on a new algorithm version | M |
+| clip-auto-3 | Automatic clip, round 3: the background run's outcome and failure step kept on the phone and shown in the debug panel; play (2x) first, seek as fallback; every run aborts when the page is hidden; the wake lock while the pickup runs; ALGO_VERSION 3 | M |
 | clip-handles | Manual in/out handles on a clip, saved as clip_in_s / clip_out_s | M |
 | clip-accuracy | Auto-clip accuracy and run time on the user's own clips (needs the user's phone) | S |
