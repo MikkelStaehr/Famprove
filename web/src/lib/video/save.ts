@@ -5,7 +5,7 @@
  * timers are injected, so the sequence is tested with fakes.
  */
 import type { IsoDate } from "../db/rows.ts";
-import type { LibraryRow } from "./library-view.ts";
+import { type LibraryRow, shownName } from "./library-view.ts";
 
 /** The pause between two downloads of Gem alle (§5). */
 export const DOWNLOAD_GAP_MS = 400;
@@ -26,7 +26,7 @@ export function safeNamePart(text: string): string {
 
 /** The row's shown name as a file name part (variant's display name, else the exercise). */
 function namePart(row: NameRow): string {
-  return safeNamePart(row.variant ?? row.exercise) || "Optagelse";
+  return safeNamePart(shownName(row)) || "Optagelse";
 }
 
 function hasFile(row: NameRow): boolean {
