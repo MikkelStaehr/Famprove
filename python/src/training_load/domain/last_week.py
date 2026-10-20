@@ -19,8 +19,10 @@ The web's "Sidste uge" (training-view.references) is a fourth reading, unchanged
 stays as it is).
 """
 
+import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date, timedelta
+from typing import Final
 
 from training_load.domain.strength import StrengthSet
 
@@ -54,11 +56,24 @@ def same_name_casefold(a: str, b: str) -> bool:
     return a.strip().casefold() == b.strip().casefold()
 
 
+_RANGE: Final = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*$")
+
+
+def reps_key(text: str) -> str | tuple[float, float]:
+    """A reps text as a key: a range by its (min, max), so "10 - 6" = "6 - 10" (the sheet may write
+    it either way; user, 2026-10-17, slice range-order); anything else by its trimmed text."""
+    m = _RANGE.match(text)
+    if m is None:
+        return text.strip()
+    lo, hi = (float(g.replace(",", ".")) for g in m.groups())
+    return (min(lo, hi), max(lo, hi))
+
+
 def same_prescribed_reps(a: StrengthSet, b: StrengthSet) -> bool:
-    """The same prescribed reps: the sheet's text ("8 - 12"), since a done range set's reps are
-    the reps done (domain.set_feedback)."""
+    """The same prescribed reps: the sheet's text ("8 - 12", a range in either order), since a done
+    range set's reps are the reps done (domain.set_feedback)."""
     if a.reps_text is not None and b.reps_text is not None:
-        return a.reps_text.strip() == b.reps_text.strip()
+        return reps_key(a.reps_text) == reps_key(b.reps_text)
     return a.reps == b.reps
 
 

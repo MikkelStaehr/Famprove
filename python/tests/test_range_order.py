@@ -9,6 +9,7 @@ from datetime import date, timedelta
 import pytest
 
 from training_load.domain.exercises import Catalog, Exercise
+from training_load.domain.last_week import reps_key, same_prescribed_reps
 from training_load.domain.planned_load import prescribed_rpe
 from training_load.domain.planned_sets import PlannedSet, planned_sets
 from training_load.domain.set_feedback import range_top
@@ -88,3 +89,14 @@ def test_planned_sets_give_the_same_numbers_for_a_reversed_range(make_set: MakeS
     back = [p for p in usual if p.sheet_row == 2]
     assert [(p.rpe, p.reps) for p in back] == [(6.0, 8.0)]
     assert back[0].suggested_kg is not None
+
+
+def test_last_weeks_anchor_matches_a_range_written_in_either_order(make_set: MakeSet) -> None:
+    """range-order (user, 2026-10-17): "6 - 10" last week and "10 - 6" this week are the same
+    prescribed reps, so the weekly cap's anchor still applies."""
+    assert reps_key("10 - 6") == reps_key("6 - 10") == reps_key("6-10") == (6.0, 10.0)
+    assert reps_key("3") == "3" and reps_key(" 5 ") == "5"
+    last = make_set(reps_text="6 - 10")
+    now = make_set(reps_text="10 - 6")
+    assert same_prescribed_reps(last, now)
+    assert not same_prescribed_reps(make_set(reps_text="6 - 10"), make_set(reps_text="8 - 12"))
