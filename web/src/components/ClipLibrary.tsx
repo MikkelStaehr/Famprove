@@ -583,7 +583,7 @@ function Player({
   async function share() {
     if (blob === null || row.ext === null) return;
     setPreparing(true);
-    const name = fileName ?? `${row.date} ${shownName(row)} sæt ${row.set}.${row.ext}`;
+    const name = fileName ?? clipFileNames([row]).get(row.id) ?? `${row.date} sæt ${row.set}.${row.ext}`;
     const outcome = await shareClip(navigator, shareData(blob, name, row.ext));
     setPreparing(false);
     setShareText(outcome === "failed" ? "Kunne ikke dele videoen. Prøv igen." : outcome === "unsupported" ? "Deling af video virker ikke i denne browser." : null);
@@ -598,24 +598,26 @@ function Player({
     if (gone.current) missing.current();
   }, []);
 
-  /** Gem (§1): the same read as Del; fixture: no file, no URL. */
+  /** Gem (§1): the blob the player loaded (as Del), else one read; fixture: no file, no URL. */
   async function save() {
     if (fileName === null || row.ext === null) return;
     if (fixture) {
       setSaveText(`Testvisning: Sendt til Downloads som ${fileName}.`);
       return;
     }
-    if (files === null) return;
-    setSaveReading(true);
-    let b: Blob | null;
-    try {
-      b = await files.read(row.id, row.ext);
-    } catch {
+    let b: Blob | null = blob;
+    if (b === null) {
+      if (files === null) return;
+      setSaveReading(true);
+      try {
+        b = await files.read(row.id, row.ext);
+      } catch {
+        setSaveReading(false);
+        setSaveText("Videoen kunne ikke læses på telefonen.");
+        return;
+      }
       setSaveReading(false);
-      setSaveText("Videoen kunne ikke læses på telefonen.");
-      return;
     }
-    setSaveReading(false);
     if (b === null) {
       gone.current = true;
       setSaveText("Videoen findes ikke længere på telefonen.");

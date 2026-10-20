@@ -8,6 +8,7 @@ import {
   doneLine,
   type NameRow,
   REVOKE_AFTER_MS,
+  safeNamePart,
   type SaveClip,
   saveSequence,
   todaysClips,
@@ -172,4 +173,18 @@ test("save.ts imports nothing from actions and makes no request", () => {
   const src = readFileSync(new URL("../src/lib/video/save.ts", import.meta.url), "utf8");
   assert.doesNotMatch(src, /from ["'][^"']*actions/);
   assert.doesNotMatch(src, /\bfetch\(/);
+});
+
+test("name: bidi and invisible characters are dropped, C1 controls become - (security, 2026-10-20)", () => {
+  assert.equal(safeNamePart("Squat\u202egnp.exe"), "Squatgnp.exe");
+  assert.equal(safeNamePart("\ufeffBench\u200b\u2066 press\u2069\u200f"), "Bench press");
+  assert.equal(safeNamePart("Dead\u0085lift"), "Dead-lift");
+  const n = clipFileNames([row({ id: ID, exercise: "Squat\u202e4pm" })]).get(ID);
+  assert.equal(n, "2026-10-19 Squat4pm sæt 2.mp4");
+});
+
+test("sequence: a stopped run still names the files that were missing (review 2026-10-20)", () => {
+  const missing: SaveClip = { id: "m", name: "x.mp4", label: "Squat sæt 1" };
+  const line = doneLine({ sent: 1, missing: [missing], unreadable: [], remaining: [missing], total: 4 });
+  assert.match(line, /^Stoppet ved 3 af 4\. 1 fil mangler på telefonen: Squat sæt 1\.$/);
 });

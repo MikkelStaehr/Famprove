@@ -18,9 +18,18 @@ const LISTED_MAX = 3;
 
 export type NameRow = Pick<LibraryRow, "id" | "kind" | "ext" | "exercise" | "variant" | "date" | "set" | "recordedAt">;
 
-/** `/ \ : * ? " < > |` and control characters become "-"; spaces collapsed and trimmed; æøå kept. */
+/**
+ * `/ \ : * ? " < > |` and control characters (C0, C1) become "-"; invisible and bidi characters
+ * (zero-width, LRM/RLM, the embeddings and overrides, the isolates, BOM) are dropped, so a name
+ * from the sheet can't show reversed in Downloads (security, 2026-10-20); spaces collapsed and
+ * trimmed; æøå kept.
+ */
 export function safeNamePart(text: string): string {
-  const cleaned = text.replace(/[/\\:*?"<>|\u0000-\u001f\u007f]/g, "-").replace(/\s+/g, " ").trim();
+  const cleaned = text
+    .replace(/[​-‏‪-‮⁦-⁩﻿]/g, "")
+    .replace(/[/\\:*?"<>|\u0000-\u001f\u007f-\u009f]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
   return cleaned.slice(0, NAME_PART_MAX).trim();
 }
 
@@ -167,9 +176,9 @@ export function progressLine(k: number, total: number): string {
 
 /** §8–§11: the line after a run. */
 export function doneLine(r: SaveResult): string {
-  if (r.remaining.length > 0) return `Stoppet ved ${r.total - r.remaining.length} af ${r.total}.`;
-  const parts = [`${r.sent} klip sendt til Downloads.`];
-  if (r.total >= 2) {
+  const stopped = r.remaining.length > 0;
+  const parts = [stopped ? `Stoppet ved ${r.total - r.remaining.length} af ${r.total}.` : `${r.sent} klip sendt til Downloads.`];
+  if (r.total >= 2 && !stopped) {
     parts.push(
       "Mangler nogle, har Chrome blokeret flere filer: Chrome › Indstillinger › Websiteindstillinger › Automatiske downloads › Tillad. Ellers tryk Gem på det enkelte klip.",
     );
