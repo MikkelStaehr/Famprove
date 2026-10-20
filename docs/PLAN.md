@@ -166,5 +166,10 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | clip-summary | A hidden overview in Optagelser of every clip's last automatic-clip outcome (status, reason, peaks found vs expected, joint, mode, time) with Kopiér alle; local only | S |
 | clip-mark | Manual clip in the player: [ Start her sets the in point at the playhead, Slut her ] sets the out point and saves (setClipRange), Fortryd after; the handles become fine-tuning | M |
 | clip-auto-park | Park the automatic clip: a switch under Optagelser, off by default (no model fetched, no background analysis, no Fokus slot, no auto labels or auto ranges); code and debug panel kept; ARCHITECTURE.md Parkeret | M |
+| bw-display | "Kropsvægt + X kg" only for category bodyweight; other exercises with a bodyweight fraction show the logged kg; the effective kg only in the detail view; the calculation unchanged | S |
+| clip-trim | Manual clip is destructive: Gem klip (after Slut her, and the handles' Gem klip) replaces the file with the keyframe cut; Fortryd for 10 s; the original deleted after; the server's duration_s updated | L |
+| clip-delete | Slet with Fortryd for 10 s (a starred clip asks first); "gemt ✓" after a download or share; Slet gemte; the 8-week cleanup stays | M |
+| clip-at-set | A ▶ at each set with a clip on Træning and in the week card's sessions; an expanded exercise's "Klip: sæt 1 ▶ · …" row | M |
+| clip-line | The Optagelser card becomes one line under the session (space, Gem alle fra i dag, Slet gemte, the auto-clip switch); the full list behind Alle klip | M |
 | clip-handles | Manual in/out handles on a clip, saved as clip_in_s / clip_out_s | M |
 | clip-accuracy | Auto-clip accuracy and run time on the user's own clips (needs the user's phone) | S |
