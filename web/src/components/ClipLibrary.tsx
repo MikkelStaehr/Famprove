@@ -1134,7 +1134,7 @@ function Player({
     }
     setPoints(m.points);
     setFromStored(false);
-    setRangeText((old) => (old === null || old.warn ? null : old));
+    setRangeText((old) => (old?.action != null ? { ...old, text: "", warn: false } : null)); // Start's line is spent; Fjern klip's Fortryd stays
   }
 
   /** The cut's outcome (the player's Gem klip or the editor's). */
@@ -1162,6 +1162,7 @@ function Player({
       return;
     }
     setTrim((st) => trimStep(st, { kind: "result", result: r }));
+    setRangeText((old) => (old?.action != null ? { ...old, text: "", warn: false } : null));
     setAnnounce(failedLine(r.space));
   }
 
