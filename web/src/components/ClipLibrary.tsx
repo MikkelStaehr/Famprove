@@ -400,7 +400,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         </button>
       )}
       {canRecord && (
-        <Link href="/kamera" className={`mt-2 inline-block font-sans text-13 text-text-muted underline-offset-4 hover:underline ${BTN}`}>
+        <Link href="/kamera" className={`mt-1 flex min-h-11 w-fit items-center font-sans text-13 text-text-muted underline-offset-4 hover:underline ${BTN}`}>
           Kameratest
         </Link>
       )}
