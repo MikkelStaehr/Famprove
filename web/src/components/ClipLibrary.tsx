@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 
@@ -64,7 +64,6 @@ import {
   type ClipNames,
   type RunSets,
   clipCount,
-  FIRST_ROWS,
   type LibraryRow,
   libraryRows,
   MISSING_DELETE_FAILED,
@@ -112,6 +111,7 @@ import { ClipDebug } from "@/components/ClipDebug";
 import { usePublishClips } from "@/components/ClipPlayerHost";
 import { isDebugToggle } from "@/lib/video/debug-log";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
+import { allLabel, type LinePart, lineParts, sheetCloseVia, sheetShouldPush, sheetStaysOnPop, SHEET_HISTORY_STATE } from "@/lib/video/clip-line";
 
 const NO_LIFTS: Readonly<Record<string, ClipLiftMeta>> = {};
 
@@ -139,6 +139,8 @@ const BUSY_WIDTH = "min-w-[7.5rem]";
 /** clip-trim §2.3: Gem klip, Ember's filled primary, full width, the stepper height. */
 const CUT_BTN = `inline-flex min-h-14 w-full items-center justify-center rounded-full bg-inverse-bg px-5 font-sans text-button text-inverse-text aria-disabled:opacity-60 ${BTN}`;
 const MARK_BTN = `inline-flex min-h-14 flex-1 items-center justify-center gap-1 rounded-full px-4 font-sans text-button text-text aria-disabled:opacity-60 ${BTN}`;
+/** clip-line §1: a quiet text button on the line (Geist 13 --text, icon --text-muted, no fill). */
+const QUIET_BTN = `inline-flex min-h-11 min-w-11 items-center gap-2 whitespace-nowrap font-sans text-13 text-text ${BTN}`;
 const TEXT_LINK = `inline-flex min-h-11 items-center text-text underline underline-offset-4 ${BTN}`;
 
 /** The status line's button: Fjern klip's Fortryd (never focused by a tap, clip-mark §3). */
@@ -205,7 +207,7 @@ function summaryItems(list: readonly LibraryRow[], server: ReadonlyMap<string, V
   }));
 }
 
-/** The Optagelser card on Træning (design/specs/video-library.md). */
+/** The Optagelser line on Træning and its Alle klip sheet (design/specs/clip-line.md; video-library.md). */
 export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecord, fixture, lifts = NO_LIFTS }: Props) {
   const store = useRef<Store | null>(null);
   const [local, setLocal] = useState<Local>({ kind: "loading" });
@@ -214,7 +216,9 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const [sizes, setSizes] = useState<Record<string, number | null>>({});
   const [cleaned, setCleaned] = useState<number>(0);
   const [status, setStatus] = useState("");
-  const [showAll, setShowAll] = useState(false);
+  /** clip-line §2: the Alle klip sheet. */
+  const [sheet, setSheet] = useState(false);
+  const allBtn = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState<LibraryRow | null>(null);
   const [slowLoad, setSlowLoad] = useState(false);
   const [files, setFiles] = useState<ClipFiles | null>(null);
@@ -263,7 +267,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   // goes the way Luk does: back over the overview's history entry, whose popstate closes it (review).
   const overviewOpen = overview !== null;
   useEffect(() => {
-    if (open !== null) return;
+    if (open !== null || sheet) return;
     const onKey = (e: KeyboardEvent) => {
       if (!isDebugToggle(e, e.target instanceof HTMLElement ? e.target : null)) return;
       if (!overviewOpen) setOverview(readAutoLast(browserStore()));
@@ -272,7 +276,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, overviewOpen]);
+  }, [open, overviewOpen, sheet]);
 
   const load = useCallback(async () => {
     await Promise.resolve(); // never set state synchronously inside the effect
@@ -343,7 +347,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   }, [fixture, initialRows, today, delTimers]);
 
   useEffect(() => {
-    const t = setTimeout(() => setSlowLoad(true), 300);
+    const t = setTimeout(() => setSlowLoad(true), 1000); // clip-line §4: the space figure pulses after 1 s
     void load();
     void Promise.resolve().then(() => setCanRecordHere(canRecord && typeof MediaRecorder !== "undefined"));
     const storage = typeof navigator === "undefined" ? undefined : navigator.storage;
@@ -542,11 +546,16 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
 
   useEffect(() => () => delTimers().clearAll(), [delTimers]); // unmount: the next load's finishDueDeletes finishes them
   // §3: Fortryd's text countdown (10 → 1) while a window is open.
-  const windowOpen = delLine?.kind === "window";
+  const trimWaiting = local.kind === "ready" && local.entries.some((e) => e.pendingTrim !== undefined && e.id !== open?.id); // clip-line §3: a cut's window on the line
+  const windowOpen = delLine?.kind === "window" || trimWaiting;
   useEffect(() => {
     if (!windowOpen) return;
+    const first = window.setTimeout(() => setNowMs(Date.now()), 0);
     const t = window.setInterval(() => setNowMs(Date.now()), 250);
-    return () => window.clearInterval(t);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(t);
+    };
   }, [windowOpen]);
 
   // §3 lifecycle (cuts and deletes alike): the finish timers go on unmount and while hidden; visible
@@ -707,10 +716,9 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
 
   function focusClip(target: string) {
     setTimeout(() => {
-      const el = target === "heading" ? document.getElementById("optagelser-title") : document.querySelector<HTMLElement>(`[data-clip-play="${target}"]`);
-      if (el === null) return;
-      if (target === "heading") el.setAttribute("tabindex", "-1");
-      el.focus();
+      // clip-line §3: the sheet's heading or its row while it is open; else Alle klip on the line.
+      const el = (target === "heading" ? document.getElementById("alle-klip-title") : document.querySelector<HTMLElement>(`[data-clip-play="${target}"]`)) ?? allBtn.current;
+      el?.focus();
     }, 0);
   }
 
@@ -849,8 +857,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         el?.focus();
         return;
       }
-      const target = after === "heading" ? document.getElementById("optagelser-title") : document.querySelector<HTMLElement>(`[data-clip-play="${after}"]`);
-      if (after === "heading") target?.setAttribute("tabindex", "-1");
+      const target = (after === "heading" ? document.getElementById("alle-klip-title") : document.querySelector<HTMLElement>(`[data-clip-play="${after}"]`)) ?? allBtn.current;
       target?.focus();
     }, 0); // after the Player's cleanup lifts inert from <main>
   }, []);
@@ -861,68 +868,136 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     else close();
   }, [close]);
 
-  // §9: no rows and recording not possible here: no card.
-  if (canRecordHere === false && list.length === 0 && local.kind !== "loading") return null;
+  /** clip-line §2: the sheet closes now (back's popstate, or no entry of ours on top); focus back to Alle klip. */
+  const closeSheet = useCallback(() => {
+    setSheet(false);
+    setTimeout(() => allBtn.current?.focus(), 0); // after the sheet's cleanup lifts inert from <main>
+  }, []);
+
+  /** Luk and Escape: back over the sheet's history entry when it is on top; its popstate then closes. */
+  const requestCloseSheet = useCallback(() => {
+    if (sheetCloseVia(window.history.state) === "back") window.history.back();
+    else closeSheet();
+  }, [closeSheet]);
+
+  /** clip-line §3: a cut's Fortryd on the line (the player's own undo, moved); focus to Alle klip or the restored row. */
+  async function undoTrimOnLine(id: string) {
+    const r = await runUndoTrim(id);
+    if (r.kind !== "undone") return;
+    setStatus(trimUndoneLine(r.durationS));
+    focusClip(id);
+  }
 
   const used = usedBytes((entries ?? []).filter((e) => e.state !== "recording").map((e) => sizes[e.id] ?? null));
   const usedText = formatBytes(used ?? undefined);
   const quotaText = formatBytes(space.quota);
-  const shown = showAll ? list : list.slice(0, FIRST_ROWS);
+  const shown = list; // clip-line §2: the sheet lists every row (no Vis alle)
   /** The open clip as the list has it now (a cut changes its file and length, clip-trim §2.3). */
   const openRow = open === null ? null : (list.find((r) => r.id === open.id) ?? open);
   const line = cleanupLine(cleaned);
   const deletable = entries === null ? [] : savedDeletable(entries);
+  const saveCount = rest.length > 0 ? rest.length : today_.length;
+  /** clip-line §3: a cut's Fortryd once its player has closed. */
+  const trimsOpen = (entries ?? []).filter((e) => e.pendingTrim !== undefined && e.id !== open?.id && nowMs > 0 && secondsLeft(e.pendingTrim.deadline, nowMs) > 0);
+  const parts = lineParts({
+    loading: local.kind === "loading",
+    error: local.kind === "error",
+    clips: list.length,
+    save: entries === null ? 0 : saveCount,
+    deletable: deletable.length,
+    pending: delLine !== null || saveLine !== "" || trimsOpen.length > 0,
+    sheetOpen: sheet,
+  });
+  const warn = (space.persisted === false && entries !== null) || rows === null;
 
-  return (
-    <section aria-labelledby="optagelser-title" className="rounded-card border border-border bg-card p-4.5 lg:col-start-1">
-      <div className="flex items-baseline justify-between gap-3">
-        <div
-          className="select-none [-webkit-touch-callout:none]"
-          onPointerDown={() => {
-            endTitlePress();
-            titlePress.current = setTimeout(() => setOverview(readAutoLast(browserStore())), 600);
-          }}
-          onPointerUp={endTitlePress}
-          onPointerLeave={endTitlePress}
-          onPointerCancel={endTitlePress}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <SectionTitle id="optagelser-title">Optagelser</SectionTitle>
-        </div>
-        {list.length > 0 && <MonoCaption uppercase={false}>{clipCount(list.length)}</MonoCaption>}
-      </div>
-      {usedText !== null && quotaText !== null && entries !== null && (
-        <p className="mt-1 font-mono text-12 text-text-muted tabular-nums">
-          {usedText} af {quotaText} · ældre end 8 uger slettes automatisk (
-          <Icon name="star" size={16} className="inline size-3 align-[-1px]" />
-          <span className="sr-only">stjernemarkerede</span> beholdes)
+  const statusRow = (
+    <div className="flex flex-col gap-1">
+      {delLine?.kind === "window" ? (
+        <p className="flex flex-wrap items-center gap-x-1 font-sans text-13 text-text-muted">
+          <span>{deleteWindowText(delLine.count, delLine.label)}</span>
+          <button type="button" className={`${DARK_BTN} tabular-nums`} aria-label={delLine.count === 1 ? "Fortryd sletningen" : `Fortryd sletningen af ${delLine.count} klip`} onClick={() => void undoDeleteBatch(delLine)}>
+            Fortryd <span aria-hidden="true">{deleteSecondsLeft(delLine.deadline, nowMs)}</span>
+          </button>
         </p>
+      ) : delLine?.kind === "text" ? (
+        <p className="font-sans text-13 text-text-muted">{delLine.text}</p>
+      ) : null}
+      {trimsOpen.map((e) =>
+        e.pendingTrim === undefined ? null : (
+          <p key={e.id} className="flex flex-wrap items-center gap-x-3 font-sans text-13 text-text-muted">
+            <span className="tabular-nums">{doneLine(e.pendingTrim.newDurationS, e.pendingTrim.originalDurationS)} ·</span>
+            <button type="button" className={`${DARK_BTN} min-h-11`} aria-label="Fortryd klippet" onClick={() => void undoTrimOnLine(e.id)}>
+              Fortryd <span aria-hidden="true" className="font-mono tabular-nums">{secondsLeft(e.pendingTrim.deadline, nowMs)}</span>
+            </button>
+          </p>
+        ),
       )}
-      <AutoClipSwitch on={autoOn} />
-      {overview !== null && <ClipSummary items={summaryItems(list, serverById, overview)} onClose={closeOverview} />}
-      {space.persisted === false && entries !== null && (
-        <div className="mt-2">
-          <WarningLine>
-            Chrome har ikke lovet at beholde optagelserne. Mangler telefonen plads, kan de blive slettet.{" "}
-            <span className="text-text-muted">Læg Famprove på startskærmen for at beskytte dem.</span>
-          </WarningLine>
-        </div>
+      <p role="status" className="font-sans text-13 text-text-muted empty:hidden">
+        {saveLine}
+      </p>
+    </div>
+  );
+
+  const spaceFigure = (
+    <span
+      className="flex min-h-11 select-none items-center font-mono text-12 text-text-muted tabular-nums [-webkit-touch-callout:none]"
+      onPointerDown={() => {
+        endTitlePress();
+        titlePress.current = setTimeout(() => setOverview(readAutoLast(browserStore())), 600);
+      }}
+      onPointerUp={endTitlePress}
+      onPointerLeave={endTitlePress}
+      onPointerCancel={endTitlePress}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {local.kind === "loading" || usedText === null ? (
+        <span aria-hidden="true" className={`inline-block h-3 w-12 rounded-sm ${slowLoad ? "animate-pulse bg-track motion-reduce:animate-none" : ""}`} />
+      ) : (
+        usedText
       )}
-      {line !== null && <p className="mt-2 font-sans text-13 text-text-muted">{line}</p>}
-      {rows === null && (
-        <div className="mt-2">
-          <WarningLine>Kunne ikke hente oplysningerne om optagelserne. Stjerner gemmes, når forbindelsen er tilbage.</WarningLine>
-        </div>
+    </span>
+  );
+
+  const allButton = (
+    <button
+      ref={allBtn}
+      id="alle-klip-btn"
+      type="button"
+      aria-haspopup="dialog"
+      className={`ml-auto inline-flex min-h-11 min-w-11 items-center gap-1 whitespace-nowrap font-sans text-14 text-text ${BTN}`}
+      onClick={() => setSheet(true)}
+    >
+      {warn && (
+        <>
+          <Icon name="warning" size={16} className="text-warning" />
+          <span className="sr-only">– se advarsel</span>
+        </>
       )}
-      {canRecordHere === false && list.length > 0 && (
-        <p className="mt-2 font-sans text-13 text-text-muted">Denne browser kan ikke optage video.</p>
-      )}
-      {entries !== null && (today_.length > 0 || rest.length > 0 || deletable.length > 0 || delLine !== null) && (
-        <div className="mt-3 flex flex-col gap-1">
-          {(today_.length > 0 || rest.length > 0) && (
+      {allLabel(list.length)}
+      <Icon name="chevron-right" size={16} />
+    </button>
+  );
+
+  const part = (p: LinePart) => {
+    switch (p) {
+      case "space":
+        return <span key={p}>{spaceFigure}</span>;
+      case "switch":
+        return <LineSwitch key={p} on={autoOn} />;
+      case "all":
+        return <span key={p} className="ml-auto">{allButton}</span>;
+      case "empty":
+        return (
+          <span key={p} className="flex min-h-11 items-center font-sans text-13 text-text-muted">
+            Ingen optagelser endnu
+          </span>
+        );
+      case "save":
+        return (
           <button
+            key={p}
             type="button"
-            className={`${DARK_BTN} self-start disabled:opacity-60`}
+            className={`${QUIET_BTN} disabled:opacity-60`}
             disabled={saving !== null}
             onClick={() =>
               void saveAll(
@@ -930,80 +1005,108 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
               )
             }
           >
-            <Icon name="download" size={18} />
+            <Icon name="download" size={16} className="text-text-muted" />
             {saving !== null ? progressLine(saving.k, saving.total) : rest.length > 0 ? `Gem resten · ${rest.length}` : `Gem alle fra i dag · ${today_.length}`}
           </button>
-          )}
-          {deletable.length > 0 && (
-            <button type="button" className={`${DARK_BTN} self-start`} onClick={() => void startDeleteRows(list.filter((r) => deletable.some((e) => e.id === r.id)), false)}>
-              <Icon name="trash" size={18} />
-              {`Slet gemte · ${deletable.length}`}
-            </button>
-          )}
-          {delLine?.kind === "window" ? (
-            <p className="flex flex-wrap items-center gap-x-1 font-sans text-13 text-text-muted">
-              <span>{deleteWindowText(delLine.count, delLine.label)}</span>
-              <button type="button" className={`${DARK_BTN} tabular-nums`} aria-label={delLine.count === 1 ? "Fortryd sletningen" : `Fortryd sletningen af ${delLine.count} klip`} onClick={() => void undoDeleteBatch(delLine)}>
-                Fortryd <span aria-hidden="true">{deleteSecondsLeft(delLine.deadline, nowMs)}</span>
-              </button>
-            </p>
-          ) : delLine?.kind === "text" ? (
-            <p className="font-sans text-13 text-text-muted">{delLine.text}</p>
-          ) : null}
-          <p role="status" className="font-sans text-13 text-text-muted empty:hidden">
-            {saveLine}
-          </p>
-        </div>
-      )}
-      {local.kind === "loading" ? (
-        slowLoad ? (
-          <div aria-hidden="true" className="mt-3 flex flex-col gap-2">
-            <div className="h-14 animate-pulse rounded-lg bg-track motion-reduce:animate-none" />
-            <div className="h-14 animate-pulse rounded-lg bg-track motion-reduce:animate-none" />
-          </div>
-        ) : null
-      ) : local.kind === "error" ? (
-        <div className="mt-3 flex flex-col gap-2" role="alert">
-          <p className="font-sans text-14 text-text">Kunne ikke læse optagelserne på telefonen.</p>
-          <p className="font-sans text-13 text-text-muted">Browserens lager svarede ikke.</p>
-          <button type="button" className={`${DARK_BTN} self-start`} onClick={() => {
-              setLocal({ kind: "loading" });
-              void load();
-            }}>
-            Prøv igen
+        );
+      case "delete":
+        return (
+          <button key={p} type="button" className={QUIET_BTN} onClick={() => void startDeleteRows(list.filter((r) => deletable.some((e) => e.id === r.id)), false)}>
+            <Icon name="trash" size={16} className="text-text-muted" />
+            {`Slet gemte · ${deletable.length}`}
           </button>
-        </div>
-      ) : list.length === 0 ? (
-        <p className="mt-3 font-sans text-14 text-text-muted">
-          Ingen optagelser endnu. Tryk Optag på et arbejdssæt i Fokus. Videoen bliver på telefonen.
-        </p>
-      ) : (
-        <ul className="mt-3">
-          {shown.map((row) => (
-            <ClipRow
-              key={row.id}
-              row={row}
-              word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id, inPickupWindow(row.recordedAt, new Date()), autoOn) : null}
-              onOpen={(el) => {
-                opener.current = el;
-                externalAfter.current = null;
-                setOpen(row);
+        );
+      case "error":
+        return (
+          <div key={p} role="alert" className="flex flex-wrap items-center gap-x-3">
+            <span className="font-sans text-13 text-text">Kunne ikke læse optagelserne på telefonen.</span>
+            <button
+              type="button"
+              className={QUIET_BTN}
+              onClick={() => {
+                setLocal({ kind: "loading" });
+                void load();
               }}
-              onStar={() => void toggleStar(row)}
-              onDelete={() => void remove(row)}
-            />
-          ))}
-        </ul>
+            >
+              Prøv igen
+            </button>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <section aria-label="Optagelser" className="-mt-1 px-5 lg:col-start-1 lg:-mt-2">
+      <div className="flex flex-wrap items-center gap-x-4">{parts.row1.map(part)}</div>
+      {parts.row2.length > 0 && <div className="flex flex-wrap items-center gap-x-4">{parts.row2.map(part)}</div>}
+      {parts.status === "line" && statusRow}
+      {!autoOn && (
+        <span id="auto-clip-off-line" className="sr-only">
+          Slået fra. Klip med Start her og Slut her i afspilleren.
+        </span>
       )}
-      {!showAll && list.length > FIRST_ROWS && (
-        <button type="button" className={`mt-2 min-h-11 font-sans text-14 text-text underline-offset-4 hover:underline ${BTN}`} onClick={() => setShowAll(true)}>
-          Vis alle {list.length}
-        </button>
-      )}
-      {canRecord && (
-        <Link href="/kamera" className={`mt-1 flex min-h-11 w-fit items-center font-sans text-13 text-text-muted underline-offset-4 hover:underline ${BTN}`}>
-          Kameratest
-        </Link>
+      {overview !== null && <ClipSummary items={summaryItems(list, serverById, overview)} onClose={closeOverview} />}
+      {sheet && (
+        <ClipSheet count={list.length} onClose={requestCloseSheet} onPopped={closeSheet} playerOpen={open !== null} footer={parts.status === "sheet" ? statusRow : null}>
+          {usedText !== null && quotaText !== null && entries !== null && (
+            <p className="font-mono text-12 text-text-muted tabular-nums">
+              {usedText} af {quotaText} · ældre end 8 uger slettes automatisk (
+              <Icon name="star" size={16} className="inline size-3 align-[-1px]" />
+              <span className="sr-only">stjernemarkerede</span> beholdes)
+            </p>
+          )}
+          {list.length === 0 && local.kind === "ready" && <AutoClipSwitch on={autoOn} />}
+          {list.length > 0 && !autoOn && <p className="mt-2 font-sans text-13 text-text-muted">Slået fra. Klip med Start her og Slut her i afspilleren.</p>}
+          {space.persisted === false && entries !== null && (
+            <div className="mt-2">
+              <WarningLine>
+                Chrome har ikke lovet at beholde optagelserne. Mangler telefonen plads, kan de blive slettet.{" "}
+                <span className="text-text-muted">Læg Famprove på startskærmen for at beskytte dem.</span>
+              </WarningLine>
+            </div>
+          )}
+          {line !== null && <p className="mt-2 font-sans text-13 text-text-muted">{line}</p>}
+          {rows === null && (
+            <div className="mt-2">
+              <WarningLine>Kunne ikke hente oplysningerne om optagelserne. Stjerner gemmes, når forbindelsen er tilbage.</WarningLine>
+            </div>
+          )}
+          {canRecordHere === false && <p className="mt-2 font-sans text-13 text-text-muted">Denne browser kan ikke optage video.</p>}
+          {local.kind === "loading" ? (
+            slowLoad ? (
+              <div aria-hidden="true" className="mt-3 flex flex-col gap-2">
+                <div className="h-14 animate-pulse rounded-lg bg-track motion-reduce:animate-none" />
+                <div className="h-14 animate-pulse rounded-lg bg-track motion-reduce:animate-none" />
+              </div>
+            ) : null
+          ) : local.kind === "error" ? (
+            <p className="mt-3 font-sans text-13 text-text-muted">Kunne ikke læse optagelserne på telefonen. Browserens lager svarede ikke.</p>
+          ) : list.length === 0 ? (
+            <p className="mt-3 font-sans text-14 text-text-muted">Tryk Optag på et arbejdssæt i Fokus. Videoen bliver på telefonen.</p>
+          ) : (
+            <ul className="mt-3">
+              {shown.map((row) => (
+                <ClipRow
+                  key={row.id}
+                  row={row}
+                  word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id, inPickupWindow(row.recordedAt, new Date()), autoOn) : null}
+                  onOpen={(el) => {
+                    opener.current = el;
+                    externalAfter.current = null;
+                    setOpen(row);
+                  }}
+                  onStar={() => void toggleStar(row)}
+                  onDelete={() => void remove(row)}
+                />
+              ))}
+            </ul>
+          )}
+          {canRecord && (
+            <Link href="/kamera" className={`mt-1 flex min-h-11 w-fit items-center font-sans text-13 text-text-muted underline-offset-4 hover:underline ${BTN}`}>
+              Kameratest
+            </Link>
+          )}
+        </ClipSheet>
       )}
       <p role="status" className="sr-only">
         {status}
@@ -1149,6 +1252,106 @@ function AutoClipSwitch({ on }: { readonly on: boolean }) {
         </p>
       )}
     </div>
+  );
+}
+
+/** clip-line §1: the switch on the line, labelled Auto-klip; while off, described by the sr-only sentence. */
+function LineSwitch({ on }: { readonly on: boolean }) {
+  return (
+    <label className="flex min-h-11 min-w-11 cursor-pointer items-center gap-2 whitespace-nowrap font-sans text-13 text-text">
+      Auto-klip
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => setAutoClipOn(switchStore(), e.currentTarget.checked)}
+        aria-describedby={on ? undefined : "auto-clip-off-line"}
+        className="size-5 shrink-0 cursor-pointer accent-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      />
+    </label>
+  );
+}
+
+/**
+ * clip-line §2: Alle klip, full screen at 390 (a centred dialog at 1280), with its own history entry
+ * like the player's. A player opened from it stacks on top; back closes the player first (its
+ * popstate lands on the sheet's entry, so the sheet stays). Escape is the player's while it is open.
+ */
+function ClipSheet({
+  count,
+  onClose,
+  onPopped,
+  playerOpen,
+  footer,
+  children,
+}: {
+  readonly count: number;
+  readonly onClose: () => void;
+  readonly onPopped: () => void;
+  readonly playerOpen: boolean;
+  /** The status row (§3) while the sheet is open; null = none. */
+  readonly footer: ReactNode;
+  readonly children: ReactNode;
+}) {
+  const dialog = useRef<HTMLDivElement | null>(null);
+  const playerOpenRef = useRef(playerOpen);
+  useEffect(() => {
+    playerOpenRef.current = playerOpen;
+  });
+  useEffect(() => {
+    const title = document.getElementById("alle-klip-title");
+    title?.setAttribute("tabindex", "-1");
+    title?.focus();
+    // Every tab's <main> (the shell mounts all three); only those it made inert are lifted.
+    const mains = [...document.querySelectorAll("main")].filter((m) => !m.hasAttribute("inert"));
+    for (const m of mains) m.setAttribute("inert", "");
+    const onKey = (e: KeyboardEvent) => {
+      if (playerOpenRef.current) return; // the player's Escape and Tab
+      if (e.key === "Escape") onClose();
+      if (e.key === "Tab" && dialog.current !== null) {
+        const f = dialog.current.querySelectorAll<HTMLElement>("button:not(:disabled), a[href], input");
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (first === undefined || last === undefined) return;
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === title)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    if (sheetShouldPush(window.history.state)) window.history.pushState({ [SHEET_HISTORY_STATE]: true }, "");
+    const onPop = () => {
+      if (!sheetStaysOnPop(window.history.state)) onPopped();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      for (const m of mains) m.removeAttribute("inert");
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("popstate", onPop);
+    };
+  }, [onClose, onPopped]);
+  return createPortal(
+    <div
+      ref={dialog}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="alle-klip-title"
+      className="clip-sheet fixed inset-0 z-[90] flex flex-col rounded-t-card bg-card text-text lg:inset-auto lg:top-1/2 lg:left-1/2 lg:max-h-[85vh] lg:w-full lg:max-w-140 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-card lg:border lg:border-border"
+    >
+      <div className="flex items-center gap-3 pt-2 pr-2 pl-5">
+        <SectionTitle id="alle-klip-title">Alle klip</SectionTitle>
+        <MonoCaption uppercase={false}>{clipCount(count)}</MonoCaption>
+        <button type="button" aria-label="Luk" className={`ml-auto flex size-11 shrink-0 items-center justify-center rounded-full text-text ${BTN}`} onClick={onClose}>
+          <Icon name="x" size={20} />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>
+      {footer !== null && <div className="border-t border-border px-5 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">{footer}</div>}
+    </div>,
+    document.body,
   );
 }
 

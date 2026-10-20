@@ -419,3 +419,15 @@ main:has(> [data-screen="fokus"]) {
     animation: none;
   }
 }
+
+/* clip-line.md §2: Alle klip slides up in 200 ms; at once under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .clip-sheet {
+    animation: clip-sheet-up 200ms var(--ease-ember, ease-out);
+  }
+}
+@keyframes clip-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
