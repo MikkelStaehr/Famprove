@@ -10,11 +10,18 @@
  * are the peaks of one polarity (squat/bench: y rises at the bottom; deadlift: y falls at lockout),
  * the polarity whose count is closest to the expected reps among those whose peaks lie away from
  * rest (AWAY_MIN_SHARE); each rep runs from where the signal
- * leaves its rest band to where it returns (see repBounds); in/out pad the first and last rep.
+ * leaves its rest band to where it returns (see repSpans; the first rep's start and the last rep's
+ * end are searched only near their peak, slice clip-auto-2); in/out pad the first and last rep.
  */
 import type { PoseFrame } from "./pose-run.ts";
 import { repsRange } from "../fokus-view.ts";
 import { isClipId } from "./clips.ts";
+
+/**
+ * The analysis's version (slice clip-auto-2): the pickup re-runs a clip analysed with an older one
+ * (lib/video/auto-version.ts). Raise it whenever findLift's result can change.
+ */
+export const ALGO_VERSION = 2;
 
 /**
  * Every threshold of the automatic clip, in one place: slice clip-accuracy tunes them against
@@ -44,13 +51,25 @@ export const AUTO_CLIP = {
   RANGE_HIGH_P: 0.95,
   /** low_confidence: fewer frames with the joint seen than this share. */
   VALID_MIN_SHARE: 0.5,
-  /** low_confidence: reps found differ from the expected by more than this. */
+  /**
+   * low_confidence: reps found differ from the expected by more than this. Found = expected is
+   * high confidence (no rep-length check, user 2026-10-20); off by exactly this, the reps must
+   * resemble each other (REP_REL_MIN … REP_REL_MAX).
+   */
   COUNT_TOLERANCE: 1,
+  /**
+   * The outer edges (the first rep's start, the last rep's end) are searched only within this many
+   * times the median inner span (a rep's side towards its neighbour: |edge − peak|) of their peak,
+   * with the rest level taken in that window too, so a walk-out or a re-rack at another height never
+   * becomes the rest level. With one rep there is no inner side: OUTER_SPAN_ONE_REP_S.
+   */
+  OUTER_SPAN_FACTOR: 1.5,
+  OUTER_SPAN_ONE_REP_S: 3,
+  /** low_confidence (count off by COUNT_TOLERANCE): a rep shorter or longer than these shares of the median rep length. */
+  REP_REL_MIN: 0.5,
+  REP_REL_MAX: 2.0,
   /** low_confidence: the joint moves less than this share of the image height (p5–p95). */
   RANGE_MIN: 0.03,
-  /** low_confidence: a rep shorter or longer than this (s). */
-  REP_MIN_S: 0.6,
-  REP_MAX_S: 12,
   /** low_confidence: in/out closer than this (s); the clip editor's shortest range (clip-range MIN_LEN_S). */
   MIN_LEN_S: 1,
 } as const;
@@ -209,43 +228,74 @@ function findPeaks(z: Series, t: readonly number[], minProm: number): Peak[] {
 }
 
 /**
- * A rep's start and end around its peak (the signal oriented so the rep is a maximum). The rest
- * level on each side is the lowest point between the peak and its neighbouring peak (or the
- * series' edge, or a gap). Walking out from the peak, the rep leaves (start) or returns to (end)
- * its rest band, BAND_SHARE of the range above that rest level; the crossing is interpolated between
- * frames. The turning point, where the joint began or stopped moving, lies a little further out:
- * the edge through the band crossing and the half-height crossing is extended to the rest level
- * (exact on a steady movement; on one that eases in it lands between the turning point and the band
- * crossing, so never before the lift). It never passes the neighbouring peak, a gap or the edge;
- * a rep that never reaches its band there ends at that limit.
+ * One side of a rep around its peak (the signal oriented so the rep is a maximum). The rest level
+ * is the lowest point between the peak and the side's limit: its neighbouring peak, a gap, the
+ * series' edge, or (an outer side, `window` set) `window` s from the peak. Walking out from the
+ * peak, the rep leaves (start) or returns to (end) its rest band, BAND_SHARE of the range above that
+ * rest level; the crossing is interpolated between frames. The turning point, where the joint began
+ * or stopped moving, lies a little further out: the edge through the band crossing and the
+ * half-height crossing is extended to the rest level (exact on a steady movement; on one that eases
+ * in it lands between the turning point and the band crossing, so never before the lift). It never
+ * passes the limit; a rep that never reaches its band there ends at that limit.
  */
-function repBounds(z: Series, t: readonly number[], peaks: readonly Peak[], k: number, range: number): { readonly start: number; readonly end: number } {
-  const side = (step: -1 | 1): number => {
-    const p = peaks[k].i;
-    const top = z[p]!;
-    const neighbour = peaks[k + step]?.i;
-    let limit = p; // the last seen index on this side, before the neighbouring peak, a gap or the edge
-    for (let j = p + step; j >= 0 && j < z.length && j !== neighbour && z[j] !== null; j += step) limit = j;
-    let rest = top;
-    for (let j = p; j !== limit + step; j += step) rest = Math.min(rest, z[j]!);
-    /** The time z first falls to level walking out from the peak (interpolated), or null. */
-    const crossing = (level: number): number | null => {
-      for (let j = p + step; j !== limit + step; j += step) {
-        const a = z[j - step]!;
-        const b = z[j]!;
-        if (b <= level) return a === b ? t[j] : t[j - step] + ((t[j] - t[j - step]) * (a - level)) / (a - b);
-      }
-      return null;
-    };
-    const band = rest + AUTO_CLIP.BAND_SHARE * range;
-    const half = rest + (top - rest) / 2;
-    const tBand = crossing(band);
-    if (tBand === null) return t[limit];
-    const tHalf = half > band ? crossing(half) : null;
-    const turn = tHalf === null ? tBand : tBand + ((tBand - tHalf) * (band - rest)) / (half - band);
-    return step === -1 ? Math.max(t[limit], turn) : Math.min(t[limit], turn);
+function repSide(z: Series, t: readonly number[], peaks: readonly Peak[], k: number, range: number, step: -1 | 1, window: number | null): number {
+  const p = peaks[k].i;
+  const top = z[p]!;
+  const neighbour = peaks[k + step]?.i;
+  let limit = p; // the last seen index on this side, before the neighbouring peak, a gap, the edge or the window
+  for (let j = p + step; j >= 0 && j < z.length && j !== neighbour && z[j] !== null; j += step) {
+    if (window !== null && Math.abs(t[j] - t[p]) > window + 1e-9) break;
+    limit = j;
+  }
+  let rest = top;
+  for (let j = p; j !== limit + step; j += step) rest = Math.min(rest, z[j]!);
+  /** The time z first falls to level walking out from the peak (interpolated), or null. */
+  const crossing = (level: number): number | null => {
+    for (let j = p + step; j !== limit + step; j += step) {
+      const a = z[j - step]!;
+      const b = z[j]!;
+      if (b <= level) return a === b ? t[j] : t[j - step] + ((t[j] - t[j - step]) * (a - level)) / (a - b);
+    }
+    return null;
   };
-  return { start: side(-1), end: side(1) };
+  const band = rest + AUTO_CLIP.BAND_SHARE * range;
+  const half = rest + (top - rest) / 2;
+  const tBand = crossing(band);
+  if (tBand === null) return t[limit];
+  const tHalf = half > band ? crossing(half) : null;
+  const turn = tHalf === null ? tBand : tBand + ((tBand - tHalf) * (band - rest)) / (half - band);
+  return step === -1 ? Math.max(t[limit], turn) : Math.min(t[limit], turn);
+}
+
+/** One rep: its start, peak and end (s). */
+export type RepSpan = { readonly start: number; readonly peak: number; readonly end: number };
+
+/**
+ * Every rep's start and end (repSide): the inner sides first (towards a neighbouring rep), then the
+ * outer two within W of their peak, W = OUTER_SPAN_FACTOR × the median inner span (one rep:
+ * OUTER_SPAN_ONE_REP_S).
+ */
+function repSpans(z: Series, t: readonly number[], peaks: readonly Peak[], range: number): RepSpan[] {
+  const last = peaks.length - 1;
+  const inner: number[] = [];
+  const starts = peaks.map((_, k) => (k === 0 ? null : repSide(z, t, peaks, k, range, -1, null)));
+  const ends = peaks.map((_, k) => (k === last ? null : repSide(z, t, peaks, k, range, 1, null)));
+  peaks.forEach((p, k) => {
+    const s = starts[k];
+    const e = ends[k];
+    if (s !== null) inner.push(Math.abs(t[p.i] - s));
+    if (e !== null) inner.push(Math.abs(e - t[p.i]));
+  });
+  const w = inner.length === 0 ? AUTO_CLIP.OUTER_SPAN_ONE_REP_S : AUTO_CLIP.OUTER_SPAN_FACTOR * medianOf(inner);
+  return peaks.map((p, k) => ({
+    start: starts[k] ?? repSide(z, t, peaks, k, range, -1, w),
+    peak: t[p.i],
+    end: ends[k] ?? repSide(z, t, peaks, k, range, 1, w),
+  }));
+}
+
+function medianOf(v: readonly number[]): number {
+  return percentile(v.toSorted((a, b) => a - b), 0.5);
 }
 
 // --- the lift ----------------------------------------------------------------------------------
@@ -264,6 +314,9 @@ export type LiftTrace = {
   peaksUp: number | null;
   peaksDown: number | null;
   chosenSign: 1 | -1 | null;
+  /** Each rep's start, peak and end (s), and its length end − start (s). */
+  reps: RepSpan[] | null;
+  repLengths: number[] | null;
 };
 
 /** findLift with its trace; findLift is this function's result, so the debug panel follows the same steps. */
@@ -273,7 +326,7 @@ export function traceLift(
   family: LiftFamily,
   durationS: number,
 ): { readonly result: AutoClipResult; readonly trace: LiftTrace } {
-  const trace: LiftTrace = { joint: null, validShare: null, range: null, peaksUp: null, peaksDown: null, chosenSign: null };
+  const trace: LiftTrace = { joint: null, validShare: null, range: null, peaksUp: null, peaksDown: null, chosenSign: null, reps: null, repLengths: null };
   const done = (result: AutoClipResult) => ({ result, trace });
   if (expected === null || !Number.isInteger(expected) || expected < 1) return done(low("no_reps"));
   if (frames.length === 0 || !Number.isFinite(durationS) || durationS <= 0) return done(low("few_frames"));
@@ -313,8 +366,15 @@ export function traceLift(
   trace.chosenSign = chosen.sign;
   if (peaks.length === 0 || Math.abs(peaks.length - expected) > AUTO_CLIP.COUNT_TOLERANCE) return done(low("count"));
 
-  const reps = peaks.map((_, k) => repBounds(z, t, peaks, k, range));
-  if (reps.some((r) => r.end - r.start < AUTO_CLIP.REP_MIN_S || r.end - r.start > AUTO_CLIP.REP_MAX_S)) return done(low("rep_length"));
+  const reps = repSpans(z, t, peaks, range);
+  const lengths = reps.map((r) => r.end - r.start);
+  trace.reps = reps;
+  trace.repLengths = lengths;
+  if (peaks.length !== expected) {
+    // Off by COUNT_TOLERANCE: the reps must resemble each other in length.
+    const m = medianOf(lengths);
+    if (!(m > 0) || lengths.some((l) => l < AUTO_CLIP.REP_REL_MIN * m - 1e-9 || l > AUTO_CLIP.REP_REL_MAX * m + 1e-9)) return done(low("rep_length"));
+  }
 
   const inS = roundTenth(Math.max(0, reps[0].start - AUTO_CLIP.PAD_S));
   const outS = roundTenth(Math.min(durationS, reps[reps.length - 1].end + AUTO_CLIP.PAD_S));
@@ -326,7 +386,8 @@ export function traceLift(
  * The lift in a clip: in/out (s, 0.1) around the reps, or low_confidence with the first reason
  * that applies: no_reps (no expected count), few_frames (the joint seen in < VALID_MIN_SHARE of
  * the frames), flat (it moves < RANGE_MIN of the image height), count (|found − expected| >
- * COUNT_TOLERANCE), rep_length (a rep outside REP_MIN_S–REP_MAX_S), short (in/out < MIN_LEN_S apart).
+ * COUNT_TOLERANCE), rep_length (off by COUNT_TOLERANCE and a rep outside REP_REL_MIN–REP_REL_MAX × the
+ * median rep length; found = expected has no rep-length check), short (in/out < MIN_LEN_S apart).
  */
 export function findLift(frames: readonly PoseFrame[], expected: number | null, family: LiftFamily, durationS: number): AutoClipResult {
   return traceLift(frames, expected, family, durationS).result;

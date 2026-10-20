@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { AUTO_CLIP, diagnoseLift, expectedReps, findLift, liftFamily, parseSetClipAutoInput, validateClipAuto, type Joint } from "../src/lib/video/auto-clip.ts";
+import { ALGO_VERSION, AUTO_CLIP, diagnoseLift, expectedReps, findLift, liftFamily, parseSetClipAutoInput, validateClipAuto, type Joint } from "../src/lib/video/auto-clip.ts";
 import type { PoseFrame, PosePoint } from "../src/lib/video/pose-run.ts";
 
 // Synthetic landmark series only (the repo is public): never real frames.
@@ -155,8 +155,15 @@ test("noise and dropped frames: still within 0.2 s", () => {
 test("no expected reps, a rep too slow, in/out clamped to the clip", () => {
   const frames = series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips", "knees"] });
   assert.deepEqual(findLift(frames, null, "lower", 20), { status: "low_confidence", reason: "no_reps" });
+  // clip-auto-2: a 14 s rep found = expected is no longer rep_length; its edges are bounded to
+  // OUTER_SPAN_ONE_REP_S of the peak (9 s), so in/out stay within that window plus the padding.
   const slow = (t: number) => 0.45 + 0.2 * Math.max(0, Math.sin((Math.PI * (t - 2)) / 14)) * (t > 2 && t < 16 ? 1 : 0);
-  assert.deepEqual(findLift(series({ durationS: 20, y: slow, moving: ["hips"] }), 1, "lower", 20), { status: "low_confidence", reason: "rep_length" });
+  const slowResult = findLift(series({ durationS: 20, y: slow, moving: ["hips"] }), 1, "lower", 20);
+  assert.equal(slowResult.status, "clipped");
+  if (slowResult.status === "clipped") {
+    assert.ok(slowResult.inS >= 9 - AUTO_CLIP.OUTER_SPAN_ONE_REP_S - AUTO_CLIP.PAD_S - 1e-9, `in ${slowResult.inS}`);
+    assert.ok(slowResult.outS <= 9 + AUTO_CLIP.OUTER_SPAN_ONE_REP_S + AUTO_CLIP.PAD_S + 1e-9, `out ${slowResult.outS}`);
+  }
   const early = series({ durationS: 17.5, y: reps5(0.45, 0.2, [0.2, 3, 6, 9, 12]), moving: ["hips"] });
   const r = findLift(early, 5, "lower", 17.5);
   assert.equal(r.status, "clipped");
@@ -218,6 +225,62 @@ test("the action's input: exactly five keys, never frames; the validation table"
     assert.equal(v(bad), null, JSON.stringify(bad));
   }
   assert.deepEqual(v({ outS: 99 }, null), { status: "clipped", inS: 1, outS: 99, runMs: 10 }, "the duration is checked when known");
+});
+
+/** A rep `k` times as long as repShape's (a grinder): same shape, stretched in time. */
+const longRep = (t: number, t0: number, k: number) => repShape(t0 + (t - t0) / k, t0);
+/** A walk-out at another standing height (y 0.40, swaying) until `until`, then 1 s to the rest level 0.45; the mirror after `from` (the re-rack). */
+function walkOutAndRerack(until: number, from: number): (t: number) => number {
+  return (t) => {
+    const sway = 0.01 * Math.sin(2 * Math.PI * 0.8 * t);
+    if (t < until) return 0.4 + sway;
+    if (t < until + 1) return 0.4 + 0.05 * (t - until);
+    if (t > from + 1) return 0.4 + sway;
+    if (t > from) return 0.45 - 0.05 * (t - from);
+    return 0.45;
+  };
+}
+
+test("clip-auto-2: a 10 s walk-out at another height and a re-rack: in/out within 0.3 s", () => {
+  const starts = [13, 16, 19, 22, 25];
+  const base = walkOutAndRerack(10, 29);
+  const y = (t: number) => base(t) + 0.2 * starts.reduce((s, t0) => s + repShape(t, t0), 0);
+  const truth = { inS: starts[0] - AUTO_CLIP.PAD_S, outS: starts[4] + REP_S + AUTO_CLIP.PAD_S };
+  for (const fps of [5, 10]) {
+    const r = findLift(series({ durationS: 40, fps, y, moving: ["hips", "knees"], noise: 0.002, seed: 11 }), 5, "lower", 40);
+    assert.equal(r.status, "clipped", JSON.stringify(r));
+    if (r.status !== "clipped") continue;
+    assert.ok(Math.abs(r.inS - truth.inS) <= 0.3 + 1e-9, `in ${r.inS} vs ${truth.inS} at ${fps} fps`);
+    assert.ok(Math.abs(r.outS - truth.outS) <= 0.3 + 1e-9, `out ${r.outS} vs ${truth.outS} at ${fps} fps`);
+  }
+});
+
+test("clip-auto-2: one rep after a walk-out and before a re-rack", () => {
+  const base = walkOutAndRerack(3, 10);
+  const y = (t: number) => base(t) + 0.2 * repShape(t, 6);
+  const r = findLift(series({ durationS: 14, y, moving: ["hips", "knees"] }), 1, "lower", 14);
+  assert.equal(r.status, "clipped", JSON.stringify(r));
+  if (r.status === "clipped") {
+    assert.ok(Math.abs(r.inS - 5.5) <= 0.3 + 1e-9, `in ${r.inS}`);
+    assert.ok(Math.abs(r.outS - 8.7) <= 0.3 + 1e-9, `out ${r.outS}`);
+  }
+});
+
+test("clip-auto-2: found = expected clips even with a rep 3× the others; off by 1 needs similar reps", () => {
+  const y = (t: number) => 0.45 + 0.2 * (repShape(t, 3) + repShape(t, 6) + longRep(t, 9, 3) + repShape(t, 17) + repShape(t, 20));
+  const frames = series({ durationS: 25, y, moving: ["hips", "knees"] });
+  const truth = { inS: 3 - AUTO_CLIP.PAD_S, outS: 20 + REP_S + AUTO_CLIP.PAD_S };
+  assertClipped(findLift(frames, 5, "lower", 25), "hips", 5, truth);
+  assert.deepEqual(findLift(frames, 4, "lower", 25), { status: "low_confidence", reason: "rep_length" }, "off by 1 with a 3× outlier");
+  assert.deepEqual(findLift(frames, 6, "lower", 25), { status: "low_confidence", reason: "rep_length" });
+  const even = series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips", "knees"] });
+  assertClipped(findLift(even, 4, "lower", 20), "hips", 5);
+  assertClipped(findLift(even, 6, "lower", 20), "hips", 5);
+  const trace = diagnoseLift(frames, 5, "lower", 25).trace;
+  assert.equal(trace.repLengths?.length, 5);
+  assert.ok(trace.repLengths !== null && Math.abs(trace.repLengths[2] / trace.repLengths[0] - 3) < 0.3, JSON.stringify(trace.repLengths));
+  assert.ok(trace.reps !== null && trace.reps.every((r) => r.start < r.peak && r.peak < r.end));
+  assert.equal(ALGO_VERSION, 2);
 });
 
 test("diagnoseLift follows findLift: the same status and reason on every synthetic series", () => {

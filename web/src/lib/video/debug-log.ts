@@ -6,7 +6,7 @@ import type { LiftDiagnosis, LiftFamily, SideVisibility } from "./auto-clip.ts";
 import type { FileFacts } from "./cut.ts";
 import type { PoseReached, SeekTiming } from "./pose-run.ts";
 
-/** One run's log: seek (production's runPose) or play (requestVideoFrameCallback, debug only). */
+/** One run's log: runPose in seek or play mode (requestVideoFrameCallback), both as production runs them. */
 export type DebugRun =
   | { readonly mode: "seek" | "play"; readonly ok: true; readonly diag: LiftDiagnosis; readonly seek: SeekTiming | null; readonly ms: number }
   | { readonly mode: "seek" | "play"; readonly ok: false; readonly step: string; readonly message: string; readonly reached: PoseReached | null; readonly ms: number };
@@ -34,7 +34,7 @@ function seekLine(s: SeekTiming): string {
 }
 
 function runLines(r: DebugRun): string[] {
-  const head = `[${r.mode === "seek" ? "seek (som produktion)" : "afspil"}] ${Math.round(r.ms)} ms`;
+  const head = `[${r.mode === "seek" ? "søg" : "afspil"}] ${Math.round(r.ms)} ms`;
   if (!r.ok) {
     const out = [head, `fejlede i trin: ${r.step}`, `fejl: ${r.message}`];
     if (r.reached !== null) out.push(`nåede billede ${r.reached.done} af ${r.reached.of}`, seekLine(r.reached.seek));
@@ -52,6 +52,7 @@ function runLines(r: DebugRun): string[] {
     `led: ${t.joint ?? "–"} · gyldige: ${pct(t.validShare)}`,
     `udsving p5–p95: ${pct(t.range)} af billedhøjden`,
     `toppe: op ${t.peaksUp ?? "–"} · ned ${t.peaksDown ?? "–"} · valgt ${t.chosenSign === null ? "–" : t.chosenSign === 1 ? "op" : "ned"} · forventet ${d.expected ?? "–"}`,
+    `rep-længder: ${t.repLengths === null ? "–" : t.repLengths.map((l) => l.toFixed(1)).join(" · ") + " s"}`,
     `resultat: ${verdict}`,
   ];
   if (r.seek !== null) out.push(seekLine(r.seek));
