@@ -44,7 +44,7 @@ test("video_clips: service_role has select, insert and delete; update only throu
 });
 
 // The one exception (slice clip-cut): the cut's fixture, Chrome's fake-camera test pattern (no personal data).
-const VIDEO_FIXTURES = ["web/tests/fixtures/video/fake-kf.mp4"];
+const VIDEO_FIXTURES = ["web/tests/fixtures/video/fake-default-12s.mp4", "web/tests/fixtures/video/fake-kf.mp4"];
 
 test("git tracks no video file except the cut's fake-camera fixture", () => {
   const files = execFileSync("git", ["ls-files"], { cwd: repo, encoding: "utf8" }).split("\n");
