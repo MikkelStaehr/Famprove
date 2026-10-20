@@ -58,6 +58,7 @@ import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
 import { ClipDebug } from "@/components/ClipDebug";
+import { isDebugToggle } from "@/lib/video/debug-log";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
 
 const NO_LIFTS: Readonly<Record<string, ClipLiftMeta>> = {};
@@ -682,7 +683,7 @@ function Player({
     main?.setAttribute("inert", "");
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "D" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) setDebug((d) => !d);
+      if (isDebugToggle(e, e.target instanceof HTMLElement ? e.target : null)) setDebug((d) => !d);
       if (e.key === "Tab" && dialog.current !== null) {
         const f = dialog.current.querySelectorAll<HTMLElement>("button:not(:disabled), video[controls], [role=slider]");
         if (f.length === 0) return;
@@ -846,6 +847,7 @@ function Player({
           status={server?.autoStatus ?? null}
           durationS={server?.durationS ?? null}
           lift={row.ext === "mp4" ? lift : null}
+          pickupBusy={running !== null}
           onAuto={onAuto}
           onClose={() => setDebug(false)}
         />

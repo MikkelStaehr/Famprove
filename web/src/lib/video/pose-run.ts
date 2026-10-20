@@ -61,16 +61,25 @@ function hasWebGl2(): boolean {
   return gl !== null;
 }
 
-/** The landmarker, from this origin only. The caller closes it. */
-export async function createPose(): Promise<PoseLandmarker> {
+async function createLandmarker(runningMode: "VIDEO" | "IMAGE"): Promise<PoseLandmarker> {
   if (!hasWebGl2()) throw new PoseError("load", "ingen WebGL2 i browseren");
   const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
   const fileset = await FilesetResolver.forVisionTasks(WASM_BASE);
   return PoseLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: MODEL_PATH, delegate: "CPU" },
-    runningMode: "VIDEO",
+    runningMode,
     numPoses: 1,
   });
+}
+
+/** The landmarker, from this origin only, in VIDEO mode (production's runs). The caller closes it. */
+export function createPose(): Promise<PoseLandmarker> {
+  return createLandmarker("VIDEO");
+}
+
+/** The same model and delegate in IMAGE mode: every detect() stands alone, no tracking (debug images only). The caller closes it. */
+export function createImagePose(): Promise<PoseLandmarker> {
+  return createLandmarker("IMAGE");
 }
 
 /** Rejects with the signal's reason once it aborts. */

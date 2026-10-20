@@ -90,3 +90,20 @@ export function frameCheck(points: readonly (readonly [number, number, number])[
   };
   return { person: true, hip: mean(23, 24), knee: mean(25, 26) };
 }
+
+/** Shift+D toggles the hidden panel, never while the focus is in a field the user types into. */
+export function isDebugToggle(
+  e: { readonly key: string; readonly shiftKey: boolean; readonly ctrlKey: boolean; readonly metaKey: boolean; readonly altKey: boolean },
+  target: { readonly tagName?: string; readonly isContentEditable?: boolean } | null,
+): boolean {
+  if (e.key !== "D" || !e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return false;
+  if (target === null) return true;
+  const tag = (target.tagName ?? "").toUpperCase();
+  return tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && target.isContentEditable !== true;
+}
+
+/** Stopping the panel revokes every blob URL it made and leaves no images pointing at one. */
+export function releaseImages<T>(urls: readonly string[], revoke: (url: string) => void): { readonly urls: string[]; readonly images: readonly T[] } {
+  for (const u of urls) revoke(u);
+  return { urls: [], images: [] };
+}

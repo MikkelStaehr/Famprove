@@ -2,13 +2,25 @@
  * The debug panel's browser runs (slice clip-debug), never wired into production: "Fejlsøg
  * (afspil)" plays the clip once at 1× and samples it with requestVideoFrameCallback (≤ 5 fps, no
  * seeking), and the debug images detect a frame twice, on the <video> (what runPose sees) and on a
- * canvas copy of it, so a rotation mismatch shows. Landmarks and canvases stay in memory; nothing
+ * canvas copy of it with a separate IMAGE-mode landmarker (each detect() fresh, no tracking carried
+ * from one to the other), so a rotation mismatch shows. Landmarks and canvases stay in memory; nothing
  * is stored or sent. The landmarker is closed on every way out.
  */
-import { createPose, type PoseFrame, type PosePoint, PoseError, untilAbort } from "./pose-run";
+import { createImagePose, createPose, type PoseFrame, type PosePoint, PoseError, untilAbort } from "./pose-run";
 import { type FrameCheck, frameCheck } from "./debug-log";
 
 type Landmarker = Awaited<ReturnType<typeof createPose>>;
+
+/** Waits for a landmarker; one that arrives after an abort is closed at once (as runPose does). */
+function landmarkerFor(loading: Promise<Landmarker>, signal: AbortSignal): Promise<Landmarker> {
+  loading.then(
+    (l) => {
+      if (signal.aborted) l.close();
+    },
+    () => undefined,
+  );
+  return untilAbort(loading, signal);
+}
 
 const points = (r: { landmarks: { x: number; y: number; visibility: number }[][] }): PosePoint[] | null => {
   const p = r.landmarks[0];
@@ -19,7 +31,7 @@ const points = (r: { landmarks: { x: number; y: number; visibility: number }[][]
 export async function playPose(video: HTMLVideoElement, opts: { readonly signal: AbortSignal; readonly onProgress: (t: number, of: number) => void }): Promise<PoseFrame[]> {
   const { signal } = opts;
   if (typeof video.requestVideoFrameCallback !== "function") throw new PoseError("video", "requestVideoFrameCallback findes ikke i browseren");
-  const landmarker: Landmarker = await untilAbort(createPose(), signal);
+  const landmarker = await landmarkerFor(createPose(), signal);
   const frames: PoseFrame[] = [];
   let handle = 0;
   try {
@@ -104,7 +116,7 @@ function draw(ctx: CanvasRenderingContext2D, pts: readonly PosePoint[] | null, l
 /** Three debug images at 25/50/75 % of the clip, from a detached <video> on `url`. */
 export async function debugImages(url: string, colours: { readonly video: string; readonly canvas: string }, signal: AbortSignal): Promise<DebugImage[]> {
   const { PoseLandmarker } = await import("@mediapipe/tasks-vision");
-  const landmarker: Landmarker = await untilAbort(createPose(), signal);
+  const landmarker = await landmarkerFor(createImagePose(), signal); // IMAGE mode: the two detections never share tracking
   const video = document.createElement("video");
   const out: DebugImage[] = [];
   try {
@@ -119,11 +131,10 @@ export async function debugImages(url: string, colours: { readonly video: string
     await untilAbort(meta, signal);
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
     if (duration <= 0) throw new PoseError("video", "ingen længde");
-    let ts = 0;
     for (const pct of [25, 50, 75]) {
       const t = (duration * pct) / 100;
       await seekTo(video, t, signal);
-      const fromVideo = points(landmarker.detectForVideo(video, (ts += 1000)));
+      const fromVideo = points(landmarker.detect(video));
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -133,7 +144,7 @@ export async function debugImages(url: string, colours: { readonly video: string
       const bitmap = await createImageBitmap(canvas);
       let fromCanvas: PosePoint[] | null;
       try {
-        fromCanvas = points(landmarker.detectForVideo(bitmap, (ts += 1000)));
+        fromCanvas = points(landmarker.detect(bitmap));
       } finally {
         bitmap.close();
       }

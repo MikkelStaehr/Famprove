@@ -13,7 +13,7 @@ import type { ClipLiftMeta } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip, failureOf } from "@/lib/video/auto-run";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
 import { type FileFacts, fileFacts } from "@/lib/video/cut";
-import { type DebugRun, type ImageCheck, debugLog } from "@/lib/video/debug-log";
+import { type DebugRun, type ImageCheck, debugLog, releaseImages } from "@/lib/video/debug-log";
 import { runPose } from "@/lib/video/pose-run";
 
 const BTN = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
@@ -26,19 +26,23 @@ type Props = {
   readonly status: string | null;
   readonly durationS: number | null;
   readonly lift: ClipLiftMeta | null;
+  /** The library's pickup is analysing this clip now: Analysér igen waits, so one run and one write at a time. */
+  readonly pickupBusy: boolean;
   readonly onAuto: (out: AutoOutcome) => void;
   readonly onClose: () => void;
 };
+
+type Shot = { readonly check: ImageCheck; readonly url: string };
 
 function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "currentColor";
 }
 
-export function ClipDebug({ clipId, label, blob, status, durationS, lift, onAuto, onClose }: Props) {
+export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickupBusy, onAuto, onClose }: Props) {
   const [facts, setFacts] = useState<FileFacts | { readonly error: string } | null>(null);
   const [videoSize, setVideoSize] = useState<{ readonly w: number; readonly h: number } | null>(null);
   const [runs, setRuns] = useState<readonly DebugRun[]>([]);
-  const [images, setImages] = useState<readonly { readonly check: ImageCheck; readonly url: string }[]>([]);
+  const [images, setImages] = useState<readonly Shot[]>([]);
   const [reanalyse, setReanalyse] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -50,8 +54,9 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, onAuto
   const stop = () => {
     ctrl.current?.abort(new Error("lukket"));
     ctrl.current = null;
-    for (const u of urls.current) URL.revokeObjectURL(u);
-    urls.current = [];
+    const released = releaseImages<Shot>(urls.current, (u) => URL.revokeObjectURL(u));
+    urls.current = released.urls;
+    setImages(released.images); // revoked and cleared together: no image is left on a dead URL
   };
   useEffect(() => {
     const onHide = () => {
@@ -83,7 +88,6 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, onAuto
     const c = new AbortController();
     ctrl.current = c;
     setRuns([]);
-    setImages([]);
     try {
       setBusy("fil");
       try {
@@ -108,10 +112,10 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, onAuto
         const made = await Promise.all(
           shots.map(
             (s) =>
-              new Promise<{ check: ImageCheck; url: string }>((resolve) =>
+              new Promise<Shot>((resolve) =>
                 s.canvas.toBlob((b) => {
                   const check = { pct: s.pct, t: s.t, video: s.video, canvas: s.copy };
-                  resolve({ check, url: b === null ? "" : url(b) });
+                  resolve({ check, url: b === null || c.signal.aborted ? "" : url(b) }); // after an abort, no URL is made
                   s.canvas.width = 0; // the canvas is dropped; only the in-memory blob URL shows it
                 }),
               ),
@@ -164,7 +168,7 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, onAuto
   }
 
   async function igen() {
-    if (!ready || blob === null || lift === null || durationS === null) return;
+    if (!ready || blob === null || lift === null || durationS === null || pickupBusy || busy !== null) return;
     stop();
     const c = new AbortController();
     ctrl.current = c;
@@ -223,7 +227,7 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, onAuto
           <button type="button" className={DARK_BTN} disabled={busy !== null} onClick={() => void afspil()}>
             Fejlsøg (afspil)
           </button>
-          <button type="button" className={DARK_BTN} disabled={busy !== null} onClick={() => void igen()}>
+          <button type="button" className={DARK_BTN} disabled={busy !== null || pickupBusy} onClick={() => void igen()}>
             Analysér igen
           </button>
         </div>

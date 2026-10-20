@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import { diagnoseLift } from "../src/lib/video/auto-clip.ts";
 import { fileFacts, matrixRotation } from "../src/lib/video/cut.ts";
-import { debugLog, frameCheck } from "../src/lib/video/debug-log.ts";
+import { debugLog, frameCheck, isDebugToggle, releaseImages } from "../src/lib/video/debug-log.ts";
 import { type PosePoint, seekTiming } from "../src/lib/video/pose-run.ts";
 
 const FIXTURE = new Uint8Array(readFileSync(new URL("./fixtures/video/fake-kf.mp4", import.meta.url)));
@@ -72,4 +72,22 @@ test("debugLog: aggregates and steps, never landmarks", () => {
   ])
     assert.ok(log.split("\n").includes(line), `missing: ${line}\n${log}`);
   assert.ok(!log.includes("0.123") && !log.includes("0.654"), "no landmark coordinates in the log");
+});
+
+test("Shift+D toggles the panel, never while typing in a field", () => {
+  const d = { key: "D", shiftKey: true, ctrlKey: false, metaKey: false, altKey: false };
+  assert.equal(isDebugToggle(d, null), true);
+  assert.equal(isDebugToggle(d, { tagName: "BUTTON", isContentEditable: false }), true);
+  assert.equal(isDebugToggle(d, { tagName: "input", isContentEditable: false }), false);
+  assert.equal(isDebugToggle(d, { tagName: "TEXTAREA", isContentEditable: false }), false);
+  assert.equal(isDebugToggle(d, { tagName: "DIV", isContentEditable: true }), false);
+  assert.equal(isDebugToggle({ ...d, ctrlKey: true }, null), false);
+  assert.equal(isDebugToggle({ ...d, key: "d", shiftKey: false }, null), false);
+});
+
+test("stopping revokes every URL and clears the images together", () => {
+  const revoked: string[] = [];
+  const out = releaseImages<{ url: string }>(["blob:a", "blob:b"], (u) => revoked.push(u));
+  assert.deepEqual(revoked, ["blob:a", "blob:b"]);
+  assert.deepEqual(out, { urls: [], images: [] });
 });
