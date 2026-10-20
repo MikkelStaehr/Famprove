@@ -55,6 +55,11 @@ import { busyText, cutFileName, cutLine, failedCutsLine, prepareClip, type Prepa
 import { formatBytes } from "@/lib/video/space";
 import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/clip-range";
 import { ClipEditor, sendClipRange } from "./ClipEditor";
+import { autoMetaWord, type ClipLiftMeta, editLabel, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
+import { analyseClip } from "@/lib/video/auto-run";
+import { browserAutoDeps } from "@/lib/video/auto-run-browser";
+
+const NO_LIFTS: Readonly<Record<string, ClipLiftMeta>> = {};
 
 const CLEANUP_KEY = "famprove.clips.cleanup";
 const BTN = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
@@ -72,7 +77,12 @@ type Props = {
   readonly canRecord: boolean;
   /** DEV_FIXTURE=clips: the fake index; nothing is written, deleted or shared. */
   readonly fixture: { readonly local: readonly ClipIndexEntry[] } | null;
+  /** clip-auto's pickup: each recent clip's lift family and reps (readClipLifts); a clip without one is never picked up. */
+  readonly lifts?: Readonly<Record<string, ClipLiftMeta>>;
 };
+
+/** clip-auto: the clip analysed on this phone right now and its frame %. */
+type Running = { readonly id: string; readonly pct: number };
 
 type Store = { readonly index: ClipIndex; readonly files: ClipFiles };
 type Local = { kind: "loading" } | { kind: "none" } | { kind: "error" } | { kind: "ready"; entries: ClipIndexEntry[] };
@@ -96,7 +106,7 @@ async function hasIndex(): Promise<boolean> {
 }
 
 /** The Optagelser card on Træning (design/specs/video-library.md). */
-export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecord, fixture }: Props) {
+export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecord, fixture, lifts = NO_LIFTS }: Props) {
   const store = useRef<Store | null>(null);
   const [local, setLocal] = useState<Local>({ kind: "loading" });
   const [rows, setRows] = useState<readonly VideoClipRow[] | null>(initialRows);
@@ -115,6 +125,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const [saving, setSaving] = useState<{ k: number; total: number } | null>(null);
   const [saveLine, setSaveLine] = useState("");
   const [rest, setRest] = useState<readonly SaveClip[]>([]);
+  const [running, setRunning] = useState<Running | null>(null);
+  const pickupStarted = useRef(false);
 
   const load = useCallback(async () => {
     await Promise.resolve(); // never set state synchronously inside the effect
@@ -202,6 +214,54 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       onHide();
     };
   }, []);
+
+  // clip-auto §1 Pickup: clips Fokus left unanalysed (auto_status null, MP4, a local file, the last
+  // 7 days, no own range), one at a time, newest first, through the same analyseClip. Unmount aborts
+  // the run (nothing written for that clip); the fixture never runs one.
+  // Keyed on the index being read, never on rows: the run's own outcome updates rows.
+  const readyEntries = local.kind === "ready" ? local.entries : null;
+  const ready = readyEntries !== null;
+  const entriesNow = useRef<readonly ClipIndexEntry[] | null>(null);
+  useEffect(() => {
+    entriesNow.current = readyEntries;
+  }, [readyEntries]);
+  useEffect(() => {
+    const found = entriesNow.current;
+    if (fixture !== null || !ready || found === null || initialRows === null || store.current === null || pickupStarted.current) return;
+    const queue = pickupQueue(found, initialRows, new Date()).filter((r) => lifts[r.id] !== undefined);
+    if (queue.length === 0) return;
+    pickupStarted.current = true;
+    const s = store.current;
+    const ctrl = new AbortController();
+    void (async () => {
+      for (const r of queue) {
+        if (ctrl.signal.aborted) return;
+        const lift = lifts[r.id];
+        let blob: Blob | null = null;
+        try {
+          blob = await s.files.read(r.id, "mp4");
+        } catch {
+          blob = null;
+        }
+        if (blob === null || lift === undefined || ctrl.signal.aborted) continue;
+        setRunning({ id: r.id, pct: 0 });
+        const out = await analyseClip(r.id, blob, { ext: "mp4", durationS: r.durationS, family: lift.family, expected: lift.expected }, {
+          signal: ctrl.signal,
+          onProgress: (p) => setRunning({ id: r.id, pct: p.kind === "running" ? p.pct : 0 }),
+          deps: browserAutoDeps,
+        });
+        setRunning(null);
+        if (out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") {
+          const auto = out.kind === "clipped" ? { autoStatus: out.kind, autoInS: out.inS, autoOutS: out.outS } : { autoStatus: out.kind, autoInS: null, autoOutS: null };
+          setRows((rs) => rs?.map((x) => (x.id === r.id ? { ...x, ...auto } : x)) ?? rs);
+        }
+      }
+    })();
+    return () => {
+      ctrl.abort();
+      pickupStarted.current = false;
+    };
+  }, [fixture, ready, initialRows, lifts]);
 
   const entries = local.kind === "ready" ? local.entries : null;
   const list = local.kind === "ready" || local.kind === "none" ? libraryRows(entries, rows, names, runSets) : [];
@@ -411,6 +471,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
             <ClipRow
               key={row.id}
               row={row}
+              word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id) : null}
               onOpen={(el) => {
                 opener.current = el;
                 setOpen(row);
@@ -442,6 +503,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           fileName={fileNames.get(open.id) ?? null}
           cut={cutOf(open)}
           server={serverById.get(open.id) ?? null}
+          running={running?.id === open.id ? running : null}
           onRange={(id, r) => setRows((rs) => rs?.map((x) => (x.id === id ? { ...x, clipInS: r.inS, clipOutS: r.outS } : x)) ?? rs)}
           onDownload={download}
           onMissing={() => void forgetMissing([open.id])}
@@ -470,11 +532,14 @@ function NameStack({ row }: { readonly row: LibraryRow }) {
 
 function ClipRow({
   row,
+  word,
   onOpen,
   onStar,
   onDelete,
 }: {
   readonly row: LibraryRow;
+  /** clip-auto §2: the word after the duration (`klippet`, `auto-klippet`, `klip selv`, `klipper …`); null = none. */
+  readonly word: string | null;
   readonly onOpen: (el: HTMLElement) => void;
   readonly onStar: () => void;
   readonly onDelete: () => void;
@@ -482,6 +547,7 @@ function ClipRow({
   const meta = (
     <MonoCaption uppercase={false} className="tabular-nums">
       {row.meta}
+      {word !== null && ` · ${word}`}
       {row.starUnsynced && <span className="text-11"> · ikke synkroniseret</span>}
     </MonoCaption>
   );
@@ -523,6 +589,7 @@ function Player({
   fileName,
   cut,
   server,
+  running,
   onRange,
   onDownload,
   onMissing,
@@ -540,6 +607,8 @@ function Player({
   readonly cut: CutRange;
   /** The clip's row on the server (clip-handles: the editor needs its duration); null = none. */
   readonly server: VideoClipRow | null;
+  /** clip-auto §2: this clip is being analysed on the phone (its frame %); null = not. */
+  readonly running: Running | null;
   /** The user's range was stored (or removed): the row in memory follows the server's reply. */
   readonly onRange: (id: string, range: StoredRange) => void;
   readonly onDownload: (blob: Blob, name: string) => void;
@@ -652,6 +721,9 @@ function Player({
     if (gone.current) missing.current();
   }, []);
 
+  /** clip-auto §2: the player's line when there is no cut to show (running, low_confidence, failed). */
+  const autoLine = cut.range === null && cut.reason !== "webm" ? playerAutoLine(server?.autoStatus ?? null, running) : null;
+
   /** clip-handles §1: Klip / Ret klip on an MP4 clip with a server row; never WebM, afbrudt or missing. */
   const canEdit = row.kind === "clip" && row.ext === "mp4" && server !== null;
 
@@ -723,6 +795,17 @@ function Player({
         </div>
       </div>
       {cutLine(cut) !== null && <p className="pl-[60px] pr-3 font-mono text-13 text-text-muted">{cutLine(cut)}</p>}
+      {autoLine !== null && (
+        <p className="pl-[60px] pr-3 font-sans text-13 text-text-muted">
+          {autoLine.words}
+          {autoLine.figure !== null && (
+            <span aria-hidden="true" className="font-mono tabular-nums">
+              {" "}
+              {autoLine.figure}
+            </span>
+          )}
+        </p>
+      )}
       <div className="flex min-h-0 flex-1 items-center justify-center p-2">
         {fixture || (url === null && files === null) ? (
           <div className="flex aspect-[9/16] max-h-full w-full max-w-xs items-center justify-center rounded-card bg-track">
@@ -795,7 +878,7 @@ function Player({
                   }}
                 >
                   <Icon name="scissors" size={18} />
-                  {server?.clipInS !== null && server?.clipOutS !== null ? "Ret klip" : "Klip"}
+                  {server === null ? "Klip" : editLabel(server)}
                 </button>
               )}
               <button type="button" className={DARK_BTN} onClick={() => setConfirm(true)}>

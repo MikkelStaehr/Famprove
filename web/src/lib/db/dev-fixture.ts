@@ -144,7 +144,12 @@ export type DevFixture =
   | "superset-pick-empty"
   | "minimised"
   | "minimised-ready"
-  | "minimise-halted";
+  | "minimise-halted"
+  | "clip-model"
+  | "clip-running"
+  | "clip-clipped"
+  | "clip-low"
+  | "clip-failed";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -179,6 +184,11 @@ const FIXTURES: readonly DevFixture[] = [
   "minimised",
   "minimised-ready",
   "minimise-halted",
+  "clip-model",
+  "clip-running",
+  "clip-clipped",
+  "clip-low",
+  "clip-failed",
 ];
 
 /** Fokus › Minimér's fixtures (fokus-minimise.md §4). */
@@ -202,6 +212,37 @@ export function isPauseFixture(f: DevFixture | null): f is PauseFixture {
 export type VideoFixture = "recording" | "camera-denied";
 export function videoFixture(f: DevFixture | null): VideoFixture | null {
   return f === "recording" || f === "camera-denied" ? f : null;
+}
+
+/**
+ * DEV_FIXTURE=clip-* (clip-auto.md §3): midsession's real-tap log plus an injected clip line in the
+ * rest card. Illustrative (40 %, 12,3–48,0 s); nothing runs and nothing is written.
+ */
+export type AutoFixture = "clip-model" | "clip-running" | "clip-clipped" | "clip-low" | "clip-failed";
+export function isAutoFixture(f: DevFixture | null): f is AutoFixture {
+  return f === "clip-model" || f === "clip-running" || f === "clip-clipped" || f === "clip-low" || f === "clip-failed";
+}
+export type AutoFixturePhase =
+  | { readonly kind: "model"; readonly pct: number }
+  | { readonly kind: "running"; readonly pct: number }
+  | { readonly kind: "clipped"; readonly inS: number; readonly outS: number }
+  | { readonly kind: "low_confidence" }
+  | { readonly kind: "failed" };
+export function autoFixturePhase(f: DevFixture | null): AutoFixturePhase | null {
+  switch (f) {
+    case "clip-model":
+      return { kind: "model", pct: 40 };
+    case "clip-running":
+      return { kind: "running", pct: 40 };
+    case "clip-clipped":
+      return { kind: "clipped", inS: 12.3, outS: 48 };
+    case "clip-low":
+      return { kind: "low_confidence" };
+    case "clip-failed":
+      return { kind: "failed" };
+    default:
+      return null;
+  }
 }
 
 /** DEV_FIXTURE=pause-rated: the done set's age (3:40, between the 3:00 MIN and the 5:00 MAX). */

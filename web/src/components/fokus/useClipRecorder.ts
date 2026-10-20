@@ -11,10 +11,23 @@ import type { ClipFiles, ClipWriter } from "@/lib/video/opfs";
 import { opfsClipFiles, persistStorage } from "@/lib/video/opfs-browser";
 import { type AfbrudtReason, clipEntryFor, clipOutcome, IDLE, lowSpace, openGuard, recReducer, type RecState, saveInputOf, stopThenDone } from "@/lib/video/recording";
 import { MAX_DURATION_S } from "@/lib/video/clips";
+import type { LiftFamily } from "@/lib/video/auto-clip";
+import { analyseClip } from "@/lib/video/auto-run";
+import { browserAutoDeps } from "@/lib/video/auto-run-browser";
+import { type FokusAutoPhase, fokusAutoLine, isOutcome } from "@/lib/video/auto-lines";
 import type { SetRef } from "@/lib/set-taps";
 
 /** DEV_FIXTURE=recording / camera-denied: the strip's state without a camera (nothing opens, nothing is written). */
 export type VideoFixture = "recording" | "camera-denied" | null;
+
+/** What the automatic clip needs of the recorded set (clip-auto): the lift's family and the reps it should hold. */
+export type ClipLift = { readonly family: LiftFamily; readonly expected: number | null };
+
+/**
+ * clip-auto §1's slot after Stop: reserved from Stop (phase null = no line yet), then the phase or
+ * the outcome; `spoken` is the status region's text, set once at the start and once at the outcome.
+ */
+export type AutoSlot = { readonly id: string; readonly phase: FokusAutoPhase | null; readonly spoken: string };
 
 /** The recording fixture's frozen time (spec §Fixtures). */
 const FIXTURE_ELAPSED_S = 48;
@@ -28,6 +41,7 @@ type Live = {
   readonly recorder: MediaRecorder;
   readonly writer: ClipWriter;
   readonly entry: ClipIndexEntry;
+  readonly lift: ClipLift;
   startedAt: number | null;
   chain: Promise<void>;
   stopped: Promise<void>;
@@ -46,7 +60,9 @@ export type ClipRecorder = {
   readonly elapsed: number;
   readonly fixture: boolean;
   readonly previewRef: RefObject<HTMLVideoElement | null>;
-  readonly optag: (ref: SetRef, names: ClipNameStack, date: string, sessionNo: number, onStarted: () => void) => void;
+  /** clip-auto §1: the rest card's slot after a recorded set; null = no slot. */
+  readonly auto: AutoSlot | null;
+  readonly optag: (ref: SetRef, names: ClipNameStack, date: string, sessionNo: number, lift: ClipLift, onStarted: () => void) => void;
   /** Stop = done: the recorder first, then `done`, then the file and the row. */
   readonly stopAndDone: (done: () => void) => void;
   /** Annullér, Afslut, background: the clip is kept as afbrudt, no done. */
@@ -68,7 +84,7 @@ function supported(): RecorderType | null {
 }
 
 /** The Fokus record control's camera, recorder, files and index (video-record.md §4–§14). */
-export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRecorder {
+export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFixture: FokusAutoPhase | null = null): ClipRecorder {
   const [state, dispatch] = useReducer(
     recReducer,
     fixture === "recording" ? { kind: "recording", startedAt: 0 } : fixture === "camera-denied" ? { kind: "denied" } : IDLE,
@@ -83,11 +99,20 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
   const persisted = useRef(false);
   const limited = useRef<{ readonly entry: ClipIndexEntry; readonly durationS: number } | null>(null);
   const opening = useRef(openGuard());
+  // clip-auto: the slot (DEV_FIXTURE=clip-*: an injected phase, nothing runs) and the run's abort.
+  const [auto, setAuto] = useState<AutoSlot | null>(() =>
+    autoFixture === null ? null : { id: "fixture", phase: autoFixture, spoken: fokusAutoLine(autoFixture).spoken },
+  );
+  const autoRun = useRef<AbortController | null>(null);
+  const stopAuto = () => {
+    autoRun.current?.abort();
+    autoRun.current = null;
+  };
 
   const ix = (): ClipIndex => (index.current ??= indexedDbClipIndex());
   const fs = (): ClipFiles => (files.current ??= opfsClipFiles());
 
-  const sync = useCallback(async (entry: ClipIndexEntry, durationS: number) => {
+  const sync = useCallback(async (entry: ClipIndexEntry, durationS: number): Promise<boolean> => {
     let ok = false;
     try {
       const r = await saveClip(saveInputOf(entry, durationS));
@@ -96,6 +121,37 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
       ok = false;
     }
     await ix().put({ ...entry, state: "done", durationS, synced: ok });
+    return ok;
+  }, []);
+
+  /**
+   * clip-auto §1: after a saved Stop, the one analysis. A new Optag and leaving Fokus abort it
+   * (nothing written); a hidden page does not (no camera is involved). The line follows the run
+   * only while the slot is still this clip's (a done clears the line, the run carries on).
+   */
+  const analyse = useCallback(async (l: Live, durationS: number) => {
+    if (l.type.ext !== "mp4") return; // WebM: no analysis and no line
+    stopAuto();
+    const ctrl = new AbortController();
+    autoRun.current = ctrl;
+    const show = (phase: FokusAutoPhase) =>
+      setAuto((a) => {
+        if (a === null || a.id !== l.id || ctrl.signal.aborted) return a;
+        const spoken = isOutcome(phase) || a.spoken === "" ? fokusAutoLine(phase).spoken : a.spoken;
+        return { id: l.id, phase, spoken };
+      });
+    let blob: Blob | null = null;
+    try {
+      blob = await fs().read(l.id, l.type.ext);
+    } catch {
+      blob = null;
+    }
+    if (ctrl.signal.aborted || blob === null) return;
+    const meta = { ext: l.type.ext, durationS, family: l.lift.family, expected: l.lift.expected };
+    const out = await analyseClip(l.id, blob, meta, { signal: ctrl.signal, onProgress: show, deps: browserAutoDeps });
+    if (autoRun.current === ctrl) autoRun.current = null;
+    if (out.kind === "clipped") show({ kind: "clipped", inS: out.inS, outS: out.outS });
+    else if (out.kind === "low_confidence" || out.kind === "failed") show({ kind: out.kind });
   }, []);
 
   // §2/§3/§13 on load: capabilities, space, a blocked camera; the index's leftovers.
@@ -177,8 +233,11 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
   }, []);
 
   const optag = useCallback(
-    (ref: SetRef, names: ClipNameStack, date: string, sessionNo: number, onStarted: () => void) => {
-      if (fixture !== null) return; // §16: no camera opens under the fixtures
+    (ref: SetRef, names: ClipNameStack, date: string, sessionNo: number, lift: ClipLift, onStarted: () => void) => {
+      if (fixture !== null || autoFixture !== null) return; // §16: no camera opens under the fixtures
+      // clip-auto §1.7: a new Optag cancels the previous clip's run (nothing written) and its line.
+      stopAuto();
+      setAuto(null);
       const type = supported();
       if (type === null) return;
       dispatch({ type: "optag" });
@@ -214,7 +273,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
           const stopped = new Promise<void>((r) => {
             resolveStopped = r;
           });
-          const l: Live = { id, ref, type, stream, recorder, writer, entry, startedAt: null, chain: Promise.resolve(), stopped, limit: undefined, failed: null, stopFired: false };
+          const l: Live = { id, ref, type, stream, recorder, writer, entry, lift, startedAt: null, chain: Promise.resolve(), stopped, limit: undefined, failed: null, stopFired: false };
           live.current = l;
           recorder.ondataavailable = (e) => {
             if (e.data.size === 0) return;
@@ -264,7 +323,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
         }
       })();
     },
-    [fixture, abort],
+    [fixture, autoFixture, abort],
   );
 
   const stopAndDone = useCallback(
@@ -277,6 +336,8 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
       live.current = null;
       const d = duration(l);
       dispatch({ type: "stop" });
+      // §1: the slot is reserved from Stop (no line until saveClip succeeds; WebM never gets one).
+      setAuto({ id: l.id, phase: null, spoken: "" });
       void stopThenDone({
         stopRecorder: () => stopRecorder(l),
         done,
@@ -296,14 +357,14 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
             }
             await ix().put({ ...l.entry, state: "done", durationS: d });
             dispatch({ type: "stopped", durationS: d });
-            await sync(l.entry, d);
+            if (await sync(l.entry, d)) void analyse(l, d);
           } catch {
             dispatch({ type: "abort", reason: "failed", durationS: d });
           }
         },
       });
     },
-    [sync],
+    [sync, analyse],
   );
 
   const saveLimited = useCallback(() => {
@@ -323,8 +384,15 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
     return () => document.removeEventListener("visibilitychange", onHide);
   }, [abort]);
 
-  // Unmount (Afslut, a tab switch): the camera is released, the clip kept as afbrudt.
-  useEffect(() => () => void abort("cancel"), [abort]);
+  // Unmount (Afslut, Minimér, back, a tab switch): the camera is released, the clip kept as afbrudt,
+  // and a running analysis is aborted (clip-auto: nothing written; Træning's pickup takes it).
+  useEffect(
+    () => () => {
+      stopAuto();
+      void abort("cancel");
+    },
+    [abort],
+  );
 
   return {
     state,
@@ -333,10 +401,15 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
     elapsed,
     fixture: fixture !== null,
     previewRef,
+    auto,
     optag,
     stopAndDone,
     abort,
     saveLimited,
-    clear: () => dispatch({ type: "clear" }),
+    clear: () => {
+      dispatch({ type: "clear" });
+      // §1 Lifetime: the next done hides the line; the run carries on and lands in Optagelser.
+      if (autoFixture === null) setAuto(null);
+    },
   };
 }

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { FokusError, NoSessionNote } from "@/components/fokus/FokusNotes";
 import { FokusScreen } from "@/components/fokus/FokusScreen";
 import { type DataError, isDataError } from "@/lib/data-error";
-import { devFixture, devSwitchOn, videoFixture } from "@/lib/db/dev-fixture";
+import { autoFixturePhase, devFixture, devSwitchOn, videoFixture } from "@/lib/db/dev-fixture";
 import { recordingAllowed } from "@/lib/video/clips";
 import { loadExerciseCategories, loadTrainingForm, loadTrainingPlan } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
@@ -105,6 +105,7 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
         mainLifts={mainLiftKeys(catalogue)}
         sheetOpen={devFixture() === "sheet" || devFixture() === "sheet-superset"}
         recording={{ allowed: recordingAllowed(process.env, process.env.NODE_ENV), fixture: videoFixture(devFixture()) }}
+        autoFixture={autoFixturePhase(devFixture())}
       />
     </FokusColumn>
   );

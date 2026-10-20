@@ -35,10 +35,13 @@ export function fixtureRunSets(today: IsoDate): RunSets {
 
 type Cut = Pick<VideoClipRow, "clipInS" | "clipOutS" | "autoInS" | "autoOutS" | "autoStatus">;
 const NO_CUT: Cut = { clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null };
-/** clip-cut's player lines: the newest clip has the user's in/out, the next an automatic one; the third is WebM. */
+/** clip-cut's player lines: the newest clip has the user's in/out, the next an automatic one; the third is WebM; clip-auto: the 4th low_confidence, the 5th failed. */
 const CUTS: readonly Cut[] = [
   { ...NO_CUT, clipInS: 12.3, clipOutS: 48 },
   { ...NO_CUT, autoInS: 4.2, autoOutS: 39.6, autoStatus: "clipped" },
+  NO_CUT, // the WebM clip
+  { ...NO_CUT, autoStatus: "low_confidence" }, // clip-auto §3: clip 4
+  { ...NO_CUT, autoStatus: "failed" }, // clip 5
 ];
 const WEBM_INDEX = 2;
 

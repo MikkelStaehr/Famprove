@@ -21,6 +21,7 @@ import {
   MINIMISED_REST_S,
   minimisedLog,
   videoFixture,
+  isAutoFixture,
   midsessionLog,
   sheetLog,
   comboParts,
@@ -520,7 +521,9 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
   }
   if (fixture === "superset-picked") return { ...base, ...supersetPickedFixture(base, today, new Date()) };
   if (fixture === "superset-offer") return { ...base, setLog: supersetOfferLog(sets, today, new Date()), supersetPairs: [] };
-  const pauseLike = videoFixture(fixture) !== null ? "pause" : fixture;
+  // clip-auto §3: the clip lines sit in the rest card after a working set's done, which midsession's
+  // log on an open day doesn't reach (it ends on a warm-up); the recording fixtures' pause log does.
+  const pauseLike = videoFixture(fixture) !== null || isAutoFixture(fixture) ? "pause" : fixture;
   if (isPauseFixture(pauseLike)) {
     const pause = pauseFixture(pauseLike, sets, plannedSets, today, new Date());
     return { ...base, ...pause, plannedSets: illustrativeToday(pause.sets, pause.plannedSets) };

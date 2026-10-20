@@ -219,7 +219,10 @@ export function RestStrip({
   since,
   rest: { minS, maxS, superset },
   onAnnounce,
+  slot = null,
 }: {
+  /** clip-auto §1: the automatic clip's slot as the card's last row; null = none. */
+  readonly slot?: ReactNode;
   readonly since: string;
   /** fokusView's restWindow; `superset`: the rest after a superset's B (supersets.md S14), the label says so. */
   readonly rest: RestWindow;
@@ -268,6 +271,7 @@ export function RestStrip({
           {line}
         </p>
       )}
+      {slot}
     </section>
   );
 }

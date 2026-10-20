@@ -67,6 +67,8 @@ export type FokusExercise = Pick<
 > & {
   /** This week's sheet kg (ExerciseView.kg): never shown (D3); only the finished signature's bar height reads it. */
   readonly kg?: number | null;
+  /** The sheet's TYPE (ExerciseView.type): clip-auto's lift family; absent in small fixtures (upper). */
+  readonly type?: string;
 };
 
 /**

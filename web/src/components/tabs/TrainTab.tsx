@@ -15,7 +15,8 @@ import { type WeekBody, WeekCard } from "@/components/WeekCard";
 import { dayDetails, weekView } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
 import { devFixture, devSwitchOn } from "@/lib/db/dev-fixture";
-import { readClipNames, readClipRunSets, readVideoClips } from "@/lib/db/video-clips";
+import { readClipLifts, readClipNames, readClipRunSets, readVideoClips } from "@/lib/db/video-clips";
+import type { ClipLiftMeta } from "@/lib/video/auto-lines";
 import { recordingAllowed, type VideoClipRow } from "@/lib/video/clips";
 import { clipsFixture, FIXTURE_NAMES, fixtureRunSets } from "@/lib/video/library-fixture";
 import type { ClipNames, RunSets } from "@/lib/video/library-view";
@@ -255,15 +256,16 @@ async function VideoLibrary({ today }: { readonly today: IsoDate }) {
   let rows: VideoClipRow[] | null = null;
   let names: ClipNames = { exercises: {}, variants: {} };
   let runSets: RunSets = {};
+  let lifts: Record<string, ClipLiftMeta> = {};
   try {
     const now = new Date();
     [rows, names] = await Promise.all([readVideoClips(now), devFixture() === null ? readClipNames() : Promise.resolve(names)]);
-    if (devFixture() === null) runSets = await readClipRunSets(rows, now);
+    if (devFixture() === null) [runSets, lifts] = await Promise.all([readClipRunSets(rows, now), readClipLifts(rows, now)]);
   } catch (error) {
     if (!isDataError(error)) throw error;
     console.error("træning: reading video clips failed", error);
   }
-  return <ClipLibrary today={today} rows={rows} names={names} runSets={runSets} canRecord={canRecord} fixture={null} />;
+  return <ClipLibrary today={today} rows={rows} names={names} runSets={runSets} canRecord={canRecord} fixture={null} lifts={lifts} />;
 }
 
 function PlanError({ error, at }: { readonly error: DataError; readonly at: Date }) {

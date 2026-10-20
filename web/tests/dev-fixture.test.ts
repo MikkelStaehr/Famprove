@@ -44,7 +44,7 @@ test("DEV_FIXTURE only switches under next dev, and only to known states", () =>
   } finally {
     console.warn = warn;
   }
-  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, pause-rated, finished, feel, calendar, ftp-warning, ftp-quiet, superset, superset-suggested, sheet, sheet-superset, jumped, superset-offer, combo, recording, camera-denied, clips, superset-pick, superset-picked, superset-pick-empty, minimised, minimised-ready, minimise-halted"]);
+  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, pause-rated, finished, feel, calendar, ftp-warning, ftp-quiet, superset, superset-suggested, sheet, sheet-superset, jumped, superset-offer, combo, recording, camera-denied, clips, superset-pick, superset-picked, superset-pick-empty, minimised, minimised-ready, minimise-halted, clip-model, clip-running, clip-clipped, clip-low, clip-failed"]);
   assert.equal(devFixture({}, "development"), null);
 });
 

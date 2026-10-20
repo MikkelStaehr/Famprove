@@ -48,6 +48,9 @@ import { usePartsSave } from "./usePartsSave";
 import { draftFrom, type PartsDraft } from "@/lib/parts-editor";
 import { afbrudtLine, isLive, LIMIT_LINE, LOW_SPACE_LINE, optagName, recordingStatus, type RecState, savedPrefix, stopInDock, stopSpoken, stopVisible } from "@/lib/video/recording";
 import { type ClipRecorder, useClipRecorder, type VideoFixture } from "./useClipRecorder";
+import { AutoSlot } from "./AutoSlot";
+import { expectedReps, liftFamily } from "@/lib/video/auto-clip";
+import type { FokusAutoPhase } from "@/lib/video/auto-lines";
 import { DeniedLine, OptagButton, RecordStrip } from "./RecordParts";
 import type { PartsData } from "@/lib/set-parts";
 
@@ -88,6 +91,8 @@ type FokusScreenProps = {
   readonly sheetOpen?: boolean;
   /** video-record.md §2: recording offered (production host or next dev) and the dev fixture. Absent = never. */
   readonly recording?: { readonly allowed: boolean; readonly fixture: VideoFixture };
+  /** DEV_FIXTURE=clip-* (clip-auto §3): the rest card's injected clip line; nothing runs or is written. */
+  readonly autoFixture?: FokusAutoPhase | null;
 };
 
 // Part B Motion: a 120ms opacity cross-fade between views, 0ms under reduced motion.
@@ -100,8 +105,8 @@ const FADE_IN = "transition-opacity duration-120 ease-out starting:opacity-0 mot
  * (✓ Opvarmning udført), finished (Tilbage til Træning). Taps go through useSetLog (optimistic,
  * saved in order).
  */
-export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts, sheetOpen: openOnLoad = false, recording }: FokusScreenProps) {
-  const rec = useClipRecorder(recording?.allowed ?? false, recording?.fixture ?? null);
+export function FokusScreen({ session, date, staleNote, devSwitches, enteredFromTraening, mainLifts, sheetOpen: openOnLoad = false, recording, autoFixture = null }: FokusScreenProps) {
+  const rec = useClipRecorder(recording?.allowed ?? false, recording?.fixture ?? null, autoFixture);
   // fokus-superset.md: the ⇄ choices of this visit; the order follows stored or saving ones only (orderPairs).
   const slots = useMemo(() => session.pairSlots ?? [], [session.pairSlots]);
   // superset-any.md §8: a pick moves B after A at once; a refusal puts the stored order back.
@@ -242,7 +247,9 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
 
   const onOptag = (setNo: number, names: ClipNameStack) => {
     if (view.kind !== "set" || isLive(rec.state)) return;
-    rec.optag(view.next, names, date, session.session, () => after(recordingStatus(setNo)));
+    const e = view.shown?.exercise;
+    const lift = { family: liftFamily(e?.type ?? null), expected: expectedReps(null, e?.repsText ?? null) };
+    rec.optag(view.next, names, date, session.session, lift, () => after(recordingStatus(setNo)));
   };
   const onCancelRec = () => void rec.abort("cancel");
   // §14: an error is announced once, assertively (the region's text appears with the line).
@@ -591,7 +598,7 @@ function SetView({
       {!recording && line !== null && <WarningLine>{line}</WarningLine>}
       {!recording && view.showRest && view.rest !== null && view.restWindow !== null && (
         <div data-sheet-anchor onClick={sheetOpen ? onStripTap : undefined}>
-          <RestStrip key={view.rest.since} since={view.rest.since} rest={view.restWindow} onAnnounce={onAnnounce} />
+          <RestStrip key={view.rest.since} since={view.rest.since} rest={view.restWindow} onAnnounce={onAnnounce} slot={rec.auto === null ? null : <AutoSlot slot={rec.auto} />} />
         </div>
       )}
       <div inert={sheetOpen} className="flex flex-1 flex-col gap-3">

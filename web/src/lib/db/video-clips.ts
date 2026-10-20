@@ -21,7 +21,9 @@ import { parseVideoClipRow, RowError, VIDEO_CLIPS_SELECT } from "./rows.ts";
 import { exerciseIds, sessionSets } from "./set-log.ts";
 import { type ClipNames, type RunSets, runSetNumbers, type SessionSetRow } from "../video/library-view.ts";
 import { FIXTURE_FAILING_RANGE_ID, type SetClipRangeInput, type SetClipRangeResult, validateClipRange } from "../video/clip-range.ts";
-import { type SetClipAutoInput, type SetClipAutoResult, validateClipAuto } from "../video/auto-clip.ts";
+import { expectedReps, liftFamily, type SetClipAutoInput, type SetClipAutoResult, validateClipAuto } from "../video/auto-clip.ts";
+import { PICKUP_DAYS } from "../video/auto-lines.ts";
+import type { ClipLiftMeta } from "../video/auto-lines.ts";
 
 /**
  * The app's fifth write path (user, 2026-10-17, slice video-record): a working set's clip recorded
@@ -258,4 +260,58 @@ export async function readClipRunSets(rows: readonly VideoClipRow[], now: Date, 
     },
   );
   return runSetNumbers(sets);
+}
+
+/**
+ * clip-auto's pickup: each recent clip's lift family (the sheet TYPE) and expected reps (the set
+ * log's reps_done, else the sheet's reps text), by clip id. One read of strength_sets for the clips'
+ * weeks and one of exercise_set_log for their dates; a clip whose set isn't found has no entry
+ * (the pickup skips it, never guesses). Errors propagate.
+ */
+export async function readClipLifts(rows: readonly VideoClipRow[], now: Date, options: VideoClipOptions = {}): Promise<Record<string, ClipLiftMeta>> {
+  const { client: makeClient = client } = options;
+  const since = addDays(localToday(now), -PICKUP_DAYS);
+  const recent = rows.filter((r) => r.date >= since);
+  if (recent.length === 0) return {};
+  const c = makeClient();
+  const weeks = [...new Set(recent.map((r) => isoWeekStart(r.date)))].toSorted();
+  const dates = [...new Set(recent.map((r) => r.date))].toSorted();
+  const key = (week: string, session: number, row: number, set: number) => `${week}|${session}|${row}|${set}`;
+  const [sets, logs] = await Promise.all([
+    selectAll(
+      c,
+      "strength_sets",
+      { columns: "week_start,session,sheet_row,set_no,type,reps_text", order: "week_start,session,sheet_row,set_no", filters: [["week_start", `in.(${weeks.join(",")})`], ["session", "not.is.null"]] },
+      (raw) => {
+        if (typeof raw !== "object" || raw === null) throw new RowError("strength_sets: expected an object");
+        const r = raw as Record<string, unknown>; // checked field by field below
+        if (typeof r.week_start !== "string" || typeof r.session !== "number" || typeof r.sheet_row !== "number" || typeof r.set_no !== "number" || typeof r.type !== "string") {
+          throw new RowError("strength_sets row must have week_start, session, sheet_row, set_no and type");
+        }
+        return [key(r.week_start, r.session, r.sheet_row, r.set_no), { type: r.type, repsText: typeof r.reps_text === "string" ? r.reps_text : null }] as const;
+      },
+    ),
+    selectAll(
+      c,
+      "exercise_set_log",
+      { columns: "date,session_no,row_no,set_no,reps_done", order: "date,session_no,row_no,set_no", filters: [["date", `in.(${dates.join(",")})`]] },
+      (raw) => {
+        if (typeof raw !== "object" || raw === null) throw new RowError("exercise_set_log: expected an object");
+        const r = raw as Record<string, unknown>; // checked field by field below
+        if (typeof r.date !== "string" || typeof r.session_no !== "number" || typeof r.row_no !== "number" || typeof r.set_no !== "number") {
+          throw new RowError("exercise_set_log row must have date, session_no, row_no and set_no");
+        }
+        return [`${r.date}|${r.session_no}|${r.row_no}|${r.set_no}`, typeof r.reps_done === "number" ? r.reps_done : null] as const;
+      },
+    ),
+  ]);
+  const sheet = new Map(sets);
+  const done = new Map(logs);
+  const out: Record<string, ClipLiftMeta> = {};
+  for (const r of recent) {
+    const s = sheet.get(key(isoWeekStart(r.date), r.session, r.row, r.set));
+    if (s === undefined) continue;
+    out[r.id] = { family: liftFamily(s.type), expected: expectedReps(done.get(`${r.date}|${r.session}|${r.row}|${r.set}`), s.repsText) };
+  }
+  return out;
 }
