@@ -820,7 +820,10 @@ function Player({
                     {rangeText.text}
                   </span>
                   {rangeText.undo !== null && (
-                    <button type="button" className={`min-h-11 text-text underline underline-offset-4 ${BTN}`} onClick={() => void undoRemove(rangeText.undo as ClipRangeS)}>
+                    <button type="button" className={`min-h-11 text-text underline underline-offset-4 ${BTN}`} onClick={() => {
+                        if (rangeText.undo !== null) void undoRemove(rangeText.undo);
+                      }}
+                    >
                       Fortryd
                     </button>
                   )}

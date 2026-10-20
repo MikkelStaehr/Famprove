@@ -113,7 +113,7 @@ export type SetClipRangeResult =
   | { readonly ok: true; readonly dev: boolean; readonly inS: number | null; readonly outS: number | null }
   | { readonly ok: false; readonly reason: "invalid" | "range" | "not_found" | "not_allowed" | "failed" };
 
-/** §3's lines under the editor's buttons; null for an ok. */
+/** §3's line under the editor's buttons for a refused or failed save. */
 export function rangeErrorLine(reason: "invalid" | "range" | "not_found" | "not_allowed" | "failed" | "network"): string {
   if (reason === "failed" || reason === "network") return "Klippet blev ikke gemt. Tjek forbindelsen og prøv igen.";
   if (reason === "not_found") return "Klippet kan ikke gemmes, fordi videoen ikke findes på serveren. Gem og Del giver hele videoen.";
