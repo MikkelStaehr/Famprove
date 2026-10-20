@@ -49,7 +49,7 @@ contain personal training data: write them to the session scratchpad or `%TEMP%`
 
 `shoot.mjs` options: `--out <png>` (required) · `--path /load?week=2026-W33` (default `/`) ·
 `--width 390` · `--open` (open every `<details>`) · `--dark` · `--reduce-motion` (emulates
-`prefers-reduced-motion: reduce`) · `--fake-camera` (Chrome's fake camera, permission granted without a prompt: for recording in Fokus; also on `swipe.mjs`) · `--zoom200` (root font 200 %) ·
+`prefers-reduced-motion: reduce`) · `--fake-camera` (Chrome's fake camera, permission granted without a prompt: for recording in Fokus; also on `swipe.mjs`) · `--zoom200` (root font 200 %) · `--click "<css>|text=<label>"` (taps before the shot, repeatable) · `--wait-text "<text>"` (after the taps, wait ≤ 30 s for the text, e.g. Kameratest's `Nøglebilleder`) ·
 `--base http://localhost:3100` · `--ready "<css selector>"` (a page outside the app, e.g. the local design
 reference: `--base file://$PWD/design/reference/ --path belastning-mockup.html --width 1400`; a bundle that
 renders inside a frame never matches, so the shot waits 30 s, exits 1 and still writes the PNG) · `--timeout 90` (seconds for the whole shot: a hung browser is killed

@@ -3,6 +3,7 @@
 // node .claude/skills/run-web/shoot.mjs --out <file.png> [--path /load] [--width 390]
 //   [--open] [--dark] [--reduce-motion] [--fake-camera] [--zoom200] [--base http://localhost:3100] [--timeout 90]
 //   [--click "<css selector>|text=<label>"]... (taps in order before the shot)
+//   [--wait-text "<text>"]  (after the taps, wait up to 30 s until the page shows this text)
 //   [--ready "<css selector>"]  (default: the app's own readiness; a selector for a page outside the app,
 //   e.g. a design reference opened with --base file:///…/design/reference/ --path mockup.html)
 // Prints one JSON line; exits 1 on horizontal overflow, console errors, a page that never got ready,
@@ -26,6 +27,9 @@ const { values: opt } = parseArgs({
     zoom200: { type: "boolean", default: false },
     timeout: { type: "string", default: "90" },
     ready: { type: "string" },
+    // After the taps, wait (≤ 30 s, inside --timeout) until the page's text contains this (slice
+    // clip-cut: Kameratest's 4 s test clip ends after the shot would be taken); not found = exit 1.
+    "wait-text": { type: "string" },
     // Taps before the shot, in order, 800 ms apart (slice fokus-minimise: a jump, then Minimér):
     // a CSS selector (the first match), or text=<start of a button's or link's text>.
     click: { type: "string", multiple: true },
@@ -145,6 +149,17 @@ try {
       exitCode = 1;
     }
     await sleep(800);
+  }
+  if (opt["wait-text"] !== undefined) {
+    let seen = false;
+    for (let i = 0; i < 150 && !seen; i++) {
+      seen = await evaluate(`document.body.innerText.includes(${JSON.stringify(opt["wait-text"])})`);
+      if (!seen) await sleep(200);
+    }
+    if (!seen) {
+      console.error(`--wait-text ${opt["wait-text"]}: not shown within 30 s`);
+      exitCode = 1;
+    }
   }
   if (opt.open) await evaluate(`document.querySelectorAll('details').forEach((d) => { d.open = true; }); true`);
   // A stylesheet, not a style attribute on <html>: React owns that element's attributes.
