@@ -1,12 +1,23 @@
 /**
  * The one analysis of a clip (slice clip-auto, design/specs/clip-auto.md): the model (fetched once
- * with a "model" phase when not cached), runPose, findLift, then setClipAuto with the run's wall time.
+ * with a "model" phase when not cached), runPose, traceLift (findLift's result, with its trace), then
+ * setClipAuto with the run's wall time.
  * Fokus (after Stop) and Træning's pickup both call analyseClip, so the outcome is the same either
  * way. The pose runner, the model probe and the action are injected (auto-run-browser.ts binds the
  * real ones), so the outcomes, an abort and a failure are tested in node. Landmarks stay in memory:
- * only status, in/out and the run's ms are sent.
+ * only status, in/out and the run's ms are sent; the outcome's summary (aggregates) stays on the phone.
  */
-import { type AutoClipResult, findLift, type LiftFamily, type LowConfidenceReason, MAX_RUN_MS, type SetClipAutoInput, type SetClipAutoResult } from "./auto-clip.ts";
+import {
+  type AutoClipResult,
+  type Joint,
+  type LiftFamily,
+  type LiftTrace,
+  type LowConfidenceReason,
+  MAX_RUN_MS,
+  type SetClipAutoInput,
+  type SetClipAutoResult,
+  traceLift,
+} from "./auto-clip.ts";
 import type { ClipExt } from "./mime.ts";
 import { type PoseMode, PoseError, type PoseFailure, type PoseReached, type PoseResult } from "./pose-run.ts";
 
@@ -48,7 +59,7 @@ export type AutoProgress = { readonly kind: "model"; readonly pct: number | null
 /**
  * Which step a failed run failed in (clip-debug): "model" (the model download), a runPose failure
  * (PoseError's reason: load, video, detect, timeout), "pose" (runPose threw something else) or
- * "lift" (findLift threw). Kept on the phone: setClipAuto still gets only "failed".
+ * "lift" (traceLift threw). Kept on the phone: setClipAuto still gets only "failed".
  */
 export type FailStep = "model" | Exclude<PoseFailure, "aborted"> | "pose" | "lift";
 export type AutoFailure = { readonly step: FailStep; readonly message: string; readonly reached: PoseReached | null };
@@ -58,11 +69,39 @@ export type AutoFailure = { readonly step: FailStep; readonly message: string; r
  * aborted and skipped (WebM) wrote nothing.
  */
 export type AutoOutcome =
-  | ({ readonly kind: "clipped"; readonly inS: number; readonly outS: number; readonly saved: boolean } & Ran)
-  | ({ readonly kind: "low_confidence"; readonly saved: boolean; readonly reason: LowConfidenceReason } & Ran)
+  | ({ readonly kind: "clipped"; readonly inS: number; readonly outS: number; readonly saved: boolean; readonly summary: AutoSummary } & Ran)
+  | ({ readonly kind: "low_confidence"; readonly saved: boolean; readonly reason: LowConfidenceReason; readonly summary: AutoSummary } & Ran)
   | ({ readonly kind: "failed"; readonly saved: boolean; readonly error: AutoFailure } & Ran)
   | ({ readonly kind: "aborted"; readonly reason: string } & Ran)
   | { readonly kind: "skipped" };
+
+/**
+ * What the lift step saw (slice clip-summary): aggregates of traceLift's trace only, never a
+ * landmark; null where its step was not reached. `chosen`: the polarity counted (+1 y rises, −1 y
+ * falls); `expected`: the reps the clip should hold. Kept on the phone (auto-last.ts), never sent.
+ */
+export type AutoSummary = {
+  readonly joint: Joint | null;
+  readonly validShare: number | null;
+  readonly peaksUp: number | null;
+  readonly peaksDown: number | null;
+  readonly chosen: 1 | -1 | null;
+  readonly expected: number | null;
+  readonly repLengths: readonly number[] | null;
+};
+
+/** The trace's summary. Pure. */
+export function summaryOf(trace: LiftTrace, expected: number | null): AutoSummary {
+  return {
+    joint: trace.joint,
+    validShare: trace.validShare,
+    peaksUp: trace.peaksUp,
+    peaksDown: trace.peaksDown,
+    chosen: trace.chosenSign,
+    expected,
+    repLengths: trace.repLengths === null ? null : [...trace.repLengths],
+  };
+}
 
 /** The run's mode and why (null when it ended before choosing one) and its wall time (ms). */
 type Ran = { readonly mode: ModeChoice | null; readonly runMs: number };
@@ -126,6 +165,7 @@ export async function analyseClip(clipId: string, blob: Blob, meta: ClipMeta, op
     opts.onProgress?.(p);
   };
   let result: AutoClipResult | null = null;
+  let summary: AutoSummary | null = null;
   let failure: AutoFailure | null = null;
   let step: "model" | "pose" | "lift" = "model";
   try {
@@ -155,7 +195,9 @@ export async function analyseClip(clipId: string, blob: Blob, meta: ClipMeta, op
     }
     if (signal.aborted) return aborted(signal.reason);
     step = "lift";
-    result = findLift(pose.frames, meta.expected, meta.family, meta.durationS);
+    const traced = traceLift(pose.frames, meta.expected, meta.family, meta.durationS); // .result is findLift's
+    result = traced.result;
+    summary = summaryOf(traced.trace, meta.expected);
   } catch (error) {
     if (signal.aborted) return aborted(signal.reason);
     if (error instanceof PoseError && error.reason === "aborted") return aborted(error);
@@ -176,8 +218,8 @@ export async function analyseClip(clipId: string, blob: Blob, meta: ClipMeta, op
   } catch {
     saved = false;
   }
-  if (result === null) return { kind: "failed", saved, error: failure ?? { step, message: "ukendt", reached: null }, mode: choice, runMs };
+  if (result === null || summary === null) return { kind: "failed", saved, error: failure ?? { step, message: "ukendt", reached: null }, mode: choice, runMs };
   return result.status === "clipped"
-    ? { kind: "clipped", inS: result.inS, outS: result.outS, saved, mode: choice, runMs }
-    : { kind: "low_confidence", saved, reason: result.reason, mode: choice, runMs };
+    ? { kind: "clipped", inS: result.inS, outS: result.outS, saved, mode: choice, runMs, summary }
+    : { kind: "low_confidence", saved, reason: result.reason, mode: choice, runMs, summary };
 }

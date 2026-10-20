@@ -14,9 +14,10 @@ const memStore = () => {
 // 2026-10-20 14:02 Copenhagen (CEST, UTC+2)
 const AT = Date.UTC(2026, 9, 20, 12, 2);
 const PLAY = { mode: "play", why: "afspil", keyframes: "nøglebilleder op til 4,1 s" } as const;
+const SUMMARY = { joint: "hips", validShare: 0.93, peaksUp: 4, peaksDown: 2, chosen: 1, expected: 5, repLengths: [2.1, 2.4, 2.2, 2.6] } as const;
 const OUTCOMES: Record<AutoOutcome["kind"], AutoOutcome> = {
-  clipped: { kind: "clipped", inS: 23.8, outS: 40.8, saved: true, mode: PLAY, runMs: 26_600 },
-  low_confidence: { kind: "low_confidence", reason: "count", saved: true, mode: PLAY, runMs: 22_000 },
+  clipped: { kind: "clipped", inS: 23.8, outS: 40.8, saved: true, mode: PLAY, runMs: 26_600, summary: SUMMARY },
+  low_confidence: { kind: "low_confidence", reason: "count", saved: true, mode: PLAY, runMs: 22_000, summary: SUMMARY },
   failed: { kind: "failed", saved: true, error: { step: "timeout", message: "over 108 s", reached: null }, mode: PLAY, runMs: 1_096_354 },
   aborted: { kind: "aborted", reason: "siden blev skjult", mode: PLAY, runMs: 4_000 },
   skipped: { kind: "skipped" },
@@ -29,7 +30,7 @@ test("last outcome store: write, read, another clip kept; unreadable is empty; a
   recordAutoLast(store, "b", OUTCOMES.low_confidence, AT);
   const read = readAutoLast(store);
   assert.deepEqual(read.a, { kind: "failed", mode: "play", why: "afspil", step: "timeout", message: "over 108 s", runMs: 1_096_354, at: AT });
-  assert.deepEqual(read.b, { kind: "low_confidence", mode: "play", why: "afspil", reason: "count", runMs: 22_000, at: AT });
+  assert.deepEqual(read.b, { kind: "low_confidence", mode: "play", why: "afspil", reason: "count", runMs: 22_000, summary: SUMMARY, at: AT });
   mem.set(AUTO_LAST_KEY, "{not json");
   assert.deepEqual(readAutoLast(store), {});
   mem.set(AUTO_LAST_KEY, JSON.stringify([1]));

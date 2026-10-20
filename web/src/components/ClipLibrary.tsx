@@ -58,7 +58,8 @@ import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, inPickupWindow, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
 import { browserStore, readAutoVersions } from "@/lib/video/auto-version";
-import { recordRun } from "@/lib/video/auto-last";
+import { type AutoLast, readAutoLast, recordRun } from "@/lib/video/auto-last";
+import { ClipSummary, type SummaryItem } from "@/components/ClipSummary";
 import { useWakeLock } from "@/components/fokus/useWakeLock";
 import { ClipDebug } from "@/components/ClipDebug";
 import { isDebugToggle } from "@/lib/video/debug-log";
@@ -125,6 +126,15 @@ async function hasIndex(): Promise<boolean> {
   return dbs.length > 0;
 }
 
+/** clip-summary: the list's rows, newest first, with the server's status and this phone's last outcome. */
+function summaryItems(list: readonly LibraryRow[], server: ReadonlyMap<string, VideoClipRow>, last: Readonly<Record<string, AutoLast>>): SummaryItem[] {
+  return list.map((r) => ({
+    id: r.id,
+    clip: { name: shownName(r), set: r.set, durationS: r.durationS, serverStatus: server.get(r.id)?.autoStatus ?? null },
+    last: last[r.id] ?? null,
+  }));
+}
+
 /** The Optagelser card on Træning (design/specs/video-library.md). */
 export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecord, fixture, lifts = NO_LIFTS }: Props) {
   const store = useRef<Store | null>(null);
@@ -147,6 +157,24 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const [rest, setRest] = useState<readonly SaveClip[]>([]);
   const [running, setRunning] = useState<Running | null>(null);
   const pickupStarted = useRef(false);
+  /** clip-summary: the hidden overview, with this phone's last outcomes read when it opened; null = closed. */
+  const [overview, setOverview] = useState<Readonly<Record<string, AutoLast>> | null>(null);
+  const titlePress = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const endTitlePress = () => {
+    if (titlePress.current !== null) clearTimeout(titlePress.current);
+    titlePress.current = null;
+  };
+  useEffect(() => endTitlePress, []);
+  const closeOverview = useCallback(() => setOverview(null), []);
+  // Shift+D on Træning while no player is open (the player's own Shift+D opens its panel).
+  useEffect(() => {
+    if (open !== null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (isDebugToggle(e, e.target instanceof HTMLElement ? e.target : null)) setOverview((o) => (o === null ? readAutoLast(browserStore()) : null));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const load = useCallback(async () => {
     await Promise.resolve(); // never set state synchronously inside the effect
@@ -429,7 +457,19 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   return (
     <section aria-labelledby="optagelser-title" className="rounded-card border border-border bg-card p-4.5 lg:col-start-1">
       <div className="flex items-baseline justify-between gap-3">
-        <SectionTitle id="optagelser-title">Optagelser</SectionTitle>
+        <div
+          className="select-none [-webkit-touch-callout:none]"
+          onPointerDown={() => {
+            endTitlePress();
+            titlePress.current = setTimeout(() => setOverview(readAutoLast(browserStore())), 600);
+          }}
+          onPointerUp={endTitlePress}
+          onPointerLeave={endTitlePress}
+          onPointerCancel={endTitlePress}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <SectionTitle id="optagelser-title">Optagelser</SectionTitle>
+        </div>
         {list.length > 0 && <MonoCaption uppercase={false}>{clipCount(list.length)}</MonoCaption>}
       </div>
       {usedText !== null && quotaText !== null && entries !== null && (
@@ -439,6 +479,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           <span className="sr-only">stjernemarkerede</span> beholdes)
         </p>
       )}
+      {overview !== null && <ClipSummary items={summaryItems(list, serverById, overview)} onClose={closeOverview} />}
       {space.persisted === false && entries !== null && (
         <div className="mt-2">
           <WarningLine>

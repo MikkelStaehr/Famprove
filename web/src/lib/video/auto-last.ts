@@ -1,10 +1,12 @@
 /**
  * The last background outcome per clip, on this phone only (slice clip-auto-3): localStorage
  * `famprove.clips.autoLast` → `{ [clip id]: AutoLast }`, written by every analyseClip caller through
- * recordRun, aborted runs included, so a hang or a hidden page shows in the debug panel's log. Never
+ * recordRun, aborted runs included, so a hang or a hidden page shows in the debug panel's log; a
+ * clipped or low_confidence run also keeps its summary (aggregates only, slice clip-summary). Never
  * sent to the server. Storage is injected (the auto-version.ts pattern), so node tests it.
  */
-import type { AutoOutcome } from "./auto-run.ts";
+import type { Joint } from "./auto-clip.ts";
+import type { AutoOutcome, AutoSummary } from "./auto-run.ts";
 import { type KeyStore, recordIfSaved } from "./auto-version.ts";
 
 export const AUTO_LAST_KEY = "famprove.clips.autoLast";
@@ -19,6 +21,8 @@ export type AutoLast = {
   /** low_confidence: its rule; aborted: why. */
   readonly reason?: string;
   readonly runMs: number | null;
+  /** clipped / low_confidence: what the lift step saw (slice clip-summary). */
+  readonly summary?: AutoSummary;
   /** Epoch ms. */
   readonly at: number;
 };
@@ -26,10 +30,30 @@ export type AutoLast = {
 const KINDS: readonly string[] = ["clipped", "low_confidence", "failed", "aborted", "skipped"];
 const str = (v: unknown): v is string => typeof v === "string";
 
+const JOINTS: readonly string[] = ["hips", "knees", "wrists", "elbows"];
+const numOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/** A stored summary; unreadable fields are null (missing, never 0), an unreadable summary none. */
+function parseSummary(v: unknown): AutoSummary | null {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>; // narrowed per field below
+  const lengths = Array.isArray(o.repLengths) && o.repLengths.every((l) => typeof l === "number" && Number.isFinite(l)) ? (o.repLengths as number[]) : null;
+  return {
+    joint: str(o.joint) && JOINTS.includes(o.joint) ? (o.joint as Joint) : null,
+    validShare: numOrNull(o.validShare),
+    peaksUp: numOrNull(o.peaksUp),
+    peaksDown: numOrNull(o.peaksDown),
+    chosen: o.chosen === 1 || o.chosen === -1 ? o.chosen : null,
+    expected: numOrNull(o.expected),
+    repLengths: lengths,
+  };
+}
+
 function parseOne(v: unknown): AutoLast | null {
   if (typeof v !== "object" || v === null) return null;
   const o = v as Record<string, unknown>; // narrowed per field below
   if (!str(o.kind) || !KINDS.includes(o.kind) || typeof o.at !== "number") return null;
+  const summary = parseSummary(o.summary);
   return {
     kind: o.kind as AutoLast["kind"],
     mode: str(o.mode) ? o.mode : null,
@@ -38,6 +62,7 @@ function parseOne(v: unknown): AutoLast | null {
     ...(str(o.message) ? { message: o.message } : {}),
     ...(str(o.reason) ? { reason: o.reason } : {}),
     runMs: typeof o.runMs === "number" ? o.runMs : null,
+    ...(summary === null ? {} : { summary }),
     at: o.at,
   };
 }
@@ -68,8 +93,9 @@ export function lastOf(out: AutoOutcome, at: number): AutoLast {
   if (out.kind === "skipped") return { kind: "skipped", mode: null, why: null, runMs: null, at };
   const base = { kind: out.kind, mode: out.mode?.mode ?? null, why: out.mode?.why ?? null, runMs: out.runMs, at };
   if (out.kind === "failed") return { ...base, step: out.error.step, message: out.error.message.slice(0, MESSAGE_MAX) };
-  if (out.kind === "low_confidence" || out.kind === "aborted") return { ...base, reason: out.reason };
-  return base;
+  if (out.kind === "low_confidence") return { ...base, reason: out.reason, summary: out.summary };
+  if (out.kind === "aborted") return { ...base, reason: out.reason };
+  return { ...base, summary: out.summary };
 }
 
 /** Records clip `id`'s last outcome; a full or blocked storage is ignored. */
