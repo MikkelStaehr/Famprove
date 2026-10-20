@@ -20,10 +20,13 @@ export function setClipButtons(rows: readonly LibraryRow[], date: IsoDate, sessi
   const mine = rows
     .filter((r) => r.kind === "clip" && r.file !== null && r.date === date && r.session === session && wanted.has(r.sheetRow))
     .toSorted((a, b) => a.set - b.set || (a.recordedAt < b.recordedAt ? -1 : a.recordedAt > b.recordedAt ? 1 : a.id.localeCompare(b.id)));
-  const seen = new Map<number, number>();
+  // Counted per (sheet row, set): the same as per run set when the run's numbers are known, and still
+  // right when they aren't (each row's own set numbers then repeat across the run's rows; review).
+  const seen = new Map<string, number>();
   return mine.map((r) => {
-    const nth = (seen.get(r.set) ?? 0) + 1;
-    seen.set(r.set, nth);
+    const key = `${r.sheetRow}:${r.set}`;
+    const nth = (seen.get(key) ?? 0) + 1;
+    seen.set(key, nth);
     return { id: r.id, set: r.set, nth, label: clipButtonLabel(r.set, nth), name: clipButtonName(shownName(r), r.set, nth) };
   });
 }

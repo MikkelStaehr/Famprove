@@ -70,3 +70,10 @@ test("label and accessible name", () => {
   assert.equal(clipButtonName("Squat", 2, 1), "Afspil klip af Squat, sæt 2");
   assert.equal(clipButtonName("Squat", 2, 2), "Afspil klip 2 af Squat, sæt 2");
 });
+
+test("review: without the run's set numbers, each row's set 1 is its own set, never sæt 1 (2)", () => {
+  const f = clipsFixture(today);
+  const rows = libraryRows(f.local, f.rows, FIXTURE_NAMES, {}); // the run-set read failed
+  const labels = setClipButtons(rows, today, 1, RUN).map((b) => b.label);
+  assert.ok(!labels.some((l) => l.includes("(")), labels.join(", "));
+});
