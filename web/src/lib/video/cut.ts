@@ -47,6 +47,8 @@ type Parsed = {
   readonly height: number;
   readonly avcC: ArrayBuffer;
   readonly samples: readonly CutSample[];
+  /** The tkhd matrix (9 values, a b u c d v x y w; a–d in 16.16 fixed point). */
+  readonly matrix: readonly number[];
 };
 
 async function parse(file: Blob): Promise<Parsed> {
@@ -86,13 +88,50 @@ async function parse(file: Blob): Promise<Parsed> {
   for (const s of samples) {
     if (!(s.size > 0) || s.offset + s.size > file.size) throw new CutError("truncated", `sample at ${s.offset} (+${s.size}) runs past the file's ${file.size} bytes`);
   }
-  return { mp4, timescale: track.timescale, width: track.video?.width ?? 0, height: track.video?.height ?? 0, avcC, samples };
+  return { mp4, timescale: track.timescale, width: track.video?.width ?? 0, height: track.video?.height ?? 0, avcC, samples, matrix: Array.from(track.matrix) };
 }
 
 /** The keyframes' start times in seconds (Kameratest measures their spacing). */
 export async function keyframeTimes(file: Blob): Promise<number[]> {
   const p = await parse(file);
   return p.samples.filter((s) => s.sync).map((s) => s.cts / p.timescale);
+}
+
+/**
+ * The display rotation a tkhd matrix asks for, clockwise in degrees (0/90/180/270), or null when it
+ * is no quarter turn. a = m[0] = cos θ, b = m[1] = sin θ (16.16 fixed point; the scale cancels).
+ */
+export function matrixRotation(m: readonly number[]): 0 | 90 | 180 | 270 | null {
+  const a = m[0];
+  const b = m[1];
+  if (!Number.isFinite(a) || !Number.isFinite(b) || (a === 0 && b === 0)) return null;
+  const deg = (Math.round((Math.atan2(b, a) * 180) / Math.PI) + 360) % 360;
+  return deg === 0 || deg === 90 || deg === 180 || deg === 270 ? deg : null;
+}
+
+/** A clip file's facts for the debug panel (clip-debug): rotation, coded size and keyframes. */
+export type FileFacts = {
+  readonly rotation: 0 | 90 | 180 | 270 | null;
+  readonly codedWidth: number;
+  readonly codedHeight: number;
+  readonly keyframes: number;
+  /** The largest gap between keyframes (s), the last one to the end included; null with no keyframe. */
+  readonly maxKeyframeGapS: number | null;
+  readonly durationS: number;
+};
+
+/** The file's facts from the same parse the cut uses (no second parser). */
+export async function fileFacts(file: Blob): Promise<FileFacts> {
+  const p = await parse(file);
+  const kf = p.samples.filter((s) => s.sync).map((s) => s.cts / p.timescale);
+  const last = p.samples[p.samples.length - 1];
+  const durationS = (last.cts + last.duration) / p.timescale;
+  let gap: number | null = null;
+  for (let i = 0; i < kf.length; i++) {
+    const next = i + 1 < kf.length ? kf[i + 1] : durationS;
+    gap = Math.max(gap ?? 0, next - kf[i]);
+  }
+  return { rotation: matrixRotation(p.matrix), codedWidth: p.width, codedHeight: p.height, keyframes: kf.length, maxKeyframeGapS: gap, durationS };
 }
 
 /** Run-length pairs (counts, values) for stts. */

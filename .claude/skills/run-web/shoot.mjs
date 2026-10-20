@@ -2,7 +2,7 @@
 // (CDP): Edge on Windows, Chrome on macOS, google-chrome on Linux; BROWSER_PATH (or EDGE_PATH) overrides.
 // node .claude/skills/run-web/shoot.mjs --out <file.png> [--path /load] [--width 390]
 //   [--open] [--dark] [--reduce-motion] [--fake-camera] [--zoom200] [--base http://localhost:3100] [--timeout 90]
-//   [--click "<css selector>|text=<label>"]... (taps in order before the shot)
+//   [--click "<css selector>|text=<label>|key=Shift+D"]... (taps, or a keydown on window, in order before the shot)
 //   [--wait-text "<text>"]  (after the taps, wait up to 30 s until the page shows this text)
 //   [--webgl]  (software WebGL2 instead of --disable-gpu: MediaPipe needs it)
 //   [--wait-seconds 30]  (how long --wait-text waits, inside --timeout)
@@ -164,7 +164,9 @@ try {
   await sleep(400);
   for (const c of opt.click ?? []) {
     const hit = await evaluate(
-      `(() => { const s = ${JSON.stringify(c)}; const el = s.startsWith('text=')` +
+      `(() => { const s = ${JSON.stringify(c)}; if (s.startsWith('key=')) { const parts = s.slice(4).split('+'); const key = parts.pop();` +
+        ` window.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey: parts.includes('Shift'), ctrlKey: parts.includes('Ctrl'), altKey: parts.includes('Alt'), bubbles: true })); return true; }` +
+        ` const el = s.startsWith('text=')` +
         ` ? [...document.querySelectorAll('button, a')].find((e) => e.textContent.trim().startsWith(s.slice(5)))` +
         ` : document.querySelector(s); if (!el) return false; el.click(); return true; })()`,
     );

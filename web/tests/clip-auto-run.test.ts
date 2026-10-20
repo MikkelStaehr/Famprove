@@ -6,7 +6,7 @@ import { autoMetaWord, editLabel, FAILED_LINE, fokusAutoLine, LOW_LINE, pickupQu
 import { analyseClip, type AutoDeps, type AutoProgress, bytePct, type ClipMeta, stepPct } from "../src/lib/video/auto-run.ts";
 import type { VideoClipRow } from "../src/lib/video/clips.ts";
 import type { ClipIndexEntry } from "../src/lib/video/index-store.ts";
-import type { PoseFrame, PosePoint, PoseResult } from "../src/lib/video/pose-run.ts";
+import { type PoseFrame, PoseError, type PosePoint, type PoseResult } from "../src/lib/video/pose-run.ts";
 
 // Synthetic landmark series only (the repo is public): never real frames.
 
@@ -208,4 +208,32 @@ test("pickup: auto_status null, MP4, a local done file, the last 7 days, no own 
   const local = [entry(a), entry(b), entry(ran), entry(own), entry(old), entry(webm, { ext: "webm" }), entry(afbrudt, { state: "afbrudt" })];
   const queue = pickupQueue(local, [a, b, ran, own, old, webm, noFile, afbrudt], now);
   assert.deepEqual(queue.map((r) => r.id), [b.id, a.id]);
+});
+
+test("analyseClip: a failure keeps its step and message on the phone, and writes only failed", async () => {
+  const pe = new PoseError("video", "seeked kom ikke inden for 5 s");
+  pe.reached = { done: 41, of: 60, seek: { count: 42, meanMs: 900, maxMs: 5000, maxAt: 41 } };
+  const d = deps({
+    runPose: async () => {
+      throw pe;
+    },
+  });
+  const out = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: d.deps });
+  assert.equal(out.kind, "failed");
+  if (out.kind === "failed") assert.deepEqual(out.error, { step: "video", message: "seeked kom ikke inden for 5 s", reached: pe.reached });
+  assert.deepEqual(d.writes, [{ id: ID, status: "failed", inS: null, outS: null, runMs: d.writes[0].runMs }]);
+  const m = deps({
+    warmModel: async () => {
+      throw new Error("offline");
+    },
+  });
+  const outM = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: m.deps });
+  assert.ok(outM.kind === "failed" && outM.error.step === "model" && outM.error.message === "offline" && outM.error.reached === null);
+  const p = deps({
+    runPose: async () => {
+      throw new Error("boom");
+    },
+  });
+  const outP = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: p.deps });
+  assert.ok(outP.kind === "failed" && outP.error.step === "pose");
 });

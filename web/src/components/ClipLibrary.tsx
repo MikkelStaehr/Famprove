@@ -56,7 +56,8 @@ import { formatBytes } from "@/lib/video/space";
 import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/clip-range";
 import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
-import { analyseClip } from "@/lib/video/auto-run";
+import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
+import { ClipDebug } from "@/components/ClipDebug";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
 
 const NO_LIFTS: Readonly<Record<string, ClipLiftMeta>> = {};
@@ -504,6 +505,13 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           cut={cutOf(open)}
           server={serverById.get(open.id) ?? null}
           running={running?.id === open.id ? running : null}
+          lift={lifts[open.id] ?? null}
+          onAuto={(out) => {
+            if (out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") {
+              const auto = out.kind === "clipped" ? { autoStatus: out.kind, autoInS: out.inS, autoOutS: out.outS } : { autoStatus: out.kind, autoInS: null, autoOutS: null };
+              setRows((rs) => rs?.map((x) => (x.id === open.id ? { ...x, ...auto } : x)) ?? rs);
+            }
+          }}
           onRange={(id, r) => setRows((rs) => rs?.map((x) => (x.id === id ? { ...x, clipInS: r.inS, clipOutS: r.outS } : x)) ?? rs)}
           onDownload={download}
           onMissing={() => void forgetMissing([open.id])}
@@ -590,6 +598,8 @@ function Player({
   cut,
   server,
   running,
+  lift,
+  onAuto,
   onRange,
   onDownload,
   onMissing,
@@ -609,6 +619,9 @@ function Player({
   readonly server: VideoClipRow | null;
   /** clip-auto §2: this clip is being analysed on the phone (its frame %); null = not. */
   readonly running: Running | null;
+  /** clip-debug: the lift's family and reps (null when the clip has none); Analysér igen's outcome. */
+  readonly lift: ClipLiftMeta | null;
+  readonly onAuto: (out: AutoOutcome) => void;
   /** The user's range was stored (or removed): the row in memory follows the server's reply. */
   readonly onRange: (id: string, range: StoredRange) => void;
   readonly onDownload: (blob: Blob, name: string) => void;
@@ -637,6 +650,14 @@ function Player({
   const dialog = useRef<HTMLDivElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
   const keepBtn = useRef<HTMLButtonElement>(null);
+  /** clip-debug: the hidden panel (long-press on the title, or Shift+D). */
+  const [debug, setDebug] = useState(false);
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const endPress = () => {
+    if (press.current !== null) clearTimeout(press.current);
+    press.current = null;
+  };
+  useEffect(() => endPress, []);
 
   useEffect(() => {
     let made: string | null = null;
@@ -661,6 +682,7 @@ function Player({
     main?.setAttribute("inert", "");
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (e.key === "D" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) setDebug((d) => !d);
       if (e.key === "Tab" && dialog.current !== null) {
         const f = dialog.current.querySelectorAll<HTMLElement>("button:not(:disabled), video[controls], [role=slider]");
         if (f.length === 0) return;
@@ -789,7 +811,17 @@ function Player({
         <button ref={closeBtn} type="button" aria-label="Luk" className={`flex size-11 items-center justify-center rounded-full ${BTN}`} onClick={onClose}>
           <Icon name="x" size={20} />
         </button>
-        <div className="flex min-w-0 flex-col">
+        <div
+          className="flex min-w-0 select-none flex-col [-webkit-touch-callout:none]"
+          onPointerDown={() => {
+            endPress();
+            press.current = setTimeout(() => setDebug(true), 600);
+          }}
+          onPointerUp={endPress}
+          onPointerLeave={endPress}
+          onPointerCancel={endPress}
+          onContextMenu={(e) => e.preventDefault()}
+        >
           <NameStack row={row} />
           <MonoCaption uppercase={false}>{row.meta}</MonoCaption>
         </div>
@@ -805,6 +837,18 @@ function Player({
             </span>
           )}
         </p>
+      )}
+      {debug && (
+        <ClipDebug
+          clipId={row.id}
+          label={`${shownName(row)}, sæt ${row.set}`}
+          blob={fixture ? null : blob}
+          status={server?.autoStatus ?? null}
+          durationS={server?.durationS ?? null}
+          lift={row.ext === "mp4" ? lift : null}
+          onAuto={onAuto}
+          onClose={() => setDebug(false)}
+        />
       )}
       <div className="flex min-h-0 flex-1 items-center justify-center p-2">
         {fixture || (url === null && files === null) ? (

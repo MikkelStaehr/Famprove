@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { AUTO_CLIP, expectedReps, findLift, liftFamily, parseSetClipAutoInput, validateClipAuto, type Joint } from "../src/lib/video/auto-clip.ts";
+import { AUTO_CLIP, diagnoseLift, expectedReps, findLift, liftFamily, parseSetClipAutoInput, validateClipAuto, type Joint } from "../src/lib/video/auto-clip.ts";
 import type { PoseFrame, PosePoint } from "../src/lib/video/pose-run.ts";
 
 // Synthetic landmark series only (the repo is public): never real frames.
@@ -218,4 +218,39 @@ test("the action's input: exactly five keys, never frames; the validation table"
     assert.equal(v(bad), null, JSON.stringify(bad));
   }
   assert.deepEqual(v({ outS: 99 }, null), { status: "clipped", inS: 1, outS: 99, runMs: 10 }, "the duration is checked when known");
+});
+
+test("diagnoseLift follows findLift: the same status and reason on every synthetic series", () => {
+  const cases: [PoseFrame[], number | null, "lower" | "upper", number][] = [
+    [series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips", "knees"] }), 5, "lower", 20],
+    [series({ durationS: 20, y: reps5(0.6, -0.2), moving: ["hips", "knees"] }), 5, "lower", 20],
+    [series({ durationS: 20, y: reps5(0.35, 0.15), moving: ["wrists", "elbows"], visibility: { hips: 0.1, knees: 0.1 } }), 5, "upper", 20],
+    [series({ durationS: 20, y: reps5(0.6, 0.08), moving: ["hips", "knees"], visibility: { hips: 0.2 } }), 5, "lower", 20],
+    [series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips", "knees"], visibility: { hips: 0.1, knees: 0.1 } }), 5, "lower", 20],
+    [series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips"], dropShare: 0.6, seed: 3 }), 5, "lower", 20],
+    [series({ durationS: 20, y: reps5(0.45, 0.01), moving: ["hips", "knees"], noise: 0.001 }), 5, "lower", 20],
+    [series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips", "knees"] }), 7, "lower", 20],
+    [series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips", "knees"] }), null, "lower", 20],
+    [[], 5, "lower", 20],
+  ];
+  for (const [frames, expected, family, d] of cases) {
+    const diag = diagnoseLift(frames, expected, family, d);
+    assert.deepEqual(diag.result, findLift(frames, expected, family, d));
+    assert.equal(diag.frames, frames.length);
+  }
+  const [squat] = cases[0];
+  const diag = diagnoseLift(squat, 5, "lower", 20);
+  assert.equal(diag.personShare, 1);
+  assert.equal(diag.trace.joint, "hips");
+  assert.equal(diag.trace.validShare, 1);
+  assert.ok(diag.trace.range !== null && diag.trace.range > 0.1);
+  assert.equal(diag.trace.chosenSign, 1);
+  assert.equal(diag.trace.peaksUp, 5);
+  assert.ok(Math.abs((diag.visibility.hips.l ?? 0) - 0.9) < 1e-9 && Math.abs((diag.visibility.shoulders.r ?? 0) - 0.9) < 1e-9);
+  const flat = diagnoseLift(cases[6][0], 5, "lower", 20);
+  assert.deepEqual(flat.result, { status: "low_confidence", reason: "flat" });
+  assert.equal(flat.trace.peaksUp, null, "steps after the failing rule are not reached");
+  const hidden = diagnoseLift(cases[4][0], 5, "lower", 20);
+  assert.ok(hidden.trace.validShare !== null && hidden.trace.validShare < AUTO_CLIP.VALID_MIN_SHARE);
+  assert.equal(diagnoseLift([], 5, "lower", 20).personShare, null);
 });

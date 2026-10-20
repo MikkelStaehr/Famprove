@@ -25,16 +25,33 @@ export type PosePoint = readonly [x: number, y: number, visibility: number];
 export type PoseFrame = { readonly t: number; readonly landmarks: readonly PosePoint[] | null };
 /** loadMs: WASM + model; totalMs: the frame pass (seeks + detection); msPerFrame: mean detection time. */
 export type PoseTiming = { readonly loadMs: number; readonly frames: number; readonly msPerFrame: number; readonly totalMs: number };
+/** Per-seek wall time (slice clip-debug): count, mean and max (ms), and the frame index of the max (null with no seek). */
+export type SeekTiming = { readonly count: number; readonly meanMs: number; readonly maxMs: number; readonly maxAt: number | null };
 export type PoseResult = { readonly frames: readonly PoseFrame[]; readonly timing: PoseTiming };
+/** runPose's result: PoseResult plus clip-debug's seek timing (a sibling type, so PoseResult keeps its meaning). */
+export type PoseRun = PoseResult & { readonly seek: SeekTiming };
+
+/** How far a failed run got: frames done of the planned, and its seeks so far (null before the frame pass). */
+export type PoseReached = { readonly done: number; readonly of: number; readonly seek: SeekTiming };
 
 export type PoseFailure = "aborted" | "timeout" | "load" | "video" | "detect";
 export class PoseError extends Error {
   readonly reason: PoseFailure;
+  /** Set by runPose when it fails inside the frame pass (clip-debug), else null. */
+  reached: PoseReached | null = null;
   constructor(reason: PoseFailure, message: string) {
     super(message);
     this.name = "PoseError";
     this.reason = reason;
   }
+}
+
+/** The seek timing of a list of per-seek durations (ms), in frame order. Pure. */
+export function seekTiming(ms: readonly number[]): SeekTiming {
+  if (ms.length === 0) return { count: 0, meanMs: 0, maxMs: 0, maxAt: null };
+  let maxAt = 0;
+  for (let i = 1; i < ms.length; i++) if (ms[i] > ms[maxAt]) maxAt = i;
+  return { count: ms.length, meanMs: ms.reduce((a, b) => a + b, 0) / ms.length, maxMs: ms[maxAt], maxAt };
 }
 
 /** MediaPipe's vision tasks upload every frame through WebGL2, even with the CPU delegate. */
@@ -132,7 +149,7 @@ export function frameTimes(duration: number, fps: number): number[] {
 export async function runPose(
   blob: Blob,
   opts: { readonly fps?: number; readonly signal?: AbortSignal; readonly onProgress?: (done: number, of: number) => void } = {},
-): Promise<PoseResult> {
+): Promise<PoseRun> {
   const fps = opts.fps ?? 5;
   if (!Number.isFinite(fps) || fps <= 0) throw new PoseError("video", `ugyldig fps: ${fps}`);
   const started = performance.now();
@@ -145,6 +162,7 @@ export async function runPose(
   const signal = ctrl.signal;
 
   let landmarker: PoseLandmarker | null = null;
+  let reached: (() => PoseReached) | null = null;
   const url = URL.createObjectURL(blob);
   const video = document.createElement("video");
   try {
@@ -175,12 +193,19 @@ export async function runPose(
 
     const times = frameTimes(duration, fps);
     const frames: PoseFrame[] = [];
+    const seekMs: number[] = [];
     let detectMs = 0;
     const pass = performance.now();
+    reached = () => ({ done: frames.length, of: times.length, seek: seekTiming(seekMs) });
     for (const t of times) {
       const seeked = mediaEvent(video, "seeked", 5000);
+      const seekStart = performance.now();
       video.currentTime = t;
-      await untilAbort(seeked, signal);
+      try {
+        await untilAbort(seeked, signal);
+      } finally {
+        seekMs.push(performance.now() - seekStart); // a timed-out seek counts with its wait
+      }
       const before = performance.now();
       let found: PoseFrame["landmarks"];
       try {
@@ -196,7 +221,14 @@ export async function runPose(
       await untilAbort(new Promise((r) => setTimeout(r, 0)), signal);
     }
     const totalMs = performance.now() - pass;
-    return { frames, timing: { loadMs, frames: frames.length, msPerFrame: frames.length === 0 ? 0 : detectMs / frames.length, totalMs } };
+    return {
+      frames,
+      timing: { loadMs, frames: frames.length, msPerFrame: frames.length === 0 ? 0 : detectMs / frames.length, totalMs },
+      seek: seekTiming(seekMs),
+    };
+  } catch (error) {
+    if (error instanceof PoseError && reached !== null) error.reached = reached();
+    throw error;
   } finally {
     clearTimeout(cap);
     outer?.removeEventListener("abort", onOuter);

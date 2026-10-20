@@ -253,28 +253,46 @@ function repBounds(z: Series, t: readonly number[], peaks: readonly Peak[], k: n
 const low = (reason: LowConfidenceReason): AutoClipResult => ({ status: "low_confidence", reason });
 const roundTenth = (s: number): number => Math.round(s * 10) / 10;
 
-/**
- * The lift in a clip: in/out (s, 0.1) around the reps, or low_confidence with the first reason
- * that applies: no_reps (no expected count), few_frames (the joint seen in < VALID_MIN_SHARE of
- * the frames), flat (it moves < RANGE_MIN of the image height), count (|found − expected| >
- * COUNT_TOLERANCE), rep_length (a rep outside REP_MIN_S–REP_MAX_S), short (in/out < MIN_LEN_S apart).
- */
-export function findLift(frames: readonly PoseFrame[], expected: number | null, family: LiftFamily, durationS: number): AutoClipResult {
-  if (expected === null || !Number.isInteger(expected) || expected < 1) return low("no_reps");
-  if (frames.length === 0 || !Number.isFinite(durationS) || durationS <= 0) return low("few_frames");
+/** What findLift saw on the way (clip-debug): every value is null until its step was reached. */
+export type LiftTrace = {
+  joint: Joint | null;
+  /** Frames with the chosen joint seen ÷ frames. */
+  validShare: number | null;
+  /** The signal's p5–p95 range as a share of the image height. */
+  range: number | null;
+  /** Peaks found per polarity (+1: y rises, −1: y falls), and the polarity chosen. */
+  peaksUp: number | null;
+  peaksDown: number | null;
+  chosenSign: 1 | -1 | null;
+};
+
+/** findLift with its trace; findLift is this function's result, so the debug panel follows the same steps. */
+export function traceLift(
+  frames: readonly PoseFrame[],
+  expected: number | null,
+  family: LiftFamily,
+  durationS: number,
+): { readonly result: AutoClipResult; readonly trace: LiftTrace } {
+  const trace: LiftTrace = { joint: null, validShare: null, range: null, peaksUp: null, peaksDown: null, chosenSign: null };
+  const done = (result: AutoClipResult) => ({ result, trace });
+  if (expected === null || !Number.isInteger(expected) || expected < 1) return done(low("no_reps"));
+  if (frames.length === 0 || !Number.isFinite(durationS) || durationS <= 0) return done(low("few_frames"));
   const [first, second] = JOINTS_OF[family];
   const firstSeries = jointSeries(frames, first);
   const secondSeries = jointSeries(frames, second);
   const useSecond = seenCount(secondSeries) > seenCount(firstSeries); // never switched mid-series
   const joint = useSecond ? second : first;
   const raw = useSecond ? secondSeries : firstSeries;
-  if (seenCount(raw) / frames.length < AUTO_CLIP.VALID_MIN_SHARE) return low("few_frames");
+  trace.joint = joint;
+  trace.validShare = seenCount(raw) / frames.length;
+  if (trace.validShare < AUTO_CLIP.VALID_MIN_SHARE) return done(low("few_frames"));
 
   const t = frames.map((f) => f.t);
   const y = smooth3(smooth3(fillGaps(raw, t), median3), mean3);
   const sorted = y.filter((v): v is number => v !== null).toSorted((a, b) => a - b);
   const range = percentile(sorted, AUTO_CLIP.RANGE_HIGH_P) - percentile(sorted, AUTO_CLIP.RANGE_LOW_P);
-  if (!(range >= AUTO_CLIP.RANGE_MIN)) return low("flat");
+  trace.range = range;
+  if (!(range >= AUTO_CLIP.RANGE_MIN)) return done(low("flat"));
 
   const median = percentile(sorted, 0.5);
   const polarities = ([1, -1] as const).map((sign) => {
@@ -283,22 +301,68 @@ export function findLift(frames: readonly PoseFrame[], expected: number | null, 
     // The tie-break: reps are excursions away from rest, which holds the median, so the polarity
     // whose peaks lie further from the median wins.
     const away = peaks.length === 0 ? 0 : peaks.reduce((s, p) => s + z[p.i]!, 0) / peaks.length - sign * median;
-    return { z, peaks, away };
+    return { sign, z, peaks, away };
   });
+  trace.peaksUp = polarities[0].peaks.length;
+  trace.peaksDown = polarities[1].peaks.length;
   const atRest = (p: { readonly away: number }): number => (p.away >= AUTO_CLIP.AWAY_MIN_SHARE * range ? 0 : 1);
   const [chosen] = polarities.toSorted(
     (a, b) => atRest(a) - atRest(b) || Math.abs(a.peaks.length - expected) - Math.abs(b.peaks.length - expected) || b.away - a.away,
   );
   const { z, peaks } = chosen;
-  if (peaks.length === 0 || Math.abs(peaks.length - expected) > AUTO_CLIP.COUNT_TOLERANCE) return low("count");
+  trace.chosenSign = chosen.sign;
+  if (peaks.length === 0 || Math.abs(peaks.length - expected) > AUTO_CLIP.COUNT_TOLERANCE) return done(low("count"));
 
   const reps = peaks.map((_, k) => repBounds(z, t, peaks, k, range));
-  if (reps.some((r) => r.end - r.start < AUTO_CLIP.REP_MIN_S || r.end - r.start > AUTO_CLIP.REP_MAX_S)) return low("rep_length");
+  if (reps.some((r) => r.end - r.start < AUTO_CLIP.REP_MIN_S || r.end - r.start > AUTO_CLIP.REP_MAX_S)) return done(low("rep_length"));
 
   const inS = roundTenth(Math.max(0, reps[0].start - AUTO_CLIP.PAD_S));
   const outS = roundTenth(Math.min(durationS, reps[reps.length - 1].end + AUTO_CLIP.PAD_S));
-  if (outS - inS < AUTO_CLIP.MIN_LEN_S - 1e-9) return low("short");
-  return { status: "clipped", inS, outS, reps: peaks.length, joint };
+  if (outS - inS < AUTO_CLIP.MIN_LEN_S - 1e-9) return done(low("short"));
+  return done({ status: "clipped", inS, outS, reps: peaks.length, joint });
+}
+
+/**
+ * The lift in a clip: in/out (s, 0.1) around the reps, or low_confidence with the first reason
+ * that applies: no_reps (no expected count), few_frames (the joint seen in < VALID_MIN_SHARE of
+ * the frames), flat (it moves < RANGE_MIN of the image height), count (|found − expected| >
+ * COUNT_TOLERANCE), rep_length (a rep outside REP_MIN_S–REP_MAX_S), short (in/out < MIN_LEN_S apart).
+ */
+export function findLift(frames: readonly PoseFrame[], expected: number | null, family: LiftFamily, durationS: number): AutoClipResult {
+  return traceLift(frames, expected, family, durationS).result;
+}
+
+/** Mean visibility (0–1) of a landmark over the frames with a person; null with none. */
+function meanVisibility(frames: readonly PoseFrame[], index: number): number | null {
+  const v = frames.flatMap((f) => (f.landmarks?.[index] === undefined ? [] : [f.landmarks[index][2]])).filter(Number.isFinite);
+  return v.length === 0 ? null : v.reduce((a, b) => a + b, 0) / v.length;
+}
+
+export type SideVisibility = { readonly l: number | null; readonly r: number | null };
+
+/** The debug panel's aggregates of one clip (clip-debug): no landmark leaves this, only these numbers. */
+export type LiftDiagnosis = {
+  readonly frames: number;
+  readonly personShare: number | null;
+  readonly visibility: { readonly hips: SideVisibility; readonly knees: SideVisibility; readonly shoulders: SideVisibility };
+  readonly expected: number | null;
+  readonly trace: LiftTrace;
+  readonly result: AutoClipResult;
+};
+
+/** findLift's steps with their values, plus who was seen how well. Pure. */
+export function diagnoseLift(frames: readonly PoseFrame[], expected: number | null, family: LiftFamily, durationS: number): LiftDiagnosis {
+  const { result, trace } = traceLift(frames, expected, family, durationS);
+  const withPerson = frames.filter((f) => f.landmarks !== null);
+  const side = (l: number, r: number): SideVisibility => ({ l: meanVisibility(withPerson, l), r: meanVisibility(withPerson, r) });
+  return {
+    frames: frames.length,
+    personShare: frames.length === 0 ? null : withPerson.length / frames.length,
+    visibility: { hips: side(23, 24), knees: side(25, 26), shoulders: side(11, 12) },
+    expected,
+    trace,
+    result,
+  };
 }
 
 // --- the action's input (setClipAuto) ------------------------------------------------------------
