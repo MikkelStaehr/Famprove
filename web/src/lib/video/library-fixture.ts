@@ -42,7 +42,7 @@ export function clipsFixture(today: IsoDate): { readonly rows: VideoClipRow[]; r
     const date = addDays(today, s.day);
     return {
       id: id(i + 1), date, session: 1, row: s.row, set: s.set, exerciseId: s.ex, variantId: s.variant,
-      recordedAt: `${date}T${s.hour}:00+02:00`, durationS: s.dur, starred: s.starred, clipInS: null, clipOutS: null,
+      recordedAt: `${date}T${s.hour}:00+02:00`, durationS: s.dur, starred: s.starred, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null,
     };
   });
   const local: ClipIndexEntry[] = rows.map((r) => ({
@@ -57,7 +57,7 @@ export function clipsFixture(today: IsoDate): { readonly rows: VideoClipRow[]; r
   const missingDate = addDays(today, -12);
   rows.push({
     id: id(9), date: missingDate, session: 2, row: 12, set: 2, exerciseId: 1, variantId: null,
-    recordedAt: `${missingDate}T17:30:00+02:00`, durationS: 50, starred: false, clipInS: null, clipOutS: null,
+    recordedAt: `${missingDate}T17:30:00+02:00`, durationS: 50, starred: false, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null,
   });
   return { rows, local };
 }

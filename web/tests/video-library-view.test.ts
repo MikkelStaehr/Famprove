@@ -46,7 +46,7 @@ test("19 Oct shape (rows 25: 1 set, 26: 1, 27: 2): the card's numbers equal Foku
   // Fokus's numbers: runPositions over the session's rows, as fokusView reads them.
   const fokus = runPositions([25, 26, 27, 28].map((row) => ({ name: named(row), variantId: null, sets: sets.filter(([r]) => r === row).map(([r, s]) => ({ row: r, set: s })) })));
   const clip = (i: number, row: number, set: number, date = today): VideoClipRow => ({
-    id: `c${i}`, date, session: 1, row, set, exerciseId: 1, variantId: null, recordedAt: `${date}T17:${40 + i}:00Z`, durationS: 40, starred: false, clipInS: null, clipOutS: null,
+    id: `c${i}`, date, session: 1, row, set, exerciseId: 1, variantId: null, recordedAt: `${date}T17:${40 + i}:00Z`, durationS: 40, starred: false, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null,
   });
   const server = [clip(1, 25, 1), clip(2, 26, 1), clip(3, 27, 1), clip(4, 27, 2), clip(5, 28, 1), clip(6, 27, 2, "2026-08-25")];
   const rows = libraryRows(null, server, FIXTURE_NAMES, runSets);
@@ -89,7 +89,7 @@ test("cleanup never deletes a locally starred clip 8 weeks old; deletes the unst
     id, setKey: { date: "2026-08-01", sessionNo: 1, row: 10, set: 1 }, ext: "mp4", recordedAt: old, durationS: 40, starred, starSynced: true, state: "done",
   });
   const row = (id: string): VideoClipRow => ({
-    id, date: "2026-08-01", session: 1, row: 10, set: 1, exerciseId: 1, variantId: null, recordedAt: old, durationS: 40, starred: false, clipInS: null, clipOutS: null,
+    id, date: "2026-08-01", session: 1, row: 10, set: 1, exerciseId: 1, variantId: null, recordedAt: old, durationS: 40, starred: false, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null,
   });
   const plan = cleanupPlan([entry("a", true), entry("b", false)], [row("a"), row("b")], new Date(`${today}T08:00:00Z`));
   assert.deepEqual(plan.deleteLocal.map((e) => e.id), ["b"]);

@@ -67,6 +67,8 @@ python/tests/golden/
 # --- Video of lifts (slice video-security): clips live only on the phone, never in git ---
 *.webm
 *.mp4
+# The cut's test fixture: Chrome's fake-camera test pattern (slice clip-cut), no personal data.
+!web/tests/fixtures/video/*.mp4
 *.mov
 *.mkv
 **/frames/

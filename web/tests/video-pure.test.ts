@@ -53,7 +53,7 @@ function entry(n: number, recordedAt: string, extra: Partial<ClipIndexEntry> = {
 }
 
 function row(n: number, recordedAt: string, starred = false): VideoClipRow {
-  return { id: ID(n), date: recordedAt.slice(0, 10), session: 1, row: 20, set: 1, exerciseId: 1, variantId: null, recordedAt, durationS: 12.3, starred, clipInS: null, clipOutS: null };
+  return { id: ID(n), date: recordedAt.slice(0, 10), session: 1, row: 20, set: 1, exerciseId: 1, variantId: null, recordedAt, durationS: 12.3, starred, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null };
 }
 
 test("cleanup: older than 56 days goes unless starred on the phone or the server; missing files are reported", () => {

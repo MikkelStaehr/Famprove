@@ -73,7 +73,16 @@ export type VideoClipRow = {
   readonly starred: boolean;
   readonly clipInS: number | null; // null until a later slice sets in/out points
   readonly clipOutS: number | null;
+  // The automatic cut found on the phone (slice clip-auto; live 2026-10-20). Null = not run yet
+  // (missing, never 0); in/out are set only when autoStatus is "clipped".
+  readonly autoInS: number | null;
+  readonly autoOutS: number | null;
+  readonly autoStatus: AutoStatus | null;
 };
+
+/** video_clips.auto_status's check constraint, in its order. */
+export const AUTO_STATUSES = ["clipped", "low_confidence", "failed"] as const;
+export type AutoStatus = (typeof AUTO_STATUSES)[number];
 
 function whole(value: unknown, min: number, max: number): number | null {
   return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : null;

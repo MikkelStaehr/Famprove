@@ -77,7 +77,7 @@ function fetchFor(db: FakeDb): FetchLike {
         assert.match(prefer, /resolution=ignore-duplicates/);
         const body = JSON.parse(String(init.body)) as Row; // the test's own request body
         assert.equal(body.recorded_at, undefined, "recorded_at is the column default");
-        if (!rows.some((r) => r.id === body.id)) rows.push({ starred: false, clip_in_s: null, clip_out_s: null, recorded_at: NOW.toISOString(), ...body });
+        if (!rows.some((r) => r.id === body.id)) rows.push({ starred: false, clip_in_s: null, clip_out_s: null, auto_in_s: null, auto_out_s: null, auto_status: null, recorded_at: NOW.toISOString(), ...body });
         response = new Response(null, { status: 201 });
       } else if (method === "PATCH") {
         const body = JSON.parse(String(init.body)) as Row; // the test's own request body
@@ -140,7 +140,7 @@ test("save: one row with the sheet's exercise and variant, the duration as numer
     { id: row.id, date: row.date, session_no: row.session_no, row_no: row.row_no, set_no: row.set_no, exercise_id: row.exercise_id, variant_id: row.variant_id, duration_s: row.duration_s },
     { id: ID, date: "2026-10-17", session_no: 2, row_no: 30, set_no: 2, exercise_id: 11, variant_id: 4, duration_s: 14.3 },
   );
-  assert.deepEqual(Object.keys(row).toSorted(), ["clip_in_s", "clip_out_s", "date", "duration_s", "exercise_id", "id", "recorded_at", "row_no", "session_no", "set_no", "starred", "variant_id"], "metadata only");
+  assert.deepEqual(Object.keys(row).toSorted(), ["auto_in_s", "auto_out_s", "auto_status", "clip_in_s", "clip_out_s", "date", "duration_s", "exercise_id", "id", "recorded_at", "row_no", "session_no", "set_no", "starred", "variant_id"], "metadata only");
 });
 
 test("save: refusals write nothing", async () => {
@@ -244,10 +244,10 @@ test("dev switches write nothing", async () => {
 
 test("read: the last 8 weeks plus every starred row, parsed", async () => {
   const db = fakeDb();
-  db.tables.video_clips.push({ id: ID, date: "2026-10-17", session_no: 2, row_no: 30, set_no: 1, exercise_id: 11, variant_id: null, recorded_at: "2026-10-17T07:00:00+00:00", duration_s: 12.5, starred: true, clip_in_s: null, clip_out_s: null });
+  db.tables.video_clips.push({ id: ID, date: "2026-10-17", session_no: 2, row_no: 30, set_no: 1, exercise_id: 11, variant_id: null, recorded_at: "2026-10-17T07:00:00+00:00", duration_s: 12.5, starred: true, clip_in_s: null, clip_out_s: null, auto_in_s: 1.5, auto_out_s: 9.0, auto_status: "clipped" });
   const rows = await readVideoClips(NOW, opts(db));
   assert.equal(db.lastGet?.get("or"), "(date.gte.2026-08-22,starred.is.true)");
-  assert.deepEqual(rows, [{ id: ID, date: "2026-10-17", session: 2, row: 30, set: 1, exerciseId: 11, variantId: null, recordedAt: "2026-10-17T07:00:00+00:00", durationS: 12.5, starred: true, clipInS: null, clipOutS: null }]);
+  assert.deepEqual(rows, [{ id: ID, date: "2026-10-17", session: 2, row: 30, set: 1, exerciseId: 11, variantId: null, recordedAt: "2026-10-17T07:00:00+00:00", durationS: 12.5, starred: true, clipInS: null, clipOutS: null, autoInS: 1.5, autoOutS: 9, autoStatus: "clipped" }]);
   db.tables.video_clips[0].set_no = 0;
   await assert.rejects(readVideoClips(NOW, opts(db)), /set_no/);
   assert.deepEqual(await readVideoClips(NOW, opts(fakeDb(), { DEV_FIXTURE: "empty" }, "development")), []);

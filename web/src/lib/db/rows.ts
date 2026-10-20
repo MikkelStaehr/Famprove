@@ -4,7 +4,7 @@ import type { DataError } from "../data-error.ts";
 import { LIFTS, type StrengthLift } from "../lifts.ts";
 import type { SetPartRow, VariantPartRow } from "../set-parts.ts";
 import type { JumpMark } from "../set-taps.ts";
-import type { VideoClipRow } from "../video/clips.ts";
+import { AUTO_STATUSES, type VideoClipRow } from "../video/clips.ts";
 
 /**
  * Row types + runtime validation for the three read-only sources. PostgREST JSON is
@@ -1563,7 +1563,7 @@ export function parseSetPartRow(raw: unknown): SetPartRow {
 
 export const VIDEO_CLIPS_SELECT = {
   table: "video_clips",
-  columns: "id,date,session_no,row_no,set_no,exercise_id,variant_id,recorded_at,duration_s,starred,clip_in_s,clip_out_s",
+  columns: "id,date,session_no,row_no,set_no,exercise_id,variant_id,recorded_at,duration_s,starred,clip_in_s,clip_out_s,auto_in_s,auto_out_s,auto_status",
   order: "recorded_at.desc,id", // newest first, then the primary key
 } as const;
 
@@ -1586,5 +1586,8 @@ export function parseVideoClipRow(raw: unknown): VideoClipRow {
     starred: f.boolean("starred"),
     clipInS: f.numberOrNull("clip_in_s"),
     clipOutS: f.numberOrNull("clip_out_s"),
+    autoInS: f.numberOrNull("auto_in_s"),
+    autoOutS: f.numberOrNull("auto_out_s"),
+    autoStatus: oneOf(VIDEO_CLIPS_SELECT.table, "auto_status", f.stringOrNull("auto_status"), AUTO_STATUSES),
   };
 }

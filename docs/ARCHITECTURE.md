@@ -66,6 +66,9 @@ Next.js (web/), server components only; the three tabs in one (tabs) shell of pa
 | `web/tests/` | `node --test` on the pure modules |
 | `DESIGN.md`, `design/` | Visual contract (design-lead), screen specs, pattern packs |
 | `.claude/skills/run-web/` | The only way to run and screenshot the web app (port 3100) |
+| `web/src/lib/video/cut.ts` | The clip cut (slice clip-cut): `cutMp4` (keyframe at or before in → last sample before out, a plain MP4 of the header plus slices of the original Blob), `keyframeTimes`, `cutRange` (user points, then auto when clipped, never WebM); mp4box only by dynamic `import()`; check in Chrome with `web/scripts/verify-cut.mjs` |
+
+Web dependencies beyond Next/React/Tailwind: `recharts` (charts), `lucide-react` (icons), `mp4box` 2.4.1 exact (the user's choice for cutting a clip without re-encoding; reads Chrome's fragmented MP4).
 
 ## Tables
 `activities` (rides; `data_warning` = the power-data check, domain/power_check.py) · `strength_activities` (WeightTraining from intervals.icu) ·
