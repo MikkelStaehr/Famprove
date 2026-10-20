@@ -31,6 +31,11 @@ type Props = {
   readonly closeRef: RefObject<(() => void) | null>;
   /** The ⇄ seam between two adjacent rows (fokus-superset.md §2.1), by their first rows; null = none. */
   readonly seamAfter?: (rowA: number, rowB: number) => ReactNode;
+  /**
+   * superset-any.md R1, §3: ⇄'s partner list as the sheet's second step, in the same dialog (its
+   * title gets id "fokus-sheet-title"); null = step 1, the session's runs.
+   */
+  readonly step2?: ReactNode;
 };
 
 export type SheetPlace = { readonly top: number; readonly strip: { readonly top: number; readonly bottom: number } | null };
@@ -53,7 +58,7 @@ export function SessionSheet(props: Props) {
  * above the scrim (the screen lifts it). Closes by Luk, scrim, Escape, the back gesture and a swipe
  * down; slides with EASE_EMBER, not at all under reduced motion.
  */
-function SheetBody({ runs, done, total, animateIn, measure, onClosed, closeRef, seamAfter }: Props) {
+function SheetBody({ runs, done, total, animateIn, measure, onClosed, closeRef, seamAfter, step2 = null }: Props) {
   const sheet = useRef<HTMLDivElement>(null);
   const scrim = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -212,6 +217,10 @@ function SheetBody({ runs, done, total, animateIn, measure, onClosed, closeRef, 
         className="fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-[30rem] flex-col rounded-t-hero border-t border-border bg-card px-4 pt-2 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
       >
         <div aria-hidden="true" className="mx-auto h-1 w-9 shrink-0 touch-none rounded-[2px] bg-shade-1" />
+        {step2 !== null ? (
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{step2}</div>
+        ) : (
+          <>
         <div className="flex shrink-0 touch-none items-center gap-3 pt-2">
           <h2 id="fokus-sheet-title" ref={title} tabIndex={-1} className="min-w-0 flex-1 font-sans text-18 font-semibold">
             Hele sessionen
@@ -230,6 +239,8 @@ function SheetBody({ runs, done, total, animateIn, measure, onClosed, closeRef, 
         <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <SheetRows runs={runs} onJump={(row) => close(row)} seamAfter={seamAfter} />
         </div>
+          </>
+        )}
       </div>
     </>
   );

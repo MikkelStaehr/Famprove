@@ -395,3 +395,21 @@ main:has(> [data-screen="fokus"]) {
   color: var(--text);
   white-space: nowrap;
 }
+
+/* superset-any.md §3, §14: the partner list as a bottom sheet; at once under reduced motion. */
+.partner-sheet::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+.partner-sheet[open] {
+  animation: partner-sheet-up 240ms var(--ease, ease-out);
+}
+@keyframes partner-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .partner-sheet[open] {
+    animation: none;
+  }
+}

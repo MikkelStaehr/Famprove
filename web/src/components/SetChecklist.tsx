@@ -6,7 +6,7 @@ import { RollingNumber } from "@/components/motion/RollingNumber";
 
 import { type FreshTicks, tickAnimates } from "@/lib/fresh-ticks";
 import { setKey, type SetState } from "@/lib/set-taps";
-import { type SeamSave, seamPaired, type SeamView, slotKey } from "@/lib/superset-view";
+import { type SeamSave, seamPaired, type SeamView, slotKey, withMovedUp } from "@/lib/superset-view";
 import {
   adjustmentBrackets,
   compactPrescription,
@@ -62,8 +62,9 @@ export function SetCount() {
 export function SetChecklist() {
   const { session, view, seams } = useSession();
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map());
-  const runs = exerciseRuns(view.groups);
   const rowOf = (run: ExerciseRunView) => run.groups[0].exercise.row;
+  // superset-any.md R2: a moved-up B sits right under its A; every other row keeps the sheet's order.
+  const runs = withMovedUp(exerciseRuns(view.groups), rowOf, seams.pairs, seams.movedUp);
   const seamAfter = new Map(seams.views.map((v) => [v.rowA, v]));
 
   const item = (run: ExerciseRunView, grouped: boolean) => {
@@ -112,7 +113,10 @@ export function SetChecklist() {
       continue;
     }
     // R1: an unpaired seam sits on the boundary above B, in place of the row divider.
-    const seamAbove = before !== undefined && before !== null && before.rowB === rowOf(run) && hasSeam(before, seams.saves) ? before : null;
+    const seamAbove =
+      before !== undefined && before !== null && before.rowB === rowOf(run) && (hasSeam(before, seams.saves) || seams.partnersFor(before.rowA) !== null || seams.problem?.rowA === before.rowA)
+        ? before
+        : null;
     items.push(
       <li key={run.key} className={`relative${i === 0 || seamAbove !== null ? "" : " border-t border-border"}`}>
         {seamAbove !== null && <Seam v={seamAbove} />}
@@ -141,7 +145,22 @@ function hasSeam(v: SeamView, saves: ReadonlyMap<string, SeamSave>): boolean {
 /** The seam between two runs (supersets.md S1–S3, S7–S9); its look is shared with Fokus's sheet. */
 function Seam({ v }: { readonly v: SeamView }) {
   const { seams } = useSession();
-  return <SupersetSeam v={v} save={seams.saves.get(slotKey(v))} onToggle={(paired) => seams.toggle(v, paired)} />;
+  const { devSwitches, session } = useSession();
+  const first = seams.views.find((x) => seams.partnersFor(x.rowA) !== null);
+  return (
+    <SupersetSeam
+      v={v}
+      save={seams.saves.get(slotKey(v))}
+      onToggle={(paired) => seams.toggle(v, paired)}
+      partners={seamPaired(v.state) ? null : seams.partnersFor(v.rowA)}
+      onPick={(row) => seams.pick(v, row)}
+      picked={seams.picked.has(slotKey(v))}
+      problem={seams.problem?.rowA === v.rowA ? seams.problem : null}
+      onRetry={seams.retry}
+      devSwitches={devSwitches}
+      initialOpen={first?.rowA === v.rowA ? (session.devPartners ?? null) : null}
+    />
+  );
 }
 
 function ExerciseRun({
@@ -156,7 +175,8 @@ function ExerciseRun({
   readonly onToggle: () => void;
 }) {
   const regionId = useId();
-  const { fresh } = useSession().setLog;
+  const { setLog, seams } = useSession();
+  const { fresh } = setLog;
   const e = run.focus;
   const today = todayKgView(e);
   const brackets = today?.basis === "e1rm" ? adjustmentBrackets(e, "long") : null;
@@ -204,6 +224,13 @@ function ExerciseRun({
           />
         </span>
       </button>
+      {/* superset-any.md §9–10: B moved up under its A, for today only. */}
+      {seams.movedUp.has(run.groups[0].exercise.row) && (
+        <p className="-mt-2 flex items-center gap-1.5 pb-2 font-sans text-13 text-text-muted">
+          <Icon name="arrow-up" size={16} />
+          Rykket op · kun i dag
+        </p>
+      )}
       {/* Expanded: the prescription, today's kg (fokus-kg.md §3), SIDSTE UGE, then the set rows.
           The visual copy is aria-hidden: each set row's sr sentence says the same values.
           Unfold (Part B "Motion"): grid rows 0fr <-> 1fr over 380 ms on the ember ease; a mount never

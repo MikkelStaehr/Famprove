@@ -6,7 +6,7 @@ import { setSupersetPair } from "@/app/actions";
 import { REDUCED_MOTION } from "@/lib/motion";
 import type { PairRef } from "@/lib/set-taps";
 import { clientPairs, orderPairs, SEAM_IDLE, type SeamSave, seamReducer, type SeamView, slotKey } from "@/lib/superset-view";
-import type { PairSlot, PairSource } from "@/lib/supersets";
+import type { PairSlot, PairSource, SupersetResult } from "@/lib/supersets";
 
 /**
  * The ⇄ switch's optimistic state (supersets.md S6–S9), shared by Træning and Fokus: each tap
@@ -23,7 +23,9 @@ export type SupersetSaves = {
   readonly drawn: ReadonlySet<string>;
   readonly status: string; // S9, one polite status
   /** `sentence`: the S9 status to announce. */
-  readonly toggle: (v: SeamView, paired: boolean, sentence: string) => void;
+  readonly toggle: (v: SeamView, paired: boolean, sentence: string, onResult?: (result: SupersetResult | null) => void) => void;
+  /** A pick's state, saved through the set log's queue (usePartnerPick): a tap, its result, or cleared (back to the stored state). */
+  readonly mark: (v: SeamView, event: { readonly kind: "tap" } | { readonly kind: "result"; readonly result: SupersetResult | null } | { readonly kind: "clear" }, sentence?: string) => void;
 };
 
 export function useSupersetSaves(slots: readonly PairSlot[], date: string, sessionNo: number): SupersetSaves {
@@ -36,7 +38,7 @@ export function useSupersetSaves(slots: readonly PairSlot[], date: string, sessi
   const seq = useRef(new Map<string, number>());
 
   const toggle = useCallback(
-    (v: SeamView, paired: boolean, sentence: string) => {
+    (v: SeamView, paired: boolean, sentence: string, onResult?: (result: SupersetResult | null) => void) => {
       const key = slotKey(v);
       const n = (seq.current.get(key) ?? 0) + 1;
       seq.current.set(key, n);
@@ -53,11 +55,37 @@ export function useSupersetSaves(slots: readonly PairSlot[], date: string, sessi
         .catch(() => null)
         .then((result) => {
           if (seq.current.get(key) !== n) return;
+          onResult?.(result);
           setSaves((m) => new Map(m).set(key, seamReducer(m.get(key) ?? { override: paired, status: "saving" }, { kind: "result", result })));
         });
     },
     [date, sessionNo],
   );
 
-  return { saves, pairs, ordered, drawn, status, toggle };
+  const mark = useCallback<SupersetSaves["mark"]>((v, event, sentence) => {
+    const key = slotKey(v);
+    seq.current.set(key, (seq.current.get(key) ?? 0) + 1);
+    if (sentence !== undefined) setStatus(sentence);
+    if (event.kind === "clear") {
+      setSaves((m) => {
+        const next = new Map(m);
+        next.delete(key);
+        return next;
+      });
+      setDrawn((d) => {
+        const next = new Set(d);
+        next.delete(key);
+        return next;
+      });
+      return;
+    }
+    if (event.kind === "tap") {
+      setSaves((m) => new Map(m).set(key, seamReducer(m.get(key) ?? SEAM_IDLE, { kind: "tap", paired: true })));
+      if (!window.matchMedia(REDUCED_MOTION).matches) setDrawn((d) => new Set(d).add(key));
+      return;
+    }
+    setSaves((m) => new Map(m).set(key, seamReducer(m.get(key) ?? { override: true, status: "saving" }, event)));
+  }, []);
+
+  return { saves, pairs, ordered, drawn, status, toggle, mark };
 }

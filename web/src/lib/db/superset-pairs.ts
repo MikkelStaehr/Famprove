@@ -99,12 +99,13 @@ export async function recordSupersetPair(input: SupersetInput, now: Date, option
     const pairs = orderedEffectivePairs(runs, today, pairRows.history, runRows);
     const result = { ok: true as const, pairs, ...(runRows === null ? {} : { runRows }) };
     if (dev) return result; // nothing is written under a dev switch
-    // 1. The order (multi-request writes: the pair, the tap's mark, is written last). Only run_rows
-    //    and updated_at: a jump's undo mark (previous_rows, jumped_at, moved_start) stays as it is.
+    // 1. The order (multi-request writes: the pair, the tap's mark, is written last). The pick is
+    //    newer than a pending jump, so the jump's undo mark (previous_rows, jumped_at, moved_start)
+    //    is cleared in the same upsert: a Fortryd afterwards undoes the done before the jump, not the pick.
     if (moved !== null) {
       await write(c, SESSION_ORDER_SELECT.table, "POST", {
         params: [["on_conflict", "date,session_no"]],
-        body: { date: input.date, session_no: input.sessionNo, run_rows: moved, updated_at: at },
+        body: { date: input.date, session_no: input.sessionNo, run_rows: moved, previous_rows: null, jumped_at: null, moved_start: null, updated_at: at },
         prefer: "resolution=merge-duplicates",
       });
     }

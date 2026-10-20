@@ -24,15 +24,16 @@ import {
   hasMainLiftWarmup,
   rampState,
 } from "@/lib/fokus-view";
-import { adjustmentLine, CAPPED_WORD } from "@/lib/training-view";
+import { adjustmentLine, CAPPED_WORD, type PartnerData, partnerViews, titleName } from "@/lib/training-view";
 import { type Signature, signature } from "@/lib/fokus-marks";
 import type { ClipNameStack } from "@/lib/video/index-store";
 import { type JumpMark, type LoggedSet, type PairRef, type SetRef, setKey } from "@/lib/set-taps";
 
-import { clientOrder, refusedText, runSetsOf, type SeamSave, slotKey, supersetOffer, type SupersetOffer, seamSentence, seamViews } from "@/lib/superset-view";
+import { clientOrder, partnerRows, type PartnerRowView, refusedText, runRowsOf, runSetsOf, type SeamSave, seamPaired, type SeamView, slotKey, supersetOffer, unpairSentence, type SupersetOffer, seamSentence, seamViews } from "@/lib/superset-view";
 import type { PairSlot } from "@/lib/supersets";
 import { SupersetSeam } from "@/components/SupersetSeam";
-import { useSupersetSaves } from "@/components/useSupersetSaves";
+import { usePartnerPick } from "@/components/usePartnerPick";
+import { PartnerListBody, PartnerSheet } from "@/components/PartnerSheet";
 
 import { ProgressButton } from "./FokusProgress";
 import { SessionSheet, type SheetPlace } from "./SessionSheet";
@@ -65,6 +66,10 @@ export type FokusSession = {
   readonly pairSlots?: readonly PairSlot[];
   /** Combined-variant parts (combo-parts.md): loadTrainingPlan's parts; absent = none. */
   readonly parts?: PartsData;
+  /** ⇄'s partner data (slice superset-any, StrengthSession.partnerData); absent = no partner list. */
+  readonly partnerData?: PartnerData;
+  /** DEV fixtures superset-pick*: the list open at load. */
+  readonly devPartners?: "open" | "empty";
 };
 
 type FokusScreenProps = {
@@ -98,20 +103,25 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const rec = useClipRecorder(recording?.allowed ?? false, recording?.fixture ?? null);
   // fokus-superset.md: the ⇄ choices of this visit; the order follows stored or saving ones only (orderPairs).
   const slots = useMemo(() => session.pairSlots ?? [], [session.pairSlots]);
-  const supersets = useSupersetSaves(slots, date, session.session);
-  const switched = supersets.saves.size > 0;
+  // superset-any.md §8: a pick moves B after A at once; a refusal puts the stored order back.
+  const supersets = usePartnerPick(session.exercises, session.runRows ?? null, slots, date, session.session);
+  const runRows = supersets.runRows;
+  const switched = supersets.saves.size > 0 || supersets.pickedAny;
   const orderedPairs = useMemo(() => (switched ? supersets.ordered : (session.pairs ?? [])), [switched, supersets.ordered, session.pairs]);
+  // A pick is newer than a pending jump: Fortryd must not restore the jump's previous_rows over it.
   const shape = useMemo(
-    () => ({ sets: runSetsOf(session.exercises), pairs: orderedPairs, runRows: session.runRows ?? null, jump: session.jump ?? null }),
-    [session.exercises, orderedPairs, session.runRows, session.jump],
+    () => ({ sets: runSetsOf(session.exercises), pairs: orderedPairs, runRows, jump: supersets.pickedAny ? null : (session.jump ?? null) }),
+    [session.exercises, orderedPairs, runRows, supersets.pickedAny, session.jump],
   );
   const baseOrder = useMemo(
-    () => (switched ? clientOrder(session.exercises, orderedPairs, session.runRows ?? null) : session.order),
-    [switched, session.exercises, orderedPairs, session.runRows, session.order],
+    () => (switched ? clientOrder(session.exercises, orderedPairs, runRows) : session.order),
+    [switched, session.exercises, orderedPairs, runRows, session.order],
   );
-  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpProblem, shape: liveShape } = useSetLog(session.log, baseOrder, date, session.session, session.exercises, shape);
+  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpProblem, shape: liveShape, pushPick, jumped, adoptOrder } = useSetLog(session.log, baseOrder, date, session.session, session.exercises, shape);
   // The session sheet (fokus-sheet.md): open state is never persisted (closed after a reload).
   const [sheet, setSheet] = useState<{ readonly animateIn: boolean } | null>(() => (openOnLoad ? { animateIn: false } : null));
+  // superset-any.md R1: the seam whose ⇄ opened the sheet's step 2; null = step 1.
+  const [listFor, setListFor] = useState<SeamView | null>(null);
   const barButton = useRef<HTMLButtonElement>(null);
   const closeSheet = useRef<(() => void) | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -139,6 +149,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       session: session.session,
       ...(session.parts === undefined ? {} : { parts: session.parts }),
       ...(liveShape === undefined ? {} : { shape: liveShape }),
+      ...(session.partnerData === undefined ? {} : { partnerData: session.partnerData }),
     },
     log,
   );
@@ -240,17 +251,65 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const lastLine = view.undo?.line ?? null;
 
   // fokus-superset.md: the seams (sheet) and the set screen's button read the same views.
-  const seams = seamViews(session.exercises, slots, supersets.pairs, log.values(), session.runRows ?? null);
+  const seams = seamViews(session.exercises, supersets.slots, supersets.pairs, log.values(), runRows);
   const current = view.kind === "set" ? view.next : view.kind === "warmup" ? view.warmup : null;
   const offer = current === null ? null : supersetOffer(session.exercises, seams, current);
+  const pickQueue = { pushPick, jumped, adoptOrder };
+  const partnersFor = (rowA: number): PartnerRowView[] | null => {
+    if (session.partnerData === undefined) return null;
+    const list = partnerViews(session.exercises, session.partnerData, runRows, supersets.pairs, log.values(), rowA);
+    return list === null ? null : partnerRows(list, session.exercises, (row) => runRowsOf(session.exercises, row));
+  };
   const seamAfter = (rowA: number, rowB: number): ReactNode => {
     const v = seams.find((x) => x.rowA === rowA && x.rowB === rowB);
     if (v === undefined) return null;
     const save = supersets.saves.get(slotKey(v));
-    if (v.state === "none" && save?.status !== "failed" && save?.status !== "refused") return null;
-    return <SupersetSeam v={v} save={save} onToggle={(paired) => supersets.toggle(v, paired, seamSentence(v, paired))} />;
+    const partners = partnersFor(v.rowA);
+    if (v.state === "none" && partners === null && save?.status !== "failed" && save?.status !== "refused") return null;
+    return (
+      <SupersetSeam
+        v={v}
+        save={save}
+        onToggle={(paired) => supersets.toggle(v, paired, paired ? seamSentence(v, paired) : unpairSentence(v))}
+        partners={seamPaired(v.state) ? null : partners}
+        onPick={(row) => supersets.pick(v, row, pickQueue)}
+        onOpenList={() => setListFor(v)}
+      />
+    );
   };
-  const offerBlock = offer === null ? null : <OfferButton offer={offer} save={supersets.saves.get(slotKey(offer.seam))} onToggle={(paired) => supersets.toggle(offer.seam, paired, offer.sentence(paired))} />;
+  // superset-any.md R1: the session sheet's step 2, ⇄'s list for `listFor`'s A; Tilbage returns to step 1.
+  const step2 =
+    listFor === null
+      ? null
+      : (
+          <PartnerListBody
+            titleId="fokus-sheet-title"
+            nameA={listFor.nameA}
+            rows={partnersFor(listFor.rowA) ?? []}
+            devSwitches={devSwitches}
+            onBack={() => setListFor(null)}
+            onClose={() => closeSheet.current?.()}
+            onPick={(row) => {
+              const v = listFor;
+              closeSheet.current?.();
+              supersets.pick(v, row, pickQueue);
+            }}
+          />
+        );
+  // superset-any.md §1–2: on A's warm-up, "Vælg superset" opens the partner list (the pressed pair stays OfferButton).
+  // DEV superset-pick-empty: the list open at load with the candidates gone (rule 13).
+  const warmupPartners = view.partners === undefined || view.partners === null || offer?.on === true ? null : partnerRows(view.partners, session.exercises, (row) => runRowsOf(session.exercises, row));
+  const pickBlock =
+    warmupPartners === null || view.kind !== "warmup" ? null : (
+      <WarmupPick
+        nameA={titleNameOf(session.exercises, view.warmup.row)}
+        rows={warmupPartners}
+        devSwitches={devSwitches}
+        initialOpen={session.devPartners ?? null}
+        onPick={(row) => supersets.pick({ rowA: view.warmup.row, nameA: titleNameOf(session.exercises, view.warmup.row) }, row, pickQueue)}
+      />
+    );
+  const offerBlock = pickBlock !== null ? pickBlock : offer === null ? null : <OfferButton offer={offer} save={supersets.saves.get(slotKey(offer.seam))} onToggle={(paired) => supersets.toggle(offer.seam, paired, offer.sentence(paired))} />;
 
   /** §6 / R4: the sheet's top is 12px under the rest strip, or under the top bar without one; §7: the strip's band stays undimmed. */
   const sheetPlace = (): SheetPlace => {
@@ -261,6 +320,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const jumpName = (row: number): string => view.sheet.runs.find((r) => r.row === row)?.name ?? "øvelsen";
 
   const onSheetClosed = (jumpTo: number | null) => {
+    setListFor(null);
     setSheet(null);
     if (jumpTo === null) {
       barButton.current?.focus();
@@ -315,6 +375,18 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
             <button type="button" onClick={retry} className={`min-h-11 px-4 ${OUTLINED}`}>
               Gem igen
             </button>
+          </WarningLine>
+        )}
+        {/* superset-any.md rule 11–12: a pick that didn't land, under the top bar. */}
+        {supersets.problem !== null && (
+          <WarningLine>
+            {supersets.problem.text}
+            {supersets.problem.sub !== null && ` ${supersets.problem.sub}`}
+            {supersets.problem.kind === "failed" && (
+              <button type="button" onClick={retry} className={`mt-2 flex min-h-11 items-center px-4 ${OUTLINED}`}>
+                Gem igen
+              </button>
+            )}
           </WarningLine>
         )}
         {jumpProblem?.kind === "refused" && (
@@ -403,6 +475,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
           onClosed={onSheetClosed}
           closeRef={closeSheet}
           seamAfter={seamAfter}
+          step2={step2}
         />
       )}
     </div>
@@ -765,6 +838,59 @@ function OfferButton({ offer, save, onToggle }: { readonly offer: SupersetOffer;
         </WarningLine>
       )}
       {save?.status === "refused" && <WarningLine>{refusedText(offer.seam, save.reason)}</WarningLine>}
+    </div>
+  );
+}
+
+function titleNameOf(exercises: readonly FokusExercise[], row: number): string {
+  const e = exercises.find((x) => x.row === row);
+  return e === undefined ? "" : titleName(e);
+}
+
+/** superset-any.md §2: A's warm-up button "Vælg superset" (44px, dark) and its partner list. */
+function WarmupPick({
+  nameA,
+  rows,
+  devSwitches,
+  initialOpen,
+  onPick,
+}: {
+  readonly nameA: string;
+  readonly rows: readonly PartnerRowView[];
+  readonly devSwitches: boolean;
+  readonly initialOpen: "open" | "empty" | null;
+  readonly onPick: (row: number) => void;
+}) {
+  const [open, setOpen] = useState(initialOpen !== null);
+  const opener = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        ref={opener}
+        type="button"
+        aria-haspopup="dialog"
+        aria-label={`Vælg superset til ${nameA}`}
+        onClick={() => setOpen(true)}
+        className={`inline-flex min-h-11 items-center gap-2 self-start px-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${OUTLINED}`}
+      >
+        <Icon name="arrow-left-right" size={18} />
+        Vælg superset
+      </button>
+      {open && (
+        <PartnerSheet
+          nameA={nameA}
+          rows={initialOpen === "empty" ? [] : rows}
+          devSwitches={devSwitches}
+          onClose={() => {
+            setOpen(false);
+            opener.current?.focus();
+          }}
+          onPick={(row) => {
+            setOpen(false);
+            onPick(row);
+          }}
+        />
+      )}
     </div>
   );
 }

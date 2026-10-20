@@ -208,6 +208,8 @@ export type StrengthSession = {
   readonly partners: readonly PartnerList[];
   /** What partnerViews needs to re-read the lists live (Fokus): runs with an exercise id and "Som sidst". */
   readonly partnerData: PartnerData;
+  /** DEV fixtures only (superset-pick*): ⇄'s list open at load; "empty" shows it without candidates. */
+  readonly devPartners?: "open" | "empty";
 };
 
 /** One partner ⇄ offers for A (slice superset-any): its run's first row, title, the exercise under a variant, working sets, today's kg. */
@@ -503,6 +505,7 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
       jump: stored?.jump ?? null,
       partners,
       partnerData: supersets.partnerData,
+      ...(data.devPartners === undefined ? {} : { devPartners: data.devPartners }),
     },
   };
 }

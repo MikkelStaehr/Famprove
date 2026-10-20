@@ -11,6 +11,9 @@ import {
   COMBO_VARIANT,
   jumpedFixture,
   supersetOfferLog,
+  supersetPickFixture,
+  supersetPickedFixture,
+  supersetPickEmptyLog,
   illustrativeToday,
   midsessionPlanned,
   pauseFixture,
@@ -22,6 +25,8 @@ import { firstOpen, type LoggedSet, sessionOrderWithWarmups, setKey, shapeOrder 
 import type { PrescribedSetRow } from "../src/lib/db/rows.ts";
 import { PostgrestError } from "../src/lib/db/postgrest.ts";
 import { freshness } from "../src/lib/dashboard-view.ts";
+import { movedUpRows, partnerRows, runRowsOf } from "../src/lib/superset-view.ts";
+import { partnerViews, sessionSupersets } from "../src/lib/training-view.ts";
 
 test("DEV_FIXTURE only switches under next dev, and only to known states", () => {
   for (const state of ["empty", "stale", "error", "band", "ef-few", "lsrpe", "midsession", "answers", "warmup", "pause", "exercise-end", "pause-rated", "finished", "feel", "calendar", "ftp-warning", "ftp-quiet", "superset", "superset-suggested", "sheet", "sheet-superset", "jumped", "superset-offer", "combo", "recording", "camera-denied"] as const) {
@@ -39,7 +44,7 @@ test("DEV_FIXTURE only switches under next dev, and only to known states", () =>
   } finally {
     console.warn = warn;
   }
-  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, pause-rated, finished, feel, calendar, ftp-warning, ftp-quiet, superset, superset-suggested, sheet, sheet-superset, jumped, superset-offer, combo, recording, camera-denied, clips, superset-pick"]);
+  assert.deepEqual(warnings, ["DEV_FIXTURE=stal ignored: expected empty, stale, error, band, ef-few, lsrpe, midsession, answers, warmup, pause, exercise-end, pause-rated, finished, feel, calendar, ftp-warning, ftp-quiet, superset, superset-suggested, sheet, sheet-superset, jumped, superset-offer, combo, recording, camera-denied, clips, superset-pick, superset-picked, superset-pick-empty"]);
   assert.equal(devFixture({}, "development"), null);
 });
 
@@ -241,4 +246,53 @@ test("combo: the row of the last done set (midsession) carries the combined vari
   const rows = comboSets(sheetRows());
   assert.deepEqual([...new Set(rows.filter((r) => r.variantId === COMBO_VARIANT.variantId).map((r) => r.sheetRow))], [31]);
   assert.ok(COMBO_VARIANT.variant.includes("+"));
+});
+
+// ---------------------------------------------------------------- superset-any (partner list)
+
+const PICK_DAY = "2026-10-12";
+const pickExercises = () =>
+  ([[30, "Squat", 2], [31, "Bench", 3], [32, "Row", 2], [33, "Curl", 2]] as const).map(([row, name, n]) => ({
+    row,
+    name,
+    variant: null,
+    variantId: null,
+    repsText: "5",
+    sets: Array.from({ length: n }, (_, k) => ({ row, set: k + 1 })),
+    todayKg: row === 32 ? 40 : null,
+  }));
+const pickRunSets = () => sheetRows().map((r) => ({ ref: { row: r.sheetRow, set: r.setNo }, name: r.name, variantId: null }));
+
+test("superset-pick: ⇄ for the first run lists every unstarted run but A, Som sidst (the third, a non-neighbour) first", () => {
+  const fx = supersetPickFixture({ sets: sheetRows() }, PICK_DAY, new Date("2026-10-12T10:00:00.000Z"));
+  const s = sessionSupersets(fx, PICK_DAY, 1, pickRunSets(), fx.setLog);
+  assert.deepEqual(s.pairs, []); // "Som sidst" is never applied to a non-neighbour
+  const list = partnerViews(pickExercises(), s.partnerData, null, s.pairs, fx.setLog, 30);
+  assert.deepEqual(list?.map((p) => [p.row, p.lastTime]), [[32, true], [31, false], [33, false]]);
+  const rows = partnerRows(list ?? [], pickExercises(), (row) => runRowsOf(pickExercises(), row));
+  assert.deepEqual(rows.map((r) => [r.meta, r.kg]), [["2 sæt · 5 reps", "40 kg"], ["3 sæt · 5 reps", null], ["2 sæt · 5 reps", null]]);
+  assert.equal(rows[0].label, "Som sidst: Row, 2 sæt, 5 reps, i dag 40 kg.");
+  assert.equal(rows[1].label, "Bench, 3 sæt, 5 reps.");
+});
+
+test("superset-picked: the third moved right after the first and paired, the old neighbour after it; no list for A", () => {
+  const fx = supersetPickedFixture({ sets: sheetRows() }, PICK_DAY, new Date("2026-10-12T10:00:00.000Z"));
+  assert.deepEqual(fx.sessionOrders.map((o) => [o.runRows, o.jump]), [[[30, 32, 31, 33], null]]);
+  const runRows = fx.sessionOrders[0].runRows;
+  const s = sessionSupersets(fx, PICK_DAY, 1, pickRunSets(), fx.setLog, runRows);
+  assert.deepEqual(s.pairs.map((p) => [p.rowA, p.rowB, p.source]), [[30, 32, "today"]]);
+  assert.deepEqual([...movedUpRows(pickExercises(), s.pairs)], [32]);
+  assert.equal(partnerViews(pickExercises(), s.partnerData, runRows, s.pairs, fx.setLog, 30), null);
+  const order = shapeOrder({ sets: pickRunSets(), pairs: s.pairs, runRows });
+  assert.deepEqual(order.slice(0, 6).map(setKey), ["30#0", "32#0", "30#1", "32#1", "30#2", "32#2"]);
+});
+
+test("superset-pick-empty (real taps): every run but the last started, its warm-up current; ⇄ has no candidate for it", () => {
+  const log = supersetPickEmptyLog(sheetRows(), PICK_DAY, new Date("2026-10-12T10:00:00.000Z"));
+  const live = new Map<string, LoggedSet>(log.map((r) => [setKey(r), r]));
+  const order = shapeOrder({ sets: pickRunSets(), pairs: [], runRows: null });
+  assert.equal(setKey(firstOpen(order, live) ?? { row: 0, set: 0 }), "33#0");
+  const fx = supersetPickFixture({ sets: sheetRows() }, PICK_DAY, new Date("2026-10-12T10:00:00.000Z"));
+  const s = sessionSupersets({ ...fx, supersetPairs: [] }, PICK_DAY, 1, pickRunSets(), log);
+  assert.equal(partnerViews(pickExercises(), s.partnerData, null, s.pairs, log, 33), null);
 });

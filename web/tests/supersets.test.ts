@@ -368,12 +368,13 @@ test("superset-any: unpairing writes paired false only and keeps the order", asy
   assert.equal(db.tables.superset_pairs[0].paired, false);
 });
 
-test("superset-any: a jump's undo mark stays as it is when a pick moves the order", async () => {
+test("superset-any: a pick that moves the order clears a pending jump's undo mark (the pick is newer)", async () => {
   const db = fakeDb();
   db.tables.session_order.push({ date: "2026-10-12", session_no: 1, run_rows: [11, 10, 12, 13], previous_rows: [10, 11, 12, 13], jumped_at: NOW.toISOString(), moved_start: null, updated_at: NOW.toISOString() });
   assert.equal((await recordSupersetPair(pairInput(true, 11, 13), at(1), opts(db))).ok, true);
   const row = db.tables.session_order[0];
-  assert.deepEqual([row.run_rows, row.previous_rows, row.jumped_at], [[11, 13, 10, 12], [10, 11, 12, 13], NOW.toISOString()]);
+  // Fortryd afterwards finds no jump to undo, so it undoes the done before the jump, never the pick.
+  assert.deepEqual([row.run_rows, row.previous_rows, row.jumped_at, row.moved_start], [[11, 13, 10, 12], null, null, null]);
 });
 
 test("superset-any: cut at each request, then retried, reaches the order and the pair", async () => {

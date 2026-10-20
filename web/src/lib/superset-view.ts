@@ -6,7 +6,8 @@
  */
 
 import { isWarmup, type LoggedSet, type PairRef, runStartRows, type RunSet, sessionOrderWithAnyPairs, type SetRef, setKey, withSessionOrder } from "./set-taps.ts";
-import { type EffectivePair, orderedPairSlots, type PairSlot, type PairSource, sessionRuns, type SupersetRefusal, type SupersetResult } from "./supersets.ts";
+import { type EffectivePair, orderedPairSlots, type PairSlot, type PairSource, pickRunRows, sessionRuns, type SupersetRefusal, type SupersetResult } from "./supersets.ts";
+import { formatKg } from "./format.ts";
 import { type ExerciseView, titleName } from "./training-view.ts";
 
 type Named = Pick<ExerciseView, "name" | "variant" | "variantId" | "row" | "sets">;
@@ -311,4 +312,88 @@ export function supersetOffer(exercises: readonly Named[], seams: readonly SeamV
     line: on ? `Superset med ${seam.nameB} · den følger uden pause` : null,
     sentence: (paired) => seamSentence(seam, paired),
   };
+}
+
+// ---------------------------------------------------------------- the partner list (slice superset-any)
+
+/** One row of ⇄'s partner list as shown (superset-any.md §6, §3): the meta line and the sr name. */
+export type PartnerRowView = {
+  readonly row: number;
+  readonly name: string;
+  readonly under: string | null;
+  readonly lastTime: boolean;
+  /** "4 sæt · 8 reps" (a range "8–10 reps"; differing reps per row: "4 sæt"). */
+  readonly meta: string;
+  /** "Pull-ups 20 kg" right column; null = no kg. */
+  readonly kg: string | null;
+  readonly label: string;
+};
+
+type RepsRow = Pick<ExerciseView, "row" | "repsText">;
+
+/** The partner rows of superset-any.md §6 from the view model's PartnerView (lib/training-view). */
+export function partnerRows(
+  partners: readonly { readonly row: number; readonly name: string; readonly under: string | null; readonly sets: number; readonly kg: number | null; readonly lastTime: boolean }[],
+  exercises: readonly RepsRow[],
+  runOf: (row: number) => readonly number[],
+): PartnerRowView[] {
+  return partners.map((p) => {
+    const reps = [...new Set(runOf(p.row).map((r) => exercises.find((e) => e.row === r)?.repsText?.replace("-", "–") ?? null))];
+    const one = reps.length === 1 && reps[0] !== null ? reps[0] : null;
+    const meta = one === null ? `${p.sets} sæt` : `${p.sets} sæt · ${one} reps`;
+    const kg = p.kg === null ? null : `${formatKg(p.kg)} kg`;
+    const said = `${p.name}, ${p.sets} sæt${one === null ? "" : `, ${one} reps`}${kg === null ? "" : `, i dag ${kg}`}.`;
+    return { row: p.row, name: p.name, under: p.under, lastTime: p.lastTime, meta, kg, label: p.lastTime ? `Som sidst: ${said}` : said };
+  });
+}
+
+/** superset-any.md §3: the polite status after an unpair (B stays where it is). */
+export function unpairSentence(v: Pick<SeamView, "both" | "nameB">): string {
+  return `${v.both} tages hver for sig. ${v.nameB} bliver, hvor den er.`;
+}
+
+/** superset-any.md §3: the polite status after a pick. */
+export function pickSentence(nameA: string, nameB: string): string {
+  return `${nameB} rykket op efter ${nameA}. De tages som superset.`;
+}
+
+/** The rows of the run that starts at `start` (its first sheet row), in sheet order. */
+export function runRowsOf(exercises: readonly Named[], start: number): number[] {
+  return runRows(exercises, start);
+}
+
+function placeholderRuns(exercises: readonly Named[]) {
+  return sessionRuns(runSetsOf(exercises), new Map(exercises.map((e) => [e.name.trim().toLowerCase(), 1])));
+}
+
+/** The optimistic run order after picking B for A (pickRunRows on the client's order); null = B already follows A. */
+export function pickedOrder(exercises: readonly Named[], runRows: readonly number[] | null, rowA: number, rowB: number): number[] | null {
+  return pickRunRows(placeholderRuns(exercises), runRows, rowA, rowB);
+}
+
+/** superset-any.md §9–10: the B rows that sit in a pair with an A that is not their sheet neighbour ("Rykket op · kun i dag"). */
+export function movedUpRows(exercises: readonly Named[], pairs: readonly PairRef[]): ReadonlySet<number> {
+  const rows = placeholderRuns(exercises).map((r) => r.row);
+  return new Set(pairs.filter((p) => rows[rows.indexOf(p.rowA) + 1] !== p.rowB).map((p) => p.rowB));
+}
+
+/** The slot a pick creates (A, B), unpaired, for the seams' offered set until the server's next read. */
+export function pickedSlot(rowA: number, rowB: number): PairSlot {
+  return { rowA, rowB, paired: false, source: null, locked: false };
+}
+
+/**
+ * superset-any.md R2, §9: Træning keeps the sheet's order (fokus-sheet.md §14) except a moved-up B,
+ * which sits right under its A. `rowOf` gives an item's run start row.
+ */
+export function withMovedUp<T>(items: readonly T[], rowOf: (item: T) => number, pairs: readonly PairRef[], moved: ReadonlySet<number>): T[] {
+  const out = items.filter((x) => !moved.has(rowOf(x)));
+  for (const p of pairs) {
+    if (!moved.has(p.rowB)) continue;
+    const b = items.find((x) => rowOf(x) === p.rowB);
+    const i = out.findIndex((x) => rowOf(x) === p.rowA);
+    if (b !== undefined && i !== -1) out.splice(i + 1, 0, b);
+    else if (b !== undefined) out.push(b);
+  }
+  return out;
 }

@@ -9,6 +9,14 @@ export function jumpFailure(tapsSinceJump: boolean): "revert" | "reload" {
   return tapsSinceJump ? "reload" : "revert";
 }
 
+/**
+ * The taps that halt the queue when their save fails (slice superset-any, spec rule 11): a jump, and
+ * a superset pick ("pick"), which is saved like a jump: later taps wait until Gem igen saves it.
+ */
+export function halts(tap: { readonly kind: string }): boolean {
+  return tap.kind === "jump" || tap.kind === "pick";
+}
+
 /** A save's outcome as the action reports it (useSetLog maps the result; a throw is "failed"). */
 export type SaveOutcome = "saved" | "dev" | "failed" | "refused";
 
@@ -69,7 +77,7 @@ export function onTapResult<T extends Tap>(state: SaveState<T>, tap: T, outcome:
  */
 export function onHeld<T extends Tap>(state: SaveState<T>, tap: T): SaveState<T> {
   if (state.halted) return { ...state, failed: [...state.failed, tap] };
-  if (!state.stopped && tap.kind === "jump" && state.failed.length > 0) return { ...state, failed: [...state.failed, tap], halted: true };
+  if (!state.stopped && halts(tap) && state.failed.length > 0) return { ...state, failed: [...state.failed, tap], halted: true };
   return state;
 }
 
@@ -80,18 +88,18 @@ export function onHeld<T extends Tap>(state: SaveState<T>, tap: T): SaveState<T>
  */
 export function sendable<T extends Tap>(state: SaveState<T>, tap: T): boolean {
   if (state.halted || state.stopped) return false;
-  return tap.kind !== "jump" || state.failed.length === 0;
+  return !halts(tap) || state.failed.length === 0;
 }
 
 /** The failed taps before the halting jump (the ones after it are held, said by the jump's line). */
 export function failedBeforeJump<T extends Tap>(state: SaveState<T>): readonly T[] {
-  const at = state.failed.findIndex((f) => f.kind === "jump");
+  const at = state.failed.findIndex((f) => halts(f));
   return at === -1 ? state.failed : state.failed.slice(0, at);
 }
 
 /** The jump that halts the queue, if any. */
 export function haltingJump<T extends Tap>(state: SaveState<T>): T | null {
-  return state.halted ? (state.failed.find((f) => f.kind === "jump") ?? null) : null;
+  return state.halted ? (state.failed.find((f) => halts(f)) ?? null) : null;
 }
 
 export type SaveQueue<T extends Tap> = {
@@ -141,7 +149,7 @@ export function createSaveQueue<T extends Tap>(
     } catch {
       // offline, or a deployment that no longer knows this action: failed
     }
-    if (input.kind !== "jump") {
+    if (!halts(input)) {
       set(onTapResult(state, input, outcome));
       return;
     }
@@ -166,7 +174,7 @@ export function createSaveQueue<T extends Tap>(
       });
     },
     drop: (keep) => {
-      const failed = state.failed.filter((f) => f.kind === "jump" || keep(f));
+      const failed = state.failed.filter((f) => halts(f) || keep(f));
       if (failed.length !== state.failed.length) set({ ...state, failed });
     },
     flush: () => chain,

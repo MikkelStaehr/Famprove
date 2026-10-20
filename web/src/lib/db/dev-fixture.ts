@@ -55,7 +55,12 @@
  *          current, nothing else logged, no pair today or before (the offer shows, off).
  *   superset-pick  (slice superset-any) superset-offer's Begynd, plus "Som sidst": a pair from 7
  *          days ago of the first run with the third (not its neighbour, so never applied): ⇄'s
- *          partner list shows it first. Picking writes nothing (the action answers the new order).
+ *          partner list shows it first, open at load. Picking writes nothing (the action answers the new order).
+ *   superset-picked  superset-pick after picking "Som sidst": today's pair row (first run, third)
+ *          and the session order pickRunRows gives (the third right after the first). No list open.
+ *   superset-pick-empty  real taps in order (Begynd, then done) through every run but the last, whose
+ *          warm-up is current: no run is left to pair with it. Fokus opens the list at load with no
+ *          candidates (the state when they vanish while it is open, e.g. another tab).
  *   combo  (combo-parts.md) midsession with the row of each session's last done set given an
  *          illustrative combined variant (two parts, a name with "+"), its parts pre-filled from an
  *          earlier session (comboParts); setSetParts writes nothing.
@@ -84,7 +89,7 @@ import {
   transition,
 } from "../set-taps.ts";
 import type { PartsData } from "../set-parts.ts";
-import { exerciseIdMap, exerciseIdOf, sessionRuns } from "../supersets.ts";
+import { exerciseIdMap, exerciseIdOf, pickRunRows, sessionRuns } from "../supersets.ts";
 import { PostgrestError } from "./postgrest.ts";
 import type {
   AnalysisSummaryRow,
@@ -134,7 +139,9 @@ export type DevFixture =
   | "recording"
   | "camera-denied"
   | "clips"
-  | "superset-pick";
+  | "superset-pick"
+  | "superset-picked"
+  | "superset-pick-empty";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -164,6 +171,8 @@ const FIXTURES: readonly DevFixture[] = [
   "camera-denied",
   "clips",
   "superset-pick",
+  "superset-picked",
+  "superset-pick-empty",
 ];
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
@@ -668,6 +677,57 @@ export function supersetPickFixture(
     pairs.push({ date: addDaysIso(today, -7), session, rowA: a.row, rowB: c.row, exerciseA: a.exerciseId, variantA: a.variantId, exerciseB: c.exerciseId, variantB: c.variantId, paired: true, updatedAt: at });
   }
   return { supersetPairs: pairs, exerciseIds, setLog: supersetOfferLog(data.sets, today, now) };
+}
+
+/** DEV_FIXTURE=superset-pick-empty: Begynd and done taps through the shared transition until the last run's warm-up is current. */
+export function supersetPickEmptyLog(sets: readonly PrescribedSetRow[], today: IsoDate, now: Date): SetLogRow[] {
+  const setLog: SetLogRow[] = [];
+  for (const [session, rows] of bySession(sets)) {
+    const shape = sessionShape(rows);
+    const order = shapeOrder(shape);
+    const runOf = runOfRows(shape.sets);
+    const runs = [...new Set(order.map((r) => runOf.get(r.row) ?? -1))];
+    const last = runs.at(-1);
+    const first = firstOpen(order, new Map());
+    if (last === undefined || runs.length < 2 || first === null) continue;
+    const taps: [SetTapKind, SetRef][] = [["begin", first]];
+    let probe: ReadonlyMap<string, LoggedSet> = applyTap(order, new Map(), "begin", first, now.toISOString());
+    for (let next = firstOpen(order, probe); next !== null && !(runOf.get(next.row) === last && isWarmup(next)); next = firstOpen(order, probe)) {
+      taps.push(["done", next]);
+      probe = applyTap(order, probe, "done", next, now.toISOString());
+    }
+    let log: ReadonlyMap<string, LoggedSet> = new Map();
+    const at = (k: number) => new Date(now.getTime() - 40_000 - (taps.length - 1 - k) * 120_000).toISOString();
+    taps.forEach(([kind, ref], k) => {
+      log = applyTap(order, log, kind, ref, at(k));
+    });
+    setLog.push(...logRows(log, today, session, at(taps.length - 1)));
+  }
+  return setLog;
+}
+
+/**
+ * DEV_FIXTURE=superset-picked (slice superset-any): superset-pick's data after the pick, through
+ * the shared rules: today's paired row (A = first run, B = third) and pickRunRows' order.
+ */
+export function supersetPickedFixture(
+  data: { readonly sets: readonly PrescribedSetRow[]; readonly exerciseIds?: readonly ExerciseIdRow[] },
+  today: IsoDate,
+  now: Date,
+): { supersetPairs: SupersetPairRow[]; exerciseIds: ExerciseIdRow[]; setLog: SetLogRow[]; sessionOrders: SessionOrderRow[] } {
+  const pick = supersetPickFixture(data, today, now);
+  const known = exerciseIdMap(pick.exerciseIds);
+  const at = new Date(now.getTime() - 20_000).toISOString();
+  const sessionOrders: SessionOrderRow[] = [];
+  const todayPairs: SupersetPairRow[] = [];
+  for (const p of pick.supersetPairs) {
+    const rows = [...bySession(data.sets)].find(([session]) => session === p.session)?.[1] ?? [];
+    const runs = sessionRuns(sessionShape(rows).sets, known);
+    const order = pickRunRows(runs, null, p.rowA, p.rowB);
+    if (order !== null) sessionOrders.push({ date: today, session: p.session, runRows: order, updatedAt: at, jump: null });
+    todayPairs.push({ ...p, date: today, updatedAt: at });
+  }
+  return { ...pick, supersetPairs: [...pick.supersetPairs, ...todayPairs], sessionOrders };
 }
 
 /** DEV_FIXTURE=combo's illustrative combined variant (a name with "+": two parts). Never a real variant. */

@@ -24,6 +24,8 @@ import {
   jumpedFixture,
   supersetOfferLog,
   supersetPickFixture,
+  supersetPickedFixture,
+  supersetPickEmptyLog,
   supersetFixture,
   illustrativeToday,
   midsessionPlanned,
@@ -306,6 +308,8 @@ export async function loadTrainingForm(today: IsoDate): Promise<DailyLoadRow | n
 
 /** Everything the Træning screen's plan reads for one local date (form is loaded separately). */
 export type TrainingPlanData = {
+  /** DEV_FIXTURE=superset-pick / superset-picked / superset-pick-empty (slice superset-any): ⇄'s list open at load ("empty": with no candidates). Absent outside them. */
+  readonly devPartners?: "open" | "empty";
   readonly weekStart: IsoDate; // Monday of today's ISO week
   readonly sessions: readonly StrengthSessionRow[]; // this ISO week: planned, done and extra
   readonly sets: readonly PrescribedSetRow[]; // this ISO week's prescription, every session
@@ -496,7 +500,12 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     const mid = midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets));
     return { ...base, ...mid, ...jumpedFixture(mid.sets, today, new Date()), supersetPairs: [] };
   }
-  if (fixture === "superset-pick") return { ...base, ...supersetPickFixture(base, today, new Date()), sessionOrders: [] };
+  if (fixture === "superset-pick") return { ...base, ...supersetPickFixture(base, today, new Date()), sessionOrders: [], devPartners: "open" };
+  if (fixture === "superset-pick-empty") {
+    const pick = supersetPickFixture(base, today, new Date());
+    return { ...base, exerciseIds: pick.exerciseIds, supersetPairs: [], setLog: supersetPickEmptyLog(sets, today, new Date()), sessionOrders: [], devPartners: "empty" };
+  }
+  if (fixture === "superset-picked") return { ...base, ...supersetPickedFixture(base, today, new Date()) };
   if (fixture === "superset-offer") return { ...base, setLog: supersetOfferLog(sets, today, new Date()), supersetPairs: [] };
   const pauseLike = videoFixture(fixture) !== null ? "pause" : fixture;
   if (isPauseFixture(pauseLike)) {

@@ -58,7 +58,18 @@ export type SetLog = {
   readonly jumpProblem: JumpProblem | null;
   /** The session's shape in force (with the jump's undo mark), for Fortryd's target; absent without a shape. */
   readonly shape?: SessionShape;
+  /** superset-any.md rule 11: queue a pick's save behind every earlier tap; it halts the queue if it fails. */
+  readonly pushPick: (pick: PickTap, send: () => Promise<SaveOutcome>) => void;
+  /** A failed pick halts the queue (its line + Gem igen = retry). */
+  readonly pickHalted: boolean;
+  /** The order and undo mark after a jump this visit (null = the stored ones). */
+  readonly jumped: { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null } | null;
+  /** Puts an order in force over the jump's (a landed pick: lib/pick-save pickedShape), or back (null). */
+  readonly adoptOrder: (next: { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null } | null) => void;
 };
+
+/** A superset pick in the save queue (slice superset-any): A's run start as `row`, set 0; halts like a jump. */
+export type PickTap = { readonly kind: "pick"; readonly row: number; readonly set: number; readonly rowB: number };
 
 /** The order and undo mark after a jump or its Fortryd this visit. */
 type Jumped = { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null };
@@ -109,8 +120,8 @@ export function useSetLog(
   const [refusedRow, setRefusedRow] = useState<number | null>(null);
   // The save queue (lib/jump-save, slice jump-retry): one at a time and in order; a failed jump
   // halts it, later taps (a jump's Fortryd too) are held behind it until Gem igen saves it.
-  const [saves, setSaves] = useState<SaveState<SetTapInput>>(NO_SAVES);
-  const [queue] = useState(() => createSaveQueue<SetTapInput>(setSaves));
+  const [saves, setSaves] = useState<SaveState<SetTapInput | PickTap>>(NO_SAVES);
+  const [queue] = useState(() => createSaveQueue<SetTapInput | PickTap>(setSaves));
   // Each set's latest done / skip / undo, updated in the tap itself (not in render): a feel or
   // reps tap from a stale closure (the reps stepper's flush as the pause unmounts after Fortryd)
   // must not reach a set that is no longer done.
@@ -184,12 +195,17 @@ export function useSetLog(
   const halting = haltingJump(saves);
   const unsaved = new Set(failedBeforeJump(saves).map((f) => setKey(f))).size;
   const jumpProblem: JumpProblem | null =
-    halting !== null ? { row: halting.row, kind: "failed" } : refusedRow !== null ? { row: refusedRow, kind: "refused" } : null;
+    halting !== null && halting.kind === "jump" ? { row: halting.row, kind: "failed" } : refusedRow !== null ? { row: refusedRow, kind: "refused" } : null;
   const retry = queue.retry;
   const flush = queue.flush;
   const failedNow = useCallback(() => queue.state().failed.length, [queue]);
+  // superset-any.md rule 11: a pick is saved like a jump; its failure halts the queue until Gem igen.
+  const pushPick = useCallback((pick: PickTap, send: () => Promise<SaveOutcome>) => queue.push(pick, send), [queue]);
+  const pickHalted = halting !== null && halting.kind === "pick";
+  // A pick is newer than a jump this visit: its order is in force and the jump's undo mark is gone.
+  const adoptOrder = useCallback((next: { readonly runRows: readonly number[] | null; readonly jump: JumpMark | null } | null) => setJumped(next), []);
   const rejected = saves.reload;
   const dev = saves.dev;
 
-  return { log, fresh, tap, unsaved, retry, rejected, dev, flush, failedNow, order: live, jumpProblem, ...(liveShape === undefined ? {} : { shape: liveShape }) };
+  return { log, fresh, tap, unsaved, retry, rejected, dev, flush, failedNow, order: live, jumpProblem, pushPick, pickHalted, jumped, adoptOrder, ...(liveShape === undefined ? {} : { shape: liveShape }) };
 }

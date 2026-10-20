@@ -94,6 +94,8 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
           runRows: next.runRows,
           jump: next.jump,
           pairSlots: next.pairSlots,
+          partnerData: next.partnerData,
+          ...(next.devPartners === undefined ? {} : { devPartners: next.devPartners }),
           ...(state.parts === undefined ? {} : { parts: state.parts }),
         }}
         date={today}
