@@ -2,6 +2,7 @@
 // (CDP): Edge on Windows, Chrome on macOS, google-chrome on Linux; BROWSER_PATH (or EDGE_PATH) overrides.
 // node .claude/skills/run-web/shoot.mjs --out <file.png> [--path /load] [--width 390]
 //   [--open] [--dark] [--reduce-motion] [--fake-camera] [--zoom200] [--base http://localhost:3100] [--timeout 90]
+//   [--click "<css selector>|text=<label>"]... (taps in order before the shot)
 //   [--ready "<css selector>"]  (default: the app's own readiness; a selector for a page outside the app,
 //   e.g. a design reference opened with --base file:///…/design/reference/ --path mockup.html)
 // Prints one JSON line; exits 1 on horizontal overflow, console errors, a page that never got ready,
@@ -25,6 +26,9 @@ const { values: opt } = parseArgs({
     zoom200: { type: "boolean", default: false },
     timeout: { type: "string", default: "90" },
     ready: { type: "string" },
+    // Taps before the shot, in order, 800 ms apart (slice fokus-minimise: a jump, then Minimér):
+    // a CSS selector (the first match), or text=<start of a button's or link's text>.
+    click: { type: "string", multiple: true },
   },
 });
 if (!opt.out) {
@@ -130,6 +134,18 @@ try {
     exitCode = 1;
   }
   await sleep(400);
+  for (const c of opt.click ?? []) {
+    const hit = await evaluate(
+      `(() => { const s = ${JSON.stringify(c)}; const el = s.startsWith('text=')` +
+        ` ? [...document.querySelectorAll('button, a')].find((e) => e.textContent.trim().startsWith(s.slice(5)))` +
+        ` : document.querySelector(s); if (!el) return false; el.click(); return true; })()`,
+    );
+    if (!hit) {
+      console.error(`--click ${c}: nothing matched`);
+      exitCode = 1;
+    }
+    await sleep(800);
+  }
   if (opt.open) await evaluate(`document.querySelectorAll('details').forEach((d) => { d.open = true; }); true`);
   // A stylesheet, not a style attribute on <html>: React owns that element's attributes.
   if (opt.zoom200) {
