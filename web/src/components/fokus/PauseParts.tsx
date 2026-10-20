@@ -14,6 +14,7 @@ import {
   nextSetSummary,
   rampBasis,
   rampState,
+  rangeFigure,
   repsRange,
   restAdvice,
   restBand,
@@ -125,7 +126,14 @@ export function FeelBlock({
         })}
       </div>
       {range !== null && (
-        <RepsStepper set={set} named={named} top={range.top} low={range.low} logged={logged?.repsDone ?? null} onTap={onTap} />
+        <RepsStepper
+          set={set}
+          named={named}
+          top={range.top}
+          figure={rangeFigure(set.exercise.repsText ?? "")}
+          logged={logged?.repsDone ?? null}
+          onTap={onTap}
+        />
       )}
     </section>
   );
@@ -134,14 +142,15 @@ export function FeelBlock({
 function RepsStepper({
   set,
   named,
-  low,
+  figure,
   top,
   logged,
   onTap,
 }: {
   readonly set: SetInContext;
   readonly named: boolean;
-  readonly low: number;
+  /** The range as the sheet writes it (rangeFigure: "10–6" stays reversed, range-order). */
+  readonly figure: string;
   readonly top: number;
   readonly logged: number | null;
   readonly onTap: (kind: "reps", ref: SetRef, value: number) => void;
@@ -180,7 +189,7 @@ function RepsStepper({
         </span>
         {/* A small tabular number, not a caption label: mono in the muted grey (Barley Corn is for captions only). */}
         <span className="font-mono text-14 text-text-muted">
-          {low}–{top}
+          {figure}
         </span>
       </p>
       <div className="flex items-center gap-2">

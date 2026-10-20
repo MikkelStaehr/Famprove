@@ -684,12 +684,16 @@ export function spokenRamp(e: FokusExercise): string | null {
   return e.ramp.map((r) => `${r.reps} reps ${formatKg(r.kg)} kg`).join(", ");
 }
 
-/** A range reps cell ("6 - 10", "8-12", "6–10") as its bounds; null for a fixed count or text. */
+/**
+ * A range reps cell ("6 - 10", "8-12", "6–10") as its bounds; null for a fixed count or text.
+ * Order-free (range-order, user 2026-10-20): the sheet may write a range reversed ("10 - 6"), so
+ * the bounds are min and max; the shown text keeps the sheet's order (rangeFigure).
+ */
 export function repsRange(repsText: string | null): { readonly low: number; readonly top: number } | null {
   const m = repsText === null ? null : /^\s*(\d+)\s*[-–]\s*(\d+)\s*$/.exec(repsText);
   if (m === null) return null;
-  const low = Number(m[1]);
-  const top = Number(m[2]);
+  const low = Math.min(Number(m[1]), Number(m[2]));
+  const top = Math.max(Number(m[1]), Number(m[2]));
   return top > low ? { low, top } : null;
 }
 
