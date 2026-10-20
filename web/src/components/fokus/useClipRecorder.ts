@@ -128,7 +128,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFix
 
   /**
    * clip-auto §1: after a saved Stop, the one analysis. A new Optag and leaving Fokus abort it
-   * (nothing written); a hidden page does not (no camera is involved). The line follows the run
+   * (nothing written), and so does a hidden page (runPose, clip-auto-3; the pickup re-runs it). The line follows the run
    * only while the slot is still this clip's (a done clears the line, the run carries on).
    */
   const analyse = useCallback(async (l: Live, durationS: number) => {
