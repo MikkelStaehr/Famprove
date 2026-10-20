@@ -164,5 +164,6 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | clip-auto-2 | Automatic clip, round 2 from the 19 Oct log: count = expected is high confidence, bounded outer rep edges, relative rep length, rep lengths in the log; playback instead of seeking when keyframes are > 1 s apart; Venter på klip; re-run on a new algorithm version | M |
 | clip-auto-3 | Automatic clip, round 3: the background run's outcome and failure step kept on the phone and shown in the debug panel; play (2x) first, seek as fallback; every run aborts when the page is hidden; the wake lock while the pickup runs; ALGO_VERSION 3 | M |
 | clip-summary | A hidden overview in Optagelser of every clip's last automatic-clip outcome (status, reason, peaks found vs expected, joint, mode, time) with Kopiér alle; local only | S |
+| clip-mark | Manual clip in the player: [ Start her sets the in point at the playhead, Slut her ] sets the out point and saves (setClipRange), Fortryd after; the handles become fine-tuning | M |
 | clip-handles | Manual in/out handles on a clip, saved as clip_in_s / clip_out_s | M |
 | clip-accuracy | Auto-clip accuracy and run time on the user's own clips (needs the user's phone) | S |
