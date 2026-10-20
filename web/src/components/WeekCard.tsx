@@ -9,6 +9,7 @@ import type {
   WeekView,
 } from "@/lib/dashboard-view";
 import type { IsoDate } from "@/lib/db/rows";
+import { SetClips } from "./SetClips";
 import {
   formatDateRange,
   formatDay,
@@ -276,7 +277,7 @@ function DayRow({
       <summary className={`${ROW.full} cursor-pointer list-none`}>{inner}</summary>
       <div className="flex flex-col gap-4 pt-2 pb-3 pl-12">
         {day.rides.length > 0 && <Cycling date={day.date} tss={day.cyclingTss} rides={day.rides} />}
-        {day.strength !== null && <Strength strength={day.strength} />}
+        {day.strength !== null && <Strength date={day.date} strength={day.strength} />}
       </div>
     </details>
   );
@@ -396,12 +397,12 @@ function ViMetric({ vi, warning }: { readonly vi: number | null; readonly warnin
  * One section per strength activity of the day (spec today.md §8), by session number. A matched
  * activity names its sheet session and lists the exercises; an extra one is "ikke i programmet".
  */
-function Strength({ strength }: { readonly strength: StrengthDetail }) {
+function Strength({ date, strength }: { readonly date: IsoDate; readonly strength: StrengthDetail }) {
   const anyExercises = strength.sessions.some((s) => s.exercises.length > 0);
   return (
     <div className="flex flex-col gap-4">
       {strength.sessions.map((s) => (
-        <StrengthSession key={s.key} session={s} />
+        <StrengthSession key={s.key} date={date} session={s} />
       ))}
       {anyExercises && (
         <p className="text-13 text-text-muted">
@@ -412,14 +413,14 @@ function Strength({ strength }: { readonly strength: StrengthDetail }) {
   );
 }
 
-function StrengthSession({ session: s }: { readonly session: SessionDetail }) {
+function StrengthSession({ date, session: s }: { readonly date: IsoDate; readonly session: SessionDetail }) {
   const title =
     s.block === null
       ? "Styrke · ikke i programmet"
       : `Session ${s.session} · ${s.block}${s.week === null ? "" : ` · uge ${s.week}`}`;
   return (
-    <div className="flex flex-col gap-1">
-      <h3 className="text-14 font-medium">{title}</h3>
+    <div className="flex flex-col gap-1" data-clip-scope="">
+      <h3 className="text-14 font-medium" data-clip-fallback="">{title}</h3>
       <p className="text-13 text-text-muted">
         {hasActivityWords(s.activityName, s.movingTimeS) && (
           <>
@@ -432,7 +433,7 @@ function StrengthSession({ session: s }: { readonly session: SessionDetail }) {
       {s.exercises.length > 0 && (
         <ol aria-label="Øvelser" className="flex flex-col">
           {s.exercises.map((exercise) => (
-            <Exercise key={exercise.key} exercise={exercise} />
+            <Exercise key={exercise.key} date={date} session={s.session} exercise={exercise} />
           ))}
         </ol>
       )}
@@ -440,7 +441,7 @@ function StrengthSession({ session: s }: { readonly session: SessionDetail }) {
   );
 }
 
-function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
+function Exercise({ date, session, exercise: e }: { readonly date: IsoDate; readonly session: number; readonly exercise: ExerciseDetail }) {
   const load = formatSetLoad(e.loggedKg, e.bodyweightWords);
   const score = e.scorePerSet === null ? null : formatScore(e.scorePerSet);
   return (
@@ -479,6 +480,8 @@ function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
           <span className="sr-only">{score === null ? "rå score ikke registreret" : `rå score ${score} pr. sæt`}</span>
         </span>
       </p>
+      {/* clip-at-set §1: the third line, this sheet row's clips numbered across the run (as Optagelser). */}
+      <SetClips date={date} session={session} rows={[e.row]} />
     </li>
   );
 }

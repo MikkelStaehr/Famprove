@@ -6,6 +6,7 @@ import { createContext, type PointerEvent, type MouseEvent, type ReactNode, useC
 import { useMedia } from "./chart-hooks";
 import { TabBar } from "./TabBar";
 import { MinimisedBar } from "./MinimisedBar";
+import { ClipPlayerHost } from "./ClipPlayerHost";
 import type { FokusSnapshot } from "@/lib/fokus-snapshot";
 import { DUR, easeOutQuart, REDUCED_MOTION } from "@/lib/motion";
 import { dragLock, dragPosition, edgeStart, pageStyle, releaseTarget, TAB_COUNT, TABS, tabIndex, tabTitle } from "@/lib/tab-shell";
@@ -233,6 +234,7 @@ export function TabShell({
 
   return (
     <TabEntries value={entries}>
+    <ClipPlayerHost>
     <div className="@container/shell flex h-dvh flex-col bg-bg">
       {/* First in the DOM (focus order: the nav before the pages, WCAG 2.4.3); shown last below lg. */}
       <TabBar index={index} onSelect={goTo} indicatorRef={indicator} />
@@ -284,6 +286,7 @@ export function TabShell({
       {/* fokus-minimise.md §2: Fokus's bar, a flex sibling under the pages (the scroll container shrinks), above the TabBar below lg. */}
       <MinimisedBar today={today} {...(devSnapshot === undefined ? {} : { devSnapshot })} />
     </div>
+    </ClipPlayerHost>
     </TabEntries>
   );
 }

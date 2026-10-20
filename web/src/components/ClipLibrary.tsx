@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 
@@ -109,6 +109,7 @@ import { ClipSummary, type SummaryItem } from "@/components/ClipSummary";
 import { isSummaryEntry } from "@/lib/video/clip-summary";
 import { useWakeLock } from "@/components/fokus/useWakeLock";
 import { ClipDebug } from "@/components/ClipDebug";
+import { usePublishClips } from "@/components/ClipPlayerHost";
 import { isDebugToggle } from "@/lib/video/debug-log";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
 
@@ -440,7 +441,26 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   useWakeLock(running !== null);
 
   const entries = local.kind === "ready" ? local.entries : null;
-  const list = local.kind === "ready" || local.kind === "none" ? libraryRows(entries, rows, names, runSets) : [];
+  const list = useMemo(
+    () => (local.kind === "ready" || local.kind === "none" ? libraryRows(local.kind === "ready" ? local.entries : null, rows, names, runSets) : []),
+    [local, rows, names, runSets],
+  );
+  // clip-at-set: Træning's list and the week card open this one Player through the tabs shell's host.
+  const listNow = useRef(list);
+  useEffect(() => {
+    listNow.current = list;
+  }, [list]);
+  /** Set when the open Player came from a ▶ outside the card: where focus goes after its Slet (§3). */
+  const externalAfter = useRef<(() => HTMLElement | null) | null>(null);
+  const openExternal = useCallback((id: string, el: HTMLElement, afterDelete: () => HTMLElement | null) => {
+    const row = listNow.current.find((r) => r.id === id);
+    if (row === undefined) return;
+    opener.current = el;
+    focusAfter.current = null;
+    externalAfter.current = afterDelete;
+    setOpen(row);
+  }, []);
+  usePublishClips(local.kind === "ready" ? list : null, openExternal);
 
   const fileNames = clipFileNames(list);
   const serverById = new Map((rows ?? []).map((r) => [r.id, r]));
@@ -966,6 +986,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
               word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id, inPickupWindow(row.recordedAt, new Date()), autoOn) : null}
               onOpen={(el) => {
                 opener.current = el;
+                externalAfter.current = null;
                 setOpen(row);
               }}
               onStar={() => void toggleStar(row)}
@@ -1016,9 +1037,13 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           onStar={() => void toggleStar(open)}
           onSaved={() => void markSavedNow([open.id])}
           onDelete={async (allowStarred) => {
+            // clip-at-set §3: from a ▶ outside the card, focus goes to the next ▶ in its row, else its exercise or session (read before the button goes).
+            const external = externalAfter.current;
+            const target = external === null ? null : external();
             const r = await startDeleteRows([openRow], true, allowStarred);
             if (r === "starred") return "starred"; // ★ set after the render: the player shows its confirm
-            opener.current = null;
+            if (external !== null) focusAfter.current = null;
+            opener.current = target;
             requestClose();
             return "started";
           }}
@@ -1268,8 +1293,9 @@ function Player({
 
   useEffect(() => {
     closeBtn.current?.focus();
-    const main = document.querySelector("main");
-    main?.setAttribute("inert", "");
+    // Every tab's <main> (the shell mounts all three; clip-at-set opens the Player from Belastning too); only those it made inert are lifted.
+    const mains = [...document.querySelectorAll("main")].filter((m) => !m.hasAttribute("inert"));
+    for (const m of mains) m.setAttribute("inert", "");
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (isDebugToggle(e, e.target instanceof HTMLElement ? e.target : null)) setDebug((d) => !d);
@@ -1292,7 +1318,7 @@ function Player({
     window.addEventListener("keydown", onKey);
     window.addEventListener("popstate", onPop);
     return () => {
-      main?.removeAttribute("inert");
+      for (const m of mains) m.removeAttribute("inert");
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", onPop);
     };

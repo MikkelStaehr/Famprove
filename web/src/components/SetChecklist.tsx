@@ -25,6 +25,7 @@ import {
 import { Icon } from "./icons";
 import { SECONDARY } from "./instrument";
 import { useSession } from "./SetLogProvider";
+import { SetClips } from "./SetClips";
 import { SupersetSeam } from "./SupersetSeam";
 import { WarningLine } from "./WarningLine";
 
@@ -175,7 +176,7 @@ function ExerciseRun({
   readonly onToggle: () => void;
 }) {
   const regionId = useId();
-  const { setLog, seams } = useSession();
+  const { setLog, seams, date, session } = useSession();
   const { fresh } = setLog;
   const e = run.focus;
   const today = todayKgView(e);
@@ -184,10 +185,11 @@ function ExerciseRun({
   const muted = run.closed ? "text-text-muted" : "text-text";
   const multi = run.groups.length > 1;
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" data-clip-scope="">
       {/* Collapsed (review round §9): the name, one dot per set and the chevron. Nothing else. */}
       <button
         type="button"
+        data-clip-fallback=""
         aria-expanded={expanded}
         aria-controls={regionId}
         onClick={onToggle}
@@ -296,6 +298,8 @@ function ExerciseRun({
                 </div>
               );
             })}
+            {/* clip-at-set §1: the run's clips after its last set line (after the last group of a multi-row run). */}
+            <SetClips date={date} session={session.session} rows={run.groups.map((g) => g.exercise.row)} open={expanded} className="border-t border-border" />
           </div>
         </div>
       </div>

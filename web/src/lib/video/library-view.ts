@@ -31,6 +31,9 @@ export type LibraryRow = {
   readonly exercise: string; // the exercise's name ("Optagelse" when unknown: a clip with no row yet)
   readonly variant: string | null; // display name, shown above the exercise name
   readonly date: IsoDate;
+  /** The clip's session_no and sheet row (slice clip-at-set: where Træning and the week card show its ▶). */
+  readonly session: number;
+  readonly sheetRow: number;
   readonly set: number; // across the exercise's run, as Fokus's "Sæt n" (RunSets); else the sheet row's set_no
   readonly durationS: number | null;
   readonly starred: boolean; // the local ★ wins over the server's
@@ -165,7 +168,7 @@ export function libraryRows(
       const label = shownName(nm);
       const set = shownSet(r.date, r.session, r.row, r.set);
       out.push({
-        id: r.id, kind: "remote", ext: null, file: null, files: [], ...nm, date: r.date, set, durationS: r.durationS,
+        id: r.id, kind: "remote", ext: null, file: null, files: [], ...nm, date: r.date, session: r.session, sheetRow: r.row, set, durationS: r.durationS,
         starred: r.starred, starUnsynced: false, recordedAt: r.recordedAt,
         meta: `${clipDay(r.date)} · sæt ${set} · ${clipDuration(r.durationS)} · på telefonen`,
         sr: `${label}, sæt ${set}, ${clipDayLong(r.date)}, på telefonen.`,
@@ -189,7 +192,8 @@ export function libraryRows(
         ? `sæt ${set} · afbrudt${dur === null ? "" : ` · ${dur}`}`
         : `${clipDay(date)} · sæt ${set}${dur === null ? "" : ` · ${dur}`}`;
       out.push({
-        id: e.id, kind: afbrudt ? "afbrudt" : "clip", ext: e.ext, file: clipFile(e), files: clipFiles(e), ...nm, date, set, durationS,
+        id: e.id, kind: afbrudt ? "afbrudt" : "clip", ext: e.ext, file: clipFile(e), files: clipFiles(e), ...nm, date,
+        session: r?.session ?? e.setKey.sessionNo, sheetRow: r?.row ?? e.setKey.row, set, durationS,
         starred: !afbrudt && e.starred, starUnsynced, recordedAt: r?.recordedAt ?? e.recordedAt, meta, saved: e.savedOut === true,
         sr: `Afspil ${label}, sæt ${set}, ${clipDayLong(date)}${durationS === null ? "" : `, ${spokenDuration(durationS)}`}${afbrudt ? ", afbrudt" : ""}.`,
       });
@@ -199,7 +203,7 @@ export function libraryRows(
       const nm = names(r, n);
       const set = shownSet(r.date, r.session, r.row, r.set);
       out.push({
-        id: r.id, kind: "missing", ext: null, file: null, files: [], ...nm, date: r.date, set, durationS: r.durationS,
+        id: r.id, kind: "missing", ext: null, file: null, files: [], ...nm, date: r.date, session: r.session, sheetRow: r.row, set, durationS: r.durationS,
         starred: r.starred, starUnsynced: false, recordedAt: r.recordedAt, meta: "fil mangler",
         sr: `Slet oplysningen om ${shownName(nm)}, sæt ${set}, ${clipDayLong(r.date)}`,
       });

@@ -163,6 +163,7 @@ export type RideDetail = {
 /** One exercise row of the sheet on that date; every set of a row has the same values. */
 export type ExerciseDetail = {
   readonly key: string;
+  readonly row: number; // strength_sets.sheet_row (clip-at-set: its clips' ▶)
   readonly name: string;
   readonly type: string;
   readonly sets: number;
@@ -364,6 +365,7 @@ function exerciseDetails(sets: readonly StrengthSetRow[], category: CategoryOf):
   }
   return [...exercises].map(([key, { first, sets: count }]) => ({
     key,
+    row: first.sheetRow,
     name: first.name,
     type: first.type,
     sets: count,
