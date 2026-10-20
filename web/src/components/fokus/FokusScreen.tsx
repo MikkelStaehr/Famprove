@@ -42,7 +42,7 @@ import { CAPTION, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTL
 import { SessionSignature } from "./SessionSignature";
 import { DoneButton, FeelBlock, Footer, NextSetCard, RestStrip, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
-import { carriedSignal, type FokusSnapshot, MINIMISE_REFUSED, minimiseAction, readSnapshot, sessionStore, snapshotOf, writeSnapshot } from "@/lib/fokus-snapshot";
+import { type FokusSnapshot, MINIMISE_REFUSED, minimiseAction, minimiseLanding, sessionStore, snapshotOf, syncSnapshot, writeSnapshot } from "@/lib/fokus-snapshot";
 import { PartsEditor } from "./PartsEditor";
 import { usePartsSave } from "./usePartsSave";
 import { draftFrom, type PartsDraft } from "@/lib/parts-editor";
@@ -171,17 +171,26 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   useWakeLock(log.size > 0 && view.kind !== "finished");
   // fokus-minimise.md §2: every tap rewrites the snapshot the minimised bar reads (cleared when nothing is left).
   const snapKey = JSON.stringify(snapshotOf(date, session.session, view, log.size > 0));
+  // After Afslut nothing re-writes it: a refused jump rolling the log back during the flush is no new tap.
+  const closed = useRef(false);
   useEffect(() => {
-    const store = sessionStore();
     // snapKey is snapshotOf's own output, serialised to key the effect: parsed back as that type.
     const now = JSON.parse(snapKey) as FokusSnapshot | null;
-    const previous = readSnapshot(store, date);
-    writeSnapshot(store, now === null ? null : { ...now, signalled: carriedSignal(now.restSince, previous) });
-  }, [snapKey, date]);
+    syncSnapshot(sessionStore(), closed.current ? "closed" : "fokus", date, session.session, now);
+  }, [snapKey, date, session.session]);
+  const afslut = async () => {
+    closed.current = true;
+    await rec.abort("cancel");
+    writeSnapshot(sessionStore(), null);
+    await saveAll();
+    writeSnapshot(sessionStore(), null); // again after the flush, in case anything wrote meanwhile
+  };
   // ↓ Minimér (§2–3): refused while a failed jump or pick halts the queue; else the saves land first.
   const halted = jumpProblem?.kind === "failed" || pickHalted;
   const [minimising, setMinimising] = useState(false);
   const [minimiseRefused, setMinimiseRefused] = useState(false);
+  // The refused line belongs to this halt: once Gem igen clears it, a later halt shows it only after a new tap.
+  if (minimiseRefused && !halted) setMinimiseRefused(false);
   const onMinimise = () => {
     if (minimiseAction(halted) === "refuse") {
       setMinimiseRefused(true);
@@ -191,7 +200,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     void settle(saveAll).then((sent) => {
       setMinimising(false);
       // A save that failed (or hasn't landed) during the flush: stay, with its line (§3).
-      if (sent && failedNow() === 0) router.push("/train");
+      if (minimiseLanding(sent, failedNow()) === "leave") router.push("/train");
     });
   };
   const p = view.progress;
@@ -375,7 +384,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       <div inert={open} data-sheet-top>
       {/* Top bar: fixed in layout, so the card never jumps (§4.1). */}
       <div className="flex items-center justify-between gap-3">
-        <HomeLink flush={async () => { await rec.abort("cancel"); writeSnapshot(sessionStore(), null); return saveAll(); }} className={COMPACT_SECONDARY}>
+        <HomeLink flush={afslut} className={COMPACT_SECONDARY}>
           <Icon name="x" size={18} />
           Afslut
         </HomeLink>

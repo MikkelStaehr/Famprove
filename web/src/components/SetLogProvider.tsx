@@ -1,6 +1,9 @@
 "use client";
 
-import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
+import { createContext, type ReactNode, use, useCallback, useEffect, useMemo, useRef } from "react";
+
+import { type FokusSnapshot, sessionStore, SNAPSHOT_EVENT, snapshotOf, syncSnapshot } from "@/lib/fokus-snapshot";
+import { fokusView } from "@/lib/fokus-view";
 
 import {
   clientOrder,
@@ -100,6 +103,33 @@ export function SetLogProvider({ session, date, devSwitches, children }: Provide
   );
   const pick = useCallback((v: SeamView, rowB: number) => pickPartner(v, rowB, setLog), [pickPartner, setLog]);
   const movedUp = useMemo(() => movedUpRows(session.exercises, pairs), [session.exercises, pairs]);
+
+  // fokus-minimise.md §2, criteria 4 and 12: a tick here rewrites the minimised bar's snapshot by
+  // Fokus's writer (snapshotOf over Fokus's view of this log), or clears it when nothing is left. It
+  // never creates one (only Minimér starts the bar), and the mount's server log is no tap.
+  const fokusPairs = saves.size === 0 && !pickedAny ? session.pairs : ordered;
+  const snapKey = useMemo(() => {
+    const fv = fokusView(
+      {
+        exercises: session.exercises,
+        pairs: fokusPairs,
+        order: setLog.order,
+        week: session.week,
+        session: session.session,
+        ...(setLog.shape === undefined ? {} : { shape: setLog.shape }),
+      },
+      setLog.log,
+    );
+    return JSON.stringify(snapshotOf(date, session.session, fv, setLog.log.size > 0));
+  }, [session.exercises, session.week, session.session, fokusPairs, setLog.order, setLog.shape, setLog.log, date]);
+  const mountKey = useRef<string | null>(snapKey);
+  useEffect(() => {
+    if (mountKey.current === snapKey) return;
+    mountKey.current = null; // from the first tick on, every change writes
+    // snapKey is snapshotOf's own output, serialised to key the effect: parsed back as that type.
+    const now = JSON.parse(snapKey) as FokusSnapshot | null;
+    if (syncSnapshot(sessionStore(), "traening", date, session.session, now)) window.dispatchEvent(new Event(SNAPSHOT_EVENT));
+  }, [snapKey, date, session.session]);
 
   const seams = useMemo(
     () => ({ views, saves, drawn, status, toggle, partnersFor, pick, movedUp, picked, problem, pairs, retry: setLog.retry }),

@@ -7,12 +7,14 @@ import {
   markSignalled,
   MINIMISE_REFUSED,
   minimiseAction,
+  minimiseLanding,
   nextLine,
   readSnapshot,
   sharedVibrator,
   SNAPSHOT_KEY,
   type SnapshotStore,
   snapshotOf,
+  syncSnapshot,
   writeSnapshot,
 } from "../src/lib/fokus-snapshot.ts";
 import { type FokusExercise, fokusView } from "../src/lib/fokus-view.ts";
@@ -220,4 +222,74 @@ test("the bar's wake lock: held while shown, released on unmount and when hidden
   assert.equal(locks[1].released, true, "unmount: released");
   await lock.visibility();
   assert.equal(locks.length, 2, "after unmount nothing is requested");
+});
+
+const BENCH: FokusExercise = {
+  ...SQUAT,
+  name: "Bench press",
+  row: 6,
+  restMinS: 120,
+  restMaxS: 180,
+  sets: [
+    { row: 6, set: 1 },
+    { row: 6, set: 2 },
+  ],
+};
+
+function snapFor(order: readonly SetRef[], log: ReadonlyMap<string, LoggedSet>) {
+  return snapshotOf(DAY, 1, fokusView({ exercises: [SQUAT, BENCH], pairs: [], order, week: 2, session: 1 }, log), log.size > 0);
+}
+
+test("Minimér leaves only after the queue landed; a failed set save stays on Fokus; a halt refuses (criteria 2, 3)", () => {
+  assert.equal(minimiseAction(true), "refuse");
+  assert.equal(minimiseAction(false), "flush");
+  assert.equal(minimiseLanding(true, 0), "leave");
+  assert.equal(minimiseLanding(true, 1), "stay", "a set save failed during the flush");
+  assert.equal(minimiseLanding(false, 0), "stay", "the flush didn't send");
+});
+
+test("after a jump or a pick, the snapshot follows the new order (criterion 4)", () => {
+  const sheet: SetRef[] = [...SQUAT.sets, ...BENCH.sets];
+  const jumped: SetRef[] = [SQUAT.sets[0], ...BENCH.sets, ...SQUAT.sets.slice(1)]; // bench moved after the finished set
+  let log: ReadonlyMap<string, LoggedSet> = new Map();
+  log = applyTap(sheet, log, "begin", SQUAT.sets[0], "2026-10-19T10:00:00Z");
+  log = applyTap(sheet, log, "done", SQUAT.sets[0], "2026-10-19T10:01:00Z");
+  assert.equal(snapFor(sheet, log)?.next.name, "Squat");
+  const afterJump = snapFor(jumped, log);
+  assert.equal(afterJump?.next.name, "Bench press");
+  assert.equal(afterJump?.next.n, 1);
+  // A pick pairs bench after squat: A1, B1, A2 …
+  const picked: SetRef[] = [SQUAT.sets[0], BENCH.sets[0], SQUAT.sets[1], BENCH.sets[1], SQUAT.sets[2]];
+  assert.equal(snapFor(picked, log)?.next.name, "Bench press");
+});
+
+test("a Træning tick updates an existing snapshot or clears it, never creates one (criteria 4, 12)", () => {
+  const store = memory();
+  let log: ReadonlyMap<string, LoggedSet> = new Map();
+  log = applyTap(ORDER, log, "begin", ORDER[0], "2026-10-19T10:00:00Z");
+  log = applyTap(ORDER, log, "done", ORDER[0], "2026-10-19T10:01:00Z");
+  const first = snapshotOf(DAY, 1, viewOf(log), true);
+  assert.equal(syncSnapshot(store, "traening", DAY, 1, first), false, "no snapshot: Træning creates none");
+  assert.equal(store.data.has(SNAPSHOT_KEY), false);
+  syncSnapshot(store, "fokus", DAY, 1, first); // Minimér started the bar
+  writeSnapshot(store, { ...readSnapshot(store, DAY)!, signalled: "2026-10-19T10:01:00Z" });
+  log = applyTap(ORDER, log, "done", ORDER[1], "2026-10-19T10:04:00Z");
+  assert.equal(syncSnapshot(store, "traening", DAY, 1, snapshotOf(DAY, 1, viewOf(log), true)), true);
+  const updated = readSnapshot(store, DAY);
+  assert.equal(updated?.next.n, 3);
+  assert.equal(updated?.restSince, "2026-10-19T10:04:00Z");
+  assert.equal(updated?.signalled, null, "a new rest is not signalled yet");
+  assert.equal(syncSnapshot(store, "traening", DAY, 2, null), false, "another session's checklist leaves it");
+  assert.notEqual(readSnapshot(store, DAY), null);
+  log = applyTap(ORDER, log, "done", ORDER[2], "2026-10-19T10:07:00Z");
+  assert.equal(syncSnapshot(store, "traening", DAY, 1, snapshotOf(DAY, 1, viewOf(log), true)), true);
+  assert.equal(store.data.has(SNAPSHOT_KEY), false, "finished from Træning: the bar clears");
+});
+
+test("after Afslut nothing re-writes the snapshot (a rolled-back jump during the flush)", () => {
+  const store = memory();
+  const log = applyTap(ORDER, new Map(), "begin", ORDER[0], "2026-10-19T10:00:00Z");
+  const snap = snapshotOf(DAY, 1, viewOf(log), true);
+  assert.equal(syncSnapshot(store, "closed", DAY, 1, snap), false);
+  assert.equal(store.data.has(SNAPSHOT_KEY), false);
 });

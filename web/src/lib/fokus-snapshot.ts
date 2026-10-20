@@ -124,6 +124,45 @@ export function readSnapshot(store: SnapshotStore | null | undefined, today: str
   }
 }
 
+/**
+ * Who writes the snapshot on a log change: Fokus (creates it), Træning's checklist (only updates or
+ * clears an existing one of its own date and session: only Minimér starts the bar), or nobody once
+ * Afslut has cleared it (a refused jump rolling the log back during the flush must not re-write it).
+ */
+export type SnapshotWriter = "fokus" | "traening" | "closed";
+
+/** What a log change writes: undefined = leave the stored snapshot, null = clear it, else `now` with its signal mark carried. */
+export function snapshotChange(
+  writer: SnapshotWriter,
+  stored: FokusSnapshot | null,
+  date: string,
+  session: number,
+  now: FokusSnapshot | null,
+): FokusSnapshot | null | undefined {
+  if (writer === "closed") return undefined;
+  if (writer === "traening" && (stored === null || stored.date !== date || stored.session !== session)) return undefined;
+  return now === null ? null : { ...now, signalled: carriedSignal(now.restSince, stored) };
+}
+
+/** Applies `snapshotChange` to the store; true when it wrote (the caller then tells the bar). */
+export function syncSnapshot(
+  store: SnapshotStore | null | undefined,
+  writer: SnapshotWriter,
+  date: string,
+  session: number,
+  now: FokusSnapshot | null,
+): boolean {
+  const change = snapshotChange(writer, readSnapshot(store, date), date, session, now);
+  if (change === undefined) return false;
+  writeSnapshot(store, change);
+  return true;
+}
+
+/** Minimér after the flush (§2, criterion 2): leave for Træning only when it sent and no set save failed. */
+export function minimiseLanding(sent: boolean, failed: number): "leave" | "stay" {
+  return sent && failed === 0 ? "leave" : "stay";
+}
+
 /** Marks the rest `since` as signalled (its minimum vibrated), so neither Fokus nor the bar buzzes again. */
 export function markSignalled(store: SnapshotStore | null | undefined, today: string, since: string): void {
   const snap = readSnapshot(store, today);
