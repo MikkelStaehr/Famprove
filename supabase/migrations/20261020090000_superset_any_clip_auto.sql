@@ -7,7 +7,24 @@
 -- No functions, triggers or RPC. Python reads none of it.
 
 -- 1. superset_pairs ---------------------------------------------------------------------------------
-alter table public.superset_pairs drop constraint if exists superset_pairs_row_b_check;
+-- The old check was written inline on row_b; it uses two columns, so Postgres named it
+-- superset_pairs_check (reviewer, checked on a local pg). Find it by its definition, not its name,
+-- and stop if it isn't there, rather than leave row_b > row_a in force.
+do $$
+declare
+  old_check text;
+begin
+  select conname into old_check
+  from pg_constraint
+  where conrelid = 'public.superset_pairs'::regclass
+    and contype = 'c'
+    and pg_get_constraintdef(oid) = 'CHECK ((row_b > row_a))';
+  if old_check is null then
+    raise exception 'superset_pairs: the check (row_b > row_a) was not found';
+  end if;
+  execute format('alter table public.superset_pairs drop constraint %I', old_check);
+end
+$$;
 alter table public.superset_pairs
   add constraint superset_pairs_rows_differ check (row_b <> row_a);
 comment on table public.superset_pairs is
