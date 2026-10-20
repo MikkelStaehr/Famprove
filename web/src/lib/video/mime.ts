@@ -27,3 +27,17 @@ export function pickRecorderType(isTypeSupported: ((type: string) => boolean) | 
 export function fileTypeOf(ext: ClipExt): string {
   return ext === "mp4" ? "video/mp4" : "video/webm";
 }
+
+/**
+ * A keyframe every second (user, 2026-10-20, slice clip-cut): a cut without re-encoding starts at a
+ * keyframe, so with this it starts at most 1 s early. Chrome's MediaRecorder option; a browser
+ * without it ignores it silently, so the spacing is measured (Kameratest), never assumed.
+ */
+export const KEYFRAME_INTERVAL_MS = 1000;
+
+/** MediaRecorder's options: TypeScript's DOM types don't have the keyframe option yet. */
+export type RecorderOptions = MediaRecorderOptions & { readonly videoKeyFrameIntervalDuration?: number };
+
+export function recorderOptions(type: RecorderType): RecorderOptions {
+  return { mimeType: type.mimeType, videoKeyFrameIntervalDuration: KEYFRAME_INTERVAL_MS };
+}

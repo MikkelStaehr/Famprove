@@ -6,7 +6,7 @@ import { saveClip } from "@/app/actions";
 import { CAMERA_CONSTRAINTS } from "@/lib/video/constraints";
 import { type ClipIndex, type ClipIndexEntry, type ClipNameStack, interrupted } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
-import { pickRecorderType, type RecorderType } from "@/lib/video/mime";
+import { pickRecorderType, recorderOptions, type RecorderType } from "@/lib/video/mime";
 import type { ClipFiles, ClipWriter } from "@/lib/video/opfs";
 import { opfsClipFiles, persistStorage } from "@/lib/video/opfs-browser";
 import { type AfbrudtReason, clipEntryFor, clipOutcome, IDLE, lowSpace, openGuard, recReducer, type RecState, saveInputOf, stopThenDone } from "@/lib/video/recording";
@@ -209,7 +209,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture): ClipRe
             return;
           }
           opening.current.settle(attempt);
-          const recorder = new MediaRecorder(stream, { mimeType: type.mimeType });
+          const recorder = new MediaRecorder(stream, recorderOptions(type));
           let resolveStopped: () => void = () => undefined;
           const stopped = new Promise<void>((r) => {
             resolveStopped = r;

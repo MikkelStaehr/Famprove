@@ -8,7 +8,7 @@ import { cleanupPlan } from "../src/lib/video/cleanup.ts";
 import type { VideoClipRow } from "../src/lib/video/clips.ts";
 import { CAMERA_CONSTRAINTS } from "../src/lib/video/constraints.ts";
 import { type ClipIndexEntry, interrupted, memoryClipIndex } from "../src/lib/video/index-store.ts";
-import { pickRecorderType } from "../src/lib/video/mime.ts";
+import { KEYFRAME_INTERVAL_MS, pickRecorderType, recorderOptions } from "../src/lib/video/mime.ts";
 import { clipPath, memoryClipFiles } from "../src/lib/video/opfs.ts";
 import { shareClip, shareData, shareFileName } from "../src/lib/video/share.ts";
 import { formatBytes, spaceLine } from "../src/lib/video/space.ts";
@@ -16,6 +16,14 @@ import { formatBytes, spaceLine } from "../src/lib/video/space.ts";
 const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const NOW = new Date("2026-10-17T08:00:00.000Z");
 const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
+
+test("mime: the recorder asks for a keyframe every second, whatever the type (clip-cut)", () => {
+  assert.equal(KEYFRAME_INTERVAL_MS, 1000);
+  for (const t of [pickRecorderType(() => true), pickRecorderType((m) => m.startsWith("video/webm"))]) {
+    assert.ok(t !== null);
+    assert.deepEqual(recorderOptions(t), { mimeType: t.mimeType, videoKeyFrameIntervalDuration: 1000 });
+  }
+});
 
 test("mime: mp4/avc1 first, then webm vp9, vp8, else none; the extension follows", () => {
   const only = (...ok: string[]) => (t: string) => ok.includes(t);
