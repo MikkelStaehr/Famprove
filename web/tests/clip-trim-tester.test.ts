@@ -13,7 +13,19 @@ import { createFile, MP4BoxBuffer } from "mp4box";
 import { fileFacts, keyframeTimes } from "../src/lib/video/cut.ts";
 import { clipFile, type ClipIndexEntry, memoryClipIndex } from "../src/lib/video/index-store.ts";
 import { type ClipFiles, memoryClipFiles } from "../src/lib/video/opfs.ts";
-import { finishDueTrims, finishTrim, startTrim, TRIM_UNDO_MS, type TrimDeps, trimInvariant, undoTrim, validateTrim } from "../src/lib/video/trim.ts";
+import {
+  type ClipLock,
+  finishDueTrims,
+  finishTrim,
+  memoryLock,
+  startTrim,
+  TRIM_UNDO_MS,
+  type TrimClipResult,
+  type TrimDeps,
+  trimInvariant,
+  undoTrim,
+  validateTrim,
+} from "../src/lib/video/trim.ts";
 
 const FIXTURE = new Uint8Array(readFileSync(new URL("./fixtures/video/fake-kf.mp4", import.meta.url)));
 const ID = "6f1c2d3e-4a5b-4c6d-8e7f-0123456789ab";
@@ -252,4 +264,205 @@ test("T7 invariant: seeded random start/undo/finish/load with failing storage, a
     commits += w.server.calls.length;
   }
   assert.ok(commits >= 5 && undos >= 3, `the sequences exercised the paths: ${commits} PATCHes, ${undos} undos`);
+});
+
+// --- re-run on the fix 8a924fd: the per-clip lock, the permanent refusal's rollback, the clamp -----
+
+for (const reason of ["duration", "invalid", "not_allowed"] as const) {
+  test(`fix: a permanent refusal (${reason}) at 0 rolls back: the original's exact bytes and length are the clip, the cut deleted, nothing pending, listed as refused`, async () => {
+    const w = await realWorld();
+    const calls: number[] = [];
+    const trim: TrimDeps["trim"] = async (input): Promise<TrimClipResult> => {
+      calls.push(input.durationS);
+      return { ok: false, reason };
+    };
+    const deps: TrimDeps = { index: w.index, files: w.files, trim };
+    const r = await startTrim(deps, ID, 1.0, 3.0, T0);
+    assert.equal(r.kind, "done");
+    if (r.kind !== "done") return;
+    const cutName = clipFile(r.entry);
+    const out = await finishDueTrims(deps, at(TRIM_UNDO_MS));
+    assert.deepEqual(out, { finished: [], failed: [], refused: [ID], pending: [] });
+    assert.equal(calls.length, 1, "one PATCH, no retry loop");
+    const e = await w.index.get(ID);
+    assert.ok(e !== null);
+    assert.equal(e.pendingTrim, undefined);
+    assert.equal(e.durationS, w.lengthS);
+    assert.equal(clipFile(e), `${ID}.mp4`);
+    const bytes = await u8(w.files, clipFile(e));
+    assert.ok(bytes !== null);
+    assert.equal(sha(bytes), sha(FIXTURE));
+    assert.equal(await w.files.readFile(cutName), null);
+    assert.deepEqual(await w.files.names(), [`${ID}.mp4`]);
+    assert.deepEqual(trimInvariant(await w.index.all(), await w.files.names()), []);
+    // a later load does nothing more
+    await finishDueTrims(deps, at(TRIM_UNDO_MS + 60_000));
+    assert.equal(calls.length, 1);
+  });
+}
+
+test("fix: a network failure (thrown, or reason failed) at 0 is not permanent: the cut stays pending with the original kept, and the next load commits", async () => {
+  const w = await realWorld();
+  let mode: "throw" | "failed" | "ok" = "throw";
+  const ok = serverTrim(w.server);
+  const trim: TrimDeps["trim"] = async (input) => {
+    if (mode === "throw") throw new Error("network");
+    if (mode === "failed") return { ok: false, reason: "failed" };
+    return ok(input);
+  };
+  const deps: TrimDeps = { index: w.index, files: w.files, trim };
+  const r = await startTrim(deps, ID, 1.0, 3.0, T0);
+  assert.equal(r.kind, "done");
+  assert.equal(await finishTrim(deps, ID, at(TRIM_UNDO_MS)), "failed");
+  mode = "failed";
+  assert.equal(await finishTrim(deps, ID, at(TRIM_UNDO_MS + 1)), "failed");
+  const e = await w.index.get(ID);
+  assert.ok(e?.pendingTrim !== undefined);
+  assert.ok((await w.files.names()).includes(e.pendingTrim.originalFileName));
+  mode = "ok";
+  assert.equal(await finishTrim(deps, ID, at(TRIM_UNDO_MS + 2)), "done");
+  const done = await w.index.get(ID);
+  assert.ok(done !== null);
+  assert.deepEqual(await w.files.names(), [clipFile(done)]);
+});
+
+test("fix: the clamp keeps the new duration ≤ the clip's own length, for a cut that measures over it and for the real cut of the whole file", async () => {
+  // a cut that reports 0.3 s more than the clip (first keyframe to the end measuring over)
+  const w = await realWorld();
+  const over: TrimDeps["cut"] = async (file) => ({ blob: file, actual: { startS: 0, endS: w.lengthS + 0.3 } });
+  const r = await startTrim({ index: w.index, files: w.files, trim: serverTrim(w.server), cut: over }, ID, 0, w.lengthS, T0);
+  assert.equal(r.kind, "done");
+  if (r.kind !== "done") return;
+  assert.ok(r.toS <= w.lengthS, `toS ${r.toS} > clip ${w.lengthS}`);
+  assert.ok((r.entry.durationS ?? Number.POSITIVE_INFINITY) <= w.lengthS);
+  assert.ok((r.entry.pendingTrim?.newDurationS ?? Number.POSITIVE_INFINITY) <= w.lengthS);
+  // the finish's PATCH is then accepted (never a raise), not refused
+  assert.equal(await finishTrim({ index: w.index, files: w.files, trim: serverTrim(w.server) }, ID, at(TRIM_UNDO_MS)), "done");
+  assert.ok(w.server.durationS <= w.lengthS);
+  // the real cut (cutClip) of the whole fixture
+  const v = await realWorld();
+  const r2 = await startTrim({ index: v.index, files: v.files, trim: serverTrim(v.server) }, ID, 0, v.lengthS, T0);
+  assert.equal(r2.kind, "done");
+  if (r2.kind !== "done") return;
+  assert.ok(r2.toS <= v.lengthS && (r2.entry.pendingTrim?.newDurationS ?? Number.POSITIVE_INFINITY) <= v.lengthS);
+});
+
+test("fix T3 race: Fortryd and the finish fired together without awaiting at 9.9 s / 10 s: exactly one wins, never zero files, the original never deleted before its PATCH", async () => {
+  for (const [undoAt, firstUndo] of [
+    [TRIM_UNDO_MS - 100, true],
+    [TRIM_UNDO_MS - 100, false],
+    [TRIM_UNDO_MS, true],
+  ] as const) {
+    const w = await realWorld();
+    const deps: TrimDeps = { index: w.index, files: w.files, trim: serverTrim(w.server), lock: memoryLock() };
+    assert.equal((await startTrim(deps, ID, 1.0, 3.0, T0)).kind, "done");
+    const u = undoTrim(deps, ID, at(undoAt));
+    const f = finishTrim(deps, ID, at(TRIM_UNDO_MS), { force: !firstUndo });
+    const [ur, fr] = await Promise.all([u, f]); // both fired before either is awaited
+    const e = await w.index.get(ID);
+    assert.ok(e !== null);
+    const names = await w.files.names();
+    assert.deepEqual(names, [clipFile(e)], `one file (${undoAt}, undo first ${firstUndo})`);
+    assert.equal(e.pendingTrim, undefined);
+    if (ur.kind === "undone") {
+      assert.equal(sha((await u8(w.files, clipFile(e))) ?? new Uint8Array()), sha(FIXTURE));
+      assert.deepEqual(w.server.calls, []);
+      assert.equal(fr, "done");
+    } else {
+      assert.equal(ur.kind, "expired");
+      assert.equal(w.server.calls.length, 1);
+    }
+  }
+});
+
+test("fix T7 invariant on the real fixture: seeded steps that fire start/undo/finish/load on the same clip together without awaiting (memory lock and navigator.locks), with failing storage, a failing or refusing server and a backwards clock: never zero files, the named file never deleted, the original never deleted before its PATCH", async () => {
+  let races = 0;
+  let undone = 0;
+  let refused = 0;
+  let committed = 0;
+  for (let seed = 101; seed <= 116; seed++) {
+    const rand = rng(seed);
+    const w = await realWorld();
+    const base = memoryClipFiles();
+    await base.writeFile(`${ID}.mp4`, new Blob([FIXTURE]));
+    const env = { failWrite: false, failRemove: false, refuse: false };
+    const files: ClipFiles = {
+      ...base,
+      writeFile: async (n, b) => {
+        if (env.failWrite) throw new DOMException("full", "QuotaExceededError");
+        return base.writeFile(n, b);
+      },
+      removeFile: async (n) => {
+        if (env.failRemove) throw new Error("remove failed");
+        const e = await w.index.get(ID);
+        assert.ok(e !== null);
+        assert.notEqual(n, clipFile(e), `seed ${seed}: the file the index names (${n}) was deleted`);
+        const p = e.pendingTrim;
+        if (p !== undefined && n === p.originalFileName) {
+          assert.ok(w.server.calls.includes(p.newDurationS), `seed ${seed}: original ${n} deleted before its PATCH landed`);
+        }
+        await base.removeFile(n);
+        assert.ok((await base.names()).length >= 1, `seed ${seed}: zero files after removing ${n}`);
+      },
+    };
+    const ok = serverTrim(w.server);
+    const trim: TrimDeps["trim"] = async (input) => (env.refuse ? { ok: false, reason: "duration" } : ok(input));
+    const lock: ClipLock | undefined = seed % 4 === 0 ? undefined : memoryLock(); // undefined = navigator.locks
+    const deps: TrimDeps = { index: w.index, files, trim, lock };
+    let clock = 0;
+    for (let step = 0; step < 16; step++) {
+      env.failWrite = rand() < 0.12;
+      env.failRemove = rand() < 0.12;
+      env.refuse = rand() < 0.1;
+      w.server.fail = rand() < 0.15;
+      const jump = rand();
+      clock += jump < 0.1 ? -3_000 : jump < 0.45 ? 2_000 : jump < 0.75 ? 6_000 : 12_000;
+      const now = at(clock);
+      const before = await w.index.get(ID);
+      assert.ok(before !== null);
+      const len = before.durationS ?? 0;
+      const ops: Promise<unknown>[] = [];
+      const n = 1 + Math.floor(rand() * 3);
+      for (let k = 0; k < n; k++) {
+        const a = rand();
+        if (a < 0.3 && len > 1.5) {
+          const inS = r1(rand() * (len - 1.2));
+          const outS = r1(Math.min(len, inS + 1.0 + rand() * (len - inS - 1.0)));
+          ops.push(startTrim(deps, ID, inS, outS, now));
+        } else if (a < 0.55) {
+          ops.push(undoTrim(deps, ID, now).then((u) => (u.kind === "undone" ? undone++ : 0)));
+        } else if (a < 0.8) {
+          ops.push(finishTrim(deps, ID, now, { force: rand() < 0.3 }).then((f) => (f === "refused" ? refused++ : 0)));
+        } else ops.push(finishDueTrims(deps, now));
+      }
+      if (ops.length > 1) races++;
+      await Promise.all(ops);
+
+      const entries = await w.index.all();
+      const names = await base.names();
+      assert.equal(entries.length, 1, `seed ${seed} step ${step}: one entry`);
+      const e = entries[0];
+      const v = trimInvariant(entries, names).filter((x) => !x.endsWith("a file no entry names"));
+      assert.deepEqual(v, [], `seed ${seed} step ${step}`);
+      const blob = await base.readFile(clipFile(e));
+      assert.ok(blob !== null, `seed ${seed} step ${step}: ${clipFile(e)} exists`);
+      const facts = await fileFacts(blob);
+      assert.ok(Math.abs(facts.durationS - (e.durationS ?? -1)) <= 0.1, `seed ${seed} step ${step}: entry ${e.durationS} vs file ${facts.durationS}`);
+      if (e.pendingTrim === undefined && w.server.calls.length > 0 && e.durationS !== w.lengthS) {
+        assert.ok(Math.abs(w.server.durationS - facts.durationS) <= 0.1, `seed ${seed} step ${step}: server ${w.server.durationS} vs file ${facts.durationS}`);
+      }
+      if (e.pendingTrim !== undefined) assert.ok(names.includes(e.pendingTrim.originalFileName), `seed ${seed} step ${step}: original kept while pending`);
+    }
+    env.failWrite = false;
+    env.failRemove = false;
+    env.refuse = false;
+    w.server.fail = false;
+    await finishDueTrims(deps, at(clock + 120_000));
+    const entries = await w.index.all();
+    const names = await base.names();
+    assert.deepEqual(trimInvariant(entries, names), [], `seed ${seed}: healed`);
+    assert.deepEqual(names, [clipFile(entries[0])], `seed ${seed}: one file`);
+    committed += w.server.calls.length;
+  }
+  assert.ok(races >= 50 && undone >= 3 && committed >= 5, `paths exercised: ${races} races, ${undone} undos, ${refused} refusals, ${committed} PATCHes`);
 });
