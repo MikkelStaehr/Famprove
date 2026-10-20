@@ -88,3 +88,6 @@ export function fixturePlayhead(clipId: string, pending: boolean): number {
   if (clipId === id(2)) return 4.8;
   return 0;
 }
+
+/** clip-delete §4: the clips marked `gemt ✓` (two today, plus the starred one): Slet gemte · 2. */
+export const FIXTURE_SAVED: readonly string[] = [id(1), id(2), id(5)];

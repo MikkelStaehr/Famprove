@@ -39,6 +39,16 @@ export type ClipIndexEntry = {
   readonly fileName?: string;
   /** A manual cut inside Fortryd's window (slice clip-trim): fileName is the cut, the original still exists. */
   readonly pendingTrim?: PendingTrim;
+  /** Slet's Fortryd window (slice clip-delete): hidden from the list; finishDelete removes row, files, then this entry. Absent = listed. */
+  readonly pendingDelete?: PendingDelete;
+  /** `gemt ✓` (slice clip-delete): handed to Downloads (Gem, Gem alle) or a share that resolved. Local only; absent = not. */
+  readonly savedOut?: boolean;
+};
+
+/** A delete inside Fortryd's window: until `deadline` the clip is only hidden; `batch` groups one tap's clips (one Fortryd). */
+export type PendingDelete = {
+  readonly deadline: string; // ISO timestamp, the phone's clock at Slet + DELETE_UNDO_MS
+  readonly batch: string;
 };
 
 /**

@@ -98,7 +98,8 @@ export function browserLock(): ClipLock | null {
 
 const fallbackLock = memoryLock();
 
-function lockOf(deps: { readonly lock?: ClipLock }): ClipLock {
+/** The lock a deps object uses (its own, else navigator.locks, else the in-memory fallback); shared with delete.ts. */
+export function lockOf(deps: { readonly lock?: ClipLock }): ClipLock {
   return deps.lock ?? browserLock() ?? fallbackLock;
 }
 

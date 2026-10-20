@@ -38,6 +38,8 @@ export type LibraryRow = {
   readonly recordedAt: string;
   readonly meta: string; // MonoCaption under the name stack
   readonly sr: string; // the row button's accessible name
+  /** `gemt ✓` (slice clip-delete): saved or shared from the app; absent = not. */
+  readonly saved?: boolean;
 };
 
 /**
@@ -173,6 +175,7 @@ export function libraryRows(
     const localIds = new Set(local.map((e) => e.id));
     for (const e of local) {
       if (e.state === "recording") continue; // the recorder owns it
+      if (e.pendingDelete !== undefined) continue; // clip-delete: hidden until the delete finishes (its server row stays out too: localIds)
       const r = rows.get(e.id);
       const nm = names(r, n, e.names);
       const label = shownName(nm);
@@ -187,7 +190,7 @@ export function libraryRows(
         : `${clipDay(date)} · sæt ${set}${dur === null ? "" : ` · ${dur}`}`;
       out.push({
         id: e.id, kind: afbrudt ? "afbrudt" : "clip", ext: e.ext, file: clipFile(e), files: clipFiles(e), ...nm, date, set, durationS,
-        starred: !afbrudt && e.starred, starUnsynced, recordedAt: r?.recordedAt ?? e.recordedAt, meta,
+        starred: !afbrudt && e.starred, starUnsynced, recordedAt: r?.recordedAt ?? e.recordedAt, meta, saved: e.savedOut === true,
         sr: `Afspil ${label}, sæt ${set}, ${clipDayLong(date)}${durationS === null ? "" : `, ${spokenDuration(durationS)}`}${afbrudt ? ", afbrudt" : ""}.`,
       });
     }

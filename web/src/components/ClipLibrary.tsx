@@ -5,6 +5,23 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 
 import { deleteClip, saveClip, starClip, trimClip } from "@/app/actions";
+import {
+  DELETE_ANNOUNCE,
+  type DeleteDeps,
+  deleteDoneLine,
+  deleteFailedLine,
+  deleteUndoneLine,
+  deleteWindowText,
+  finishDelete,
+  finishDueDeletes,
+  markSaved,
+  notPendingDelete,
+  savedDeletable,
+  secondsLeft as deleteSecondsLeft,
+  shareMarksSaved,
+  startDelete,
+  undoDelete,
+} from "@/lib/video/delete";
 import { type CutResult, finishDueTrims, finishTrim, startTrim, type StartTrimResult, type TrimDeps, undoTrim, type UndoTrimResult } from "@/lib/video/trim";
 import {
   CUTTING_LINE,
@@ -37,7 +54,7 @@ import { type DeleteClipResult, PERMANENT_SAVE_REFUSALS, type VideoClipRow } fro
 import { cleanupPlan } from "@/lib/video/cleanup";
 import { type ClipIndex, type ClipIndexEntry, clipFile, clipFiles, memoryClipIndex } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
-import { FIXTURE_CLIP_BYTES, fixturePlayhead } from "@/lib/video/library-fixture";
+import { FIXTURE_CLIP_BYTES, FIXTURE_SAVED, fixturePlayhead } from "@/lib/video/library-fixture";
 import {
   cleanupDue,
   cleanupLine,
@@ -151,6 +168,10 @@ type Props = {
 type Running = { readonly id: string; readonly pct: number };
 
 type Store = { readonly index: ClipIndex; readonly files: ClipFiles };
+/** clip-delete §3: Fortryd's window for one batch, or a finished line. */
+type DelLine =
+  | { readonly kind: "window"; readonly batch: string; readonly ids: readonly string[]; readonly deadline: string; readonly count: number; readonly label: string }
+  | { readonly kind: "text"; readonly text: string };
 type Local = { kind: "loading" } | { kind: "none" } | { kind: "error" } | { kind: "ready"; entries: ClipIndexEntry[] };
 
 /** deleteClip that never throws: a thrown call (the network) is a failed one, so the caller goes on. */
@@ -208,6 +229,17 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const [finishedTrims, setFinishedTrims] = useState<Readonly<Record<string, number | null | "refused">>>({}); // "refused": rolled back at 0
   /** clip-summary: the hidden overview, with this phone's last outcomes read when it opened; null = closed. */
   const [overview, setOverview] = useState<Readonly<Record<string, AutoLast>> | null>(null);
+  /** clip-delete §3: the delete line (a Fortryd window, or its outcome); null = none. */
+  const [delLine, setDelLine] = useState<DelLine | null>(null);
+  const [nowMs, setNowMs] = useState(0);
+  const deleteTimers = useRef(new Map<string, number>());
+  const currentBatch = useRef<string | null>(null);
+  /** clip-delete §3 Focus: where focus goes when the player closes after Slet (a row id, "heading"); null = the opener. */
+  const focusAfter = useRef<string | null>(null);
+  const sizesRef = useRef(sizes);
+  useEffect(() => {
+    sizesRef.current = sizes;
+  });
   const titlePress = useRef<ReturnType<typeof setTimeout> | null>(null);
   const endTitlePress = () => {
     if (titlePress.current !== null) clearTimeout(titlePress.current);
@@ -237,6 +269,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         store.current = { index: memoryClipIndex(fixture.local), files: memoryClipFiles() };
         for (const e of fixture.local) await store.current.files.writeFile(clipFile(e), new Blob([new Uint8Array(32)])); // clip-trim §6: the simulated cut reads a placeholder
         setFiles(store.current.files);
+        await markSaved({ index: store.current.index }, FIXTURE_SAVED); // clip-delete §4: through Gem's own setter
         setLocal({ kind: "ready", entries: await store.current.index.all() });
         setSizes(Object.fromEntries(fixture.local.map((e) => [e.id, FIXTURE_CLIP_BYTES])));
         return;
@@ -249,9 +282,19 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       store.current = s;
       setFiles(s.files);
       await finishDueTrims({ index: s.index, files: s.files, trim: trimClip }, new Date()); // clip-trim §3: originals past their deadline
+      const dueDeletes = await finishDueDeletes({ index: s.index, files: s.files, del: (i) => tryDeleteClip(i.id) }, new Date()); // clip-delete: deletes past their deadline
+      if (dueDeletes.finished.length > 0) {
+        const gone = new Set(dueDeletes.finished);
+        setRows((rs) => rs?.filter((r) => !gone.has(r.id)) ?? rs);
+      }
+      if (dueDeletes.failed.length > 0) {
+        setDelLine({ kind: "text", text: deleteFailedLine(dueDeletes.failed.length) });
+        setStatus(deleteFailedLine(dueDeletes.failed.length));
+      }
+      for (const e of dueDeletes.pending) if (e.pendingDelete !== undefined) scheduleDeleteRef.current(e.pendingDelete.batch, [e.id], e.pendingDelete.deadline); // a reload inside the window: hidden, finished at its deadline, no Fortryd
       let entries = await s.index.all();
       // Retries: unsynced clips (video-record §8) and unconfirmed stars (§6), then the daily cleanup.
-      for (const e of unsyncedClips(entries)) {
+      for (const e of notPendingDelete(unsyncedClips(entries))) {
         const r = await saveClip({ id: e.id, date: e.setKey.date, sessionNo: e.setKey.sessionNo, row: e.setKey.row, set: e.setKey.set, durationS: e.durationS });
         if (r.ok) await s.index.put({ ...e, synced: true });
         else if (PERMANENT_SAVE_REFUSALS.has(r.reason)) await s.index.put({ ...e, syncRefused: r.reason }); // never retried
@@ -263,15 +306,15 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       const last = window.localStorage.getItem(CLEANUP_KEY);
       if (initialRows !== null && cleanupDue(last, today)) {
         const plan = cleanupPlan(entries, initialRows, new Date());
-        for (const e of plan.deleteLocal) {
+        for (const e of notPendingDelete(plan.deleteLocal)) {
           for (const f of clipFiles(e)) await s.files.removeFile(f);
           await s.index.remove(e.id);
           await tryDeleteClip(e.id); // a failed row is tomorrow's deleteServerOnly; the cleanup goes on
         }
         for (const id of plan.deleteServerOnly) await tryDeleteClip(id);
-        const gone = new Set([...plan.deleteLocal.map((e) => e.id), ...plan.deleteServerOnly]);
+        const gone = new Set([...notPendingDelete(plan.deleteLocal).map((e) => e.id), ...plan.deleteServerOnly, ...dueDeletes.finished]);
         setRows(initialRows.filter((r) => !gone.has(r.id)));
-        setCleaned(plan.deleteLocal.length);
+        setCleaned(notPendingDelete(plan.deleteLocal).length);
         window.localStorage.setItem(CLEANUP_KEY, today);
       }
       entries = await s.index.all();
@@ -465,6 +508,28 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     trimTimers.current.set(id, window.setTimeout(() => void finishRef.current(id), ms));
   });
 
+  /** clip-delete: one finish timer per batch, at its deadline. */
+  const scheduleDeleteRef = useRef((batch: string, ids: readonly string[], deadline: string) => {
+    const old = deleteTimers.current.get(batch);
+    if (old !== undefined) window.clearTimeout(old);
+    const ms = Math.max(0, Date.parse(deadline) - new Date().getTime()) + 50;
+    deleteTimers.current.set(batch, window.setTimeout(() => void finishDeleteRef.current(batch, ids), ms));
+  });
+  useEffect(() => {
+    const timers = deleteTimers.current;
+    return () => {
+      for (const t of timers.values()) window.clearTimeout(t); // the next load's finishDueDeletes finishes them
+      timers.clear();
+    };
+  }, []);
+  // §3: Fortryd's text countdown (10 → 1) while a window is open.
+  const windowOpen = delLine?.kind === "window";
+  useEffect(() => {
+    if (!windowOpen) return;
+    const t = window.setInterval(() => setNowMs(Date.now()), 250);
+    return () => window.clearInterval(t);
+  }, [windowOpen]);
+
   // §3 lifecycle: the finish timers go on unmount and while hidden; visible again re-arms every
   // pending window (past its deadline it finishes at once); a next mount's finishDueTrims covers the rest.
   useEffect(() => {
@@ -555,6 +620,9 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     const byId = new Map(list.map((r) => [r.id, r]));
     let cutCount = 0;
     let failedCuts = 0;
+    let preparing: string | null = null;
+    const sentIds: string[] = [];
+    setDelLine(null);
     const result: SaveResult = await saveSequence(clips, {
       read: async (id) => {
         if (fixture !== null) return new Blob([]);
@@ -570,6 +638,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       },
       aborted: () => stop.current,
       prepare: async (clip, blob) => {
+        preparing = clip.id;
         const r = byId.get(clip.id);
         const cut = r === undefined ? ({ reason: "none", range: null } as const) : cutOf(r);
         if (fixture !== null) return { blob, name: cut.range === null ? clip.name : cutFileName(clip.name), cut: cut.range !== null };
@@ -579,6 +648,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       },
       onSent: (cut) => {
         if (cut) cutCount += 1;
+        if (preparing !== null) sentIds.push(preparing);
       },
     });
     setSaving(null);
@@ -586,7 +656,117 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     const failedLine = failedCutsLine(failedCuts);
     setSaveLine(`${testPrefix}${saveAllDoneLine(result, splitCount(result.sent, cutCount))}${failedLine === null ? "" : ` ${failedLine}`}`);
     await forgetMissing(result.missing.map((c) => c.id));
+    await markSavedNow(sentIds);
   }
+
+  /** clip-delete §2: `gemt ✓` after Gem, Gem alle or a share that resolved (local only). */
+  async function markSavedNow(ids: readonly string[]) {
+    const s = store.current;
+    if (s === null || ids.length === 0) return;
+    await markSaved({ index: s.index }, ids);
+    setLocal({ kind: "ready", entries: await s.index.all() });
+  }
+
+  function deleteDeps(): DeleteDeps | null {
+    const s = store.current;
+    if (s === null) return null;
+    if (fixture !== null) return { index: s.index, files: s.files, del: async () => ({ ok: true, dev: true }) }; // dev switches: no server DELETE
+    return { index: s.index, files: s.files, del: (i) => tryDeleteClip(i.id) };
+  }
+
+  /** §3 Focus after a delete: the next row's play button, else the previous row's, else the heading. */
+  function focusTargetAfter(ids: ReadonlySet<string>): string {
+    const at = shown.findIndex((r) => ids.has(r.id));
+    const kept = (r: LibraryRow) => !ids.has(r.id) && (r.kind === "clip" || r.kind === "afbrudt");
+    const next = at < 0 ? undefined : shown.slice(at + 1).find(kept);
+    const prev = at < 0 ? undefined : [...shown.slice(0, at)].reverse().find(kept);
+    return (next ?? prev)?.id ?? "heading";
+  }
+
+  function focusClip(target: string) {
+    setTimeout(() => {
+      const el = target === "heading" ? document.getElementById("optagelser-title") : document.querySelector<HTMLElement>(`[data-clip-play="${target}"]`);
+      if (el === null) return;
+      if (target === "heading") el.setAttribute("tabindex", "-1");
+      el.focus();
+    }, 0);
+  }
+
+  /** Slet (one clip) and Slet gemte (a batch): mark, hide, open Fortryd's window, time the finish. */
+  async function startDeleteRows(targets: readonly LibraryRow[], viaPlayer: boolean) {
+    const deps = deleteDeps();
+    const s = store.current;
+    if (deps === null || s === null || targets.length === 0) return;
+    const ids = targets.map((r) => r.id);
+    const focus = focusTargetAfter(new Set(ids));
+    if (viaPlayer) focusAfter.current = focus;
+    const batch = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${new Date().toISOString()}-${ids.join(",")}`;
+    const { marked, deadline } = await startDelete(deps, ids, batch, new Date());
+    setLocal({ kind: "ready", entries: await s.index.all() });
+    if (marked.length === 0) return;
+    const first = targets.find((r) => r.id === marked[0]?.id) ?? targets[0];
+    const label = first === undefined ? "" : `${shownName(first)} · sæt ${first.set}`;
+    currentBatch.current = batch;
+    setSaveLine("");
+    setNowMs(new Date().getTime());
+    setDelLine({ kind: "window", batch, ids: marked.map((e) => e.id), deadline, count: marked.length, label });
+    setStatus(DELETE_ANNOUNCE);
+    scheduleDeleteRef.current(batch, marked.map((e) => e.id), deadline);
+    if (!viaPlayer) focusClip(focus);
+  }
+
+  /** Fortryd: the batch's marks go (no server write); focus to the first restored row. */
+  async function undoDeleteBatch(line: Extract<DelLine, { kind: "window" }>) {
+    const deps = deleteDeps();
+    const s = store.current;
+    if (deps === null || s === null) return;
+    const restored = await undoDelete(deps, line.ids, line.batch, new Date());
+    if (restored.length === 0) return; // the window closed first: the finish goes on
+    const t = deleteTimers.current.get(line.batch);
+    if (t !== undefined) window.clearTimeout(t);
+    deleteTimers.current.delete(line.batch);
+    setLocal({ kind: "ready", entries: await s.index.all() });
+    const text = deleteUndoneLine(restored.length, line.label);
+    setDelLine({ kind: "text", text });
+    setStatus(text);
+    const firstId = line.ids.find((id) => restored.some((e) => e.id === id));
+    if (firstId !== undefined) focusClip(firstId);
+  }
+
+  /** At 0: finishDelete per clip (DELETE → files → entry), then the frigjort or failure line. */
+  async function finishDeleteBatch(batch: string, ids: readonly string[]) {
+    deleteTimers.current.delete(batch);
+    const deps = deleteDeps();
+    const s = store.current;
+    if (deps === null || s === null) return;
+    const done: string[] = [];
+    let failed = 0;
+    for (const id of ids) {
+      const r = await finishDelete(deps, id, new Date());
+      if (r === "done") done.push(id);
+      else if (r === "failed") failed += 1;
+      else {
+        const e = await s.index.get(id);
+        if (e?.pendingDelete !== undefined) scheduleDeleteRef.current(batch, [id], e.pendingDelete.deadline);
+      }
+    }
+    const gone = new Set(done);
+    const freed = done.reduce<number | null>((sum, id) => {
+      const b = sizesRef.current[id];
+      return sum === null || b === null || b === undefined ? null : sum + b;
+    }, 0);
+    setRows((rs) => rs?.filter((r) => !gone.has(r.id)) ?? rs);
+    setSizes((sz) => Object.fromEntries(Object.entries(sz).filter(([id]) => !gone.has(id))));
+    setLocal({ kind: "ready", entries: await s.index.all() });
+    if (currentBatch.current !== batch) return; // an older batch: the line shows the newest
+    const text = failed > 0 ? deleteFailedLine(failed) : deleteDoneLine(done.length, done.length > 0 ? formatBytes(freed ?? undefined) : null);
+    setDelLine({ kind: "text", text });
+    setStatus(text);
+  }
+  const finishDeleteRef = useRef(finishDeleteBatch);
+  useEffect(() => {
+    finishDeleteRef.current = finishDeleteBatch;
+  });
 
   async function toggleStar(row: LibraryRow) {
     const s = store.current;
@@ -632,8 +812,18 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   /** Closes the player now (the back gesture's popstate, or no entry of ours on top). Stable, so the Player's effect runs once. */
   const close = useCallback(() => {
     const el = opener.current;
+    const after = focusAfter.current;
+    focusAfter.current = null;
     setOpen(null);
-    setTimeout(() => el?.focus(), 0); // after the Player's cleanup lifts inert from <main>
+    setTimeout(() => {
+      if (after === null) {
+        el?.focus();
+        return;
+      }
+      const target = after === "heading" ? document.getElementById("optagelser-title") : document.querySelector<HTMLElement>(`[data-clip-play="${after}"]`);
+      if (after === "heading") target?.setAttribute("tabindex", "-1");
+      target?.focus();
+    }, 0); // after the Player's cleanup lifts inert from <main>
   }, []);
 
   /** Luk and Escape: back over our history entry when it is on top; its popstate then closes (§10). */
@@ -652,6 +842,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   /** The open clip as the list has it now (a cut changes its file and length, clip-trim §2.3). */
   const openRow = open === null ? null : (list.find((r) => r.id === open.id) ?? open);
   const line = cleanupLine(cleaned);
+  const deletable = entries === null ? [] : savedDeletable(entries);
 
   return (
     <section aria-labelledby="optagelser-title" className="rounded-card border border-border bg-card p-4.5 lg:col-start-1">
@@ -697,8 +888,9 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       {canRecordHere === false && list.length > 0 && (
         <p className="mt-2 font-sans text-13 text-text-muted">Denne browser kan ikke optage video.</p>
       )}
-      {entries !== null && (today_.length > 0 || rest.length > 0) && (
+      {entries !== null && (today_.length > 0 || rest.length > 0 || deletable.length > 0 || delLine !== null) && (
         <div className="mt-3 flex flex-col gap-1">
+          {(today_.length > 0 || rest.length > 0) && (
           <button
             type="button"
             className={`${DARK_BTN} self-start disabled:opacity-60`}
@@ -712,8 +904,25 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
             <Icon name="download" size={18} />
             {saving !== null ? progressLine(saving.k, saving.total) : rest.length > 0 ? `Gem resten · ${rest.length}` : `Gem alle fra i dag · ${today_.length}`}
           </button>
-          <p role="status" className="font-sans text-13 text-text-muted">
-            {saveLine}
+          )}
+          {deletable.length > 0 && (
+            <button type="button" className={`${DARK_BTN} self-start`} onClick={() => void startDeleteRows(list.filter((r) => deletable.some((e) => e.id === r.id)), false)}>
+              <Icon name="trash" size={18} />
+              {`Slet gemte · ${deletable.length}`}
+            </button>
+          )}
+          {delLine?.kind === "window" ? (
+            <p className="flex flex-wrap items-center gap-x-1 font-sans text-13 text-text-muted">
+              <span>{deleteWindowText(delLine.count, delLine.label)}</span>
+              <button type="button" className={`${DARK_BTN} tabular-nums`} aria-label={delLine.count === 1 ? "Fortryd sletningen" : `Fortryd sletningen af ${delLine.count} klip`} onClick={() => void undoDeleteBatch(delLine)}>
+                Fortryd <span aria-hidden="true">{deleteSecondsLeft(delLine.deadline, nowMs)}</span>
+              </button>
+            </p>
+          ) : delLine?.kind === "text" ? (
+            <p className="font-sans text-13 text-text-muted">{delLine.text}</p>
+          ) : null}
+          <p role="status" className="font-sans text-13 text-text-muted empty:hidden">
+            {delLine === null ? saveLine : ""}
           </p>
         </div>
       )}
@@ -796,8 +1005,9 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           onClose={requestClose}
           onPopped={close}
           onStar={() => void toggleStar(open)}
+          onSaved={() => void markSavedNow([open.id])}
           onDelete={() => {
-            void remove(open);
+            void startDeleteRows([openRow], true);
             opener.current = null;
             requestClose();
           }}
@@ -834,6 +1044,7 @@ function ClipRow({
     <MonoCaption uppercase={false} className="tabular-nums">
       {row.meta}
       {word !== null && ` ·\u00a0${word}`}{/* the dot wraps with its word (design-lead) */}
+      {row.saved === true && " ·\u00a0gemt ✓"}
       {row.starUnsynced && <span className="text-11"> · ikke synkroniseret</span>}
     </MonoCaption>
   );
@@ -841,7 +1052,13 @@ function ClipRow({
   return (
     <li className="flex min-h-14 items-center gap-3 border-t border-border">
       {playable ? (
-        <button type="button" aria-label={row.sr} className={`flex min-h-14 min-w-0 flex-1 items-center gap-3 py-2 text-left ${BTN}`} onClick={(e) => onOpen(e.currentTarget)}>
+        <button
+          type="button"
+          data-clip-play={row.id}
+          aria-label={row.saved === true ? `${row.sr} Gemt eller delt fra appen.` : row.sr}
+          className={`flex min-h-14 min-w-0 flex-1 items-center gap-3 py-2 text-left ${BTN}`}
+          onClick={(e) => onOpen(e.currentTarget)}
+        >
           <Icon name="play" size={18} className="text-text-muted" />
           <span className="flex min-w-0 flex-col">
             <NameStack row={row} />
@@ -919,6 +1136,7 @@ function Player({
   onClose,
   onPopped,
   onStar,
+  onSaved,
   onDelete,
 }: {
   readonly row: LibraryRow;
@@ -953,6 +1171,8 @@ function Player({
   /** The entry was popped (back gesture, or onClose's back): close without another back. */
   readonly onPopped: () => void;
   readonly onStar: () => void;
+  /** clip-delete §2: Gem handed the file over, or a share resolved: `gemt ✓`. */
+  readonly onSaved: () => void;
   readonly onDelete: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -1081,6 +1301,7 @@ function Player({
     const p = await prepareClip(blob, name, cut, cutClip); // clip-cut: Del uses Gem's name
     const outcome = await shareClip(navigator, shareData(p.blob, p.name, row.ext));
     setPreparing(false);
+    if (shareMarksSaved(outcome)) onSaved();
     setShareText(
       outcome === "failed"
         ? "Kunne ikke dele videoen. Prøv igen."
@@ -1209,6 +1430,7 @@ function Player({
           ? { kind: "whole", blob: new Blob([]), name: fileName }
           : { kind: "cut", blob: new Blob([]), name: cutFileName(fileName), actual: { startS: cut.range.inS, endS: cut.range.outS } };
       setSaveText(`Testvisning: ${saveDoneLine(shown)}`);
+      onSaved();
       return;
     }
     setSaveReading(true); // from the tap until the file is handed over (§7)
@@ -1236,6 +1458,7 @@ function Player({
     }
     const p = await prepareClip(b, fileName, cut, cutClip); // a failed cut gives the original, whole (§4)
     onDownload(p.blob, p.name);
+    onSaved();
     setSaveReading(false);
     setSaveText(saveDoneLine(p));
   }
@@ -1258,7 +1481,15 @@ function Player({
           onContextMenu={(e) => e.preventDefault()}
         >
           <NameStack row={row} />
-          <MonoCaption uppercase={false}>{row.meta}</MonoCaption>
+          <MonoCaption uppercase={false}>
+            {row.meta}
+            {row.saved === true && (
+              <>
+                <span aria-hidden="true"> ·&nbsp;gemt ✓</span>
+                <span className="sr-only">, gemt eller delt fra appen</span>
+              </>
+            )}
+          </MonoCaption>
         </div>
       </div>
       {(points.inS !== null || points.outS !== null) && !editing ? (
@@ -1343,14 +1574,12 @@ function Player({
           />
         ) : confirm ? (
           <>
-            <p className="font-sans text-14 text-text">
-              Slet videoen fra telefonen? Den kan ikke hentes igen.{row.starred ? " Den er markeret til at blive beholdt." : ""}
-            </p>
+            <p className="font-sans text-14 text-text">Denne video er markeret Behold altid. Slet den alligevel?</p>
             <div className="flex gap-2">
               <button type="button" className={DARK_BTN} onClick={onDelete}>
-                Slet video
+                Slet alligevel
               </button>
-              <button ref={keepBtn} type="button" className={DARK_BTN} onClick={() => setConfirm(false)}>
+              <button ref={keepBtn} type="button" className={`min-h-11 px-3 font-sans text-14 text-text underline-offset-4 hover:underline ${BTN}`} onClick={() => setConfirm(false)}>
                 Behold
               </button>
             </div>
@@ -1431,7 +1660,7 @@ function Player({
                   {server === null ? "Klip" : editLabel(server, auto)}
                 </button>
               )}
-              <button type="button" className={DARK_BTN} onClick={() => setConfirm(true)}>
+              <button type="button" data-clip-delete="" className={DARK_BTN} onClick={() => (row.starred ? setConfirm(true) : onDelete())}>
                 <Icon name="trash" size={18} />
                 Slet
               </button>
