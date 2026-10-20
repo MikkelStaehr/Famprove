@@ -39,7 +39,7 @@ Reps and kg figures (`text-44` → Geist Mono 44, −0.03em), the RestTimer and 
 - **FokusProgress**: done `--text`, skipped `--shade-2`, open `--track`, current a 1px `--text` outline. Segments get radius 2, with a 2px gap kept and the same height. The baseline hairline `--border`.
 - **Rest Scale** (PauseParts): the track `--track`, the recommended span `--shade-2`, minor ticks `--axis`, the now tick 2px `--text` (was `--accent`), labels Geist Mono 12 muted.
 - **SessionSignature** glyphs and **DotRow**: `--text` / `--text-muted` as today. Lines that were 1px stay 1px, and icon-like glyphs use a 1.5px stroke.
-- **Warm-up ramp** rows: ListRow style (1px `--border` top, min-height 44): "40 %" Geist Mono 14 muted | kg Geist Mono 24 | "5 reps" Geist Mono 14 muted.
+- **Superseded 2026-10-20 (user, slice `warmup-no-ramp`):** no ramp rows; only the caption `OP MOD … KG` stays (see `fokus-pause.md`). ~~**Warm-up ramp** rows: ListRow style (1px `--border` top, min-height 44): "40 %" Geist Mono 14 muted | kg Geist Mono 24 | "5 reps" Geist Mono 14 muted.~~
 
 ## 6. Desktop
 Fokus stays one column and phone-first. Max width 480, centred in the viewport, with the dock the same width. No grid and no tab bar. It is a full-screen mode whose only exit is Afslut.

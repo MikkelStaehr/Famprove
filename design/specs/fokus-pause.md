@@ -2,6 +2,8 @@
 
 > **Superseded in part (bookkeeping 2026-10-16):** `Til næste sæt` and the separate rest view by `fokus-flow.md` §1 (2026-10-15: the pause view is the next set); the `Forslag` / `FORSLAG` label by `fokus-kg.md` (today's kg under `I DAG`); a text-link Spring over by `button-type.md` B4 (bordered button); a Fokus note line (NOTES not shown since 2026-10-15); the rest windows by type only (main lift or variant 3–5 min, isolation and abs 1–2, the rest 1.5–3; slice `rest-by-type`). Mentions below are history.
 
+> **Superseded 2026-10-20 (user, slice `warmup-no-ramp`):** the warm-up shows no ramp rows (the 40/60/80 % kg and reps, §2.3 and acceptance 3); the warm-up step, its clock and the basis line `Op mod X kg` stay, and the warm-up's spoken sentence says the basis line instead of the ramp. Python still computes `planned_sets.ramp`; the web parses it and shows only the basis line.
+
 Extends `traening.md` §4 (Fokus). Replaces §4.3 (rest view); amends §4.1 (last-tap line), §4.2 (suggestion line), §4.4 (finished view), §4.7, §6, §7. Everything not named here is unchanged. Data model: main session's brief of 2026-10-13 (exercise_set_log `kind`, `derived`, `felt_rpe`, `reps_done`; planned_sets `adjustment_kg`, `adjustment_reason`, `rest_min_s`, `rest_max_s`, `ramp`; `strength_sets.notes`; `exercise_feel`).
 
 **Readings taken (user away, "most reasonable reading"):**

@@ -626,7 +626,8 @@ export function warmupTitle(e: FokusExercise): string {
 
 /**
  * The ramp's basis line (§2.3): Python's ramp is 40/60/80 % of the first working set's kg, which
- * is the suggestion when there is one, else last week's logged kg. The web never computes it.
+ * is the suggestion when there is one, else last week's logged kg. The web never computes it, and
+ * since 2026-10-20 (user, warmup-no-ramp) shows only this line, not the ramp's rows.
  */
 export function rampBasis(e: FokusExercise): string | null {
   if (e.ramp === null) return null;
@@ -676,12 +677,6 @@ export function beginUndone(search: string): boolean {
 export function rampState(e: FokusExercise, mainLift: boolean): "ramp" | "none" | "hidden" {
   if (e.ramp !== null && e.ramp.length > 0) return "ramp";
   return mainLift ? "none" : "hidden";
-}
-
-/** The ramp in the status sentence: "5 reps 57,5 kg, 3 reps 85 kg, 2 reps 115 kg". */
-export function spokenRamp(e: FokusExercise): string | null {
-  if (e.ramp === null || e.ramp.length === 0) return null;
-  return e.ramp.map((r) => `${r.reps} reps ${formatKg(r.kg)} kg`).join(", ");
 }
 
 /**
@@ -744,11 +739,11 @@ function spokenMinutes(seconds: number): string {
   return m === "1" ? "1 minut" : `${m.startsWith(",") ? "0" + m : m} minutter`;
 }
 
-/** "Squat, sæt 4 udført. Opvarmning, Bænkpres: 5 reps 57,5 kg, 3 reps 85 kg, 2 reps 115 kg." */
+/** "Squat, sæt 4 udført. Opvarmning, Bænkpres. Op mod 142,5 kg." (the ramp rows are not shown since 2026-10-20). */
 export function warmupSentence(done: SetInContext | null, next: FokusExercise): string {
-  const ramp = spokenRamp(next);
+  const basis = next.ramp !== null && next.ramp.length > 0 ? rampBasis(next) : null;
   const head = done === null ? "" : `${spokenName(done.exercise)}, sæt ${done.number} udført. `;
-  return `${head}Opvarmning, ${spokenName(next)}${ramp === null ? "." : `: ${ramp}.`}`;
+  return `${head}Opvarmning, ${spokenName(next)}.${basis === null ? "" : ` ${basis}.`}`;
 }
 
 /** "Hvordan var sæt 2?" / "Hvordan var sæt 4 i Squat?" (when the card below names another exercise). */

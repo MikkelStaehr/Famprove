@@ -27,7 +27,6 @@ import {
   warmupTitle,
 } from "@/lib/fokus-view";
 import type { LoggedSet, SetRef } from "@/lib/set-taps";
-import { formatKg } from "@/lib/format";
 import { dotField, FIELD_WIDTH } from "@/lib/fokus-marks";
 
 import { Icon } from "@/components/icons";
@@ -338,7 +337,7 @@ function emptyFill(cx: number, minX: number | null, maxX: number | null): string
 /** The warm-up's scale: 0-10 minutes (round 2). */
 const WARMUP_SCALE_S = 600;
 
-/** §2: the warm-up of `exercise`, with Python's ramp on a main lift (fokus-instrument.md §3: a mono table). */
+/** §2: the warm-up of `exercise`; on a main lift with Python's ramp only its basis line "Op mod X kg" (warmup-no-ramp, 2026-10-20). */
 export function WarmupCard({
   since,
   exercise,
@@ -366,24 +365,8 @@ export function WarmupCard({
         {/* No recorded start (§2.2): a static 0:00 with the tick at 0, never a clock from page load. */}
         {since === null ? <WarmupClock seconds={0} /> : <WarmupTimer since={since} />}
       </div>
-      {ramp === "ramp" && exercise.ramp !== null && (
-        <div className="mt-14 flex flex-col">
-          {basis !== null && <p className={CAPTION}>{basis}</p>}
-          {/* reset-fokus.md §5: ListRow-style rows (1px --border top, min 44px): % | kg | reps. */}
-          <ol aria-label="Opvarmningssæt" className="mt-3 flex flex-col">
-            {exercise.ramp.map((r) => (
-              <li key={r.pct} className="flex min-h-11 flex-wrap items-center gap-x-3 border-t border-border py-2.5 font-mono tabular-nums">
-                <span className="w-12 shrink-0 text-14 text-text-muted">{Math.round(r.pct)}&nbsp;%</span>
-                <span className="flex flex-1 items-baseline">
-                  <span className="text-24 font-medium text-text">{formatKg(r.kg)}</span>
-                  <span className="text-14 text-text-muted">&nbsp;kg</span>
-                </span>
-                <span className="shrink-0 text-14 text-text-muted">{r.reps} reps</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
+      {/* warmup-no-ramp (2026-10-20, user): the 40/60/80 % rows are gone; the basis line stays. */}
+      {ramp === "ramp" && basis !== null && <p className={`mt-14 ${CAPTION}`}>{basis}</p>}
       {ramp === "none" && <p className="mt-14 text-16 text-text-muted">Intet kg at regne opvarmningen ud fra.</p>}
     </section>
   );

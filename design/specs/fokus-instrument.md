@@ -32,7 +32,7 @@ No card. Section, top to bottom:
 
 ## 3. Warm-up (fokus-pause §2)
 - `h2` `Opvarmning · Squat` Inter 400 `text-32` (wraps). Hairline. Timer mono 400 `text-56` `--text`, `role="timer"` as today, no scale (R7).
-- **Ramp = mono table**: caption `OP MOD FORSLAGET 142,5 KG` (or `OP MOD SIDSTE UGE 140 KG`), then the `<ol>` as a 3-column grid, gap 16, hairline between columns (1px `--border` left rule on columns 2–3). Each cell: caption `40 %`, `57,5` mono `text-24` `--text` + ` kg` `text-16` muted, `5 reps` mono `text-14` muted. Under each cell a 1px `--text` rule at pct × cell width ending in a 1×8px `--text` tick (`aria-hidden`): the rules rise left to right. 200 % text: one column, as today. Null ramp / accessory: as today, Inter `text-16` muted.
+- **Superseded 2026-10-20 (user, slice `warmup-no-ramp`):** no ramp rows; only the caption `OP MOD … KG` stays (see `fokus-pause.md`). ~~**Ramp = mono table**: caption `OP MOD FORSLAGET 142,5 KG` (or `OP MOD SIDSTE UGE 140 KG`), then the `<ol>` as a 3-column grid, gap 16, hairline between columns (1px `--border` left rule on columns 2–3). Each cell: caption `40 %`, `57,5` mono `text-24` `--text` + ` kg` `text-16` muted, `5 reps` mono `text-14` muted. Under each cell a 1px `--text` rule at pct × cell width ending in a 1×8px `--text` tick (`aria-hidden`): the rules rise left to right. 200 % text: one column, as today. Null ramp / accessory: as today, Inter `text-16` muted.~~
 - **Til sæt 1** is the filled accent (as Udført, label `TIL SÆT 1`, → SVG after).
 
 ## 4. Pause (fokus-pause §1, §3, §4)
