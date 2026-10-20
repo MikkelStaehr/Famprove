@@ -84,9 +84,15 @@ type Phase =
 /** One camera, opened alone by deviceId; its tracks are stopped before this returns. */
 async function testCamera(device: MediaDeviceInfo, index: number, res: DiagResources): Promise<Shown | null> {
   let stream: MediaStream;
+  const asked = navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: device.deviceId } }, audio: false });
   try {
-    stream = await withTimeout(navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: device.deviceId } }, audio: false }), 10_000, "getUserMedia");
+    stream = await withTimeout(asked, 10_000, "getUserMedia");
   } catch (error) {
+    // A stream that arrives after the timeout is stopped at once, so no lens stays on (security, 2026-10-20).
+    asked.then(
+      (late) => late.getTracks().forEach((t) => t.stop()),
+      () => undefined,
+    );
     const failed: DiagOutcome = { ok: false, error: errorText(error) };
     return { index, label: device.label, open: failed, capabilities: null, otherCapabilities: [], tries: [], zoomMin: null, shot: null, shotUrl: null };
   }
