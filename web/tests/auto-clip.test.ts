@@ -280,7 +280,7 @@ test("clip-auto-2: found = expected clips even with a rep 3× the others; off by
   assert.equal(trace.repLengths?.length, 5);
   assert.ok(trace.repLengths !== null && Math.abs(trace.repLengths[2] / trace.repLengths[0] - 3) < 0.3, JSON.stringify(trace.repLengths));
   assert.ok(trace.reps !== null && trace.reps.every((r) => r.start < r.peak && r.peak < r.end));
-  assert.equal(ALGO_VERSION, 2);
+  assert.equal(ALGO_VERSION, 3);
 });
 
 test("diagnoseLift follows findLift: the same status and reason on every synthetic series", () => {

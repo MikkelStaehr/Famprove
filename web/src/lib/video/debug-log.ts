@@ -3,6 +3,7 @@
  * landmark, a frame or a file name). Pure, so the wording is tested in node.
  */
 import type { LiftDiagnosis, LiftFamily, SideVisibility } from "./auto-clip.ts";
+import { type AutoLast, lastLine } from "./auto-last.ts";
 import type { FileFacts } from "./cut.ts";
 import type { PoseReached, SeekTiming } from "./pose-run.ts";
 
@@ -16,6 +17,8 @@ export type FrameCheck = { readonly person: boolean; readonly hip: number | null
 export type ImageCheck = { readonly pct: number; readonly t: number; readonly video: FrameCheck; readonly canvas: FrameCheck };
 
 export type DebugLogInput = {
+  /** The last background outcome on this phone (clip-auto-3), or null: none yet. */
+  readonly last: AutoLast | null;
   readonly clip: { readonly label: string; readonly status: string | null; readonly durationS: number | null; readonly family: LiftFamily | null; readonly expected: number | null };
   readonly facts: FileFacts | { readonly error: string } | null;
   readonly videoSize: { readonly w: number; readonly h: number } | null;
@@ -64,7 +67,7 @@ const check = (c: FrameCheck): string => `${c.person ? "person ja" : "person nej
 /** The whole log, one fact per line. */
 export function debugLog(input: DebugLogInput): string {
   const c = input.clip;
-  const lines = [`klip: ${c.label} · status ${c.status ?? "ingen"} · længde ${s1(c.durationS)} · ${c.family ?? "–"} · forventet ${c.expected ?? "–"} reps`];
+  const lines = [lastLine(input.last), `klip: ${c.label} · status ${c.status ?? "ingen"} · længde ${s1(c.durationS)} · ${c.family ?? "–"} · forventet ${c.expected ?? "–"} reps`];
   if (input.facts !== null) {
     if ("error" in input.facts) lines.push(`fil: kunne ikke læses (${input.facts.error})`);
     else {

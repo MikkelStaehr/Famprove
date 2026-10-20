@@ -17,10 +17,12 @@ test("a >10 s clip recorded without the keyframe option gets play mode from anal
   const kf = await keyframeTimes(DEFAULT_12S);
   const choice = chooseMode(kf, facts.durationS);
   assert.equal(choice.mode, "play", `keyframes ${JSON.stringify(kf)} → ${JSON.stringify(choice)}`);
-  assert.match(choice.why, /^afspil: nøglebilleder op til \d+,\d s$/, "the reason uses a comma decimal");
+  assert.match(choice.keyframes ?? "", /^nøglebilleder op til \d+,\d s$/, "the keyframe fact uses a comma decimal");
 });
 
-test("the keyframe-option clip stays in seek mode", async () => {
+test("the keyframe-option clip plays too since clip-auto-3 (seek is only the fallback)", async () => {
   const facts = await fileFacts(KF);
-  assert.deepEqual(chooseMode(await keyframeTimes(KF), facts.durationS), { mode: "seek", why: "søg" });
+  const choice = chooseMode(await keyframeTimes(KF), facts.durationS);
+  assert.equal(choice.mode, "play");
+  assert.equal(choice.why, "afspil");
 });

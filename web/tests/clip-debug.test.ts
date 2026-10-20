@@ -43,6 +43,7 @@ test("frameCheck: no person, else mean hip and knee visibility", () => {
 test("debugLog: aggregates and steps, never landmarks", () => {
   const frames = Array.from({ length: 10 }, (_, i) => ({ t: i / 5, landmarks: i < 3 ? null : (Array.from({ length: 33 }, () => [0.123456, 0.654321, 0.9] as const) as PosePoint[]) }));
   const log = debugLog({
+    last: null,
     clip: { label: "Squat, sæt 2", status: "failed", durationS: 12.34, family: "lower", expected: 5 },
     facts: { rotation: 90, codedWidth: 1280, codedHeight: 720, keyframes: 2, maxKeyframeGapS: 9.5, durationS: 12.3 },
     videoSize: { w: 720, h: 1280 },
@@ -53,6 +54,7 @@ test("debugLog: aggregates and steps, never landmarks", () => {
     images: [{ pct: 50, t: 6.2, video: { person: true, hip: 0.91, knee: 0.5 }, canvas: { person: false, hip: null, knee: null } }],
     reanalyse: "failed (video: seeked kom ikke inden for 5 s) · gemt ja",
   });
+  assert.equal(log.split("\n")[0], "baggrund: ingen kørsel endnu", "the background outcome is the first line");
   for (const line of [
     "klip: Squat, sæt 2 · status failed · længde 12.3 s · lower · forventet 5 reps",
     "fil: rotation 90° · kodet 1280×720 · 12.3 s",

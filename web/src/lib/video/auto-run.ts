@@ -6,30 +6,32 @@
  * real ones), so the outcomes, an abort and a failure are tested in node. Landmarks stay in memory:
  * only status, in/out and the run's ms are sent.
  */
-import { type AutoClipResult, findLift, type LiftFamily, MAX_RUN_MS, type SetClipAutoInput, type SetClipAutoResult } from "./auto-clip.ts";
+import { type AutoClipResult, findLift, type LiftFamily, type LowConfidenceReason, MAX_RUN_MS, type SetClipAutoInput, type SetClipAutoResult } from "./auto-clip.ts";
 import type { ClipExt } from "./mime.ts";
 import { type PoseMode, PoseError, type PoseFailure, type PoseReached, type PoseResult } from "./pose-run.ts";
 
-/** Seek mode only when every keyframe gap (the last one to the end included) is at most this (s); the decision says 1 s. */
-export const SEEK_MAX_KEYFRAME_GAP_S = 1.1;
-
 /** The mode of a run and why, as the outcome and the debug log name it. */
-export type ModeChoice = { readonly mode: PoseMode; readonly why: string };
+export type ModeChoice = { readonly mode: PoseMode; readonly why: string; readonly keyframes?: string };
 
 const comma1 = (v: number): string => v.toFixed(1).replace(".", ",");
 
-/**
- * Seek or play (slice clip-auto-2): play when the largest keyframe gap (the last keyframe to the
- * end included) is > SEEK_MAX_KEYFRAME_GAP_S or unknown (no keyframes read), else seek. Pure.
- */
-export function chooseMode(keyframes: readonly number[] | null, durationS: number): ModeChoice {
-  if (keyframes === null || keyframes.length === 0) return { mode: "play", why: "afspil: nøglebilleder ukendt" };
+/** The keyframe facts for the log (slice clip-auto-2): the largest gap, the last keyframe to the end included. Pure. */
+export function keyframeFact(keyframes: readonly number[] | null, durationS: number): string {
+  if (keyframes === null || keyframes.length === 0) return "nøglebilleder ukendt";
   const k = keyframes.toSorted((a, b) => a - b);
   let gap = k[0];
   for (let i = 1; i < k.length; i++) gap = Math.max(gap, k[i] - k[i - 1]);
   if (Number.isFinite(durationS) && durationS > 0) gap = Math.max(gap, durationS - k[k.length - 1]);
-  if (!Number.isFinite(gap)) return { mode: "play", why: "afspil: nøglebilleder ukendt" };
-  return gap > SEEK_MAX_KEYFRAME_GAP_S + 1e-9 ? { mode: "play", why: `afspil: nøglebilleder op til ${comma1(gap)} s` } : { mode: "seek", why: "søg" };
+  return Number.isFinite(gap) ? `nøglebilleder op til ${comma1(gap)} s` : "nøglebilleder ukendt";
+}
+
+/**
+ * The mode (slice clip-auto-3, the user's decision 2026-10-20): play (2×) always, since seek took
+ * 73.6 s against play's 26.6 s on a 51.8 s phone clip; seek is only analyseClip's fallback after a
+ * play "video" error. The keyframe facts stay for the log. Pure.
+ */
+export function chooseMode(keyframes: readonly number[] | null, durationS: number): ModeChoice {
+  return { mode: "play", why: "afspil", keyframes: keyframeFact(keyframes, durationS) };
 }
 
 /** What the analysis needs of the clip besides its file: the format, its length, the lift's family and reps. */
@@ -57,13 +59,18 @@ export type AutoFailure = { readonly step: FailStep; readonly message: string; r
  */
 export type AutoOutcome =
   | ({ readonly kind: "clipped"; readonly inS: number; readonly outS: number; readonly saved: boolean } & Ran)
-  | ({ readonly kind: "low_confidence"; readonly saved: boolean } & Ran)
+  | ({ readonly kind: "low_confidence"; readonly saved: boolean; readonly reason: LowConfidenceReason } & Ran)
   | ({ readonly kind: "failed"; readonly saved: boolean; readonly error: AutoFailure } & Ran)
-  | { readonly kind: "aborted" }
+  | ({ readonly kind: "aborted"; readonly reason: string } & Ran)
   | { readonly kind: "skipped" };
 
-/** The run's mode and why (null when it failed before choosing one). */
-type Ran = { readonly mode: ModeChoice | null };
+/** The run's mode and why (null when it ended before choosing one) and its wall time (ms). */
+type Ran = { readonly mode: ModeChoice | null; readonly runMs: number };
+
+/** An abort's reason as words: the signal's reason or runPose's PoseError message. */
+function abortReason(reason: unknown): string {
+  return reason instanceof Error && reason.message !== "" && reason.name !== "AbortError" ? reason.message : "afbrudt";
+}
 
 export type AutoDeps = {
   /** The clip's keyframe times (s): cut.ts's mp4box parse; a throw counts as unknown. */
@@ -101,14 +108,16 @@ export function failureOf(step: "model" | "pose" | "lift", error: unknown): Auto
 
 /**
  * Analyse one clip and store the outcome. Never throws; an abort (the signal, or runPose's own
- * "aborted": a play run whose page was hidden) writes nothing. The mode comes from chooseMode; a seek
- * run that fails with a "video" PoseError is retried once in play mode.
+ * "aborted": a run whose page was hidden) writes nothing and says why. The mode comes from chooseMode
+ * (play); a run that fails with a "video" PoseError is retried once in the other mode.
  */
 export async function analyseClip(clipId: string, blob: Blob, meta: ClipMeta, opts: AnalyseOptions): Promise<AutoOutcome> {
   const { signal, deps } = opts;
   if (meta.ext !== "mp4") return { kind: "skipped" }; // WebM can't be cut (clip-cut §3): no analysis
-  if (signal.aborted) return { kind: "aborted" };
   const started = deps.now();
+  let choice: ModeChoice | null = null;
+  const aborted = (reason: unknown): AutoOutcome => ({ kind: "aborted", reason: abortReason(reason), mode: choice, runMs: Math.max(0, Math.round(deps.now() - started)) });
+  if (signal.aborted) return aborted(signal.reason);
   let lastPct: string | null = null;
   const report = (p: AutoProgress) => {
     const key = `${p.kind}:${p.pct}`;
@@ -119,17 +128,16 @@ export async function analyseClip(clipId: string, blob: Blob, meta: ClipMeta, op
   let result: AutoClipResult | null = null;
   let failure: AutoFailure | null = null;
   let step: "model" | "pose" | "lift" = "model";
-  let choice: ModeChoice | null = null;
   try {
     await deps.warmModel(signal, (pct) => report({ kind: "model", pct }));
-    if (signal.aborted) return { kind: "aborted" };
+    if (signal.aborted) return aborted(signal.reason);
     let keyframes: number[] | null;
     try {
       keyframes = await deps.keyframeTimes(blob);
     } catch {
       keyframes = null; // unknown: play
     }
-    if (signal.aborted) return { kind: "aborted" };
+    if (signal.aborted) return aborted(signal.reason);
     choice = chooseMode(keyframes, meta.durationS);
     report({ kind: "running", pct: 0 });
     step = "pose";
@@ -140,20 +148,21 @@ export async function analyseClip(clipId: string, blob: Blob, meta: ClipMeta, op
     } catch (error) {
       if (signal.aborted || !(error instanceof PoseError) || error.reason !== "video") throw error;
       // One retry in the other mode: seek fails on far keyframes, play on a throttled element.
-      choice = choice.mode === "seek" ? { mode: "play", why: "afspil: søgning fejlede" } : { mode: "seek", why: "søg: afspilning fejlede" };
+      choice = choice.mode === "seek" ? { mode: "play", why: "afspil: søgning fejlede", keyframes: choice.keyframes } : { mode: "seek", why: "søg: afspilning fejlede", keyframes: choice.keyframes };
       lastPct = null;
       report({ kind: "running", pct: 0 });
       pose = await run(choice.mode);
     }
-    if (signal.aborted) return { kind: "aborted" };
+    if (signal.aborted) return aborted(signal.reason);
     step = "lift";
     result = findLift(pose.frames, meta.expected, meta.family, meta.durationS);
   } catch (error) {
-    if (signal.aborted || (error instanceof PoseError && error.reason === "aborted")) return { kind: "aborted" };
+    if (signal.aborted) return aborted(signal.reason);
+    if (error instanceof PoseError && error.reason === "aborted") return aborted(error);
     result = null;
     failure = failureOf(step, error);
   }
-  if (signal.aborted) return { kind: "aborted" };
+  if (signal.aborted) return aborted(signal.reason);
   const runMs = Math.min(MAX_RUN_MS, Math.max(0, Math.round(deps.now() - started)));
   const input: SetClipAutoInput =
     result === null
@@ -167,6 +176,8 @@ export async function analyseClip(clipId: string, blob: Blob, meta: ClipMeta, op
   } catch {
     saved = false;
   }
-  if (result === null) return { kind: "failed", saved, error: failure ?? { step, message: "ukendt", reached: null }, mode: choice };
-  return result.status === "clipped" ? { kind: "clipped", inS: result.inS, outS: result.outS, saved, mode: choice } : { kind: "low_confidence", saved, mode: choice };
+  if (result === null) return { kind: "failed", saved, error: failure ?? { step, message: "ukendt", reached: null }, mode: choice, runMs };
+  return result.status === "clipped"
+    ? { kind: "clipped", inS: result.inS, outS: result.outS, saved, mode: choice, runMs }
+    : { kind: "low_confidence", saved, reason: result.reason, mode: choice, runMs };
 }

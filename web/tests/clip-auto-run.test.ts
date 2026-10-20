@@ -114,7 +114,7 @@ test("analyseClip: an abort writes nothing (mid-run, or before the write)", asyn
       throw new Error("afbrudt");
     },
   });
-  assert.deepEqual(await analyseClip(ID, new Blob([]), META, { signal: ctrl.signal, deps: d.deps }), { kind: "aborted" });
+  assert.equal((await analyseClip(ID, new Blob([]), META, { signal: ctrl.signal, deps: d.deps })).kind, "aborted");
   const ctrl2 = new AbortController();
   const d2 = deps({
     runPose: async () => {
@@ -122,7 +122,7 @@ test("analyseClip: an abort writes nothing (mid-run, or before the write)", asyn
       return POSE(squatFrames());
     },
   });
-  assert.deepEqual(await analyseClip(ID, new Blob([]), META, { signal: ctrl2.signal, deps: d2.deps }), { kind: "aborted" });
+  assert.equal((await analyseClip(ID, new Blob([]), META, { signal: ctrl2.signal, deps: d2.deps })).kind, "aborted");
   assert.equal(d.writes.length + d2.writes.length, 0);
 });
 
@@ -242,20 +242,19 @@ test("auto versions: localStorage map, unreadable = empty, recorded as ALGO_VERS
   assert.deepEqual(readAutoVersions(broken), {});
   recordAutoVersion(broken, "x"); // never throws
   recordAutoVersion(null, "x");
-  assert.equal(ALGO_VERSION, 2);
+  assert.equal(ALGO_VERSION, 3);
 });
 
-test("mode: largest keyframe gap ≤ 1.1 s seeks, else (or unknown) plays", () => {
+test("mode (clip-auto-3): always play, the keyframe facts kept for the log", () => {
   const every = (gap: number, d: number) => Array.from({ length: Math.floor(d / gap) + 1 }, (_, i) => i * gap).filter((t) => t < d);
-  assert.deepEqual(chooseMode(every(0.9, 20), 20), { mode: "seek", why: "søg" });
-  assert.deepEqual(chooseMode(every(1.2, 20), 20).mode, "play");
-  assert.deepEqual(chooseMode([0, 4.1, 8.2, 12.3], 15), { mode: "play", why: "afspil: nøglebilleder op til 4,1 s" });
-  assert.deepEqual(chooseMode([0, 1, 2], 10), { mode: "play", why: "afspil: nøglebilleder op til 8,0 s" }, "the last keyframe to the end counts");
-  assert.deepEqual(chooseMode(null, 20), { mode: "play", why: "afspil: nøglebilleder ukendt" });
-  assert.deepEqual(chooseMode([], 20), { mode: "play", why: "afspil: nøglebilleder ukendt" });
+  assert.deepEqual(chooseMode(every(0.9, 20), 20), { mode: "play", why: "afspil", keyframes: "nøglebilleder op til 0,9 s" });
+  assert.deepEqual(chooseMode([0, 4.1, 8.2, 12.3], 15), { mode: "play", why: "afspil", keyframes: "nøglebilleder op til 4,1 s" });
+  assert.deepEqual(chooseMode([0, 1, 2], 10), { mode: "play", why: "afspil", keyframes: "nøglebilleder op til 8,0 s" }, "the last keyframe to the end counts");
+  assert.deepEqual(chooseMode(null, 20), { mode: "play", why: "afspil", keyframes: "nøglebilleder ukendt" });
+  assert.deepEqual(chooseMode([], 20), { mode: "play", why: "afspil", keyframes: "nøglebilleder ukendt" });
 });
 
-test("mode: analyseClip reads the keyframes, seeks or plays, and retries a seek video error once in play", async () => {
+test("mode: analyseClip plays, retries a play video error once in seek, and never retries anything else", async () => {
   const modes: string[] = [];
   const recorder = (fail: (mode: string) => Error | null) =>
     deps({
@@ -266,42 +265,36 @@ test("mode: analyseClip reads the keyframes, seeks or plays, and retries a seek 
         return POSE(squatFrames());
       },
     });
-  const seek = recorder(() => null);
-  const out = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: seek.deps });
-  assert.deepEqual(modes, ["seek"]);
-  assert.ok(out.kind === "clipped" && out.mode?.why === "søg");
-  modes.length = 0;
-  const sparse = recorder(() => null);
-  const playOut = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...sparse.deps, keyframeTimes: async () => [0, 4.1, 8.2, 12.3] } });
-  assert.deepEqual(modes, ["play"]);
-  assert.ok(playOut.kind === "clipped" && playOut.mode?.why === "afspil: nøglebilleder op til 4,1 s");
+  const dense = recorder(() => null);
+  const out = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...dense.deps, keyframeTimes: async () => [0, 1, 2, 3] } });
+  assert.deepEqual(modes, ["play"], "dense keyframes play too");
+  assert.ok(out.kind === "clipped" && out.mode?.why === "afspil");
   modes.length = 0;
   const unknown = recorder(() => null);
   await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...unknown.deps, keyframeTimes: async () => { throw new Error("no moov"); } } });
   assert.deepEqual(modes, ["play"]);
   modes.length = 0;
-  const retry = recorder((m) => (m === "seek" ? new PoseError("video", "seeked kom ikke inden for 5 s") : null));
-  const retried = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: retry.deps });
-  assert.deepEqual(modes, ["seek", "play"], "one retry, in play");
-  assert.ok(retried.kind === "clipped" && retried.mode?.why === "afspil: søgning fejlede");
-  assert.equal(retry.writes.length, 1);
-  modes.length = 0;
   const detect = recorder(() => new PoseError("detect", "boom"));
   const failed = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: detect.deps });
-  assert.deepEqual(modes, ["seek"], "only a video error is retried");
+  assert.deepEqual(modes, ["play"], "only a video error is retried");
   assert.equal(failed.kind, "failed");
   modes.length = 0;
   const hidden = recorder((m) => (m === "play" ? new PoseError("aborted", "siden blev skjult") : null));
-  const gone = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...hidden.deps, keyframeTimes: async () => [0, 5] } });
-  assert.deepEqual(gone, { kind: "aborted" }, "a hidden page aborts the play run: nothing written");
+  const gone = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: hidden.deps });
+  assert.ok(gone.kind === "aborted" && gone.reason === "siden blev skjult" && gone.mode?.why === "afspil", "a hidden page aborts the run and says why: nothing written");
+  assert.deepEqual(modes, ["play"], "an abort is never retried");
   assert.equal(hidden.writes.length, 0);
   modes.length = 0;
   // review 2026-10-20: a throttled offscreen element gives too few frames (a video error): one retry in seek.
   const throttled = recorder((m) => (m === "play" ? new PoseError("video", "afspilning gav kun 0 af 200 billeder") : null));
-  const back = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...throttled.deps, keyframeTimes: async () => [0, 5] } });
+  const back = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: throttled.deps });
   assert.deepEqual(modes, ["play", "seek"], "one retry, in seek");
-  assert.ok(back.kind === "clipped" && back.mode?.why === "søg: afspilning fejlede");
+  assert.ok(back.kind === "clipped" && back.mode?.why === "søg: afspilning fejlede" && back.mode.keyframes !== undefined);
   assert.equal(throttled.writes.length, 1);
+  modes.length = 0;
+  const both = recorder(() => new PoseError("video", "x"));
+  assert.equal((await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: both.deps })).kind, "failed");
+  assert.deepEqual(modes, ["play", "seek"], "at most one retry");
 });
 
 test("the cap scales with the clip: max(90 s, duration × 1.5 + 30 s)", () => {

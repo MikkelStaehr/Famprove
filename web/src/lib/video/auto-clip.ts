@@ -21,7 +21,7 @@ import { isClipId } from "./clips.ts";
  * The analysis's version (slice clip-auto-2): the pickup re-runs a clip analysed with an older one
  * (lib/video/auto-version.ts). Raise it whenever findLift's result can change.
  */
-export const ALGO_VERSION = 2;
+export const ALGO_VERSION = 3;
 
 /**
  * Every threshold of the automatic clip, in one place: slice clip-accuracy tunes them against

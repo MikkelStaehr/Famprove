@@ -96,6 +96,19 @@ export function createImagePose(): Promise<PoseLandmarker> {
   return createLandmarker("IMAGE");
 }
 
+/** The part of Document abortWhenHidden reads (a fake in node tests). */
+export type VisibilityDoc = Pick<Document, "visibilityState" | "addEventListener" | "removeEventListener">;
+
+/** Aborts `ctrl` with PoseError "aborted" now if the page is hidden, or once it is; returns the unwatch. */
+export function abortWhenHidden(doc: VisibilityDoc, ctrl: AbortController): () => void {
+  const onHidden = () => {
+    if (doc.visibilityState === "hidden") ctrl.abort(new PoseError("aborted", "siden blev skjult"));
+  };
+  doc.addEventListener("visibilitychange", onHidden);
+  onHidden();
+  return () => doc.removeEventListener("visibilitychange", onHidden);
+}
+
 /** Rejects with the signal's reason once it aborts. */
 export function untilAbort<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return Promise.reject(signal.reason);
@@ -269,8 +282,8 @@ async function playPass(video: HTMLVideoElement, of: number, fps: number, detect
 /**
  * Pose on a recorded clip: a <video> on a blob URL (seek mode: detached; play mode: offscreen in
  * the DOM), the frames reached by seeking or by playing (PoseMode), detectForVideo per frame. Aborts
- * on the signal, after poseCapMs of the clip's length, or (play mode) when the page is hidden, since
- * a hidden page stops playback: PoseError "aborted", nothing written, the pickup retries later. The
+ * on the signal, after poseCapMs of the clip's length, or (every mode, clip-auto-3) when the page is
+ * hidden, since Chrome throttles timers and media there (an 18-minute hang on the phone): PoseError "aborted", nothing written, the pickup retries later. The
  * blob URL is revoked, the element removed and the landmarker closed on every way out.
  */
 export async function runPose(
@@ -287,13 +300,7 @@ export async function runPose(
   const onOuter = () => ctrl.abort(new PoseError("aborted", "afbrudt"));
   if (outer?.aborted) onOuter();
   else outer?.addEventListener("abort", onOuter, { once: true });
-  const onHidden = () => {
-    if (document.visibilityState === "hidden") ctrl.abort(new PoseError("aborted", "siden blev skjult"));
-  };
-  if (mode === "play") {
-    document.addEventListener("visibilitychange", onHidden);
-    onHidden();
-  }
+  const unwatch = abortWhenHidden(document, ctrl);
   const signal = ctrl.signal;
 
   let landmarker: PoseLandmarker | null = null;
@@ -363,7 +370,7 @@ export async function runPose(
   } finally {
     clearTimeout(cap);
     outer?.removeEventListener("abort", onOuter);
-    document.removeEventListener("visibilitychange", onHidden);
+    unwatch();
     video.pause();
     video.removeAttribute("src");
     video.load();

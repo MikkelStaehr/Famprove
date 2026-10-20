@@ -89,7 +89,7 @@ test("criterion 7: a new Optag mid-run aborts the old run; only the new clip is 
   first.abort();
   const second = new AbortController();
   const newRun = analyseClip(B, new Blob([]), META, { signal: second.signal, deps });
-  assert.deepEqual(await oldRun, { kind: "aborted" });
+  assert.equal((await oldRun).kind, "aborted");
   const out = await newRun;
   assert.equal(out.kind, "clipped");
   assert.deepEqual(
@@ -109,7 +109,7 @@ test("criterion 7: an abort that lands while runPose ignores it still writes not
   await new Promise((r) => setTimeout(r, 1));
   ctrl.abort();
   resolvePose(POSE(squatFrames()));
-  assert.deepEqual(await run, { kind: "aborted" });
+  assert.equal((await run).kind, "aborted");
   assert.equal(writes.length, 0);
 });
 
@@ -127,7 +127,7 @@ test("criterion 7: an abort during the model download writes nothing and never s
       return true;
     },
   );
-  assert.deepEqual(await analyseClip(A, new Blob([]), META, { signal: ctrl.signal, deps }), { kind: "aborted" });
+  assert.equal((await analyseClip(A, new Blob([]), META, { signal: ctrl.signal, deps })).kind, "aborted");
   assert.equal(poseStarted, false);
   assert.equal(writes.length, 0);
 });

@@ -57,7 +57,9 @@ import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/c
 import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, inPickupWindow, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
-import { browserStore, readAutoVersions, recordIfSaved } from "@/lib/video/auto-version";
+import { browserStore, readAutoVersions } from "@/lib/video/auto-version";
+import { recordRun } from "@/lib/video/auto-last";
+import { useWakeLock } from "@/components/fokus/useWakeLock";
 import { ClipDebug } from "@/components/ClipDebug";
 import { isDebugToggle } from "@/lib/video/debug-log";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
@@ -66,6 +68,21 @@ const NO_LIFTS: Readonly<Record<string, ClipLiftMeta>> = {};
 
 const CLEANUP_KEY = "famprove.clips.cleanup";
 const BTN = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
+
+/** Resolves once the page is visible again, or the signal aborts. */
+function untilVisible(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      if (document.visibilityState !== "visible" && !signal.aborted) return;
+      document.removeEventListener("visibilitychange", done);
+      signal.removeEventListener("abort", done);
+      resolve();
+    };
+    document.addEventListener("visibilitychange", done);
+    signal.addEventListener("abort", done, { once: true });
+    done();
+  });
+}
 const DARK_BTN = `inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-track px-4 font-sans text-14 font-medium text-text ${BTN}`;
 /** Gem and Del keep their width while they read `Klipper …` / `Forbereder …` (clip-cut §7). */
 const BUSY_WIDTH = "min-w-[7.5rem]";
@@ -237,7 +254,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     const s = store.current;
     const ctrl = new AbortController();
     void (async () => {
-      for (const r of queue) {
+      for (let i = 0; i < queue.length; i++) {
+        const r = queue[i];
         if (ctrl.signal.aborted) return;
         const lift = lifts[r.id];
         let blob: Blob | null = null;
@@ -254,7 +272,13 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           deps: browserAutoDeps,
         });
         setRunning(null);
-        recordIfSaved(browserStore(), r.id, out);
+        recordRun(browserStore(), r.id, out, Date.now());
+        if (out.kind === "aborted" && !ctrl.signal.aborted && document.visibilityState === "hidden") {
+          // clip-auto-3: a hidden page aborts the run (nothing written); the same clip again once visible
+          await untilVisible(ctrl.signal);
+          i--;
+          continue;
+        }
         if (out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") {
           const auto = out.kind === "clipped" ? { autoStatus: out.kind, autoInS: out.inS, autoOutS: out.outS } : { autoStatus: out.kind, autoInS: null, autoOutS: null };
           setRows((rs) => rs?.map((x) => (x.id === r.id ? { ...x, ...auto } : x)) ?? rs);
@@ -266,6 +290,9 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       pickupStarted.current = false;
     };
   }, [fixture, ready, initialRows, lifts]);
+
+  // clip-auto-3: the screen stays on while a pickup run is on (released after it; the hook re-requests when visible).
+  useWakeLock(running !== null);
 
   const entries = local.kind === "ready" ? local.entries : null;
   const list = local.kind === "ready" || local.kind === "none" ? libraryRows(entries, rows, names, runSets) : [];

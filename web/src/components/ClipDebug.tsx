@@ -7,12 +7,13 @@
  * with its setClipAuto write (the only thing sent); Kopiér log copies the aggregates. Canvases live
  * in memory and are dropped, runs aborted and the landmarker closed on close, unmount or page hidden.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { diagnoseLift } from "@/lib/video/auto-clip";
 import type { ClipLiftMeta } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip, failureOf } from "@/lib/video/auto-run";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
-import { browserStore, recordIfSaved } from "@/lib/video/auto-version";
+import { browserStore } from "@/lib/video/auto-version";
+import { readAutoLast, recordRun } from "@/lib/video/auto-last";
 import { type FileFacts, fileFacts } from "@/lib/video/cut";
 import { type DebugRun, type ImageCheck, debugLog, releaseImages } from "@/lib/video/debug-log";
 import { runPose } from "@/lib/video/pose-run";
@@ -45,6 +46,7 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
   const [runs, setRuns] = useState<readonly DebugRun[]>([]);
   const [images, setImages] = useState<readonly Shot[]>([]);
   const [reanalyse, setReanalyse] = useState<string | null>(null);
+  const [lastSeen, setLastSeen] = useState(0); // bumped after Analysér igen, so the background line is read again
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const ctrl = useRef<AbortController | null>(null);
@@ -168,7 +170,8 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
       deps: browserAutoDeps,
     });
     if (ctrl.current === c) setBusy(null);
-    recordIfSaved(browserStore(), clipId, out);
+    recordRun(browserStore(), clipId, out, Date.now());
+    setLastSeen((n) => n + 1);
     onAuto(out);
     const how = out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed" ? ` · ${out.mode?.why ?? "ingen tilstand"}` : "";
     setReanalyse(
@@ -182,7 +185,9 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
     );
   }
 
+  const last = useMemo(() => (lastSeen >= 0 ? (readAutoLast(browserStore())[clipId] ?? null) : null), [clipId, lastSeen]);
   const log = debugLog({
+    last,
     clip: { label, status, durationS, family: lift?.family ?? null, expected: lift?.expected ?? null },
     facts,
     videoSize,

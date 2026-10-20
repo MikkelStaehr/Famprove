@@ -12,7 +12,7 @@ export const AUTO_VERSION_KEY = "famprove.clips.autoVersion";
 export const UNRECORDED_VERSION = 1;
 
 export type AutoVersions = Readonly<Record<string, number>>;
-type KeyStore = Pick<Storage, "getItem" | "setItem">;
+export type KeyStore = Pick<Storage, "getItem" | "setItem">;
 
 /** The stored map; anything unreadable is an empty map (every clip then counts as version 1). */
 export function parseAutoVersions(raw: string | null): AutoVersions {
