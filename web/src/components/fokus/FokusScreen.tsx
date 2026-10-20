@@ -42,7 +42,7 @@ import { CAPTION, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTL
 import { SessionSignature } from "./SessionSignature";
 import { DoneButton, FeelBlock, Footer, NextSetCard, RestStrip, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
-import { type FokusSnapshot, MINIMISE_REFUSED, minimiseAction, readSnapshot, sessionStore, snapshotOf, writeSnapshot } from "@/lib/fokus-snapshot";
+import { carriedSignal, type FokusSnapshot, MINIMISE_REFUSED, minimiseAction, readSnapshot, sessionStore, snapshotOf, writeSnapshot } from "@/lib/fokus-snapshot";
 import { PartsEditor } from "./PartsEditor";
 import { usePartsSave } from "./usePartsSave";
 import { draftFrom, type PartsDraft } from "@/lib/parts-editor";
@@ -176,7 +176,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     // snapKey is snapshotOf's own output, serialised to key the effect: parsed back as that type.
     const now = JSON.parse(snapKey) as FokusSnapshot | null;
     const previous = readSnapshot(store, date);
-    writeSnapshot(store, now === null ? null : { ...now, signalled: previous !== null && now.restSince !== null && previous.signalled === now.restSince ? now.restSince : null });
+    writeSnapshot(store, now === null ? null : { ...now, signalled: carriedSignal(now.restSince, previous) });
   }, [snapKey, date]);
   // ↓ Minimér (§2–3): refused while a failed jump or pick halts the queue; else the saves land first.
   const halted = jumpProblem?.kind === "failed" || pickHalted;

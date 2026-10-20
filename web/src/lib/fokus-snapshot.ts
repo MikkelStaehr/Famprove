@@ -58,8 +58,13 @@ export function snapshotOf(
     restSince,
     restMinS: window?.minS ?? null,
     restMaxS: window?.maxS ?? null,
-    signalled: previous !== null && restSince !== null && previous.signalled === restSince ? restSince : null,
+    signalled: carriedSignal(restSince, previous),
   };
+}
+
+/** The "already signalled" mark carried over from `previous` while the rest is the same one, else null. */
+export function carriedSignal(restSince: string | null, previous: FokusSnapshot | null): string | null {
+  return previous !== null && restSince !== null && previous.signalled === restSince ? restSince : null;
 }
 
 function isSnapshot(x: unknown): x is FokusSnapshot {
