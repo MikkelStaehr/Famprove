@@ -2,7 +2,8 @@
 
 import { type RefObject, useCallback, useEffect, useReducer, useRef, useState } from "react";
 
-import { saveClip } from "@/app/actions";
+import { saveClip, trimClip } from "@/app/actions";
+import { finishDueTrims, syncAllowed } from "@/lib/video/trim";
 import { CAMERA_CONSTRAINTS } from "@/lib/video/constraints";
 import { type ClipIndex, type ClipIndexEntry, type ClipNameStack, interrupted } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
@@ -175,10 +176,11 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFix
       .catch(() => undefined);
     void (async () => {
       try {
+        await finishDueTrims({ index: ix(), files: fs(), trim: trimClip }, new Date()); // clip-trim §3: originals past their deadline
         const all = await ix().all();
         for (const e of interrupted(all, live.current?.id ?? null)) await ix().put(e);
-        // A failed insert is retried on the next open (§8); the index marks it unsynced.
-        for (const e of all) if (e.state === "done" && e.synced === false && e.durationS !== null) await sync(e, e.durationS);
+        // A failed insert is retried on the next open (§8); the index marks it unsynced. A pending cut waits for its finish.
+        for (const e of all) if (e.state === "done" && e.synced === false && e.durationS !== null && syncAllowed(e)) await sync(e, e.durationS);
       } catch {
         // an unreadable index never blocks Fokus
       }

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import Link from "next/link";
 import { createPortal } from "react-dom";
 
-import { deleteClip, saveClip, starClip } from "@/app/actions";
+import { deleteClip, saveClip, starClip, trimClip } from "@/app/actions";
+import { finishDueTrims } from "@/lib/video/trim";
 import { Icon } from "@/components/icons";
 import { MonoCaption } from "@/components/MonoCaption";
 import { SectionTitle } from "@/components/SectionTitle";
@@ -12,7 +13,7 @@ import { WarningLine } from "@/components/WarningLine";
 import type { IsoDate } from "@/lib/db/rows";
 import { type DeleteClipResult, PERMANENT_SAVE_REFUSALS, type VideoClipRow } from "@/lib/video/clips";
 import { cleanupPlan } from "@/lib/video/cleanup";
-import { type ClipIndex, type ClipIndexEntry, memoryClipIndex } from "@/lib/video/index-store";
+import { type ClipIndex, type ClipIndexEntry, clipFile, clipFiles, memoryClipIndex } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
 import { FIXTURE_CLIP_BYTES, fixturePlayhead } from "@/lib/video/library-fixture";
 import {
@@ -214,6 +215,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       const s: Store = { index: indexedDbClipIndex(), files: opfsClipFiles() };
       store.current = s;
       setFiles(s.files);
+      await finishDueTrims({ index: s.index, files: s.files, trim: trimClip }, new Date()); // clip-trim §3: originals past their deadline
       let entries = await s.index.all();
       // Retries: unsynced clips (video-record §8) and unconfirmed stars (§6), then the daily cleanup.
       for (const e of unsyncedClips(entries)) {
@@ -229,7 +231,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       if (initialRows !== null && cleanupDue(last, today)) {
         const plan = cleanupPlan(entries, initialRows, new Date());
         for (const e of plan.deleteLocal) {
-          await s.files.remove(e.id, e.ext);
+          for (const f of clipFiles(e)) await s.files.removeFile(f);
           await s.index.remove(e.id);
           await tryDeleteClip(e.id); // a failed row is tomorrow's deleteServerOnly; the cleanup goes on
         }
@@ -242,7 +244,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       entries = await s.index.all();
       setLocal({ kind: "ready", entries });
       const sz: Record<string, number | null> = {};
-      for (const e of entries) sz[e.id] = (await s.files.read(e.id, e.ext))?.size ?? null;
+      for (const e of entries) sz[e.id] = (await s.files.readFile(clipFile(e)))?.size ?? null;
       setSizes(sz);
     } catch (error) {
       console.error("optagelser: reading the clip index failed", error);
@@ -311,7 +313,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         const lift = lifts[r.id];
         let blob: Blob | null = null;
         try {
-          blob = await s.files.read(r.id, "mp4");
+          const e = found.find((x) => x.id === r.id);
+          blob = e === undefined || e.pendingTrim !== undefined ? null : await s.files.readFile(clipFile(e)); // clip-trim §5
         } catch {
           blob = null;
         }
@@ -386,8 +389,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       read: async (id) => {
         if (fixture !== null) return new Blob([]);
         const r = byId.get(id);
-        if (s === null || r === undefined || r.ext === null) return null;
-        return s.files.read(id, r.ext);
+        if (s === null || r === undefined || r.file === null) return null;
+        return s.files.readFile(r.file);
       },
       download,
       sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
@@ -436,7 +439,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     const s = store.current;
     if (fixture === null) {
       if (s !== null && row.ext !== null) {
-        await s.files.remove(row.id, row.ext);
+        for (const f of row.files) await s.files.removeFile(f);
         await s.index.remove(row.id);
       }
       const r = await tryDeleteClip(row.id);
@@ -806,8 +809,8 @@ function Player({
   useEffect(() => {
     let made: string | null = null;
     let live = true;
-    if (!fixture && files !== null && row.ext !== null) {
-      void files.read(row.id, row.ext).then((b) => {
+    if (!fixture && files !== null && row.file !== null) {
+      void files.readFile(row.file).then((b) => {
         if (!live || b === null) return;
         made = URL.createObjectURL(b);
         setBlob(b);
@@ -818,7 +821,7 @@ function Player({
       live = false;
       if (made !== null) URL.revokeObjectURL(made); // revoked on close (§10)
     };
-  }, [files, fixture, row.ext, row.id]);
+  }, [files, fixture, row.file]);
 
   useEffect(() => {
     closeBtn.current?.focus();
@@ -1002,7 +1005,7 @@ function Player({
         return;
       }
       try {
-        b = await files.read(row.id, row.ext);
+        b = row.file === null ? null : await files.readFile(row.file);
       } catch {
         setSaveReading(false);
         setSaveText("Videoen kunne ikke læses på telefonen.");

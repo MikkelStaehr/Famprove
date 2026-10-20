@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { createClient, type FetchLike } from "../src/lib/db/postgrest.ts";
-import { readVideoClips, recordClip, recordClipAuto, recordClipRange, recordStar, removeClip, type VideoClipOptions } from "../src/lib/db/video-clips.ts";
+import { readVideoClips, recordClip, recordClipAuto, recordClipRange, recordClipTrim, recordStar, removeClip, type VideoClipOptions } from "../src/lib/db/video-clips.ts";
+import { parseTrimClipInput } from "../src/lib/video/trim.ts";
 import { FIXTURE_FAILING_RANGE_ID } from "../src/lib/video/clip-range.ts";
 import {
   clipDateAge,
@@ -84,8 +85,9 @@ function fetchFor(db: FakeDb): FetchLike {
         const body = JSON.parse(String(init.body)) as Row; // the test's own request body
         const keys = Object.keys(body).join(",");
         assert.ok(
-          keys === "starred" || keys === "clip_in_s,clip_out_s" || keys === "auto_in_s,auto_out_s,auto_status,auto_run_ms",
-          `only starred, the range or the auto clip is updated (${keys})`,
+          keys === "starred" || keys === "clip_in_s,clip_out_s" || keys === "auto_in_s,auto_out_s,auto_status,auto_run_ms" ||
+            keys === "duration_s,clip_in_s,clip_out_s,auto_in_s,auto_out_s,auto_status,auto_run_ms",
+          `only starred, the range, the auto clip or a trim is updated (${keys})`,
         );
         const hit = rows.filter((r) => matches(r, parsed.searchParams));
         for (const r of hit) Object.assign(r, body);
@@ -376,4 +378,50 @@ test("auto: dev switches reach no Supabase request", async () => {
   assert.deepEqual(await recordClipAuto(auto({ status: "failed", inS: null, outS: null }), clips), { ok: true, dev: true, status: "failed", inS: null, outS: null, runMs: 4100 });
   assert.deepEqual(await recordClipAuto(auto({ inS: 3, outS: 1 }), clips), { ok: false, reason: "range" });
   assert.equal(db.requests, 0);
+});
+
+// --- trim (slice clip-trim) ------------------------------------------------------------------------
+
+test("trim: the validation table; the one PATCH clears the ranges and auto_*; the same duration again is ok", async () => {
+  const db = fakeDb();
+  await recordClip(input(), NOW, opts(db)); // duration_s 14.3
+  const row = db.tables.video_clips[0];
+  Object.assign(row, { clip_in_s: 2, clip_out_s: 9, auto_in_s: 1, auto_out_s: 8, auto_status: "clipped", auto_run_ms: 900 });
+  const writes = db.writes;
+  const table: Array<[unknown, string]> = [
+    [0, "duration"], [-1, "duration"], [Number.NaN, "duration"], [Number.POSITIVE_INFINITY, "duration"], ["7", "duration"],
+    [null, "duration"], [901, "duration"], [14.4, "duration"], [20, "duration"], [0.04, "duration"],
+  ];
+  for (const [d, reason] of table) {
+    assert.deepEqual(await recordClipTrim({ id: ID, durationS: d }, opts(db)), { ok: false, reason }, String(d));
+  }
+  assert.equal(db.writes, writes, "a refused trim writes nothing");
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 7.26 }, opts(db)), { ok: true, dev: false, durationS: 7.3 });
+  assert.equal(db.writes, writes + 1, "one PATCH");
+  assert.deepEqual(
+    { d: row.duration_s, ci: row.clip_in_s, co: row.clip_out_s, ai: row.auto_in_s, ao: row.auto_out_s, as: row.auto_status, ar: row.auto_run_ms },
+    { d: 7.3, ci: null, co: null, ai: null, ao: null, as: null, ar: null },
+  );
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 7.3 }, opts(db)), { ok: true, dev: false, durationS: 7.3 }, "idempotent: a retry after a lost reply");
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 9 }, opts(db)), { ok: false, reason: "duration" }, "never longer than the stored duration");
+});
+
+test("trim: not_found, preview host, dev switches and a failed request", async () => {
+  const db = fakeDb();
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 5 }, opts(db)), { ok: false, reason: "not_found" });
+  assert.equal(db.writes, 0);
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 5 }, opts(db, { VERCEL_ENV: "preview" })), { ok: false, reason: "not_allowed" });
+  const before = db.requests;
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 5 }, opts(db, { DEV_FIXTURE: "clips" }, "development")), { ok: true, dev: true, durationS: 5 });
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 5 }, opts(db, { DEV_TODAY: "2026-10-19" }, "development")), { ok: true, dev: true, durationS: 5 });
+  assert.equal(db.requests, before, "dev switches reach no Supabase request");
+  await recordClip(input(), NOW, opts(db));
+  db.cut = { at: db.requests + 2, afterApply: false };
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 5 }, opts(db)), { ok: false, reason: "failed" });
+  assert.equal(db.tables.video_clips[0].duration_s, 14.3);
+});
+
+test("trim: the action's input parse", () => {
+  assert.deepEqual(parseTrimClipInput({ id: ID, durationS: 5 }), { id: ID, durationS: 5 });
+  for (const raw of [null, [], "x", { id: "nope", durationS: 5 }, { id: ID }]) assert.equal(parseTrimClipInput(raw), null, JSON.stringify(raw));
 });

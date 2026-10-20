@@ -4,9 +4,10 @@ import { recordFtpChoice, undoFtpChoice } from "@/lib/db/ftp-ack";
 import { recordSetTap, type SetTapResult } from "@/lib/db/set-log";
 import { recordSetParts } from "@/lib/db/set-parts";
 import { recordSupersetPair } from "@/lib/db/superset-pairs";
-import { recordClip, recordClipAuto, recordClipRange, recordStar, removeClip } from "@/lib/db/video-clips";
+import { recordClip, recordClipAuto, recordClipRange, recordClipTrim, recordStar, removeClip } from "@/lib/db/video-clips";
 import { parseSetClipAutoInput, type SetClipAutoResult } from "@/lib/video/auto-clip";
 import { parseSetClipRangeInput, type SetClipRangeResult } from "@/lib/video/clip-range";
+import { parseTrimClipInput, type TrimClipResult } from "@/lib/video/trim";
 import { parseSetPartsInput, type SetPartsResult } from "@/lib/set-parts";
 import { parseSupersetInput, type SupersetResult } from "@/lib/supersets";
 import type { FtpChoiceResult, FtpUndoResult } from "@/lib/ftp-line";
@@ -105,6 +106,16 @@ export async function setClipAuto(raw: unknown): Promise<SetClipAutoResult> {
   const input = parseSetClipAutoInput(raw);
   if (input === null) return { ok: false, reason: "invalid" };
   return recordClipAuto(input);
+}
+
+/**
+ * A committed manual cut (slice clip-trim), sent once Fortryd's window is over: one PATCH of the new
+ * duration_s with clip_in_s/clip_out_s and auto_* null; refused unless 0 < new ≤ the row's duration_s.
+ */
+export async function trimClip(raw: unknown): Promise<TrimClipResult> {
+  const input = parseTrimClipInput(raw);
+  if (input === null) return { ok: false, reason: "invalid" };
+  return recordClipTrim(input);
 }
 
 /** A clip deleted on the phone deletes its row: one DELETE, idempotent. */

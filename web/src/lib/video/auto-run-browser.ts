@@ -6,6 +6,8 @@
  */
 import { setClipAuto } from "@/app/actions";
 import { type AutoDeps, bytePct } from "./auto-run";
+import { indexedDbClipIndex } from "./index-store-browser";
+import { guardAutoWrite } from "./trim";
 import { MODEL_PATH, runPose } from "./pose-run";
 
 async function cached(): Promise<boolean> {
@@ -43,6 +45,6 @@ export const browserAutoDeps: AutoDeps = {
   warmModel,
   keyframeTimes: async (blob) => (await import("./cut")).keyframeTimes(blob), // mp4box only when a clip is analysed
   runPose: (blob, opts) => runPose(blob, opts),
-  setClipAuto: (input) => setClipAuto(input),
+  setClipAuto: guardAutoWrite((input) => setClipAuto(input), { get: (id) => indexedDbClipIndex().get(id) }), // clip-trim §5
   now: () => performance.now(),
 };

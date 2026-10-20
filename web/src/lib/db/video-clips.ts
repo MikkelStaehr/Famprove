@@ -23,6 +23,7 @@ import { type ClipNames, type RunSets, runSetNumbers, type SessionSetRow } from 
 import { FIXTURE_FAILING_RANGE_ID, type SetClipRangeInput, type SetClipRangeResult, validateClipRange } from "../video/clip-range.ts";
 import { expectedReps, liftFamily, type SetClipAutoInput, type SetClipAutoResult, validateClipAuto } from "../video/auto-clip.ts";
 import { PICKUP_DAYS } from "../video/auto-lines.ts";
+import { type TrimClipInput, type TrimClipResult, validateTrim } from "../video/trim.ts";
 import type { ClipLiftMeta } from "../video/auto-lines.ts";
 
 /**
@@ -155,6 +156,37 @@ export async function recordClipRange(input: SetClipRangeInput, options: VideoCl
     return { ok: true, dev: false, ...range };
   } catch (error) {
     return failed(error, "clip range not saved");
+  }
+}
+
+/**
+ * A committed manual cut (slice clip-trim): one PATCH of duration_s (the cut file's own length) with
+ * clip_in_s/clip_out_s and auto_* null (the file is the clip, so no stored range applies), after one
+ * read of the row's duration_s. Refused unless 0 < new < current (validateTrim); the same new
+ * duration again is ok (idempotent: a retry after a lost reply). Refused on a preview host.
+ * Dev switches read and write nothing and answer as if saved.
+ */
+export async function recordClipTrim(input: TrimClipInput, options: VideoClipOptions = {}): Promise<TrimClipResult> {
+  const { env = process.env, nodeEnv = process.env.NODE_ENV, client: makeClient = client } = options;
+  if (!recordingAllowed(env, nodeEnv)) return { ok: false, reason: "not_allowed" };
+  const shaped = validateTrim(input.durationS, null);
+  if (shaped === null) return { ok: false, reason: "duration" };
+  if (devSwitchOn(env, nodeEnv)) return { ok: true, dev: true, durationS: shaped }; // nothing is read or written
+  try {
+    const c = makeClient();
+    const current = await clipDuration(c, input.id);
+    if (current === undefined) return { ok: false, reason: "not_found" };
+    const durationS = validateTrim(input.durationS, current);
+    if (durationS === null) return { ok: false, reason: "duration" };
+    const n = await patchCount(c, TABLE, {
+      params: [["id", `eq.${input.id}`]],
+      body: { duration_s: durationS, clip_in_s: null, clip_out_s: null, auto_in_s: null, auto_out_s: null, auto_status: null, auto_run_ms: null },
+      columns: "id",
+    });
+    if (n === 0) return { ok: false, reason: "not_found" }; // deleted between the read and the write
+    return { ok: true, dev: false, durationS };
+  } catch (error) {
+    return failed(error, "clip trim not saved");
   }
 }
 

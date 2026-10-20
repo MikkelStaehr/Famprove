@@ -38,6 +38,31 @@ export function opfsClipFiles(): ClipFiles {
         if (!notFound(error)) throw error;
       }
     },
+    writeFile: async (name, blob) => {
+      const stream = await (await (await dir()).getFileHandle(name, { create: true })).createWritable();
+      try {
+        await stream.write(blob);
+      } catch (error) {
+        await stream.abort(); // nothing is committed: a half file never exists
+        throw error;
+      }
+      await stream.close();
+    },
+    readFile: async (name) => {
+      try {
+        return await (await (await dir()).getFileHandle(name)).getFile();
+      } catch (error) {
+        if (notFound(error)) return null;
+        throw error;
+      }
+    },
+    removeFile: async (name) => {
+      try {
+        await (await dir()).removeEntry(name);
+      } catch (error) {
+        if (!notFound(error)) throw error;
+      }
+    },
     names: async () => {
       const names: string[] = [];
       for await (const name of (await dir()).keys()) names.push(name);

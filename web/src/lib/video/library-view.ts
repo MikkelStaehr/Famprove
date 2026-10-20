@@ -10,7 +10,7 @@ import { isoWeekStart } from "../dates.ts";
 import type { IsoDate } from "../db/rows.ts";
 import { runPositions } from "../training-view.ts";
 import type { VideoClipRow } from "./clips.ts";
-import type { ClipIndexEntry, ClipNameStack } from "./index-store.ts";
+import { clipFile, clipFiles, type ClipIndexEntry, type ClipNameStack } from "./index-store.ts";
 import type { ClipExt } from "./mime.ts";
 
 export type ClipNames = {
@@ -24,6 +24,10 @@ export type LibraryRow = {
   readonly id: string;
   readonly kind: LibraryRowKind;
   readonly ext: ClipExt | null; // null without a local file
+  /** The local file to read (clipFile(entry), slice clip-trim); null without one. */
+  readonly file: string | null;
+  /** Every local file of the clip (clipFiles(entry)): what deleting it removes; empty without one. */
+  readonly files: readonly string[];
   readonly exercise: string; // the exercise's name ("Optagelse" when unknown: a clip with no row yet)
   readonly variant: string | null; // display name, shown above the exercise name
   readonly date: IsoDate;
@@ -159,7 +163,7 @@ export function libraryRows(
       const label = shownName(nm);
       const set = shownSet(r.date, r.session, r.row, r.set);
       out.push({
-        id: r.id, kind: "remote", ext: null, ...nm, date: r.date, set, durationS: r.durationS,
+        id: r.id, kind: "remote", ext: null, file: null, files: [], ...nm, date: r.date, set, durationS: r.durationS,
         starred: r.starred, starUnsynced: false, recordedAt: r.recordedAt,
         meta: `${clipDay(r.date)} · sæt ${set} · ${clipDuration(r.durationS)} · på telefonen`,
         sr: `${label}, sæt ${set}, ${clipDayLong(r.date)}, på telefonen.`,
@@ -174,7 +178,7 @@ export function libraryRows(
       const label = shownName(nm);
       const date = r?.date ?? e.setKey.date;
       const set = r === undefined ? shownSet(e.setKey.date, e.setKey.sessionNo, e.setKey.row, e.setKey.set) : shownSet(r.date, r.session, r.row, r.set);
-      const durationS = r?.durationS ?? e.durationS;
+      const durationS = e.pendingTrim !== undefined ? e.durationS : (r?.durationS ?? e.durationS); // clip-trim: the cut's length until the server has it
       const dur = durationS === null ? null : clipDuration(durationS);
       const afbrudt = e.state === "afbrudt";
       const starUnsynced = !afbrudt && e.starred !== (r?.starred ?? false) && !e.starSynced;
@@ -182,7 +186,7 @@ export function libraryRows(
         ? `sæt ${set} · afbrudt${dur === null ? "" : ` · ${dur}`}`
         : `${clipDay(date)} · sæt ${set}${dur === null ? "" : ` · ${dur}`}`;
       out.push({
-        id: e.id, kind: afbrudt ? "afbrudt" : "clip", ext: e.ext, ...nm, date, set, durationS,
+        id: e.id, kind: afbrudt ? "afbrudt" : "clip", ext: e.ext, file: clipFile(e), files: clipFiles(e), ...nm, date, set, durationS,
         starred: !afbrudt && e.starred, starUnsynced, recordedAt: r?.recordedAt ?? e.recordedAt, meta,
         sr: `Afspil ${label}, sæt ${set}, ${clipDayLong(date)}${durationS === null ? "" : `, ${spokenDuration(durationS)}`}${afbrudt ? ", afbrudt" : ""}.`,
       });
@@ -192,7 +196,7 @@ export function libraryRows(
       const nm = names(r, n);
       const set = shownSet(r.date, r.session, r.row, r.set);
       out.push({
-        id: r.id, kind: "missing", ext: null, ...nm, date: r.date, set, durationS: r.durationS,
+        id: r.id, kind: "missing", ext: null, file: null, files: [], ...nm, date: r.date, set, durationS: r.durationS,
         starred: r.starred, starUnsynced: false, recordedAt: r.recordedAt, meta: "fil mangler",
         sr: `Slet oplysningen om ${shownName(nm)}, sæt ${set}, ${clipDayLong(r.date)}`,
       });
@@ -214,7 +218,7 @@ export function pendingStars(local: readonly ClipIndexEntry[]): ClipIndexEntry[]
 
 /** Clips whose row insert failed (video-record §8): retried by the cleanup. */
 export function unsyncedClips(local: readonly ClipIndexEntry[]): ClipIndexEntry[] {
-  return local.filter((e) => e.state === "done" && e.synced === false && e.durationS !== null && e.syncRefused === undefined);
+  return local.filter((e) => e.state === "done" && e.synced === false && e.durationS !== null && e.syncRefused === undefined && e.pendingTrim === undefined);
 }
 
 /** The player's history entry (video-library §10): pushed once on open, so the back gesture closes it. */

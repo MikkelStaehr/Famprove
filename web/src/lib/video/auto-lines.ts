@@ -114,7 +114,7 @@ export function inPickupWindow(recordedAt: string, now: Date): boolean {
 
 export function pickupQueue(local: readonly ClipIndexEntry[], rows: readonly VideoClipRow[], now: Date, versions: AutoVersions = {}, auto = true): VideoClipRow[] {
   if (!auto) return []; // clip-auto-park: the switch is off, the pickup takes nothing
-  const files = new Map(local.filter((e) => e.state === "done" && e.ext === "mp4").map((e) => [e.id, e]));
+  const files = new Map(local.filter((e) => e.state === "done" && e.ext === "mp4" && e.pendingTrim === undefined).map((e) => [e.id, e]));
   const due = (r: VideoClipRow): boolean => r.autoStatus === null || versionOf(versions, r.id) < ALGO_VERSION;
   return rows
     .filter((r) => due(r) && files.has(r.id) && inPickupWindow(r.recordedAt, now))
