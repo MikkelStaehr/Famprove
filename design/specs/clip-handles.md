@@ -1,5 +1,7 @@
 # Spec-lite: clip-handles (slice `clip-handles`, M; user 2026-10-20)
 
+> **Amended by `clip-trim.md` (2026-10-20):** the primary is `Gem klip` (R1), which cuts the file destructively with Fortryd 10 s (clip-trim §2.3, §3); it no longer writes `clip_in_s`/`clip_out_s`. The close-without-writing `Fortryd` is renamed `Annullér`. `Fjern klip` shows only for an old stored range. §3's Gem klip lines, §4 and criteria 7–8 are replaced by clip-trim §4–5 and §7.
+
 "Kan jeg selv sætte start og slut på klippet?" One primary action: `Gem klip`. Builds on `clip-cut.md` (number format, cut line, `cutRange`); voice and tokens from DESIGN.md (Ember). No orange: the accent stays the today marker.
 
 ## 1. Entry

@@ -1,5 +1,7 @@
 # Spec-lite: clip-mark (slice `clip-mark`, M; user 2026-10-20)
 
+> **Amended by `clip-trim.md` (2026-10-20):** Slut her only sets the out point and saves nothing; the cut is `Gem klip` (destructive, Fortryd 10 s). §2.2's saving/saved/Fortryd lines, criteria 4, 6, 7 and shots 3–4 are replaced by clip-trim §2–3 and §7. Start her, Ryd, the refused line and §3 focus stay.
+
 "Can I cut the clip while I watch it?" One primary action: **Slut her ]**, which saves. It builds on `clip-handles.md` (save path `setClipRange`, status lines, Fortryd pattern) and `clip-cut.md` (number format, cut line). The handles editor (`Klip` / `Ret klip`) stays as it is and becomes the fine-tuning. There is no orange.
 
 ## 1. Entry and placement (390 px)
