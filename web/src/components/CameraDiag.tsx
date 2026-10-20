@@ -97,9 +97,10 @@ async function testCamera(device: MediaDeviceInfo, index: number, res: DiagResou
     const open: DiagOutcome = { ok: true, settings: pickDiag(track.getSettings()) };
     const raw: unknown = typeof track.getCapabilities === "function" ? track.getCapabilities() : null;
     const capabilities = raw === null ? null : pickDiag(raw);
+    // 4:3 last, so the test shot (after zoom min) shows the frame camera-wide will record.
     const tries = [
-      { name: "960×720 (4:3)", outcome: await tryConstraints(track, { width: { ideal: 960 }, height: { ideal: 720 }, aspectRatio: { ideal: 4 / 3 } }) },
       { name: "1280×720", outcome: await tryConstraints(track, { width: { ideal: 1280 }, height: { ideal: 720 } }) },
+      { name: "960×720 (4:3)", outcome: await tryConstraints(track, { width: { ideal: 960 }, height: { ideal: 720 }, aspectRatio: { ideal: 4 / 3 } }) },
     ];
     const min = zoomMinOf(capabilities);
     // zoom is not in TypeScript's MediaTrackConstraintSet yet (Image Capture spec); the browser reads it.
