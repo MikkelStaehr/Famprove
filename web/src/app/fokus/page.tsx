@@ -36,9 +36,12 @@ type PlanState =
   | { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 
 /** The plan and today's set log are one read: a failure of either is Fokus's ErrorState (§5). */
-async function planState(today: IsoDate, categories: readonly ExerciseCategoryRow[] | null): Promise<PlanState> {
+async function planState(
+  today: IsoDate,
+  catalogue: Promise<readonly ExerciseCategoryRow[] | null>,
+): Promise<PlanState> {
   try {
-    const data = await loadTrainingPlan(today);
+    const [data, categories] = await Promise.all([loadTrainingPlan(today), catalogue]);
     // combo-parts.md: the parts editor's data goes to Fokus as read (fokusView pre-fills from it).
     return { kind: "ready", plan: buildTrainingPlan(data, today, categories), parts: data.parts };
   } catch (error) {
@@ -59,7 +62,7 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
   const catalogueRead = loadExerciseCategories();
   const [stale, state, params, catalogue] = await Promise.all([
     staleNote(today, now),
-    catalogueRead.then((c) => planState(today, c)),
+    planState(today, catalogueRead), // both reads in parallel, as before bw-display
     searchParams,
     catalogueRead,
   ]);
