@@ -8,7 +8,10 @@
  * The week switcher picks among weekly_load rows; a `?week=` value that names no row falls
  * back to the latest week, so user input never reaches a query.
  */
+import { type CategoryOf, categoryLookup } from "./catalogue.ts";
 import { addDays } from "./dates.ts";
+import type { ExerciseCategoryRow } from "./db/rows.ts";
+import { bodyweightWords } from "./format.ts";
 import { strengthLogStart } from "./load-days.ts";
 import type {
   ActivityRow,
@@ -166,6 +169,8 @@ export type ExerciseDetail = {
   readonly reps: number;
   readonly loggedKg: number | null; // as logged; null when blank or unreadable
   readonly bodyweight: boolean; // kg in the score = BODYWEIGHT x the exercise's fraction + loggedKg
+  /** The load in words ("kropsvægt + 10 kg") only on a pure bodyweight exercise (bw-display: category bodyweight); else the logged kg. */
+  readonly bodyweightWords: boolean;
   /** strength_sets.kg (Python: logged + BODYWEIGHT x bodyweight_fraction) when it differs from
    * the logged kg, i.e. on a bodyweight exercise; null when they are the same. */
   readonly effectiveKg: number | null;
@@ -346,7 +351,7 @@ function rideDetail(a: ActivityRow, vi: RideViRow | undefined): RideDetail {
   };
 }
 
-function exerciseDetails(sets: readonly StrengthSetRow[]): ExerciseDetail[] {
+function exerciseDetails(sets: readonly StrengthSetRow[], category: CategoryOf): ExerciseDetail[] {
   const ordered = sets.toSorted(
     (a, b) => a.block.localeCompare(b.block) || a.sheetRow - b.sheetRow || a.setNo - b.setNo,
   );
@@ -365,6 +370,7 @@ function exerciseDetails(sets: readonly StrengthSetRow[]): ExerciseDetail[] {
     reps: first.reps,
     loggedKg: first.loggedKg,
     bodyweight: first.bodyweight,
+    bodyweightWords: bodyweightWords(first.bodyweight, category(first.name)),
     effectiveKg: first.bodyweight && first.kg !== (first.loggedKg ?? 0) ? first.kg : null,
     prescribed: first.prescribed,
     // The score that feeds the session's TSS (score_final). Null shows as missing, never the parser's score.
@@ -372,7 +378,7 @@ function exerciseDetails(sets: readonly StrengthSetRow[]): ExerciseDetail[] {
   }));
 }
 
-function sessionDetail(row: StrengthSessionRow, sets: readonly StrengthSetRow[]): SessionDetail {
+function sessionDetail(row: StrengthSessionRow, sets: readonly StrengthSetRow[], category: CategoryOf): SessionDetail {
   const own = sets.filter((s) => s.weekStart === row.weekStart && s.session === row.session);
   return {
     key: `${row.weekStart}#${row.session}`,
@@ -382,7 +388,7 @@ function sessionDetail(row: StrengthSessionRow, sets: readonly StrengthSetRow[])
     activityName: row.activityName,
     movingTimeS: row.movingTimeS,
     tss: row.tss,
-    exercises: row.block === null ? [] : exerciseDetails(own),
+    exercises: row.block === null ? [] : exerciseDetails(own, category),
   };
 }
 
@@ -391,7 +397,9 @@ function sessionDetail(row: StrengthSessionRow, sets: readonly StrengthSetRow[])
  * did the session (the n-th strength activity of the ISO week is session n); planned
  * sessions that weren't done don't appear. Rest = no ride and no strength activity.
  */
-export function dayDetails(week: WeekView, detail: WeekDetailData): DayDetail[] {
+/** `categories`: the exercise catalogue (bw-display), null when unread (the words stay as the set's flag says). */
+export function dayDetails(week: WeekView, detail: WeekDetailData, categories: readonly ExerciseCategoryRow[] | null): DayDetail[] {
+  const category = categoryLookup(categories);
   const vi = new Map(detail.rideVi.map((r) => [r.activityId, r]));
   return week.days.map((day) => {
     const rides = detail.activities
@@ -399,7 +407,7 @@ export function dayDetails(week: WeekView, detail: WeekDetailData): DayDetail[] 
       .map((a) => rideDetail(a, vi.get(a.id)));
     const sessions = detail.sessions
       .filter((s) => s.date === day.date)
-      .map((s) => sessionDetail(s, detail.sets));
+      .map((s) => sessionDetail(s, detail.sets, category));
     const strength = sessions.length > 0 ? { strengthTss: day.strengthTss, sessions } : null;
     return { ...day, rides, strength, rest: rides.length === 0 && strength === null };
   });

@@ -441,7 +441,7 @@ function StrengthSession({ session: s }: { readonly session: SessionDetail }) {
 }
 
 function Exercise({ exercise: e }: { readonly exercise: ExerciseDetail }) {
-  const load = formatSetLoad(e.loggedKg, e.bodyweight);
+  const load = formatSetLoad(e.loggedKg, e.bodyweightWords);
   const score = e.scorePerSet === null ? null : formatScore(e.scorePerSet);
   return (
     <li className="flex flex-col border-t border-border py-2 first:border-t-0">

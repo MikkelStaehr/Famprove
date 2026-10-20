@@ -81,7 +81,8 @@ async function loadWeekBody(today: IsoDate, strength: StrengthWeek | null): Prom
     const data = await loadDashboardData();
     const row = data.weeks.find((w) => w.weekStart <= today && today <= w.weekEnd);
     const week = row === undefined ? null : weekView(data, row);
-    const days = week === null ? [] : dayDetails(week, await loadWeekDetail(week.weekStart, week.weekEnd));
+    const [detail, categories] = week === null ? [null, null] : await Promise.all([loadWeekDetail(week.weekStart, week.weekEnd), loadExerciseCategories()]);
+    const days = week === null || detail === null ? [] : dayDetails(week, detail, categories);
     const logStart = data.blocks.reduce<IsoDate | null>((min, b) => (min === null || b.startDate < min ? b.startDate : min), null);
     const plan = strength === null ? null : datedPlan(strength, today, days.map((d) => d.date));
     return { kind: "rows", week, days, logStart, today, plan };

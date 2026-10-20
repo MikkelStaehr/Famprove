@@ -3,13 +3,13 @@
  * It selects and groups what Python stored; it never calculates training numbers
  * (watts, TSB and zones all come from the database).
  */
+import { catalogueCategories, catalogueKey, type CategoryOf, categoryLookup } from "./catalogue.ts";
 import { freshness, zoneDisplay } from "./dashboard-view.ts";
 import type { Freshness, Hero } from "./dashboard-view.ts";
 import { addDays, isoWeek, isoWeekStart } from "./dates.ts";
 import type { TrainingPlanData } from "./db/queries.ts";
 import type {
   DailyLoadRow,
-  ExerciseCategory,
   ExerciseCategoryRow,
   IsoDate,
   PlanItem,
@@ -393,32 +393,6 @@ function plannedKey(s: { readonly block: string; readonly sheetRow: number; read
   return `${s.block}#${s.sheetRow}#${s.week}#${s.setNo}`;
 }
 
-/** A catalogue key: trimmed, case-insensitive (as lib/db/set-log.ts and public.exercises' lower(btrim(name))). */
-export function catalogueKey(name: string): string {
-  return name.trim().toLowerCase();
-}
-
-/**
- * The catalogue's category per name and alias key, matched as the server matches: a canonical name
- * wins over another exercise's alias. A failed read (null) is null.
- */
-export function catalogueCategories(
-  rows: readonly Pick<ExerciseCategoryRow, "name" | "aliases" | "category">[] | null,
-): ReadonlyMap<string, ExerciseCategory> | null {
-  if (rows === null) return null;
-  const category = new Map<string, ExerciseCategory>();
-  for (const r of rows) if (!category.has(catalogueKey(r.name))) category.set(catalogueKey(r.name), r.category);
-  for (const r of rows) for (const a of r.aliases) if (!category.has(catalogueKey(a))) category.set(catalogueKey(a), r.category);
-  return category;
-}
-
-/** A sheet name's catalogue category; null = catalogue unread or the name not in it. */
-type CategoryOf = (name: string) => ExerciseCategory | null;
-
-function categoryLookup(rows: readonly ExerciseCategoryRow[] | null): CategoryOf {
-  const map = catalogueCategories(rows);
-  return (name) => map?.get(catalogueKey(name)) ?? null;
-}
 
 function exercisesOf(
   sets: readonly PrescribedSetRow[],
@@ -1022,3 +996,5 @@ export function runCountText(run: Pick<ExerciseRunView, "done" | "skipped" | "to
   const base = `${run.done} af ${run.total} sæt udført`;
   return run.skipped > 0 ? `${base}, ${run.skipped} sprunget over` : base;
 }
+
+export { catalogueCategories, catalogueKey };

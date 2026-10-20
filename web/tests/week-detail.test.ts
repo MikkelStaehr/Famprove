@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 import { dayDetails, selectWeek, weekParam, weekView } from "../src/lib/dashboard-view.ts";
 import { addDays } from "../src/lib/dates.ts";
+import { formatSetLoad } from "../src/lib/format.ts";
 import {
   parseActivityRow,
   parseAppNoticeRow,
@@ -172,7 +173,7 @@ test("dayDetails, week 40: Mon rest, Tue session 1 on its activity date, Wed rid
       // Session 3 has kg pre-filled but no activity: it never shows.
       set({ session: 3, sheetRow: 40, name: "Dødløft", loggedKg: 125 }),
     ],
-  });
+  }, null);
   const [mon, tue, wed, thu, fri] = detail;
 
   assert.equal(mon.rest, true);
@@ -225,7 +226,7 @@ test("effective kg: a bodyweight exercise with nothing logged shows its bodyweig
       set({ sheetRow: 10, name: "Pullups", bodyweight: true, loggedKg: null, kg: 85 }),
       set({ sheetRow: 11, name: "Facepulls", loggedKg: null, kg: 0 }), // blank: nothing to show
     ],
-  });
+  }, null);
   assert.deepEqual(
     tue.strength?.sessions[0]?.exercises.map((e) => [e.name, e.effectiveKg]),
     [
@@ -234,6 +235,37 @@ test("effective kg: a bodyweight exercise with nothing logged shows its bodyweig
       ["Facepulls", null],
     ],
   );
+});
+
+test("bw-display: the week card words kropsvægt only on a pure bodyweight exercise; the effective kg stays", () => {
+  const w = weekView(
+    { daily: [day("2026-09-29", 0, 10)], blocks: [], weeks: [], projection: [], weeklyPlan: [] },
+    week(40, "2026-09-28"),
+  );
+  const categories = [
+    { name: "Zercher FFE split squat", aliases: [], category: "accessory" },
+    { name: "Dips", aliases: [], category: "bodyweight" },
+  ] as const;
+  const [tue] = dayDetails(w, {
+    activities: [],
+    rideVi: [],
+    sessions: [done(1, "2026-09-29")],
+    sets: [
+      set({ name: "Zercher FFE split squat", type: "QUADS/ADDUCTORS", bodyweight: true, loggedKg: 42.5, kg: 102.5 }),
+      set({ sheetRow: 10, name: "Dips", bodyweight: true, loggedKg: 10, kg: 82 }),
+    ],
+  }, categories);
+  const ex = tue.strength?.sessions[0]?.exercises ?? [];
+  assert.deepEqual(
+    ex.map((e) => [e.name, formatSetLoad(e.loggedKg, e.bodyweightWords), e.effectiveKg]),
+    [
+      ["Zercher FFE split squat", "42,5 kg", 102.5],
+      ["Dips", "kropsvægt + 10 kg", 82],
+    ],
+  );
+  // An unread catalogue keeps today's words.
+  const [unread] = dayDetails(w, { activities: [], rideVi: [], sessions: [done(1, "2026-09-29")], sets: [set({ name: "Zercher FFE split squat", bodyweight: true, loggedKg: 42.5, kg: 102.5 })] }, null);
+  assert.equal(unread.strength?.sessions[0]?.exercises[0]?.bodyweightWords, true);
 });
 
 test("parseActivityRow and parseStrengthSetRow map and validate", () => {
@@ -304,7 +336,7 @@ test("a ride without ride_metrics (before 2024-12-30) has no VI and no warning",
     rideVi: [],
     sessions: [],
     sets: [],
-  });
+  }, null);
   assert.deepEqual([wed.rides[0]?.vi, wed.rides[0]?.viWarning], [null, false]);
 });
 
@@ -342,7 +374,7 @@ test("week view: the score per set is the final one that feeds the TSS; a null s
       set({ sheetRow: 30, name: "Bænk", type: "BENCH", score: 428.4, scoreFinal: 223.2 }), // rescored
       set({ sheetRow: 31, name: "Dips", type: "BACK", score: 128.6, scoreFinal: null }), // before the column
     ],
-  });
+  }, null);
   const [s1] = detail[1]?.strength?.sessions ?? [];
   // score_final null is missing (null), never the parser's score and never 0
   assert.deepEqual(s1?.exercises.map((e) => [e.name, e.scorePerSet]), [["Bænk", 223.2], ["Dips", null]]);

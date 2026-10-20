@@ -80,8 +80,8 @@ async function loadPageState(week: string | undefined): Promise<PageState> {
 /** The selected week's rides and sets; same error policy as loadPageState. */
 async function loadWeekState(nav: WeekNav): Promise<WeekState> {
   try {
-    const detail = await loadWeekDetail(nav.selected.weekStart, nav.selected.weekEnd);
-    return { kind: "ready", days: dayDetails(nav.selected, detail) };
+    const [detail, categories] = await Promise.all([loadWeekDetail(nav.selected.weekStart, nav.selected.weekEnd), loadExerciseCategories()]);
+    return { kind: "ready", days: dayDetails(nav.selected, detail, categories) };
   } catch (error) {
     if (isDataError(error)) {
       console.error("dashboard: loading week detail failed", error);
