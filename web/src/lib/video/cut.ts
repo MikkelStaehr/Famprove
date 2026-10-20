@@ -256,14 +256,14 @@ export type CutReason = "user" | "auto" | "none" | "webm";
 
 export type CutRange = { readonly reason: CutReason; readonly range: { readonly inS: number; readonly outS: number } | null };
 
+/** clip-auto-park: `auto: false` ignores the auto_* range (the switch is off); default true = as before. */
+export type CutOptions = { readonly auto?: boolean };
+
 /**
  * The range to cut a stored clip to: the user's clip_in_s/clip_out_s win, then auto_in_s/auto_out_s
  * when auto_status is 'clipped' (low_confidence, failed and not-yet-run give none), else none.
  * A WebM clip is never cut (mp4box reads MP4 only). Pure.
  */
-/** clip-auto-park: `auto: false` ignores the auto_* range (the switch is off); default true = as before. */
-export type CutOptions = { readonly auto?: boolean };
-
 export function cutRange(row: Pick<VideoClipRow, "clipInS" | "clipOutS" | "autoInS" | "autoOutS" | "autoStatus">, ext: ClipExt, opts: CutOptions = {}): CutRange {
   if (ext === "webm") return { reason: "webm", range: null };
   const valid = (a: number | null, b: number | null): a is number => a !== null && b !== null && a >= 0 && a < b;
