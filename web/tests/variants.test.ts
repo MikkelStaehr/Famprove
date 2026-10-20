@@ -90,7 +90,7 @@ function plan(sets: PrescribedSetRow[], previousWeek: PrescribedSetRow[], planne
     sessions: [{ weekStart: "2026-10-12", session: 1, block: "B", week: 3, activityId: null, date: null, activityName: null, movingTimeS: null, tss: 0 }],
     sets, previousWeek, rides: [], upcomingRides: [], plannedSets, setLog: [], setLogFailed: false,
   };
-  const next = buildTrainingPlan(data, "2026-10-14").strength.next;
+  const next = buildTrainingPlan(data, "2026-10-14", null).strength.next;
   assert.ok(next !== null);
   return next;
 }

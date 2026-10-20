@@ -38,6 +38,8 @@ import {
   spokenAdjustment,
   spokenName,
   titleName,
+  catalogueCategories,
+  catalogueKey,
 } from "./training-view.ts";
 import { handOffLabel, handOffName, pairHandOff, pairLine, restWindowOf, runSetsOf, runStartOf } from "./superset-view.ts";
 import { type FokusParts, NO_PARTS, partsFor, type PartsData } from "./set-parts.ts";
@@ -656,20 +658,13 @@ export function rampBasis(e: FokusExercise): string | null {
   return null;
 }
 
-/** A catalogue key: trimmed, case-insensitive (as lib/db/set-log.ts and public.exercises' lower(btrim(name))). */
-function catalogueKey(name: string): string {
-  return name.trim().toLowerCase();
-}
-
 /**
  * The name and alias keys of the catalogue's main lifts (category "main"), matched as the server
- * matches: a canonical name wins over another exercise's alias. A failed read (null) is null.
+ * matches (training-view.catalogueCategories). A failed read (null) is null.
  */
 export function mainLiftKeys(rows: readonly Pick<ExerciseCategoryRow, "name" | "aliases" | "category">[] | null): string[] | null {
-  if (rows === null) return null;
-  const category = new Map<string, ExerciseCategoryRow["category"]>();
-  for (const r of rows) if (!category.has(catalogueKey(r.name))) category.set(catalogueKey(r.name), r.category);
-  for (const r of rows) for (const a of r.aliases) if (!category.has(catalogueKey(a))) category.set(catalogueKey(a), r.category);
+  const category = catalogueCategories(rows);
+  if (category === null) return null;
   return [...category].filter(([, c]) => c === "main").map(([k]) => k);
 }
 

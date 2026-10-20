@@ -20,7 +20,7 @@ import type { ClipLiftMeta } from "@/lib/video/auto-lines";
 import { recordingAllowed, type VideoClipRow } from "@/lib/video/clips";
 import { clipsFixture, FIXTURE_NAMES, fixtureRunSets } from "@/lib/video/library-fixture";
 import type { ClipNames, RunSets } from "@/lib/video/library-view";
-import { loadDashboardData, loadTrainingForm, loadTrainingPlan, loadWeekDetail, NEXT_SESSION_DAYS } from "@/lib/db/queries";
+import { loadDashboardData, loadExerciseCategories, loadTrainingForm, loadTrainingPlan, loadWeekDetail, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { addDays, isoWeek, isoWeekStart } from "@/lib/dates";
 import { formatDay, formatUpdatedAt } from "@/lib/format";
@@ -59,7 +59,9 @@ async function loadFormState(today: IsoDate, now: Date): Promise<FormState> {
 
 async function loadPlanState(today: IsoDate): Promise<PlanState> {
   try {
-    return { kind: "ready", plan: buildTrainingPlan(await loadTrainingPlan(today), today) };
+    // The catalogue only words a load (bw-display); a failed read is null and keeps today's words.
+    const [data, categories] = await Promise.all([loadTrainingPlan(today), loadExerciseCategories()]);
+    return { kind: "ready", plan: buildTrainingPlan(data, today, categories) };
   } catch (error) {
     if (isDataError(error)) {
       console.error("træning: loading plan failed", error);

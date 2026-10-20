@@ -140,7 +140,7 @@ test("week 40 example: Wed 30 Sept after one activity on Tue 29 shows session 2 
         set({ session: 3, sheetRow: 40, name: "Dødløft" }),
       ],
     }),
-    "2026-09-30",
+    "2026-09-30", null,
   );
   assert.equal(view.kind, "strength");
   assert.equal(view.doneToday, false);
@@ -183,7 +183,7 @@ test("next session: exercises in sheet order, one per row, with last week's kg a
         set({ week: 0, weekStart: "2026-09-21", sheetRow: 31, loggedKg: 0, bodyweight: true }),
       ],
     }),
-    "2026-09-28",
+    "2026-09-28", null,
   );
   assert.equal(view.strength.next?.session, 1);
   assert.deepEqual(
@@ -215,7 +215,7 @@ test("next session: each row lists its sets, Python's suggestion, and today's lo
         { date: "2026-09-27", session: 1, row: 25, set: 1, startedAt: null, endedAt: null, skipped: true, skippedAt: "2026-09-27T16:04:00Z", updatedAt: "2026-09-27T16:04:00Z", feltRpe: null, repsDone: null },
       ],
     }),
-    "2026-09-28",
+    "2026-09-28", null,
   );
   const next = view.strength.next;
   assert.deepEqual(
@@ -240,7 +240,7 @@ test("three activities: all sessions done this week, rest card, next week's Mond
       ],
       upcomingRides: [RIDE],
     }),
-    "2026-10-02",
+    "2026-10-02", null,
   );
   assert.equal(view.strength.state, "all_done");
   assert.equal(view.strength.next, null);
@@ -255,7 +255,7 @@ test("an extra activity beyond the program is listed as extra; no program means 
   const extra = session(4, { block: null, week: null, activityId: "x", date: "2026-10-03", activityName: "Styrke" });
   const full = buildTrainingPlan(
     data({ sessions: [doneOn(1, "2026-09-29"), doneOn(2, "2026-09-30"), doneOn(3, "2026-10-01"), extra] }),
-    "2026-10-03",
+    "2026-10-03", null,
   );
   assert.equal(full.strength.state, "all_done");
   assert.deepEqual(full.strength.done.map((d) => [d.session, d.extra]), [
@@ -270,7 +270,7 @@ test("an extra activity beyond the program is listed as extra; no program means 
       weekStart: "2026-09-21",
       sessions: [session(1, { weekStart: "2026-09-21", block: null, week: null, activityId: "a", date: "2026-09-22" })],
     }),
-    "2026-09-23",
+    "2026-09-23", null,
   );
   assert.equal(week39.strength.state, "no_program");
   assert.equal(week39.strength.isoWeek, 39);
@@ -288,21 +288,21 @@ test("trainingHeader: TSB, zone and freshness from the latest row; null without 
 });
 
 test("ride day, both, and the next planned ride", () => {
-  const ride = buildTrainingPlan(data({ rides: [{ ...RIDE, date: "2026-10-05" }] }), "2026-10-05");
+  const ride = buildTrainingPlan(data({ rides: [{ ...RIDE, date: "2026-10-05" }] }), "2026-10-05", null);
   assert.equal(ride.kind, "ride");
   assert.equal(ride.rides[0]?.steps[0]?.kind, "step");
 
   const both = buildTrainingPlan(
     data({ sessions: [session(1)], sets: [set({ session: 1 })], rides: [{ ...RIDE, date: "2026-10-01" }] }),
-    "2026-10-01",
+    "2026-10-01", null,
   );
   assert.equal(both.kind, "both");
 
-  const rest = buildTrainingPlan(data({ upcomingRides: [RIDE] }), "2026-10-07");
+  const rest = buildTrainingPlan(data({ upcomingRides: [RIDE] }), "2026-10-07", null);
   assert.equal(rest.kind, "rest");
   assert.deepEqual(rest.next, { date: "2026-10-08", isTomorrow: true, rides: ["Zwift - Over-unders"] });
 
-  assert.equal(buildTrainingPlan(data({}), "2026-10-06").next, null);
+  assert.equal(buildTrainingPlan(data({}), "2026-10-06", null).next, null);
 });
 
 test("parsers for the Træning rows", () => {

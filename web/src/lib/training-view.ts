@@ -9,6 +9,8 @@ import { addDays, isoWeek, isoWeekStart } from "./dates.ts";
 import type { TrainingPlanData } from "./db/queries.ts";
 import type {
   DailyLoadRow,
+  ExerciseCategory,
+  ExerciseCategoryRow,
   IsoDate,
   PlanItem,
   PlannedSetRow,
@@ -24,6 +26,7 @@ import {
   formatDay,
   formatKg,
   formatSetLoad,
+  bodyweightWords,
   formatSetsReps,
   updatedText,
   spokenRange,
@@ -80,6 +83,7 @@ export function resolveToday(
   return localToday(now);
 }
 
+/** `bodyweight`: the load reads "kropsvægt + X kg" (format.bodyweightWords), display only. */
 export type Reference = { readonly kg: number; readonly bodyweight: boolean };
 
 /** One sheet row of the next session (all its sets share these values). */
@@ -93,6 +97,7 @@ export type ExerciseView = {
   readonly setsText: string | null;
   readonly repsText: string | null;
   readonly prescribed: string | null;
+  /** The load reads "kropsvægt + X kg": format.bodyweightWords of the set's bodyweight and the catalogue (bw-display). */
   readonly bodyweight: boolean;
   /** This week's kg from the sheet (the user's own number: planned ahead or lifted); null = none. */
   readonly kg: number | null;
@@ -374,11 +379,11 @@ export function withoutSkipped<S extends Pick<PrescribedSetRow, "weekStart" | "s
 
 /** Last week's logged kg per sheet row and variant. Nothing logged (null) is no reference; on a bodyweight
  * exercise 0 is a real entry ("kropsvægt"), on a weighted one the parser already made it null. */
-function references(previous: readonly PrescribedSetRow[]): Map<string, Reference> {
+function references(previous: readonly PrescribedSetRow[], category: CategoryOf): Map<string, Reference> {
   const refs = new Map<string, Reference>();
   for (const s of previous) {
     if (s.loggedKg !== null && (s.loggedKg > 0 || s.bodyweight) && !refs.has(refKey(s))) {
-      refs.set(refKey(s), { kg: s.loggedKg, bodyweight: s.bodyweight });
+      refs.set(refKey(s), { kg: s.loggedKg, bodyweight: bodyweightWords(s.bodyweight, category(s.name)) });
     }
   }
   return refs;
@@ -388,10 +393,38 @@ function plannedKey(s: { readonly block: string; readonly sheetRow: number; read
   return `${s.block}#${s.sheetRow}#${s.week}#${s.setNo}`;
 }
 
+/** A catalogue key: trimmed, case-insensitive (as lib/db/set-log.ts and public.exercises' lower(btrim(name))). */
+export function catalogueKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/**
+ * The catalogue's category per name and alias key, matched as the server matches: a canonical name
+ * wins over another exercise's alias. A failed read (null) is null.
+ */
+export function catalogueCategories(
+  rows: readonly Pick<ExerciseCategoryRow, "name" | "aliases" | "category">[] | null,
+): ReadonlyMap<string, ExerciseCategory> | null {
+  if (rows === null) return null;
+  const category = new Map<string, ExerciseCategory>();
+  for (const r of rows) if (!category.has(catalogueKey(r.name))) category.set(catalogueKey(r.name), r.category);
+  for (const r of rows) for (const a of r.aliases) if (!category.has(catalogueKey(a))) category.set(catalogueKey(a), r.category);
+  return category;
+}
+
+/** A sheet name's catalogue category; null = catalogue unread or the name not in it. */
+type CategoryOf = (name: string) => ExerciseCategory | null;
+
+function categoryLookup(rows: readonly ExerciseCategoryRow[] | null): CategoryOf {
+  const map = catalogueCategories(rows);
+  return (name) => map?.get(catalogueKey(name)) ?? null;
+}
+
 function exercisesOf(
   sets: readonly PrescribedSetRow[],
   refs: Map<string, Reference>,
   planned: ReadonlyMap<string, PlannedSetRow>,
+  category: CategoryOf,
 ): ExerciseView[] {
   const rows = new Map<string, ExerciseView>();
   const ordered = sets.toSorted(
@@ -412,7 +445,7 @@ function exercisesOf(
         setsText: s.setsText,
         repsText: s.repsText,
         prescribed: s.prescribed,
-        bodyweight: s.bodyweight,
+        bodyweight: bodyweightWords(s.bodyweight, category(s.name)),
         kg: s.loggedKg,
         reference: refs.get(refKey(s)) ?? null,
         row: s.sheetRow,
@@ -436,7 +469,12 @@ function exercisesOf(
 type DoneRow = StrengthSessionRow & { readonly date: IsoDate };
 
 /** This ISO week's strength (see StrengthWeek). Rows of other weeks are ignored. */
-export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWeek {
+/** `categories`: loadExerciseCategories (null = unread), for the load's words (bw-display). */
+export function strengthWeek(
+  data: TrainingPlanData,
+  today: IsoDate,
+  categories: readonly ExerciseCategoryRow[] | null,
+): StrengthWeek {
   const week = data.sessions.filter((r) => r.weekStart === data.weekStart);
   const planned = week.filter((r) => r.block !== null);
   const done: DoneSession[] = week
@@ -473,10 +511,12 @@ export function strengthWeek(data: TrainingPlanData, today: IsoDate): StrengthWe
     return { ...base, state: "all_done", next: null };
   }
   const sessionSets = data.sets.filter((s) => s.weekStart === data.weekStart && s.session === slot.session);
+  const category = categoryLookup(categories);
   const exercises = exercisesOf(
     sessionSets,
-    references(data.previousWeek),
+    references(data.previousWeek, category),
     new Map(data.plannedSets.map((p) => [plannedKey(p), p])),
+    category,
   );
   const runSets = exercises.flatMap((e) => e.sets.map((ref) => ({ ref, name: e.name, variantId: e.variantId })));
   const log = data.setLog.filter((l) => l.date === today && l.session === slot.session);
@@ -566,8 +606,12 @@ export function trainingHeader(latest: DailyLoadRow | null, now: Date): Training
       };
 }
 
-export function buildTrainingPlan(data: TrainingPlanData, today: IsoDate): TrainingPlan {
-  const strength = strengthWeek(data, today);
+export function buildTrainingPlan(
+  data: TrainingPlanData,
+  today: IsoDate,
+  categories: readonly ExerciseCategoryRow[] | null,
+): TrainingPlan {
+  const strength = strengthWeek(data, today, categories);
   const rides: RideView[] = data.rides.map((r) => ({
     name: r.name,
     notes: r.notes,

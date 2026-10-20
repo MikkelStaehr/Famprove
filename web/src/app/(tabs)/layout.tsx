@@ -2,7 +2,7 @@ import { connection } from "next/server";
 
 import { TabShell } from "@/components/TabShell";
 import { devFixture } from "@/lib/db/dev-fixture";
-import { loadTrainingPlan } from "@/lib/db/queries";
+import { loadExerciseCategories, loadTrainingPlan } from "@/lib/db/queries";
 import { type FokusSnapshot, snapshotOf } from "@/lib/fokus-snapshot";
 import { fokusView } from "@/lib/fokus-view";
 import { setKey } from "@/lib/set-taps";
@@ -15,7 +15,8 @@ import { buildTrainingPlan, resolveToday } from "@/lib/training-view";
 async function devSnapshot(today: string): Promise<FokusSnapshot | null | undefined> {
   const fixture = devFixture();
   if (fixture !== "minimised" && fixture !== "minimised-ready") return undefined;
-  const plan = buildTrainingPlan(await loadTrainingPlan(today), today);
+  const [data, categories] = await Promise.all([loadTrainingPlan(today), loadExerciseCategories()]);
+  const plan = buildTrainingPlan(data, today, categories);
   const next = plan.strength.state === "next" ? plan.strength.next : null;
   if (next === null) return null;
   const log = new Map(next.log.map((l) => [setKey(l), l]));

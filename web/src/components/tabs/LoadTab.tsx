@@ -27,7 +27,7 @@ import {
   type WeekNav,
 } from "@/lib/dashboard-view";
 import { type DataError, describeDataError, isDataError } from "@/lib/data-error";
-import { loadAppNotices, loadDashboardData, loadFtpCheck, loadTrainingPlan, loadWeekDetail } from "@/lib/db/queries";
+import { loadAppNotices, loadDashboardData, loadExerciseCategories, loadFtpCheck, loadTrainingPlan, loadWeekDetail } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
 import { FTP_NOTICE_KIND, ftpLine } from "@/lib/ftp-line";
 import { LOAD_GRID, LOAD_PLACE } from "@/lib/load-grid";
@@ -340,7 +340,8 @@ function Week({ view }: { readonly view: ReadyView }) {
 async function loadWeekPlan(nav: WeekNav, today: IsoDate): Promise<DatedPlan | null> {
   if (today < nav.selected.weekStart || nav.selected.weekEnd < today) return null;
   try {
-    const strength = strengthWeek(await loadTrainingPlan(today), today);
+    const [data, categories] = await Promise.all([loadTrainingPlan(today), loadExerciseCategories()]);
+    const strength = strengthWeek(data, today, categories);
     return datedPlan(strength, today, nav.selected.days.map((d) => d.date));
   } catch (error) {
     if (isDataError(error)) {

@@ -160,6 +160,19 @@ export function formatSetLoad(loggedKg: number | null, bodyweight: boolean): str
     : `kropsvægt − ${formatKg(-loggedKg)} kg`;
 }
 
+/**
+ * Whether a set's load reads "kropsvægt + X kg" (user, 2026-10-20, slice bw-display): only on a pure
+ * bodyweight exercise, i.e. the set's `bodyweight` AND the catalogue's category "bodyweight". An
+ * exercise that only carries a bodyweight fraction (the split squats, accessory 0.75) shows the
+ * logged kg alone. `category` null = the catalogue couldn't be read or doesn't hold the name: keep
+ * the set's `bodyweight` as before, so a dip never shows a bare "10 kg". Display only: the score
+ * and `strength_sets.bodyweight` are unchanged.
+ */
+export function bodyweightWords(bodyweight: boolean, category: string | null): boolean {
+  if (category === null) return bodyweight;
+  return bodyweight && category === "bodyweight";
+}
+
 /** A raw strength score as a whole number: 336.8 -> "337". */
 export function formatScore(score: number): string {
   return formatLoad(score);

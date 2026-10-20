@@ -8,7 +8,7 @@ import { type DataError, isDataError } from "@/lib/data-error";
 import { autoFixturePhase, devFixture, devSwitchOn, videoFixture } from "@/lib/db/dev-fixture";
 import { recordingAllowed } from "@/lib/video/clips";
 import { loadExerciseCategories, loadTrainingForm, loadTrainingPlan } from "@/lib/db/queries";
-import type { IsoDate } from "@/lib/db/rows";
+import type { ExerciseCategoryRow, IsoDate } from "@/lib/db/rows";
 import type { PartsData } from "@/lib/set-parts";
 import { fokusStaleNote, mainLiftKeys, noSessionSentence } from "@/lib/fokus-view";
 import { buildTrainingPlan, resolveToday, trainingHeader, type TrainingPlan } from "@/lib/training-view";
@@ -36,11 +36,11 @@ type PlanState =
   | { readonly kind: "error"; readonly error: DataError; readonly at: Date };
 
 /** The plan and today's set log are one read: a failure of either is Fokus's ErrorState (§5). */
-async function planState(today: IsoDate): Promise<PlanState> {
+async function planState(today: IsoDate, categories: readonly ExerciseCategoryRow[] | null): Promise<PlanState> {
   try {
     const data = await loadTrainingPlan(today);
     // combo-parts.md: the parts editor's data goes to Fokus as read (fokusView pre-fills from it).
-    return { kind: "ready", plan: buildTrainingPlan(data, today), parts: data.parts };
+    return { kind: "ready", plan: buildTrainingPlan(data, today, categories), parts: data.parts };
   } catch (error) {
     if (isDataError(error)) {
       console.error("fokus: loading plan failed", error);
@@ -55,11 +55,13 @@ export default async function FokusPage({ searchParams }: PageProps<"/fokus">) {
   await connection(); // request time: "today" is the Copenhagen date now, never the build's
   const now = new Date();
   const today = resolveToday(now, process.env);
+  // A failed catalogue read is null: no main lift known and the loads keep today's words; nothing breaks.
+  const catalogueRead = loadExerciseCategories();
   const [stale, state, params, catalogue] = await Promise.all([
     staleNote(today, now),
-    planState(today),
+    catalogueRead.then((c) => planState(today, c)),
     searchParams,
-    loadExerciseCategories(), // a failed read is null: no main lift known, nothing breaks
+    catalogueRead,
   ]);
   if (state.kind === "error") {
     return (
