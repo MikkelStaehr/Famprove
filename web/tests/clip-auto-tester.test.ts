@@ -39,6 +39,7 @@ function recordingDeps(runPose: AutoDeps["runPose"], warmModel: AutoDeps["warmMo
     writes,
     deps: {
       warmModel,
+      keyframeTimes: async () => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
       runPose,
       setClipAuto: async (input): Promise<SetClipAutoResult> => {
         writes.push(input);
@@ -72,6 +73,7 @@ test("criterion 7: a new Optag mid-run aborts the old run; only the new clip is 
   const writes: SetClipAutoInput[] = [];
   const deps: AutoDeps = {
     warmModel: async () => false,
+    keyframeTimes: async () => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
     runPose: (b, o) => (calls++ === 0 ? held.runPose(b, o) : Promise.resolve(POSE(squatFrames()))),
     setClipAuto: async (input) => {
       writes.push(input);

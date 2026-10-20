@@ -1,6 +1,6 @@
 /**
- * analyseClip's real dependencies (clip-auto): the model probe, MediaPipe's runPose and the
- * setClipAuto action. The model is fetched from this origin only; "only-if-cached" tells whether
+ * analyseClip's real dependencies (clip-auto): the model probe, the keyframe read (cut.ts's parse),
+ * MediaPipe's runPose and the setClipAuto action. The model is fetched from this origin only; "only-if-cached" tells whether
  * the HTTP cache already holds it (then no model phase), else one download with a byte % fills the
  * cache, so MediaPipe's own fetch of MODEL_PATH is answered from it.
  */
@@ -41,6 +41,7 @@ async function warmModel(signal: AbortSignal, onPct: (pct: number | null) => voi
 
 export const browserAutoDeps: AutoDeps = {
   warmModel,
+  keyframeTimes: async (blob) => (await import("./cut")).keyframeTimes(blob), // mp4box only when a clip is analysed
   runPose: (blob, opts) => runPose(blob, opts),
   setClipAuto: (input) => setClipAuto(input),
   now: () => performance.now(),

@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { SetClipAutoInput, SetClipAutoResult } from "../src/lib/video/auto-clip.ts";
-import { autoMetaWord, editLabel, FAILED_LINE, fokusAutoLine, LOW_LINE, pickupQueue, PLAYER_FAILED_LINE, PLAYER_LOW_LINE, playerAutoLine } from "../src/lib/video/auto-lines.ts";
-import { analyseClip, type AutoDeps, type AutoProgress, bytePct, type ClipMeta, stepPct } from "../src/lib/video/auto-run.ts";
+import { autoMetaWord, editLabel, FAILED_LINE, fokusAutoLine, LOW_LINE, pickupQueue, PLAYER_FAILED_LINE, PLAYER_LOW_LINE, PLAYER_WAITING_LINE, playerAutoLine } from "../src/lib/video/auto-lines.ts";
+import { analyseClip, type AutoDeps, type AutoProgress, bytePct, chooseMode, type ClipMeta, stepPct } from "../src/lib/video/auto-run.ts";
+import { AUTO_VERSION_KEY, parseAutoVersions, readAutoVersions, recordAutoVersion } from "../src/lib/video/auto-version.ts";
+import { ALGO_VERSION } from "../src/lib/video/auto-clip.ts";
+import { poseCapMs } from "../src/lib/video/pose-run.ts";
 import type { VideoClipRow } from "../src/lib/video/clips.ts";
 import type { ClipIndexEntry } from "../src/lib/video/index-store.ts";
 import { type PoseFrame, PoseError, type PosePoint, type PoseResult } from "../src/lib/video/pose-run.ts";
@@ -32,6 +35,8 @@ function squatFrames(): PoseFrame[] {
   return frames;
 }
 
+/** Keyframes 1 s apart over META's 15 s: seek mode. */
+const DENSE_KEYFRAMES = Array.from({ length: 15 }, (_, i) => i);
 const META: ClipMeta = { ext: "mp4", durationS: 15, family: "lower", expected: 5 };
 const POSE = (frames: PoseFrame[]): PoseResult => ({ frames, timing: { loadMs: 1, frames: frames.length, msPerFrame: 1, totalMs: 1 } });
 
@@ -42,6 +47,7 @@ function deps(over: Partial<AutoDeps> = {}): { deps: AutoDeps; writes: SetClipAu
     writes,
     deps: {
       warmModel: async () => false,
+      keyframeTimes: async () => DENSE_KEYFRAMES,
       runPose: async (_b, o) => {
         for (let i = 1; i <= 20; i++) o.onProgress(i, 20);
         return POSE(squatFrames());
@@ -167,8 +173,9 @@ test("§2: the meta word per state", () => {
   assert.equal(autoMetaWord("mp4", { ...NONE, autoStatus: "low_confidence" }, false), "klip selv");
   assert.equal(autoMetaWord("mp4", { ...NONE, autoStatus: "failed" }, false), "klip selv");
   assert.equal(autoMetaWord("mp4", NONE, true), "klipper …");
-  assert.equal(autoMetaWord("mp4", NONE, false), null);
+  assert.equal(autoMetaWord("mp4", NONE, false), "venter på klip", "not analysed yet: waiting, never klip selv");
   assert.equal(autoMetaWord("webm", { ...NONE, autoStatus: "failed" }, false), null);
+  assert.equal(autoMetaWord("webm", NONE, false), null);
   assert.equal(autoMetaWord("mp4", null, false), null);
 });
 
@@ -176,7 +183,10 @@ test("§2: the player's line and the button", () => {
   assert.deepEqual(playerAutoLine("low_confidence", null), { words: PLAYER_LOW_LINE, figure: null });
   assert.deepEqual(playerAutoLine("failed", null), { words: PLAYER_FAILED_LINE, figure: null });
   assert.deepEqual(playerAutoLine(null, { pct: 40 }), { words: "Klipper video …", figure: "40 %" });
-  assert.equal(playerAutoLine(null, null), null);
+  assert.deepEqual(playerAutoLine(null, null), { words: "Venter på klip", figure: null });
+  assert.equal(PLAYER_WAITING_LINE, "Venter på klip");
+  assert.equal(playerAutoLine("clipped", null), null);
+  assert.equal(editLabel(NONE), "Klip", "waiting reads Klip, never Klip selv");
   assert.equal(editLabel({ ...NONE, autoStatus: "low_confidence" }), "Klip selv");
   assert.equal(editLabel({ ...NONE, autoStatus: "failed" }), "Klip selv");
   assert.equal(editLabel({ ...NONE, clipInS: 1, clipOutS: 4, autoStatus: "failed" }), "Ret klip");
@@ -195,7 +205,7 @@ function entry(r: VideoClipRow, over: Partial<ClipIndexEntry> = {}): ClipIndexEn
   };
 }
 
-test("pickup: auto_status null, MP4, a local done file, the last 7 days, no own range; newest first", () => {
+test("pickup: auto_status null or an older version, MP4, a local done file, the last 7 days; newest first", () => {
   const now = new Date("2026-10-20T12:00:00+02:00");
   const a = row(1, "2026-10-19T10:00:00+02:00");
   const b = row(2, "2026-10-20T09:00:00+02:00");
@@ -206,8 +216,93 @@ test("pickup: auto_status null, MP4, a local done file, the last 7 days, no own 
   const noFile = row(7, "2026-10-20T07:00:00+02:00");
   const afbrudt = row(8, "2026-10-20T06:00:00+02:00");
   const local = [entry(a), entry(b), entry(ran), entry(own), entry(old), entry(webm, { ext: "webm" }), entry(afbrudt, { state: "afbrudt" })];
-  const queue = pickupQueue(local, [a, b, ran, own, old, webm, noFile, afbrudt], now);
-  assert.deepEqual(queue.map((r) => r.id), [b.id, a.id]);
+  const rows = [a, b, ran, own, old, webm, noFile, afbrudt];
+  // No version recorded: ran (failed) counts as version 1 < ALGO_VERSION, so it is re-run; an own range no longer excludes.
+  assert.deepEqual(pickupQueue(local, rows, now).map((r) => r.id), [b.id, ran.id, own.id, a.id]);
+  // ran analysed with this version: not again; null is analysed whatever its record says.
+  const current = { [ran.id]: ALGO_VERSION, [b.id]: ALGO_VERSION };
+  assert.deepEqual(pickupQueue(local, rows, now, current).map((r) => r.id), [b.id, own.id, a.id]);
+  assert.deepEqual(pickupQueue(local, rows, now, { [ran.id]: 1 }).map((r) => r.id), [b.id, ran.id, own.id, a.id]);
+  const clipped = row(9, "2026-10-19T09:00:00+02:00", { autoStatus: "clipped", autoInS: 1, autoOutS: 5 });
+  assert.deepEqual(pickupQueue([entry(clipped)], [clipped], now, {}).map((r) => r.id), [clipped.id]);
+  assert.deepEqual(pickupQueue([entry(clipped)], [clipped], now, { [clipped.id]: ALGO_VERSION }), []);
+});
+
+test("auto versions: localStorage map, unreadable = empty, recorded as ALGO_VERSION", () => {
+  const mem = new Map<string, string>();
+  const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
+  assert.deepEqual(readAutoVersions(store), {});
+  recordAutoVersion(store, "x");
+  recordAutoVersion(store, "y");
+  assert.deepEqual(JSON.parse(mem.get(AUTO_VERSION_KEY)!), { x: ALGO_VERSION, y: ALGO_VERSION });
+  assert.deepEqual(parseAutoVersions("not json"), {});
+  assert.deepEqual(parseAutoVersions("[1]"), {});
+  assert.deepEqual(parseAutoVersions('{"a":2,"b":"2","c":1.5}'), { a: 2 });
+  const broken = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("full"); } };
+  assert.deepEqual(readAutoVersions(broken), {});
+  recordAutoVersion(broken, "x"); // never throws
+  recordAutoVersion(null, "x");
+  assert.equal(ALGO_VERSION, 2);
+});
+
+test("mode: largest keyframe gap ≤ 1.1 s seeks, else (or unknown) plays", () => {
+  const every = (gap: number, d: number) => Array.from({ length: Math.floor(d / gap) + 1 }, (_, i) => i * gap).filter((t) => t < d);
+  assert.deepEqual(chooseMode(every(0.9, 20), 20), { mode: "seek", why: "søg" });
+  assert.deepEqual(chooseMode(every(1.2, 20), 20).mode, "play");
+  assert.deepEqual(chooseMode([0, 4.1, 8.2, 12.3], 15), { mode: "play", why: "afspil: nøglebilleder op til 4,1 s" });
+  assert.deepEqual(chooseMode([0, 1, 2], 10), { mode: "play", why: "afspil: nøglebilleder op til 8,0 s" }, "the last keyframe to the end counts");
+  assert.deepEqual(chooseMode(null, 20), { mode: "play", why: "afspil: nøglebilleder ukendt" });
+  assert.deepEqual(chooseMode([], 20), { mode: "play", why: "afspil: nøglebilleder ukendt" });
+});
+
+test("mode: analyseClip reads the keyframes, seeks or plays, and retries a seek video error once in play", async () => {
+  const modes: string[] = [];
+  const recorder = (fail: (mode: string) => Error | null) =>
+    deps({
+      runPose: async (_b, o) => {
+        modes.push(o.mode);
+        const e = fail(o.mode);
+        if (e !== null) throw e;
+        return POSE(squatFrames());
+      },
+    });
+  const seek = recorder(() => null);
+  const out = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: seek.deps });
+  assert.deepEqual(modes, ["seek"]);
+  assert.ok(out.kind === "clipped" && out.mode?.why === "søg");
+  modes.length = 0;
+  const sparse = recorder(() => null);
+  const playOut = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...sparse.deps, keyframeTimes: async () => [0, 4.1, 8.2, 12.3] } });
+  assert.deepEqual(modes, ["play"]);
+  assert.ok(playOut.kind === "clipped" && playOut.mode?.why === "afspil: nøglebilleder op til 4,1 s");
+  modes.length = 0;
+  const unknown = recorder(() => null);
+  await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...unknown.deps, keyframeTimes: async () => { throw new Error("no moov"); } } });
+  assert.deepEqual(modes, ["play"]);
+  modes.length = 0;
+  const retry = recorder((m) => (m === "seek" ? new PoseError("video", "seeked kom ikke inden for 5 s") : null));
+  const retried = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: retry.deps });
+  assert.deepEqual(modes, ["seek", "play"], "one retry, in play");
+  assert.ok(retried.kind === "clipped" && retried.mode?.why === "afspil: søgning fejlede");
+  assert.equal(retry.writes.length, 1);
+  modes.length = 0;
+  const detect = recorder(() => new PoseError("detect", "boom"));
+  const failed = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: detect.deps });
+  assert.deepEqual(modes, ["seek"], "only a video error is retried");
+  assert.equal(failed.kind, "failed");
+  modes.length = 0;
+  const hidden = recorder((m) => (m === "play" ? new PoseError("aborted", "siden blev skjult") : null));
+  const gone = await analyseClip(ID, new Blob([]), META, { signal: new AbortController().signal, deps: { ...hidden.deps, keyframeTimes: async () => [0, 5] } });
+  assert.deepEqual(gone, { kind: "aborted" }, "a hidden page aborts the play run: nothing written");
+  assert.equal(hidden.writes.length, 0);
+});
+
+test("the cap scales with the clip: max(90 s, duration × 1.5 + 30 s)", () => {
+  assert.equal(poseCapMs(null), 90_000);
+  assert.equal(poseCapMs(20), 90_000);
+  assert.equal(poseCapMs(40), 90_000);
+  assert.equal(poseCapMs(60), 120_000);
+  assert.equal(poseCapMs(326), 519_000);
 });
 
 test("analyseClip: a failure keeps its step and message on the phone, and writes only failed", async () => {

@@ -16,8 +16,22 @@ export const MEDIAPIPE_VERSION = "1.1.0";
 export const WASM_BASE = `/mediapipe/${MEDIAPIPE_VERSION}/wasm`;
 /** Versioned like its source, storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/. */
 export const MODEL_PATH = "/mediapipe/models/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
-/** The wall-time cap of one run, load included. */
+/** The wall-time cap of one run, load included: at least this, more for a long clip (poseCapMs). */
 export const POSE_CAP_MS = 90_000;
+
+/** The cap for a clip of durationS (slice clip-auto-2): max(90 s, duration × 1.5 + 30 s); POSE_CAP_MS while unknown. */
+export function poseCapMs(durationS: number | null): number {
+  if (durationS === null || !Number.isFinite(durationS) || durationS <= 0) return POSE_CAP_MS;
+  return Math.max(POSE_CAP_MS, Math.round(durationS * 1500 + 30_000));
+}
+
+/**
+ * How runPose reaches the frames: "seek" steps currentTime in 1/fps (each seek decodes from the
+ * keyframe before it, slow when keyframes are far apart); "play" plays the clip once at
+ * PLAY_RATE on an offscreen element and samples requestVideoFrameCallback (slice clip-auto-2).
+ */
+export type PoseMode = "seek" | "play";
+export const PLAY_RATE = 2;
 
 /** One landmark: normalised x, y and visibility (0–1). */
 export type PosePoint = readonly [x: number, y: number, visibility: number];
@@ -28,8 +42,8 @@ export type PoseTiming = { readonly loadMs: number; readonly frames: number; rea
 /** Per-seek wall time (slice clip-debug): count, mean and max (ms), and the frame index of the max (null with no seek). */
 export type SeekTiming = { readonly count: number; readonly meanMs: number; readonly maxMs: number; readonly maxAt: number | null };
 export type PoseResult = { readonly frames: readonly PoseFrame[]; readonly timing: PoseTiming };
-/** runPose's result: PoseResult plus clip-debug's seek timing (a sibling type, so PoseResult keeps its meaning). */
-export type PoseRun = PoseResult & { readonly seek: SeekTiming };
+/** runPose's result: PoseResult plus clip-debug's seek timing (empty in play mode) and the mode (a sibling type, so PoseResult keeps its meaning). */
+export type PoseRun = PoseResult & { readonly seek: SeekTiming; readonly mode: PoseMode };
 
 /** How far a failed run got: frames done of the planned, and its seeks so far (null before the frame pass). */
 export type PoseReached = { readonly done: number; readonly of: number; readonly seek: SeekTiming };
@@ -150,24 +164,116 @@ export function frameTimes(duration: number, fps: number): number[] {
   return times;
 }
 
+/** The offscreen element of a play run: in the DOM (a detached element may not play), never seen or reached. */
+function attachOffscreen(video: HTMLVideoElement): void {
+  video.setAttribute("aria-hidden", "true");
+  video.tabIndex = -1;
+  Object.assign(video.style, { position: "fixed", left: "0", top: "0", width: "1px", height: "1px", opacity: "0", pointerEvents: "none" });
+  document.body.appendChild(video);
+}
+
+type Detect = (video: HTMLVideoElement, t: number, ts: number) => PoseFrame["landmarks"];
+
+/** Seek mode's frame pass: currentTime in 1/fps steps, one detect per seek, yielding between frames. */
+async function seekPass(video: HTMLVideoElement, times: readonly number[], detect: Detect, frames: PoseFrame[], seekMs: number[], signal: AbortSignal, onProgress: ((done: number, of: number) => void) | undefined): Promise<void> {
+  for (const t of times) {
+    const seeked = mediaEvent(video, "seeked", 5000);
+    const seekStart = performance.now();
+    video.currentTime = t;
+    try {
+      await untilAbort(seeked, signal);
+    } finally {
+      seekMs.push(performance.now() - seekStart); // a timed-out seek counts with its wait
+    }
+    frames.push({ t, landmarks: detect(video, t, Math.round(t * 1000)) });
+    onProgress?.(frames.length, times.length);
+    await untilAbort(new Promise((r) => setTimeout(r, 0)), signal);
+  }
+}
+
 /**
- * Pose on a recorded clip: a detached <video> on a blob URL, seeked in 1/fps steps, detectForVideo
- * per frame, yielding to the event loop between frames. Aborts on the signal or after POSE_CAP_MS.
- * The blob URL is revoked and the landmarker closed on every way out.
+ * Play mode's frame pass: plays once from 0 at PLAY_RATE, muted, and detects on the frames
+ * requestVideoFrameCallback hands over whose mediaTime is ≥ 1/fps after the last one sampled (so at
+ * most fps of media time), with times and timestamps strictly increasing.
+ */
+async function playPass(video: HTMLVideoElement, of: number, fps: number, detect: Detect, frames: PoseFrame[], signal: AbortSignal, onProgress: ((done: number, of: number) => void) | undefined): Promise<void> {
+  if (typeof video.requestVideoFrameCallback !== "function") throw new PoseError("video", "requestVideoFrameCallback findes ikke i browseren");
+  let handle = 0;
+  let lastT = -Infinity;
+  let lastTs = -1;
+  let begun = false; // an "ended" left over from durationOf's probe at the end is never the end of this pass
+  const onEnded = { resolve: () => undefined as void };
+  const endedListener = () => {
+    if (begun) onEnded.resolve();
+  };
+  try {
+    const ended = new Promise<void>((resolve, reject) => {
+      onEnded.resolve = resolve;
+      video.addEventListener("ended", endedListener);
+      video.addEventListener("error", () => reject(new PoseError("video", "videoen kunne ikke afspilles")), { once: true });
+      const onFrame = (_now: number, meta: VideoFrameCallbackMetadata) => {
+        const t = Math.round(meta.mediaTime * 1000) / 1000;
+        if (t > lastT && t - lastT >= 1 / fps - 1e-6) {
+          lastT = t;
+          lastTs = Math.max(lastTs + 1, Math.round(t * 1000)); // detectForVideo needs increasing timestamps
+          try {
+            frames.push({ t, landmarks: detect(video, t, lastTs) });
+          } catch (error) {
+            reject(error);
+            return;
+          }
+          onProgress?.(Math.min(frames.length, of), of);
+        }
+        handle = video.requestVideoFrameCallback(onFrame);
+      };
+      handle = video.requestVideoFrameCallback(onFrame);
+    });
+    ended.catch(() => undefined); // awaited below; an abort may leave it unsettled
+    video.currentTime = 0;
+    video.playbackRate = PLAY_RATE;
+    begun = true;
+    try {
+      await untilAbort(video.play(), signal);
+    } catch (error) {
+      if (error instanceof PoseError) throw error;
+      throw new PoseError("video", error instanceof Error ? error.message : String(error));
+    }
+    await untilAbort(ended, signal);
+  } finally {
+    video.removeEventListener("ended", endedListener);
+    video.cancelVideoFrameCallback?.(handle);
+    video.pause();
+  }
+}
+
+/**
+ * Pose on a recorded clip: a <video> on a blob URL (seek mode: detached; play mode: offscreen in
+ * the DOM), the frames reached by seeking or by playing (PoseMode), detectForVideo per frame. Aborts
+ * on the signal, after poseCapMs of the clip's length, or (play mode) when the page is hidden, since
+ * a hidden page stops playback: PoseError "aborted", nothing written, the pickup retries later. The
+ * blob URL is revoked, the element removed and the landmarker closed on every way out.
  */
 export async function runPose(
   blob: Blob,
-  opts: { readonly fps?: number; readonly signal?: AbortSignal; readonly onProgress?: (done: number, of: number) => void } = {},
+  opts: { readonly fps?: number; readonly mode?: PoseMode; readonly signal?: AbortSignal; readonly onProgress?: (done: number, of: number) => void } = {},
 ): Promise<PoseRun> {
   const fps = opts.fps ?? 5;
+  const mode = opts.mode ?? "seek";
   if (!Number.isFinite(fps) || fps <= 0) throw new PoseError("video", `ugyldig fps: ${fps}`);
   const started = performance.now();
   const ctrl = new AbortController();
-  const cap = setTimeout(() => ctrl.abort(new PoseError("timeout", `over ${POSE_CAP_MS / 1000} s`)), POSE_CAP_MS);
+  let cap = setTimeout(() => ctrl.abort(new PoseError("timeout", `over ${POSE_CAP_MS / 1000} s`)), POSE_CAP_MS);
   const outer = opts.signal;
   const onOuter = () => ctrl.abort(new PoseError("aborted", "afbrudt"));
   if (outer?.aborted) onOuter();
   else outer?.addEventListener("abort", onOuter, { once: true });
+  const onHidden = () => {
+    if (document.visibilityState === "hidden") ctrl.abort(new PoseError("aborted", "siden blev skjult"));
+  };
+  if (mode === "play") {
+    document.addEventListener("visibilitychange", onHidden);
+    onHidden();
+  }
   const signal = ctrl.signal;
 
   let landmarker: PoseLandmarker | null = null;
@@ -190,50 +296,46 @@ export async function runPose(
       throw new PoseError("load", error instanceof Error ? error.message : String(error));
     }
     const loadMs = performance.now() - started;
+    const lm = landmarker;
 
     video.muted = true;
     video.playsInline = true;
     video.preload = "auto";
+    if (mode === "play") attachOffscreen(video);
     const meta = mediaEvent(video, "loadedmetadata", 10_000);
     video.src = url;
     await untilAbort(meta, signal);
     const duration = await untilAbort(durationOf(video), signal);
     if (duration <= 0) throw new PoseError("video", "ingen længde");
+    const capMs = poseCapMs(duration);
+    clearTimeout(cap);
+    cap = setTimeout(() => ctrl.abort(new PoseError("timeout", `over ${Math.round(capMs / 1000)} s`)), Math.max(0, capMs - (performance.now() - started)));
 
     const times = frameTimes(duration, fps);
     const frames: PoseFrame[] = [];
     const seekMs: number[] = [];
     let detectMs = 0;
-    const pass = performance.now();
-    reached = () => ({ done: frames.length, of: times.length, seek: seekTiming(seekMs) });
-    for (const t of times) {
-      const seeked = mediaEvent(video, "seeked", 5000);
-      const seekStart = performance.now();
-      video.currentTime = t;
-      try {
-        await untilAbort(seeked, signal);
-      } finally {
-        seekMs.push(performance.now() - seekStart); // a timed-out seek counts with its wait
-      }
+    const detect: Detect = (v, _t, ts) => {
       const before = performance.now();
-      let found: PoseFrame["landmarks"];
       try {
-        const result = landmarker.detectForVideo(video, Math.round(t * 1000));
-        const person = result.landmarks[0];
-        found = person === undefined ? null : person.map((p) => [p.x, p.y, p.visibility] as const);
+        const person = lm.detectForVideo(v, ts).landmarks[0];
+        return person === undefined ? null : person.map((p) => [p.x, p.y, p.visibility] as const);
       } catch (error) {
         throw new PoseError("detect", error instanceof Error ? error.message : String(error));
+      } finally {
+        detectMs += performance.now() - before;
       }
-      detectMs += performance.now() - before;
-      frames.push({ t, landmarks: found });
-      opts.onProgress?.(frames.length, times.length);
-      await untilAbort(new Promise((r) => setTimeout(r, 0)), signal);
-    }
+    };
+    const pass = performance.now();
+    reached = () => ({ done: frames.length, of: times.length, seek: seekTiming(seekMs) });
+    if (mode === "seek") await seekPass(video, times, detect, frames, seekMs, signal, opts.onProgress);
+    else await playPass(video, times.length, fps, detect, frames, signal, opts.onProgress);
     const totalMs = performance.now() - pass;
     return {
       frames,
       timing: { loadMs, frames: frames.length, msPerFrame: frames.length === 0 ? 0 : detectMs / frames.length, totalMs },
       seek: seekTiming(seekMs),
+      mode,
     };
   } catch (error) {
     if (error instanceof PoseError && reached !== null) error.reached = reached();
@@ -241,8 +343,11 @@ export async function runPose(
   } finally {
     clearTimeout(cap);
     outer?.removeEventListener("abort", onOuter);
+    document.removeEventListener("visibilitychange", onHidden);
+    video.pause();
     video.removeAttribute("src");
     video.load();
+    video.remove();
     URL.revokeObjectURL(url);
     landmarker?.close();
   }

@@ -12,6 +12,7 @@ import { diagnoseLift } from "@/lib/video/auto-clip";
 import type { ClipLiftMeta } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip, failureOf } from "@/lib/video/auto-run";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
+import { browserStore, recordAutoVersion } from "@/lib/video/auto-version";
 import { type FileFacts, fileFacts } from "@/lib/video/cut";
 import { type DebugRun, type ImageCheck, debugLog, releaseImages } from "@/lib/video/debug-log";
 import { runPose } from "@/lib/video/pose-run";
@@ -46,10 +47,8 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
   const [reanalyse, setReanalyse] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [playUrl, setPlayUrl] = useState<string | null>(null);
   const ctrl = useRef<AbortController | null>(null);
   const urls = useRef<string[]>([]);
-  const playWait = useRef<((v: HTMLVideoElement) => void) | null>(null);
 
   const stop = () => {
     ctrl.current?.abort(new Error("lukket"));
@@ -63,7 +62,6 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
       if (document.visibilityState === "hidden") {
         stop();
         setBusy(null);
-        setPlayUrl(null);
       }
     };
     document.addEventListener("visibilitychange", onHide);
@@ -97,7 +95,7 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
       }
       const started = performance.now();
       try {
-        const pose = await runPose(blob, { signal: c.signal, onProgress: (d, of) => setBusy(`seek ${d}/${of}`) });
+        const pose = await runPose(blob, { mode: "seek", signal: c.signal, onProgress: (d, of) => setBusy(`søg ${d}/${of}`) });
         setRuns([{ mode: "seek", ok: true, diag: diagnoseLift(pose.frames, meta.expected, meta.family, meta.durationS), seek: pose.seek, ms: performance.now() - started }]);
       } catch (error) {
         if (c.signal.aborted) return;
@@ -145,25 +143,16 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
     const c = new AbortController();
     ctrl.current = c;
     const started = performance.now();
-    const element = new Promise<HTMLVideoElement>((resolve) => {
-      playWait.current = resolve;
-    });
-    setPlayUrl(url(blob));
     setBusy("afspiller");
     try {
-      const v = await element;
-      const { playPose } = await import("@/lib/video/pose-debug-browser");
-      const frames = await playPose(v, { signal: c.signal, onProgress: (t, of) => setBusy(`afspiller ${t.toFixed(1)}/${Number.isFinite(of) ? of.toFixed(1) : "?"} s`) });
-      setRuns((rs) => [...rs.filter((r) => r.mode !== "play"), { mode: "play", ok: true, diag: diagnoseLift(frames, meta.expected, meta.family, meta.durationS), seek: null, ms: performance.now() - started }]);
+      const pose = await runPose(blob, { mode: "play", signal: c.signal, onProgress: (d, of) => setBusy(`afspil ${d}/${of}`) });
+      setRuns((rs) => [...rs.filter((r) => r.mode !== "play"), { mode: "play", ok: true, diag: diagnoseLift(pose.frames, meta.expected, meta.family, meta.durationS), seek: null, ms: performance.now() - started }]);
     } catch (error) {
       if (c.signal.aborted) return;
       const f = failureOf("pose", error);
-      setRuns((rs) => [...rs.filter((r) => r.mode !== "play"), { mode: "play", ok: false, step: f.step, message: f.message, reached: null, ms: performance.now() - started }]);
+      setRuns((rs) => [...rs.filter((r) => r.mode !== "play"), { mode: "play", ok: false, step: f.step, message: f.message, reached: f.reached, ms: performance.now() - started }]);
     } finally {
-      if (ctrl.current === c) {
-        setBusy(null);
-        setPlayUrl(null);
-      }
+      if (ctrl.current === c) setBusy(null);
     }
   }
 
@@ -179,14 +168,16 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
       deps: browserAutoDeps,
     });
     if (ctrl.current === c) setBusy(null);
+    if ((out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") && out.saved) recordAutoVersion(browserStore(), clipId);
     onAuto(out);
+    const how = out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed" ? ` · ${out.mode?.why ?? "ingen tilstand"}` : "";
     setReanalyse(
       out.kind === "failed"
-        ? `failed (${out.error.step}: ${out.error.message}) · gemt ${out.saved ? "ja" : "nej"}`
+        ? `failed (${out.error.step}: ${out.error.message}) · gemt ${out.saved ? "ja" : "nej"}${how}`
         : out.kind === "clipped"
-          ? `clipped ${out.inS}–${out.outS} s · gemt ${out.saved ? "ja" : "nej"}`
+          ? `clipped ${out.inS}–${out.outS} s · gemt ${out.saved ? "ja" : "nej"}${how}`
           : out.kind === "low_confidence"
-            ? `low_confidence · gemt ${out.saved ? "ja" : "nej"}`
+            ? `low_confidence · gemt ${out.saved ? "ja" : "nej"}${how}`
             : out.kind,
     );
   }
@@ -235,17 +226,6 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
       <p role="status" className="font-mono text-13 text-text-muted">
         {busy}
       </p>
-      {playUrl !== null && (
-        <video
-          ref={(v) => {
-            if (v !== null) playWait.current?.(v);
-          }}
-          src={playUrl}
-          playsInline
-          muted
-          className="max-h-48 w-fit rounded-tile"
-        />
-      )}
       {images.length > 0 && (
         <>
           <p className="font-mono text-13 text-text-muted">

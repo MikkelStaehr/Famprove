@@ -57,6 +57,7 @@ import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/c
 import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
+import { browserStore, readAutoVersions, recordAutoVersion } from "@/lib/video/auto-version";
 import { ClipDebug } from "@/components/ClipDebug";
 import { isDebugToggle } from "@/lib/video/debug-log";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
@@ -217,8 +218,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     };
   }, []);
 
-  // clip-auto §1 Pickup: clips Fokus left unanalysed (auto_status null, MP4, a local file, the last
-  // 7 days, no own range), one at a time, newest first, through the same analyseClip. Unmount aborts
+  // clip-auto §1 Pickup: clips Fokus left unanalysed or analysed with an older ALGO_VERSION (MP4, a
+  // local file, the last 7 days), one at a time, newest first, through the same analyseClip. Unmount aborts
   // the run (nothing written for that clip); the fixture never runs one.
   // Keyed on the index being read, never on rows: the run's own outcome updates rows.
   const readyEntries = local.kind === "ready" ? local.entries : null;
@@ -230,7 +231,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   useEffect(() => {
     const found = entriesNow.current;
     if (fixture !== null || !ready || found === null || initialRows === null || store.current === null || pickupStarted.current) return;
-    const queue = pickupQueue(found, initialRows, new Date()).filter((r) => lifts[r.id] !== undefined);
+    const queue = pickupQueue(found, initialRows, new Date(), readAutoVersions(browserStore())).filter((r) => lifts[r.id] !== undefined);
     if (queue.length === 0) return;
     pickupStarted.current = true;
     const s = store.current;
@@ -253,6 +254,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           deps: browserAutoDeps,
         });
         setRunning(null);
+        if ((out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") && out.saved) recordAutoVersion(browserStore(), r.id);
         if (out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") {
           const auto = out.kind === "clipped" ? { autoStatus: out.kind, autoInS: out.inS, autoOutS: out.outS } : { autoStatus: out.kind, autoInS: null, autoOutS: null };
           setRows((rs) => rs?.map((x) => (x.id === r.id ? { ...x, ...auto } : x)) ?? rs);
@@ -547,7 +549,7 @@ function ClipRow({
   onDelete,
 }: {
   readonly row: LibraryRow;
-  /** clip-auto §2: the word after the duration (`klippet`, `auto-klippet`, `klip selv`, `klipper …`); null = none. */
+  /** clip-auto §2: the word after the duration (`klippet`, `auto-klippet`, `klip selv`, `venter på klip`, `klipper …`); null = none. */
   readonly word: string | null;
   readonly onOpen: (el: HTMLElement) => void;
   readonly onStar: () => void;
@@ -744,8 +746,8 @@ function Player({
     if (gone.current) missing.current();
   }, []);
 
-  /** clip-auto §2: the player's line when there is no cut to show (running, low_confidence, failed). */
-  const autoLine = cut.range === null && cut.reason !== "webm" ? playerAutoLine(server?.autoStatus ?? null, running) : null;
+  /** clip-auto §2: the player's line when there is no cut to show (running, waiting, low_confidence, failed); waiting needs a server row. */
+  const autoLine = cut.range === null && cut.reason !== "webm" && (server !== null || running !== null) ? playerAutoLine(server?.autoStatus ?? null, running) : null;
 
   /** clip-handles §1: Klip / Ret klip on an MP4 clip with a server row; never WebM, afbrudt or missing. */
   const canEdit = row.kind === "clip" && row.ext === "mp4" && server !== null;

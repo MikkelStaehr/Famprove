@@ -30,13 +30,15 @@
   - `· auto-klippet`: `clipped` and no own range;
   - `· klip selv`: `low_confidence` or `failed`;
   - `· klipper …`: running on this phone right now;
-  - none: null or WebM.
+  - `· venter på klip`: an MP4 clip with `auto_status` null (not analysed yet; clip-auto-2, user 2026-10-20: never `klip selv`);
+  - none: WebM.
   - The status is carried by the word, never by colour alone.
 - **Player, cut-line slot** (clip-cut §1, under the title, Geist 13 muted):
   - clipped: clip-cut's line unchanged (`… · automatisk`);
   - low_confidence: `Løftet blev ikke fundet sikkert, så videoen er ikke klippet.`;
   - failed: `Automatisk klip mislykkedes. Gem og Del giver hele videoen.`;
-  - running: `Klipper video … 40 %`. Gem and Del give the whole video meanwhile, with no wait.
+  - running: `Klipper video … 40 %`. Gem and Del give the whole video meanwhile, with no wait;
+  - null (MP4, not analysed yet): `Venter på klip`, and the button reads `Klip` (manual clipping still works).
 - **Button:** on low_confidence and failed, `Klip` (clip-handles §1) reads **`Klip selv`**, in the same place with the scissors icon, and opens `openClipEditor(row)` at 0 / `duration_s`. An own range still reads `Ret klip` and wins over every auto value.
 
 ## 3. States to shoot (`run-web`, port 3100, 390 and 1280)
