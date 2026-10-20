@@ -60,6 +60,7 @@ import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
 import { browserStore, readAutoVersions } from "@/lib/video/auto-version";
 import { type AutoLast, readAutoLast, recordRun } from "@/lib/video/auto-last";
 import { ClipSummary, type SummaryItem } from "@/components/ClipSummary";
+import { isSummaryEntry } from "@/lib/video/clip-summary";
 import { useWakeLock } from "@/components/fokus/useWakeLock";
 import { ClipDebug } from "@/components/ClipDebug";
 import { isDebugToggle } from "@/lib/video/debug-log";
@@ -166,15 +167,20 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   };
   useEffect(() => endTitlePress, []);
   const closeOverview = useCallback(() => setOverview(null), []);
-  // Shift+D on Træning while no player is open (the player's own Shift+D opens its panel).
+  // Shift+D on Træning while no player is open (the player's own Shift+D opens its panel). Closing
+  // goes the way Luk does: back over the overview's history entry, whose popstate closes it (review).
+  const overviewOpen = overview !== null;
   useEffect(() => {
     if (open !== null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (isDebugToggle(e, e.target instanceof HTMLElement ? e.target : null)) setOverview((o) => (o === null ? readAutoLast(browserStore()) : null));
+      if (!isDebugToggle(e, e.target instanceof HTMLElement ? e.target : null)) return;
+      if (!overviewOpen) setOverview(readAutoLast(browserStore()));
+      else if (isSummaryEntry(window.history.state)) window.history.back();
+      else setOverview(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, overviewOpen]);
 
   const load = useCallback(async () => {
     await Promise.resolve(); // never set state synchronously inside the effect
