@@ -4,7 +4,8 @@ import { recordFtpChoice, undoFtpChoice } from "@/lib/db/ftp-ack";
 import { recordSetTap, type SetTapResult } from "@/lib/db/set-log";
 import { recordSetParts } from "@/lib/db/set-parts";
 import { recordSupersetPair } from "@/lib/db/superset-pairs";
-import { recordClip, recordClipRange, recordStar, removeClip } from "@/lib/db/video-clips";
+import { recordClip, recordClipAuto, recordClipRange, recordStar, removeClip } from "@/lib/db/video-clips";
+import { parseSetClipAutoInput, type SetClipAutoResult } from "@/lib/video/auto-clip";
 import { parseSetClipRangeInput, type SetClipRangeResult } from "@/lib/video/clip-range";
 import { parseSetPartsInput, type SetPartsResult } from "@/lib/set-parts";
 import { parseSupersetInput, type SupersetResult } from "@/lib/supersets";
@@ -94,6 +95,16 @@ export async function setClipRange(raw: unknown): Promise<SetClipRangeResult> {
   const input = parseSetClipRangeInput(raw);
   if (input === null) return { ok: false, reason: "invalid" };
   return recordClipRange(input);
+}
+
+/**
+ * The phone's automatic clip (slice clip-auto): one PATCH of auto_in_s/auto_out_s/auto_status/auto_run_ms.
+ * The input holds exactly the clip id and those four values; landmarks and frames never leave the phone.
+ */
+export async function setClipAuto(raw: unknown): Promise<SetClipAutoResult> {
+  const input = parseSetClipAutoInput(raw);
+  if (input === null) return { ok: false, reason: "invalid" };
+  return recordClipAuto(input);
 }
 
 /** A clip deleted on the phone deletes its row: one DELETE, idempotent. */

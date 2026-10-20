@@ -21,6 +21,7 @@ import { parseVideoClipRow, RowError, VIDEO_CLIPS_SELECT } from "./rows.ts";
 import { exerciseIds, sessionSets } from "./set-log.ts";
 import { type ClipNames, type RunSets, runSetNumbers, type SessionSetRow } from "../video/library-view.ts";
 import { FIXTURE_FAILING_RANGE_ID, type SetClipRangeInput, type SetClipRangeResult, validateClipRange } from "../video/clip-range.ts";
+import { type SetClipAutoInput, type SetClipAutoResult, validateClipAuto } from "../video/auto-clip.ts";
 
 /**
  * The app's fifth write path (user, 2026-10-17, slice video-record): a working set's clip recorded
@@ -40,6 +41,9 @@ import { FIXTURE_FAILING_RANGE_ID, type SetClipRangeInput, type SetClipRangeResu
  *  - range (slice clip-handles): the user's in/out, one PATCH of clip_in_s/clip_out_s by id after one
  *    read of the row's duration_s; both numbers or both null, rounded to 0.1, 0 ≤ in < out, out − in ≥ 1,
  *    out ≤ duration_s (lib/video/clip-range.ts, shared with the editor). Refused on a preview host.
+ *  - auto (slice clip-auto): the phone's automatic clip, one PATCH of auto_in_s/auto_out_s/auto_status/
+ *    auto_run_ms by id after one read of duration_s (lib/video/auto-clip.ts validateClipAuto). Never
+ *    landmarks or frames: the input type has only those four values. Refused on a preview host.
  *  - delete: one DELETE by id (deleting a clip on the phone deletes its row); idempotent.
  * Dev switches (DEV_TODAY, DEV_FIXTURE) write nothing and answer as if written.
  * Python never reads the table: TSS is unchanged.
@@ -149,6 +153,47 @@ export async function recordClipRange(input: SetClipRangeInput, options: VideoCl
     return { ok: true, dev: false, ...range };
   } catch (error) {
     return failed(error, "clip range not saved");
+  }
+}
+
+/** duration_s of one clip, or undefined when there is no such row. Errors propagate. */
+async function clipDuration(c: PostgrestClient, id: string): Promise<number | undefined> {
+  const found = await selectAll(c, TABLE, { columns: "id,duration_s", order: "id", filters: [["id", `eq.${id}`]] }, (raw) => {
+    if (typeof raw !== "object" || raw === null) throw new RowError(`${TABLE}: expected an object`);
+    const d = (raw as Record<string, unknown>).duration_s; // checked below
+    if (typeof d !== "number") throw new RowError(`${TABLE}.duration_s must be a number`);
+    return d;
+  });
+  return found[0];
+}
+
+/**
+ * The automatic clip (slice clip-auto): one PATCH of only auto_in_s, auto_out_s, auto_status and
+ * auto_run_ms on the clip's id, after one read of its duration_s. Idempotent: the same values twice
+ * give the same row. Refused on a preview host (as recordClip), for a bad status/range/run time, or
+ * `not_found` without the row. Dev switches read and write nothing and answer as if saved.
+ */
+export async function recordClipAuto(input: SetClipAutoInput, options: VideoClipOptions = {}): Promise<SetClipAutoResult> {
+  const { env = process.env, nodeEnv = process.env.NODE_ENV, client: makeClient = client } = options;
+  if (!recordingAllowed(env, nodeEnv)) return { ok: false, reason: "not_allowed" };
+  const shaped = validateClipAuto(input, null);
+  if (shaped === null) return { ok: false, reason: "range" };
+  if (devSwitchOn(env, nodeEnv)) return { ok: true, dev: true, ...shaped }; // nothing is read or written
+  try {
+    const c = makeClient();
+    const durationS = await clipDuration(c, input.id);
+    if (durationS === undefined) return { ok: false, reason: "not_found" };
+    const auto = validateClipAuto(input, durationS);
+    if (auto === null) return { ok: false, reason: "range" };
+    const n = await patchCount(c, TABLE, {
+      params: [["id", `eq.${input.id}`]],
+      body: { auto_in_s: auto.inS, auto_out_s: auto.outS, auto_status: auto.status, auto_run_ms: auto.runMs },
+      columns: "id",
+    });
+    if (n === 0) return { ok: false, reason: "not_found" }; // deleted between the read and the write
+    return { ok: true, dev: false, ...auto };
+  } catch (error) {
+    return failed(error, "auto clip not saved");
   }
 }
 
