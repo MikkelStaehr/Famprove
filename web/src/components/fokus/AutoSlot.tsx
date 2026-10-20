@@ -10,7 +10,7 @@ import type { AutoSlot as Slot } from "./useClipRecorder";
 export function AutoSlot({ slot }: { readonly slot: Slot }) {
   const line = slot.phase === null ? null : fokusAutoLine(slot.phase);
   return (
-    <div className="mt-auto pt-3">
+    <div className="mt-auto h-(--h-fokus-auto-slot) pt-3">
       <p aria-hidden="true" className="h-[2lh] overflow-hidden font-sans text-13 text-text-muted">
         {line !== null && (
           <>

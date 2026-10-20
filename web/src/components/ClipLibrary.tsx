@@ -547,7 +547,7 @@ function ClipRow({
   const meta = (
     <MonoCaption uppercase={false} className="tabular-nums">
       {row.meta}
-      {word !== null && ` · ${word}`}
+      {word !== null && ` ·\u00a0${word}`}{/* the dot wraps with its word (design-lead) */}
       {row.starUnsynced && <span className="text-11"> · ikke synkroniseret</span>}
     </MonoCaption>
   );

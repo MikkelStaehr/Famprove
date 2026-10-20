@@ -43,6 +43,10 @@
   /* Fokus strip height (DESIGN.md Space): the min-height of both the rest card and the recording
      strip, so the hero card never moves when recording starts or stops. min-height, never height. */
   --h-fokus-strip: 11.1125rem;
+  /* clip-auto's analysis slot in the rest card after an MP4 Stop (pt-3 + two 18px lines), and the
+     recording strip's min-height while an MP4 records, so the hero card moves only on the Optag tap. */
+  --h-fokus-auto-slot: 3rem;
+  --h-fokus-strip-clip: calc(var(--h-fokus-strip) + var(--h-fokus-auto-slot));
   /* Fokus › Minimér's bar (fokus-minimise.md §2): the link's min-height, never height. */
   --h-fokus-bar: 3.5rem;
   /* The recording dot's pulse cycle (DESIGN.md Motion; lib/motion.ts DUR.recPulse, motion.test). */

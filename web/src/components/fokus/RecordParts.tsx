@@ -1,8 +1,9 @@
 "use client";
 
-import { type RefObject, useEffect, useState } from "react";
+import { type RefObject, useEffect, useState, useSyncExternalStore } from "react";
 
 import { Icon } from "@/components/icons";
+import { pickRecorderType } from "@/lib/video/mime";
 import { clock, DENIED_HELP, DENIED_TITLE, WAITING_LABEL } from "@/lib/video/recording";
 import { CAPTION, FokusWarning, OUTLINED } from "./Instrument";
 
@@ -57,6 +58,11 @@ export function DeniedLine() {
   );
 }
 
+const noSubscribe = () => () => undefined;
+/** The recorder this browser picks makes MP4 (clip-auto analyses only MP4). */
+const recordsMp4 = () =>
+  pickRecorderType(typeof MediaRecorder === "undefined" ? undefined : (t) => MediaRecorder.isTypeSupported(t))?.ext === "mp4";
+
 /**
  * §5–§6: the recording strip in the rest strip's slot (Card 22, padding 16): OPTAGER ↔ SÆT n · UDEN
  * LYD, the running time, and the live preview (88 × 128, contain, not mirrored) as a button that
@@ -87,10 +93,16 @@ export function RecordStrip({
   ) : (
     <video ref={previewRef} muted playsInline autoPlay aria-hidden="true" className="size-full bg-bg object-contain" />
   );
+  // clip-auto §1: an MP4 clip gets the analysis slot (--h-fokus-auto-slot) in the rest card after
+  // Stop; reserving it here (--h-fokus-strip-clip) keeps the hero card still at Stop, so the only
+  // change is the Optag tap. WebM gets no analysis, so no slot (design-lead, 2026-10-20).
+  // The server has no MediaRecorder: its snapshot is false, the client's is read after hydration
+  // (useSyncExternalStore re-renders without a mismatch; a dev fixture is server-rendered).
+  const slotted = useSyncExternalStore(noSubscribe, recordsMp4, () => false);
   return (
     // acceptance 2: --h-fokus-strip is the rest card's min-height too, so the hero card under it stays
     // put when recording starts. §5: the left column is 12px from the preview.
-    <section aria-label="Optagelse" className="relative flex min-h-(--h-fokus-strip) items-stretch justify-between gap-3 rounded-card border border-border bg-card p-4">
+    <section aria-label="Optagelse" className="relative flex min-h-(--h-fokus-strip) items-stretch justify-between gap-3 rounded-card border border-border bg-card p-4 data-[auto=true]:min-h-(--h-fokus-strip-clip)" data-auto={slotted}>
       <div className="flex min-w-0 flex-col">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="font-mono text-13 text-text uppercase">Optager</span>
