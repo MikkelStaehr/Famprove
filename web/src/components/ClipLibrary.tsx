@@ -273,8 +273,10 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         });
         setRunning(null);
         recordRun(browserStore(), r.id, out, Date.now());
-        if (out.kind === "aborted" && !ctrl.signal.aborted && document.visibilityState === "hidden") {
-          // clip-auto-3: a hidden page aborts the run (nothing written); the same clip again once visible
+        if (out.kind === "aborted" && !ctrl.signal.aborted) {
+          // clip-auto-3: a hidden page aborts the run (nothing written; the pickup's own abort is the
+          // only other cause, excluded above); the same clip again once visible, even if the page is
+          // visible again by now (review 2026-10-20)
           await untilVisible(ctrl.signal);
           i--;
           continue;

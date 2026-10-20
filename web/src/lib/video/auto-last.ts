@@ -60,11 +60,14 @@ export function readAutoLast(store: KeyStore | null): Readonly<Record<string, Au
   }
 }
 
+/** A stored failure message's length (security, 2026-10-20). */
+const MESSAGE_MAX = 200;
+
 /** The outcome as its stored record. Pure. */
 export function lastOf(out: AutoOutcome, at: number): AutoLast {
   if (out.kind === "skipped") return { kind: "skipped", mode: null, why: null, runMs: null, at };
   const base = { kind: out.kind, mode: out.mode?.mode ?? null, why: out.mode?.why ?? null, runMs: out.runMs, at };
-  if (out.kind === "failed") return { ...base, step: out.error.step, message: out.error.message };
+  if (out.kind === "failed") return { ...base, step: out.error.step, message: out.error.message.slice(0, MESSAGE_MAX) };
   if (out.kind === "low_confidence" || out.kind === "aborted") return { ...base, reason: out.reason };
   return base;
 }

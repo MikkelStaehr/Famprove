@@ -155,6 +155,8 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFix
     if (autoRun.current === ctrl) autoRun.current = null;
     if (out.kind === "clipped") show({ kind: "clipped", inS: out.inS, outS: out.outS });
     else if (out.kind === "low_confidence" || out.kind === "failed") show({ kind: out.kind });
+    // A run aborted by a hidden page leaves no running line behind; the pickup re-runs the clip.
+    else if (out.kind === "aborted") setAuto((a) => (a !== null && a.id === l.id ? { ...a, phase: null } : a));
   }, []);
 
   // §2/§3/§13 on load: capabilities, space, a blocked camera; the index's leftovers.
