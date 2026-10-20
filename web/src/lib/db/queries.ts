@@ -16,6 +16,10 @@ import {
   illustrativeWeeklyPlan,
   ILLUSTRATIVE_FEEL,
   isPauseFixture,
+  isMinimiseFixture,
+  MINIMISED_READY_PAST_MIN_S,
+  MINIMISED_REST_S,
+  minimisedLog,
   videoFixture,
   midsessionLog,
   sheetLog,
@@ -495,6 +499,15 @@ export async function loadTrainingPlan(today: IsoDate): Promise<TrainingPlanData
     const shown = fixture === "combo" ? comboSets(mid.sets) : mid.sets;
     const setLog = fixture === "sheet" ? sheetLog(shown, today, new Date()) : midsessionLog(shown, today, new Date());
     return { ...base, ...mid, sets: shown, setLog };
+  }
+  if (isMinimiseFixture(fixture)) {
+    // fokus-minimise.md §4: real taps; minimised-ready's done is the set's own minimum + 10 s ago.
+    const mid = midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets));
+    const restMin = (row: PrescribedSetRow | undefined) =>
+      row === undefined ? null : (mid.plannedSets.find((p) => p.block === row.block && p.sheetRow === row.sheetRow && p.week === row.week && p.setNo === row.setNo)?.restMinS ?? null);
+    const ago = (row: PrescribedSetRow | undefined) =>
+      fixture === "minimised-ready" ? (restMin(row) ?? MINIMISED_REST_S) + MINIMISED_READY_PAST_MIN_S : MINIMISED_REST_S;
+    return { ...base, ...mid, setLog: minimisedLog(mid.sets, today, new Date(), ago), supersetPairs: [] };
   }
   if (fixture === "jumped") {
     const mid = midsessionVariants(sets, base.previousWeek, midsessionPlanned(sets, plannedSets));

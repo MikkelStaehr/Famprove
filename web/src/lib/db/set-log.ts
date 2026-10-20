@@ -18,7 +18,7 @@ import {
 } from "../set-taps.ts";
 import { exerciseIdMap, orderedEffectivePairs, type SessionRun, sessionRuns } from "../supersets.ts";
 import { localToday } from "../training-view.ts";
-import { devSwitchOn } from "./dev-fixture.ts";
+import { devFixture, devSwitchOn } from "./dev-fixture.ts";
 import { EnvError, readSupabaseEnv } from "./env.ts";
 import {
   createClient,
@@ -312,7 +312,11 @@ export type RecordOptions = {
 
 export async function recordSetTap(input: SetTapInput, now: Date, options: RecordOptions = {}): Promise<SetTapResult> {
   const { env = process.env, nodeEnv = process.env.NODE_ENV, client: makeClient = client } = options;
-  if (devSwitchOn(env, nodeEnv)) return { ok: false, reason: "dev" };
+  if (devSwitchOn(env, nodeEnv)) {
+    // DEV_FIXTURE=minimise-halted (fokus-minimise.md §4): a jump's save fails, so the queue halts; nothing is written.
+    if (input.kind === "jump" && devFixture(env, nodeEnv) === "minimise-halted") return { ok: false, reason: "failed" };
+    return { ok: false, reason: "dev" };
+  }
   if (input.date !== localToday(now)) return { ok: false, reason: "invalid" };
   try {
     const c = makeClient();

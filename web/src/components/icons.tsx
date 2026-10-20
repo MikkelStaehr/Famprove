@@ -10,6 +10,7 @@ import {
   Bike,
   Check,
   ChevronDown,
+  ChevronUp,
   ChevronLeft,
   History,
   ChevronRight,
@@ -48,6 +49,7 @@ export type IconName =
   | "history"
   | "chevron-right"
   | "chevron-down"
+  | "chevron-up"
   | "warning"
   | "check"
   | "arrow-up"
@@ -98,6 +100,7 @@ const LUCIDE: Readonly<Record<Exclude<IconName, OwnName>, LucideIcon>> = {
   history: History,
   "chevron-right": ChevronRight,
   "chevron-down": ChevronDown,
+  "chevron-up": ChevronUp,
   warning: TriangleAlert,
   check: Check,
   "arrow-up": ArrowUp,

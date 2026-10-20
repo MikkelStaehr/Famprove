@@ -42,6 +42,7 @@ import { CAPTION, COMPACT_SECONDARY, DARK_BOX, FokusWarning as WarningLine, OUTL
 import { SessionSignature } from "./SessionSignature";
 import { DoneButton, FeelBlock, Footer, NextSetCard, RestStrip, WarmupCard } from "./PauseParts";
 import { useWakeLock } from "./useWakeLock";
+import { type FokusSnapshot, MINIMISE_REFUSED, minimiseAction, readSnapshot, sessionStore, snapshotOf, writeSnapshot } from "@/lib/fokus-snapshot";
 import { PartsEditor } from "./PartsEditor";
 import { usePartsSave } from "./usePartsSave";
 import { draftFrom, type PartsDraft } from "@/lib/parts-editor";
@@ -117,7 +118,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     () => (switched ? clientOrder(session.exercises, orderedPairs, runRows) : session.order),
     [switched, session.exercises, orderedPairs, runRows, session.order],
   );
-  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpProblem, shape: liveShape, pushPick, jumped, adoptOrder } = useSetLog(session.log, baseOrder, date, session.session, session.exercises, shape);
+  const { log, tap, unsaved, retry, rejected, dev, flush, failedNow, order, jumpProblem, shape: liveShape, pushPick, pickHalted, jumped, adoptOrder } = useSetLog(session.log, baseOrder, date, session.session, session.exercises, shape);
   // The session sheet (fokus-sheet.md): open state is never persisted (closed after a reload).
   const [sheet, setSheet] = useState<{ readonly animateIn: boolean } | null>(() => (openOnLoad ? { animateIn: false } : null));
   // superset-any.md R1: the seam whose ⇄ opened the sheet's step 2; null = step 1.
@@ -168,6 +169,31 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   };
   // fokus-flow.md §4: the screen stays on from an open, begun session until it is finished.
   useWakeLock(log.size > 0 && view.kind !== "finished");
+  // fokus-minimise.md §2: every tap rewrites the snapshot the minimised bar reads (cleared when nothing is left).
+  const snapKey = JSON.stringify(snapshotOf(date, session.session, view, log.size > 0));
+  useEffect(() => {
+    const store = sessionStore();
+    // snapKey is snapshotOf's own output, serialised to key the effect: parsed back as that type.
+    const now = JSON.parse(snapKey) as FokusSnapshot | null;
+    const previous = readSnapshot(store, date);
+    writeSnapshot(store, now === null ? null : { ...now, signalled: previous !== null && now.restSince !== null && previous.signalled === now.restSince ? now.restSince : null });
+  }, [snapKey, date]);
+  // ↓ Minimér (§2–3): refused while a failed jump or pick halts the queue; else the saves land first.
+  const halted = jumpProblem?.kind === "failed" || pickHalted;
+  const [minimising, setMinimising] = useState(false);
+  const [minimiseRefused, setMinimiseRefused] = useState(false);
+  const onMinimise = () => {
+    if (minimiseAction(halted) === "refuse") {
+      setMinimiseRefused(true);
+      return;
+    }
+    setMinimising(true);
+    void settle(saveAll).then((sent) => {
+      setMinimising(false);
+      // A save that failed (or hasn't landed) during the flush: stay, with its line (§3).
+      if (sent && failedNow() === 0) router.push("/train");
+    });
+  };
   const p = view.progress;
 
   const after = (message: string) => {
@@ -349,10 +375,16 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
       <div inert={open} data-sheet-top>
       {/* Top bar: fixed in layout, so the card never jumps (§4.1). */}
       <div className="flex items-center justify-between gap-3">
-        <HomeLink flush={async () => { await rec.abort("cancel"); return saveAll(); }} className={COMPACT_SECONDARY}>
+        <HomeLink flush={async () => { await rec.abort("cancel"); writeSnapshot(sessionStore(), null); return saveAll(); }} className={COMPACT_SECONDARY}>
           <Icon name="x" size={18} />
           Afslut
         </HomeLink>
+        {!recLive && log.size > 0 && view.kind !== "finished" && (
+          <button type="button" onClick={onMinimise} disabled={minimising} className={`${COMPACT_SECONDARY} disabled:opacity-100`}>
+            <Icon name="arrow-down" size={18} />
+            {minimising ? "Gemmer…" : "Minimér"}
+          </button>
+        )}
       </div>
       {(devSwitches || dev) && <p className="mt-2 font-mono text-13 text-text-muted">Testvisning: sæt gemmes ikke.</p>}
       {/* fokus-sheet.md §4: the count and the grouped bar are one button that opens the session sheet. */}
@@ -389,6 +421,7 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
             )}
           </WarningLine>
         )}
+        {minimiseRefused && halted && <WarningLine>{MINIMISE_REFUSED}</WarningLine>}
         {jumpProblem?.kind === "refused" && (
           <WarningLine>{`Kunne ikke springe til ${jumpName(jumpProblem.row)}: sessionen er ændret. Rækkefølgen er som før.`}</WarningLine>
         )}

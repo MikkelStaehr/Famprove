@@ -141,7 +141,10 @@ export type DevFixture =
   | "clips"
   | "superset-pick"
   | "superset-picked"
-  | "superset-pick-empty";
+  | "superset-pick-empty"
+  | "minimised"
+  | "minimised-ready"
+  | "minimise-halted";
 const FIXTURES: readonly DevFixture[] = [
   "empty",
   "stale",
@@ -173,7 +176,21 @@ const FIXTURES: readonly DevFixture[] = [
   "superset-pick",
   "superset-picked",
   "superset-pick-empty",
+  "minimised",
+  "minimised-ready",
+  "minimise-halted",
 ];
+
+/** Fokus › Minimér's fixtures (fokus-minimise.md §4). */
+export type MinimiseFixture = "minimised" | "minimised-ready" | "minimise-halted";
+export function isMinimiseFixture(f: DevFixture | null): f is MinimiseFixture {
+  return f === "minimised" || f === "minimised-ready" || f === "minimise-halted";
+}
+
+/** DEV_FIXTURE=minimised: the latest done this long ago (under every recommended minimum, 90 s). */
+export const MINIMISED_REST_S = 42;
+/** DEV_FIXTURE=minimised-ready: the latest done the set's recommended minimum + this long ago. */
+export const MINIMISED_READY_PAST_MIN_S = 10;
 
 /** The Fokus pause fixtures (fokus-pause.md §8). */
 export type PauseFixture = "warmup" | "pause" | "exercise-end" | "pause-rated" | "finished";
@@ -629,6 +646,43 @@ export function sheetLog(sets: readonly PrescribedSetRow[], today: IsoDate, now:
       if (!isWarmup(next)) done += 1;
     }
     const at = (k: number) => new Date(now.getTime() - 102_000 - (taps.length - 1 - k) * 180_000).toISOString();
+    let log: ReadonlyMap<string, LoggedSet> = new Map();
+    taps.forEach(([kind, ref], k) => {
+      log = applyTap(order, log, kind, ref, at(k));
+    });
+    setLog.push(...logRows(log, today, session, at(taps.length - 1)));
+  }
+  return setLog;
+}
+
+/**
+ * DEV_FIXTURE=minimised / minimised-ready / minimise-halted (fokus-minimise.md §4): midsession's
+ * shape played through the real taps (Begynd, warm-ups done on the way, MIDSESSION_DONE working
+ * sets done, 3 minutes apart), the latest tap a done `restAgoS(done row)` seconds before `now`.
+ * Never written anywhere.
+ */
+export function minimisedLog(
+  sets: readonly PrescribedSetRow[],
+  today: IsoDate,
+  now: Date,
+  restAgoS: (row: PrescribedSetRow | undefined) => number,
+): SetLogRow[] {
+  const setLog: SetLogRow[] = [];
+  for (const [session, rows] of bySession(sets)) {
+    const order = shapeOrder(sessionShape(rows));
+    const first = firstOpen(order, new Map());
+    if (first === null) continue;
+    const taps: [SetTapKind, SetRef][] = [["begin", first]];
+    let probe: ReadonlyMap<string, LoggedSet> = applyTap(order, new Map(), "begin", first, now.toISOString());
+    let done = 0;
+    for (let next = firstOpen(order, probe); next !== null && done < MIDSESSION_DONE; next = firstOpen(order, probe)) {
+      taps.push(["done", next]);
+      probe = applyTap(order, probe, "done", next, now.toISOString());
+      if (!isWarmup(next)) done += 1;
+    }
+    const last = taps[taps.length - 1][1];
+    const ago = restAgoS(rows.find((r) => r.sheetRow === last.row && r.setNo === last.set)) * 1000;
+    const at = (k: number) => new Date(now.getTime() - ago - (taps.length - 1 - k) * 180_000).toISOString();
     let log: ReadonlyMap<string, LoggedSet> = new Map();
     taps.forEach(([kind, ref], k) => {
       log = applyTap(order, log, kind, ref, at(k));

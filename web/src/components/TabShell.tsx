@@ -5,6 +5,8 @@ import { createContext, type PointerEvent, type MouseEvent, type ReactNode, useC
 
 import { useMedia } from "./chart-hooks";
 import { TabBar } from "./TabBar";
+import { MinimisedBar } from "./MinimisedBar";
+import type { FokusSnapshot } from "@/lib/fokus-snapshot";
 import { DUR, easeOutQuart, REDUCED_MOTION } from "@/lib/motion";
 import { dragLock, dragPosition, edgeStart, pageStyle, releaseTarget, TAB_COUNT, TABS, tabIndex, tabTitle } from "@/lib/tab-shell";
 
@@ -31,7 +33,17 @@ export function useTabEntry(i: number): number {
  * p lives in a ref and every frame writes the styles straight to the frames, scrims and the bar's
  * indicator; React renders them once, at the first paint's index, and never touches them again.
  */
-export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
+export function TabShell({
+  pages,
+  today,
+  devSnapshot,
+}: {
+  readonly pages: readonly ReactNode[];
+  /** The screen's date (DEV_TODAY aware): a Fokus snapshot from another day is cleared. */
+  readonly today: string;
+  /** DEV_FIXTURE=minimised*: the snapshot the server built from real taps (fokus-minimise.md §4). */
+  readonly devSnapshot?: FokusSnapshot | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const index = tabIndex(pathname);
@@ -269,6 +281,8 @@ export function TabShell({ pages }: { readonly pages: readonly ReactNode[] }) {
           );
         })}
       </div>
+      {/* fokus-minimise.md §2: Fokus's bar, a flex sibling under the pages (the scroll container shrinks), above the TabBar below lg. */}
+      <MinimisedBar today={today} {...(devSnapshot === undefined ? {} : { devSnapshot })} />
     </div>
     </TabEntries>
   );

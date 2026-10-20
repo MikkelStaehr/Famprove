@@ -33,6 +33,7 @@ import { Icon } from "@/components/icons";
 
 import { CAPTION, CheckIcon, PRIMARY_BOX, PRIMARY_DOCK } from "./Instrument";
 import { type RestSignal, restSignal } from "@/lib/rest-signal";
+import { sessionStore, sharedVibrator } from "@/lib/fokus-snapshot";
 import { RestTimer, useElapsed } from "./RestTimer";
 
 type PrimaryRef = RefObject<(HTMLButtonElement & HTMLAnchorElement) | null>;
@@ -229,7 +230,7 @@ export function RestStrip({
   const signal = useRef<{ readonly since: string; readonly s: RestSignal } | null>(null);
   const said = useRef<string | null>(null);
   useEffect(() => {
-    if (signal.current?.since !== since) signal.current = { since, s: restSignal(since, minS, navigator) };
+    if (signal.current?.since !== since) signal.current = { since, s: restSignal(since, minS, sharedVibrator(sessionStore(), since, navigator)) };
     const visible = document.visibilityState === "visible";
     if (signal.current.s.tick(Date.now(), visible)) {
       const sentence = restSentence({ kind: "ready" }, minS, maxS);
