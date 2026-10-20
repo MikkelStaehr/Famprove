@@ -5,7 +5,7 @@
  * canvas copy of it, so a rotation mismatch shows. Landmarks and canvases stay in memory; nothing
  * is stored or sent. The landmarker is closed on every way out.
  */
-import { createPose, type PoseFrame, type PosePoint, PoseError } from "./pose-run";
+import { createPose, type PoseFrame, type PosePoint, PoseError, untilAbort } from "./pose-run";
 import { type FrameCheck, frameCheck } from "./debug-log";
 
 type Landmarker = Awaited<ReturnType<typeof createPose>>;
@@ -15,19 +15,11 @@ const points = (r: { landmarks: { x: number; y: number; visibility: number }[][]
   return p === undefined ? null : p.map((q) => [q.x, q.y, q.visibility] as const);
 };
 
-/** Rejects once the signal aborts. */
-function abortable(signal: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
-    if (signal.aborted) reject(signal.reason);
-    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
-  });
-}
-
 /** Plays `video` (src already set) once at 1×, detecting on frames ≥ 200 ms apart. */
 export async function playPose(video: HTMLVideoElement, opts: { readonly signal: AbortSignal; readonly onProgress: (t: number, of: number) => void }): Promise<PoseFrame[]> {
   const { signal } = opts;
   if (typeof video.requestVideoFrameCallback !== "function") throw new PoseError("video", "requestVideoFrameCallback findes ikke i browseren");
-  const landmarker: Landmarker = await Promise.race([createPose(), abortable(signal)]);
+  const landmarker: Landmarker = await untilAbort(createPose(), signal);
   const frames: PoseFrame[] = [];
   let handle = 0;
   try {
@@ -58,7 +50,7 @@ export async function playPose(video: HTMLVideoElement, opts: { readonly signal:
       handle = video.requestVideoFrameCallback(onFrame);
     });
     await video.play();
-    await Promise.race([ended, abortable(signal)]);
+    await untilAbort(ended, signal);
     return frames;
   } finally {
     video.cancelVideoFrameCallback(handle);
@@ -79,7 +71,7 @@ function seekTo(video: HTMLVideoElement, t: number, signal: AbortSignal): Promis
     }, { once: true });
   });
   video.currentTime = t;
-  return Promise.race([seeked, abortable(signal)]);
+  return untilAbort(seeked, signal);
 }
 
 function draw(ctx: CanvasRenderingContext2D, pts: readonly PosePoint[] | null, links: readonly { start: number; end: number }[], colour: string, dash: number[]) {
@@ -112,7 +104,7 @@ function draw(ctx: CanvasRenderingContext2D, pts: readonly PosePoint[] | null, l
 /** Three debug images at 25/50/75 % of the clip, from a detached <video> on `url`. */
 export async function debugImages(url: string, colours: { readonly video: string; readonly canvas: string }, signal: AbortSignal): Promise<DebugImage[]> {
   const { PoseLandmarker } = await import("@mediapipe/tasks-vision");
-  const landmarker: Landmarker = await Promise.race([createPose(), abortable(signal)]);
+  const landmarker: Landmarker = await untilAbort(createPose(), signal);
   const video = document.createElement("video");
   const out: DebugImage[] = [];
   try {
@@ -124,7 +116,7 @@ export async function debugImages(url: string, colours: { readonly video: string
       video.addEventListener("error", () => reject(new PoseError("video", "videoen kunne ikke læses")), { once: true });
     });
     video.src = url;
-    await Promise.race([meta, abortable(signal)]);
+    await untilAbort(meta, signal);
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
     if (duration <= 0) throw new PoseError("video", "ingen længde");
     let ts = 0;

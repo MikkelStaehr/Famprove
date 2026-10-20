@@ -74,7 +74,7 @@ export async function createPose(): Promise<PoseLandmarker> {
 }
 
 /** Rejects with the signal's reason once it aborts. */
-function untilAbort<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
+export function untilAbort<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return Promise.reject(signal.reason);
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(signal.reason);
