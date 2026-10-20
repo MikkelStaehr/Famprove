@@ -57,6 +57,8 @@ import { formatBytes } from "@/lib/video/space";
 const CLEANUP_KEY = "famprove.clips.cleanup";
 const BTN = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 const DARK_BTN = `inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-track px-4 font-sans text-14 font-medium text-text ${BTN}`;
+/** Gem and Del keep their width while they read `Klipper …` / `Forbereder …` (clip-cut §7). */
+const BUSY_WIDTH = "min-w-[7.5rem]";
 
 type Props = {
   readonly today: IsoDate;
@@ -607,6 +609,7 @@ function Player({
   async function share() {
     if (blob === null || row.ext === null) return;
     setPreparing(true);
+    setShareText(busyText(cut)); // §7: announced in the status line, then replaced by the outcome
     const name = fileName ?? clipFileNames([row]).get(row.id) ?? `${row.date} sæt ${row.set}.${row.ext}`;
     const p = await prepareClip(blob, name, cut, cutClip); // clip-cut: Del uses Gem's name
     const outcome = await shareClip(navigator, shareData(p.blob, p.name, row.ext));
@@ -643,10 +646,12 @@ function Player({
       return;
     }
     setSaveReading(true); // from the tap until the file is handed over (§7)
+    setSaveText(busyText(cut)); // §7: announced in the status line, then replaced by the outcome
     let b: Blob | null = blob;
     if (b === null) {
       if (files === null) {
         setSaveReading(false);
+        setSaveText(null);
         return;
       }
       try {
@@ -680,7 +685,7 @@ function Player({
           <MonoCaption uppercase={false}>{row.meta}</MonoCaption>
         </div>
       </div>
-      {cutLine(cut) !== null && <p className="px-3 font-mono text-13 text-text-muted">{cutLine(cut)}</p>}
+      {cutLine(cut) !== null && <p className="pl-[60px] pr-3 font-mono text-13 text-text-muted">{cutLine(cut)}</p>}
       <div className="flex min-h-0 flex-1 items-center justify-center p-2">
         {fixture || (url === null && files === null) ? (
           <div className="flex aspect-[9/16] max-h-full w-full max-w-xs items-center justify-center rounded-card bg-track">
@@ -715,13 +720,13 @@ function Player({
                 </button>
               )}
               {canShare && (
-                <button type="button" className={DARK_BTN} disabled={blob === null || preparing} onClick={() => void share()}>
+                <button type="button" className={`${DARK_BTN} ${BUSY_WIDTH}`} disabled={blob === null || preparing} onClick={() => void share()}>
                   <Icon name="share" size={18} />
                   {preparing ? busyText(cut) : "Del"}
                 </button>
               )}
               {fileName !== null && (
-                <button type="button" className={DARK_BTN} disabled={saveReading} onClick={() => void save()}>
+                <button type="button" className={`${DARK_BTN} ${BUSY_WIDTH}`} disabled={saveReading} onClick={() => void save()}>
                   <Icon name="download" size={18} />
                   {saveReading ? busyText(cut) : "Gem"}
                 </button>
