@@ -1112,7 +1112,7 @@ function Player({
 
   /** §2.1 Start her: a pending in point; no write, the video keeps playing. An out under 1,0 s after it is cleared. */
   function markStart() {
-    if (markBusy || server === null) return;
+    if (markBusy || server === null || view.kind === "done") return; // inert during the cut's Fortryd window
     const t = playhead();
     if (!Number.isFinite(t)) return;
     const next = startAt(points, markPoint(t, server.durationS));
@@ -1124,7 +1124,7 @@ function Player({
 
   /** §2.2 Slut her: only a pending out point (in = the pending Start, else 0); it writes nothing. Refused: the ◆ line, nothing set. */
   function markEnd() {
-    if (markBusy || server === null) return;
+    if (markBusy || server === null || view.kind === "done") return;
     const t = playhead();
     if (!Number.isFinite(t)) return;
     const m = endAt(points, t, server.durationS);
@@ -1343,7 +1343,7 @@ function Player({
                 <button
                   ref={startBtn}
                   type="button"
-                  aria-disabled={markBusy || undefined}
+                  aria-disabled={markBusy || view.kind === "done" || undefined}
                   className={`${MARK_BTN} ${pending === null ? "bg-track" : "bg-raised"}`}
                   onClick={markStart}
                 >
@@ -1358,11 +1358,13 @@ function Player({
                     </span>
                   )}
                 </button>
-                <button ref={endBtn} type="button" aria-disabled={markBusy || undefined} className={`${MARK_BTN} ${points.outS === null ? "bg-track" : "bg-raised"}`} onClick={markEnd}>
+                <button ref={endBtn} type="button" aria-disabled={markBusy || view.kind === "done" || undefined} className={`${MARK_BTN} ${points.outS === null ? "bg-track" : "bg-raised"}`} onClick={markEnd}>
                   {points.outS === null ? (
                     <span>Slut her</span>
                   ) : (
-                    <span className="tabular-nums">Slut {formatSeconds(points.outS)}</span>
+                    <span className="tabular-nums">
+                      Slut <span className="normal-case">{formatSeconds(points.outS)}</span>
+                    </span>
                   )}
                   <span aria-hidden="true" className="font-mono">
                     ]
