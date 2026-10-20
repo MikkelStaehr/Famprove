@@ -20,6 +20,7 @@ import {
   Plus,
   RotateCw,
   Share2,
+  Download,
   Star,
   Trash2,
   TriangleAlert,
@@ -62,7 +63,8 @@ export type IconName =
   | "play"
   | "star"
   | "share"
-  | "trash";
+  | "trash"
+  | "download";
 
 /** Part B sizes: 22 phone tab bar, 20 desktop tabs / card corners / icon buttons, 18 ListRow, 16 WarningLine and chevrons. */
 export type IconSize = 16 | 18 | 20 | 22;
@@ -113,6 +115,7 @@ const LUCIDE: Readonly<Record<Exclude<IconName, OwnName>, LucideIcon>> = {
   play: Play,
   star: Star,
   share: Share2,
+  download: Download,
   trash: Trash2,
 };
 

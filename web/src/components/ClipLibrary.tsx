@@ -35,7 +35,21 @@ import {
 } from "@/lib/video/library-view";
 import { type ClipFiles, memoryClipFiles } from "@/lib/video/opfs";
 import { opfsClipFiles } from "@/lib/video/opfs-browser";
-import { shareClip, shareData, shareFileName } from "@/lib/video/share";
+import {
+  browserDownload,
+  clipFileNames,
+  clipLabel,
+  doneLine,
+  PROMPT_LINE,
+  progressLine,
+  type SaveClip,
+  type SaveResult,
+  saveSequence,
+  todaysClips,
+  type UrlKeeper,
+  urlKeeper,
+} from "@/lib/video/save";
+import { shareClip, shareData } from "@/lib/video/share";
 import { formatBytes } from "@/lib/video/space";
 
 const CLEANUP_KEY = "famprove.clips.cleanup";
@@ -90,6 +104,11 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const [files, setFiles] = useState<ClipFiles | null>(null);
   const [canRecordHere, setCanRecordHere] = useState<boolean | null>(null);
   const opener = useRef<HTMLElement | null>(null);
+  const keeper = useRef<UrlKeeper | null>(null);
+  const stop = useRef(false);
+  const [saving, setSaving] = useState<{ k: number; total: number } | null>(null);
+  const [saveLine, setSaveLine] = useState("");
+  const [rest, setRest] = useState<readonly SaveClip[]>([]);
 
   const load = useCallback(async () => {
     await Promise.resolve(); // never set state synchronously inside the effect
@@ -157,8 +176,73 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     return () => clearTimeout(t);
   }, [load, canRecord, fixture]);
 
+  // §6, §9: blob URLs revoked 60 s after their click, or all on pagehide and unmount; a run stops when the page is hidden.
+  useEffect(() => {
+    const k = urlKeeper((url) => URL.revokeObjectURL(url), { setTimeout: (fn, ms) => window.setTimeout(fn, ms), clearTimeout: (h) => window.clearTimeout(h as number) });
+    keeper.current = k;
+    stop.current = false;
+    const onHide = () => {
+      stop.current = true;
+      k.revokeAll();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "hidden") stop.current = true;
+    };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisible);
+      onHide();
+    };
+  }, []);
+
   const entries = local.kind === "ready" ? local.entries : null;
   const list = local.kind === "ready" || local.kind === "none" ? libraryRows(entries, rows, names, runSets) : [];
+
+  const fileNames = clipFileNames(list);
+  const today_ = todaysClips(list, today);
+  const testPrefix = fixture !== null ? "Testvisning: " : "";
+
+  /** One clip to Downloads (the player's Gem, §1). Fixture: no file, no URL. */
+  function download(blob: Blob, name: string) {
+    if (fixture !== null || keeper.current === null) return;
+    browserDownload(keeper.current)(blob, name);
+  }
+
+  /** A clip whose file is gone (§10): its index entry goes, so the row turns fil mangler. Fixture: nothing written. */
+  async function forgetMissing(ids: readonly string[]) {
+    const s = store.current;
+    if (fixture !== null || s === null || ids.length === 0) return;
+    for (const id of ids) await s.index.remove(id);
+    setLocal({ kind: "ready", entries: await s.index.all() });
+  }
+
+  async function saveAll(clips: readonly SaveClip[]) {
+    if (clips.length === 0 || saving !== null) return;
+    stop.current = false;
+    const s = store.current;
+    const byId = new Map(list.map((r) => [r.id, r]));
+    const result: SaveResult = await saveSequence(clips, {
+      read: async (id) => {
+        if (fixture !== null) return new Blob([]);
+        const r = byId.get(id);
+        if (s === null || r === undefined || r.ext === null) return null;
+        return s.files.read(id, r.ext);
+      },
+      download,
+      sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
+      onProgress: (k, total) => {
+        setSaving({ k, total });
+        setSaveLine(`${testPrefix}${progressLine(k, total)}${total >= 2 ? ` ${PROMPT_LINE}` : ""}`);
+      },
+      aborted: () => stop.current,
+    });
+    setSaving(null);
+    setRest(result.remaining);
+    setSaveLine(`${testPrefix}${doneLine(result)}`);
+    await forgetMissing(result.missing.map((c) => c.id));
+  }
 
   async function toggleStar(row: LibraryRow) {
     const s = store.current;
@@ -252,6 +336,26 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       {canRecordHere === false && list.length > 0 && (
         <p className="mt-2 font-sans text-13 text-text-muted">Denne browser kan ikke optage video.</p>
       )}
+      {entries !== null && (today_.length > 0 || rest.length > 0) && (
+        <div className="mt-3 flex flex-col gap-1">
+          <button
+            type="button"
+            className={`${DARK_BTN} self-start disabled:opacity-60`}
+            disabled={saving !== null}
+            onClick={() =>
+              void saveAll(
+                rest.length > 0 ? rest : today_.map((r) => ({ id: r.id, name: fileNames.get(r.id) ?? `${r.id}.${r.ext}`, label: clipLabel(r) })),
+              )
+            }
+          >
+            <Icon name="download" size={18} />
+            {saving !== null ? progressLine(saving.k, saving.total) : rest.length > 0 ? `Gem resten · ${rest.length}` : `Gem alle fra i dag · ${today_.length}`}
+          </button>
+          <p role="status" className="font-sans text-13 text-text-muted">
+            {saveLine}
+          </p>
+        </div>
+      )}
       {local.kind === "loading" ? (
         slowLoad ? (
           <div aria-hidden="true" className="mt-3 flex flex-col gap-2">
@@ -308,6 +412,9 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           row={open}
           files={files}
           fixture={fixture !== null}
+          fileName={fileNames.get(open.id) ?? null}
+          onDownload={download}
+          onMissing={() => void forgetMissing([open.id])}
           onClose={requestClose}
           onPopped={close}
           onStar={() => void toggleStar(open)}
@@ -383,6 +490,9 @@ function Player({
   row,
   files,
   fixture,
+  fileName,
+  onDownload,
+  onMissing,
   onClose,
   onPopped,
   onStar,
@@ -391,6 +501,11 @@ function Player({
   readonly row: LibraryRow;
   readonly files: ClipFiles | null;
   readonly fixture: boolean;
+  /** Gem's (and Del's) file name; null without a local file. */
+  readonly fileName: string | null;
+  readonly onDownload: (blob: Blob, name: string) => void;
+  /** The file is gone (§10): the row turns fil mangler on close. */
+  readonly onMissing: () => void;
   /** Luk and Escape (back over the player's entry when it is on top). */
   readonly onClose: () => void;
   /** The entry was popped (back gesture, or onClose's back): close without another back. */
@@ -403,6 +518,9 @@ function Player({
   const [confirm, setConfirm] = useState(false);
   const [shareText, setShareText] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
+  const [saveText, setSaveText] = useState<string | null>(null);
+  const [saveReading, setSaveReading] = useState(false);
+  const gone = useRef(false);
   const dialog = useRef<HTMLDivElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
   const keepBtn = useRef<HTMLButtonElement>(null);
@@ -465,10 +583,46 @@ function Player({
   async function share() {
     if (blob === null || row.ext === null) return;
     setPreparing(true);
-    const name = shareFileName({ exerciseName: shownName(row), date: row.date, set: row.set, ext: row.ext });
+    const name = fileName ?? `${row.date} ${shownName(row)} sæt ${row.set}.${row.ext}`;
     const outcome = await shareClip(navigator, shareData(blob, name, row.ext));
     setPreparing(false);
     setShareText(outcome === "failed" ? "Kunne ikke dele videoen. Prøv igen." : outcome === "unsupported" ? "Deling af video virker ikke i denne browser." : null);
+  }
+
+  // §10: a file found gone turns the row fil mangler when the player closes.
+  const missing = useRef(onMissing);
+  useEffect(() => {
+    missing.current = onMissing;
+  }, [onMissing]);
+  useEffect(() => () => {
+    if (gone.current) missing.current();
+  }, []);
+
+  /** Gem (§1): the same read as Del; fixture: no file, no URL. */
+  async function save() {
+    if (fileName === null || row.ext === null) return;
+    if (fixture) {
+      setSaveText(`Testvisning: Sendt til Downloads som ${fileName}.`);
+      return;
+    }
+    if (files === null) return;
+    setSaveReading(true);
+    let b: Blob | null;
+    try {
+      b = await files.read(row.id, row.ext);
+    } catch {
+      setSaveReading(false);
+      setSaveText("Videoen kunne ikke læses på telefonen.");
+      return;
+    }
+    setSaveReading(false);
+    if (b === null) {
+      gone.current = true;
+      setSaveText("Videoen findes ikke længere på telefonen.");
+      return;
+    }
+    onDownload(b, fileName);
+    setSaveText(`Sendt til Downloads som ${fileName}.`);
   }
 
   return createPortal(
@@ -521,6 +675,12 @@ function Player({
                   {preparing ? "Forbereder …" : "Del"}
                 </button>
               )}
+              {fileName !== null && (
+                <button type="button" className={DARK_BTN} disabled={saveReading} onClick={() => void save()}>
+                  <Icon name="download" size={18} />
+                  {saveReading ? "Forbereder …" : "Gem"}
+                </button>
+              )}
               <button type="button" className={DARK_BTN} onClick={() => setConfirm(true)}>
                 <Icon name="trash" size={18} />
                 Slet
@@ -528,6 +688,9 @@ function Player({
             </div>
             {!canShare && <p className="font-sans text-13 text-text-muted">Deling af video virker ikke i denne browser.</p>}
             {shareText !== null && <p role="status" className="font-sans text-13 text-text-muted">{shareText}</p>}
+            <p role="status" className="font-sans text-13 text-text-muted">
+              {saveText}
+            </p>
           </>
         )}
       </div>
