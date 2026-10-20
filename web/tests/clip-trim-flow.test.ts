@@ -20,6 +20,7 @@ import {
   storedLine,
   storedPoints,
   type TrimState,
+  REFUSED_LINE,
   trimStep,
   undoneLine,
 } from "../src/lib/video/trim-flow.ts";
@@ -136,4 +137,11 @@ test("the fixture-style cut (fakes, no write) commits once at 0", async () => {
   assert.deepEqual(writes, []);
   assert.equal(await finishTrim({ index, files, trim, cut }, ID, new Date(T0.getTime() + 10_000)), "done");
   assert.deepEqual(writes, [36.2]);
+});
+
+test("at 0 a permanent refusal: done → refused, with its line; other states ignore it", () => {
+  const done = { kind: "done", fromS: 51.8, toS: 36.2, deadline: "2026-10-20T16:00:10.000Z" } as const;
+  assert.deepEqual(trimStep(done, { kind: "refused" }), { kind: "refused" });
+  assert.deepEqual(trimStep({ kind: "idle" }, { kind: "refused" }), { kind: "idle" });
+  assert.equal(REFUSED_LINE, "Klippet kunne ikke gemmes. Hele videoen er tilbage.");
 });

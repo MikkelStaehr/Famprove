@@ -141,10 +141,10 @@ test("T4/§7.7 real file: the app closed inside the window, the next load past t
   // "reload": fresh deps over the same storage (the in-memory timer is gone)
   const reload = (): TrimDeps => ({ index: w.index, files: w.files, trim: serverTrim(w.server) });
   const early = await finishDueTrims(reload(), at(5_000));
-  assert.deepEqual(early, { finished: [], failed: [], pending: [ID] });
+  assert.deepEqual(early, { finished: [], failed: [], refused: [], pending: [ID] });
   assert.deepEqual(w.server.calls, []);
   const late = await finishDueTrims(reload(), at(TRIM_UNDO_MS + 60_000));
-  assert.deepEqual(late, { finished: [ID], failed: [], pending: [] });
+  assert.deepEqual(late, { finished: [ID], failed: [], refused: [], pending: [] });
   const e = await w.index.get(ID);
   assert.ok(e !== null);
   assert.equal(e.pendingTrim, undefined);

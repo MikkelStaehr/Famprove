@@ -162,7 +162,8 @@ export async function recordClipRange(input: SetClipRangeInput, options: VideoCl
 /**
  * A committed manual cut (slice clip-trim): one PATCH of duration_s (the cut file's own length) with
  * clip_in_s/clip_out_s and auto_* null (the file is the clip, so no stored range applies), after one
- * read of the row's duration_s. Refused unless 0 < new < current (validateTrim); the same new
+ * read of the row's duration_s, filtered duration_s ≥ new so it never raises (0 rows = `duration`).
+ * Refused unless 0 < new < current (validateTrim); the same new
  * duration again is ok (idempotent: a retry after a lost reply). Refused on a preview host.
  * Dev switches read and write nothing and answer as if saved.
  */
@@ -179,11 +180,14 @@ export async function recordClipTrim(input: TrimClipInput, options: VideoClipOpt
     const durationS = validateTrim(input.durationS, current);
     if (durationS === null) return { ok: false, reason: "duration" };
     const n = await patchCount(c, TABLE, {
-      params: [["id", `eq.${input.id}`]],
+      params: [
+        ["id", `eq.${input.id}`],
+        ["duration_s", `gte.${durationS}`], // "never raise" in the write itself
+      ],
       body: { duration_s: durationS, clip_in_s: null, clip_out_s: null, auto_in_s: null, auto_out_s: null, auto_status: null, auto_run_ms: null },
       columns: "id",
     });
-    if (n === 0) return { ok: false, reason: "not_found" }; // deleted between the read and the write
+    if (n === 0) return { ok: false, reason: "duration" }; // shorter than the new one by now (or deleted): never raised
     return { ok: true, dev: false, durationS };
   } catch (error) {
     return failed(error, "clip trim not saved");

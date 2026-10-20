@@ -14,6 +14,7 @@ import {
   endAt,
   failedLine,
   finishedLine,
+  REFUSED_LINE,
   GEM_KLIP,
   NO_POINTS,
   OUT_CLEARED_LINE,
@@ -204,7 +205,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   /** clip-trim §3: each pending cut's finish timer (kept here, so closing the player never ends a window), and the bytes it freed. */
   const trimTimers = useRef(new Map<string, number>());
   const trimBefore = useRef(new Map<string, { readonly row: VideoClipRow | null; readonly bytes: number | null }>());
-  const [finishedTrims, setFinishedTrims] = useState<Readonly<Record<string, number | null>>>({});
+  const [finishedTrims, setFinishedTrims] = useState<Readonly<Record<string, number | null | "refused">>>({}); // "refused": rolled back at 0
   /** clip-summary: the hidden overview, with this phone's last outcomes read when it opened; null = closed. */
   const [overview, setOverview] = useState<Readonly<Record<string, AutoLast>> | null>(null);
   const titlePress = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -433,6 +434,17 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     if (r === "failed") return; // pendingTrim stays: the next load's finishDueTrims retries
     const before = trimBefore.current.get(id);
     trimBefore.current.delete(id);
+    if (r === "refused") {
+      // refused for good: the original is the clip again (finishTrim rolled back), so is its row
+      if (before?.row != null) {
+        const prev = before.row;
+        setRows((rs) => rs?.map((x) => (x.id === id ? prev : x)) ?? rs);
+      }
+      setSizes((sz) => ({ ...sz, [id]: before?.bytes ?? null }));
+      setLocal({ kind: "ready", entries: await s.index.all() });
+      setFinishedTrims((f) => ({ ...f, [id]: "refused" }));
+      return;
+    }
     const e = await s.index.get(id);
     const after = await fileBytes(id, e?.durationS ?? undefined, before?.row?.durationS ?? null);
     setSizes((sz) => ({ ...sz, [id]: after }));
@@ -527,7 +539,12 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   async function forgetMissing(ids: readonly string[]) {
     const s = store.current;
     if (fixture !== null || s === null || ids.length === 0) return;
-    for (const id of ids) await s.index.remove(id);
+    for (const id of ids) {
+      const e = await s.index.get(id);
+      if (e?.pendingTrim !== undefined) for (const f of clipFiles(e)) await s.files.removeFile(f); // a pending cut: the original and the cut both go
+      clearTrimTimer(id);
+      await s.index.remove(id);
+    }
     setLocal({ kind: "ready", entries: await s.index.all() });
   }
 
@@ -590,6 +607,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
 
   async function remove(row: LibraryRow) {
     const s = store.current;
+    clearTrimTimer(row.id); // a pending cut's finish never runs on a deleted clip
     if (fixture === null) {
       if (s !== null && row.ext !== null) {
         for (const f of row.files) await s.files.removeFile(f);
@@ -909,7 +927,7 @@ function Player({
   /** §3 Fortryd (undoTrim, local only). */
   readonly onUndoTrim: () => Promise<UndoTrimResult>;
   /** §3 at 0: the library's finish landed (the bytes freed, null = not measured); undefined = not finished. */
-  readonly finished: number | null | undefined;
+  readonly finished: number | null | "refused" | undefined;
   readonly files: ClipFiles | null;
   readonly fixture: boolean;
   /** Gem's (and Del's) file name; null without a local file. */
@@ -995,7 +1013,8 @@ function Player({
     };
   }, [doneDeadline]);
   /** The flow as shown: a done cut whose finish landed is finished (Fortryd went). */
-  const view: TrimState = trim.kind === "done" && finished !== undefined ? trimStep(trim, { kind: "finished", freed: finished }) : trim;
+  const view: TrimState =
+    trim.kind === "done" && finished !== undefined ? trimStep(trim, finished === "refused" ? { kind: "refused" } : { kind: "finished", freed: finished }) : trim;
   const left = view.kind === "done" ? secondsLeft(view.deadline, nowMs) : 0;
 
   useEffect(() => {
@@ -1439,6 +1458,14 @@ function Player({
                 )}
                 {view.kind === "finished" && <span className="tabular-nums">{finishedLine(view.toS, view.freed)}</span>}
                 {view.kind === "undone" && <span className="tabular-nums">{trimUndoneLine(view.fromS)}</span>}
+                {view.kind === "refused" && (
+                  <span role="status">
+                    <span aria-hidden="true" className="text-warning">
+                      ◆{" "}
+                    </span>
+                    {REFUSED_LINE}
+                  </span>
+                )}
                 {view.kind === "failed" && (
                   <>
                     <span>

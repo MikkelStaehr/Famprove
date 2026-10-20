@@ -54,15 +54,18 @@ export type TrimState =
   | { readonly kind: "done"; readonly fromS: number | null; readonly toS: number; readonly deadline: string }
   | { readonly kind: "finished"; readonly toS: number; readonly freed: number | null }
   | { readonly kind: "undone"; readonly fromS: number | null }
+  /** At 0 the server refused for good: the original is the clip again. */
+  | { readonly kind: "refused" }
   | { readonly kind: "failed"; readonly space: boolean; readonly inS: number; readonly outS: number };
 
 export type TrimEvent =
   | { readonly kind: "cut"; readonly inS: number; readonly outS: number }
   | { readonly kind: "result"; readonly result: { readonly kind: "done"; readonly fromS: number | null; readonly toS: number; readonly deadline: string } | { readonly kind: "failed"; readonly space: boolean } }
   | { readonly kind: "finished"; readonly freed: number | null }
+  | { readonly kind: "refused" }
   | { readonly kind: "undone"; readonly fromS: number | null };
 
-/** The flow: idle/failed/undone/finished → cutting → done | failed; done → finished (at 0) | undone (Fortryd). */
+/** The flow: idle/failed/undone/finished/refused → cutting → done | failed; done → finished (at 0) | refused (at 0) | undone (Fortryd). */
 export function trimStep(s: TrimState, e: TrimEvent): TrimState {
   switch (e.kind) {
     case "cut":
@@ -76,6 +79,8 @@ export function trimStep(s: TrimState, e: TrimEvent): TrimState {
       return s.kind === "done" ? { kind: "finished", toS: s.toS, freed: e.freed } : s;
     case "undone":
       return s.kind === "done" ? { kind: "undone", fromS: e.fromS } : s;
+    case "refused":
+      return s.kind === "done" ? { kind: "refused" } : s;
   }
 }
 
@@ -119,6 +124,9 @@ export function failedLine(space: boolean): string {
 export function undoneLine(fromS: number | null): string {
   return fromS === null ? "Fortrudt · hele videoen er tilbage." : `Fortrudt · hele videoen er tilbage (${clockLength(fromS)}).`;
 }
+
+/** At 0, a permanent refusal (trim.ts finishTrim `refused`): rolled back locally. */
+export const REFUSED_LINE = "Klippet kunne ikke gemmes. Hele videoen er tilbage.";
 
 /** §3 at 0: the MB measured at render (null: not measured, no MB part). */
 export function finishedLine(toS: number, freed: number | null): string {

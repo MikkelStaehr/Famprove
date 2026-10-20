@@ -25,6 +25,7 @@ type FakeDb = {
   /** Fail this request number with a 503 before it applies ("cut"), or after it applied ("lost reply"). */
   cut?: { at: number; afterApply: boolean };
   lastGet?: URLSearchParams;
+  lastPatch?: URLSearchParams;
 };
 
 const ID = "6f1c2d3e-4a5b-4c6d-8e7f-0123456789ab";
@@ -51,6 +52,7 @@ function matches(row: Row, params: URLSearchParams): boolean {
     if (["select", "order", "limit", "offset", "on_conflict", "or"].includes(column)) continue;
     const [op, ...rest] = expression.split(".");
     if (op === "eq" && String(row[column]) !== rest.join(".")) return false;
+    if (op === "gte" && !(Number(row[column]) >= Number(rest.join(".")))) return false;
   }
   return true;
 }
@@ -89,6 +91,7 @@ function fetchFor(db: FakeDb): FetchLike {
             keys === "duration_s,clip_in_s,clip_out_s,auto_in_s,auto_out_s,auto_status,auto_run_ms",
           `only starred, the range, the auto clip or a trim is updated (${keys})`,
         );
+        db.lastPatch = parsed.searchParams;
         const hit = rows.filter((r) => matches(r, parsed.searchParams));
         for (const r of hit) Object.assign(r, body);
         response = new Response(JSON.stringify(hit.map((r) => ({ id: r.id }))), { status: 200 });
@@ -404,6 +407,27 @@ test("trim: the validation table; the one PATCH clears the ranges and auto_*; th
   );
   assert.deepEqual(await recordClipTrim({ id: ID, durationS: 7.3 }, opts(db)), { ok: true, dev: false, durationS: 7.3 }, "idempotent: a retry after a lost reply");
   assert.deepEqual(await recordClipTrim({ id: ID, durationS: 9 }, opts(db)), { ok: false, reason: "duration" }, "never longer than the stored duration");
+});
+
+test("trim: the PATCH filters duration_s=gte.<new>, so a row shortened after the read is never raised (0 rows = duration)", async () => {
+  const db = fakeDb();
+  await recordClip(input(), NOW, opts(db)); // duration_s 14.3
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 7.3 }, opts(db)), { ok: true, dev: false, durationS: 7.3 });
+  assert.equal(db.lastPatch?.get("duration_s"), "gte.7.3");
+  assert.equal(db.lastPatch?.get("id"), `eq.${ID}`);
+  const row = db.tables.video_clips[0];
+  const base = opts(db);
+  const racing: VideoClipOptions = {
+    ...base,
+    client: () =>
+      createClient("https://x.supabase.co", "sb_secret_test", async (url, init) => {
+        const r = await fetchFor(db)(url, init);
+        if ((init.method ?? "GET") === "GET") row.duration_s = 5; // another tab's shorter cut lands between the read and the PATCH
+        return r;
+      }),
+  };
+  assert.deepEqual(await recordClipTrim({ id: ID, durationS: 6 }, racing), { ok: false, reason: "duration" });
+  assert.equal(row.duration_s, 5, "never raised");
 });
 
 test("trim: not_found, preview host, dev switches and a failed request", async () => {
