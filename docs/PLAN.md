@@ -149,3 +149,15 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | video-record | Record a set in Fokus (Optag / Stop = sæt udført), 720p30 MP4/H.264 or WebM, no audio, OPFS with persist(); only metadata in Supabase | L |
 | video-library | The phone's clips: list, play, star (kept), share via Web Share, keep the last 8 weeks; the used space as a line on Træning | M |
 | rec-indicator | Recording in Fokus: a --rec token (red, only while recording), a pulsing dot and a counter readable at 3 m; reduced motion keeps the dot without the pulse; the strip's height from a token; "Klippet blev ikke slettet. Prøv igen." | S |
+| clip-set-no | The Optagelser card numbers a clip's set across the exercise's run (as Fokus's "Sæt n"), not within the sheet row; clips keyed by uuid | S |
+| range-order | Sheet intervals shown exactly as written (also reversed, e.g. "RPE 7-5"); every calculation uses min/max, tested with a reversed range | S |
+| warmup-no-ramp | Fokus's warm-up without the 40/60/80 % ramp; the step and "Op mod X kg" stay | S |
+| superset-any | Superset with any not-started exercise of the session: the partner moves right after A (session_order), "Som sidst" first | L |
+| fokus-minimise | "↓ Minimér": a thin bar on every tab with the rest timer and the next set; timer, vibration and wake lock keep running | M |
+| camera-diag | A camera diagnostic on the phone: cameras, zoom range, resolutions, 4:3, mime, keyframe option, a test shot per lens | S |
+| camera-wide | Record wide: the ultra-wide or the minimum zoom below 1, 4:3 (960x720), a remembered "0,6× / 1×" toggle | M |
+| clip-save | A "Gem" button per clip and "Gem alle fra i dag" (downloads) on the Optagelser card | M |
+| clip-cut | Gem and Del use the cut clip: cut at keyframes without re-encoding (mp4box.js), a keyframe every second; the original stays | L |
+| clip-auto | Automatic clip: MediaPipe Pose lite on the phone after Stop finds in and out from hip/knee movement and the rep count (0.5 s margin) | L |
+| clip-handles | Manual in/out handles on a clip, saved as clip_in_s / clip_out_s | M |
+| clip-accuracy | Auto-clip accuracy and run time on the user's own clips (needs the user's phone) | S |
