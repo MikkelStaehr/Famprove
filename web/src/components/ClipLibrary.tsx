@@ -57,7 +57,7 @@ import { type ClipRangeS, rangeErrorLine, type StoredRange } from "@/lib/video/c
 import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
-import { browserStore, readAutoVersions, recordAutoVersion } from "@/lib/video/auto-version";
+import { browserStore, readAutoVersions, recordIfSaved } from "@/lib/video/auto-version";
 import { ClipDebug } from "@/components/ClipDebug";
 import { isDebugToggle } from "@/lib/video/debug-log";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
@@ -254,7 +254,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
           deps: browserAutoDeps,
         });
         setRunning(null);
-        if ((out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") && out.saved) recordAutoVersion(browserStore(), r.id);
+        recordIfSaved(browserStore(), r.id, out);
         if (out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") {
           const auto = out.kind === "clipped" ? { autoStatus: out.kind, autoInS: out.inS, autoOutS: out.outS } : { autoStatus: out.kind, autoInS: null, autoOutS: null };
           setRows((rs) => rs?.map((x) => (x.id === r.id ? { ...x, ...auto } : x)) ?? rs);

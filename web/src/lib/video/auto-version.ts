@@ -5,6 +5,7 @@
  * record counts as version 1 (analysed before versions were kept). Storage is injected, so node tests it.
  */
 import { ALGO_VERSION } from "./auto-clip.ts";
+import type { AutoOutcome } from "./auto-run.ts";
 
 export const AUTO_VERSION_KEY = "famprove.clips.autoVersion";
 /** The version a clip without a record was analysed with. */
@@ -45,6 +46,11 @@ export function recordAutoVersion(store: KeyStore | null, id: string): void {
   } catch {
     // ignored: see above
   }
+}
+
+/** Records the version after a run whose setClipAuto succeeded (clipped, low_confidence or failed, saved); aborted and skipped wrote nothing. */
+export function recordIfSaved(store: KeyStore | null, id: string, out: AutoOutcome): void {
+  if ((out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") && out.saved) recordAutoVersion(store, id);
 }
 
 /** window.localStorage, or null where it can't be reached. */

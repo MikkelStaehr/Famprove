@@ -14,6 +14,7 @@ import { MAX_DURATION_S } from "@/lib/video/clips";
 import type { LiftFamily } from "@/lib/video/auto-clip";
 import { analyseClip } from "@/lib/video/auto-run";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
+import { browserStore, recordIfSaved } from "@/lib/video/auto-version";
 import { type FokusAutoPhase, fokusAutoLine, isOutcome } from "@/lib/video/auto-lines";
 import type { SetRef } from "@/lib/set-taps";
 
@@ -149,6 +150,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFix
     if (ctrl.signal.aborted || blob === null) return;
     const meta = { ext: l.type.ext, durationS, family: l.lift.family, expected: l.lift.expected };
     const out = await analyseClip(l.id, blob, meta, { signal: ctrl.signal, onProgress: show, deps: browserAutoDeps });
+    recordIfSaved(browserStore(), l.id, out); // else the library pickup re-runs a clip Fokus analysed with ALGO_VERSION
     if (autoRun.current === ctrl) autoRun.current = null;
     if (out.kind === "clipped") show({ kind: "clipped", inS: out.inS, outS: out.outS });
     else if (out.kind === "low_confidence" || out.kind === "failed") show({ kind: out.kind });

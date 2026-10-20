@@ -12,7 +12,7 @@ import { diagnoseLift } from "@/lib/video/auto-clip";
 import type { ClipLiftMeta } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip, failureOf } from "@/lib/video/auto-run";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
-import { browserStore, recordAutoVersion } from "@/lib/video/auto-version";
+import { browserStore, recordIfSaved } from "@/lib/video/auto-version";
 import { type FileFacts, fileFacts } from "@/lib/video/cut";
 import { type DebugRun, type ImageCheck, debugLog, releaseImages } from "@/lib/video/debug-log";
 import { runPose } from "@/lib/video/pose-run";
@@ -168,7 +168,7 @@ export function ClipDebug({ clipId, label, blob, status, durationS, lift, pickup
       deps: browserAutoDeps,
     });
     if (ctrl.current === c) setBusy(null);
-    if ((out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed") && out.saved) recordAutoVersion(browserStore(), clipId);
+    recordIfSaved(browserStore(), clipId, out);
     onAuto(out);
     const how = out.kind === "clipped" || out.kind === "low_confidence" || out.kind === "failed" ? ` · ${out.mode?.why ?? "ingen tilstand"}` : "";
     setReanalyse(
