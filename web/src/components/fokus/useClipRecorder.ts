@@ -337,7 +337,7 @@ export function useClipRecorder(allowed: boolean, fixture: VideoFixture, autoFix
       const d = duration(l);
       dispatch({ type: "stop" });
       // §1: the slot is reserved from Stop (no line until saveClip succeeds; WebM never gets one).
-      setAuto({ id: l.id, phase: null, spoken: "" });
+      if (l.type.ext === "mp4") setAuto({ id: l.id, phase: null, spoken: "" });
       void stopThenDone({
         stopRecorder: () => stopRecorder(l),
         done,

@@ -79,7 +79,7 @@ export type AutoClipResult =
 
 /**
  * The sheet TYPE words that make an exercise lower body. A copy of Python's
- * `domain/planned_sets.LOWER_BODY_WORDS` (the weekly cap's split); change both together.
+ * `domain/planned_sets.LOWER_BODY_WORDS` (the weekly cap's split); tests/lower-body-words.test.ts holds them equal.
  */
 export const LOWER_BODY_WORDS: readonly string[] = ["SQUAT", "DEADLIFT", "QUADS", "HAMSTRINGS", "GLUTES", "ADDUCTORS", "CALVES"];
 
