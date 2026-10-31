@@ -13,6 +13,7 @@ import { INVERSE_BUTTON } from "./InverseCard";
 import { useSession } from "./SetLogProvider";
 import { TodaySecond, TodayShell } from "./TodayCard";
 import { settle } from "./useSetLog";
+import { perfStart } from "@/lib/perf-probe";
 
 /**
  * Træning's "I dag" card with a strength session next (reset-traening.md §3; behaviour
@@ -43,7 +44,10 @@ export function SessionBlock({ today, className }: { readonly today: IsoDate; re
     const at = view.beginAt;
     if (at === null) return;
     if (setLog.log.get(setKey(at))?.startedAt == null) setLog.tap("begin", at);
-    void settle(setLog.flush).then(() => router.push("/fokus?view=set")); // the set view (spec §4.5)
+    void settle(setLog.flush).then(() => {
+      perfStart("begin", "/train", "/fokus");
+      router.push("/fokus?view=set");
+    }); // the set view (spec §4.5)
   };
   const finished = view.primary === "finished";
   return (

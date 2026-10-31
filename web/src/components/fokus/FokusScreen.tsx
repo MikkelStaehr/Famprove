@@ -53,6 +53,7 @@ import { expectedReps, liftFamily } from "@/lib/video/auto-clip";
 import type { FokusAutoPhase } from "@/lib/video/auto-lines";
 import { DeniedLine, OptagButton, RecordStrip } from "./RecordParts";
 import type { PartsData } from "@/lib/set-parts";
+import { perfReady, perfStart } from "@/lib/perf-probe";
 
 export type FokusSession = {
   readonly session: number;
@@ -135,6 +136,9 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
   const primary = useRef<HTMLButtonElement & HTMLAnchorElement>(null);
   const router = useRouter();
 
+  // tab-perf-probe: Fokus's content is committed (Begynd/Fortsæt's ready signal).
+  useEffect(() => perfReady("/fokus"), []);
+
   // Entered with ?view=set: drop it, so a reload rebuilds the view from the log alone (§4.5).
   useEffect(() => {
     if (enteredFromTraening) window.history.replaceState(null, "", "/fokus");
@@ -205,7 +209,10 @@ export function FokusScreen({ session, date, staleNote, devSwitches, enteredFrom
     void settle(saveAll).then((sent) => {
       setMinimising(false);
       // A save that failed (or hasn't landed) during the flush: stay, with its line (§3).
-      if (minimiseLanding(sent, failedNow()) === "leave") router.push("/train");
+      if (minimiseLanding(sent, failedNow()) === "leave") {
+        perfStart("minimise", "/fokus", "/train");
+        router.push("/train");
+      }
     });
   };
   const p = view.progress;

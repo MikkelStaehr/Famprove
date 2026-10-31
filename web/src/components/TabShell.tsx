@@ -7,8 +7,10 @@ import { useMedia } from "./chart-hooks";
 import { TabBar } from "./TabBar";
 import { MinimisedBar } from "./MinimisedBar";
 import { ClipPlayerHost } from "./ClipPlayerHost";
+import { PerfSheet } from "./PerfSheet";
 import type { FokusSnapshot } from "@/lib/fokus-snapshot";
 import { DUR, easeOutQuart, REDUCED_MOTION } from "@/lib/motion";
+import { perfSettled, perfStart, perfStartAt } from "@/lib/perf-probe";
 import { dragLock, dragPosition, edgeStart, pageStyle, releaseTarget, TAB_COUNT, TABS, tabIndex, tabTitle } from "@/lib/tab-shell";
 
 type Drag = { x: number; y: number; t: number; id: number; lock: "x" | null; dx: number };
@@ -124,6 +126,7 @@ export function TabShell({
       if (from === to || window.matchMedia(REDUCE).matches) {
         moving.current = false;
         render(to);
+        perfSettled();
         return;
       }
       moving.current = true;
@@ -133,6 +136,7 @@ export function TabShell({
         if (t >= 1) {
           moving.current = false;
           render(to);
+          perfSettled();
           return;
         }
         render(from + (to - from) * easeOutQuart(t));
@@ -153,6 +157,7 @@ export function TabShell({
       }
       lastPath.current[index] = window.location.pathname + window.location.search;
       if (document.activeElement?.closest("[data-tab-strip]") != null) focusTab.current = TABS[to].path;
+      perfStart("tab", TABS[index].path, TABS[to].path);
       window.history.pushState(null, "", lastPath.current[to]);
       animateTo(to);
     },
@@ -162,7 +167,10 @@ export function TabShell({
   // Back/forward (or any URL change to another tab not started here): animate to the URL's tab.
   // A path change inside a tab (/analyse -> /analyse/styrke) keeps the index, so p stays.
   useEffect(() => {
-    if (target.current !== index) animateTo(index);
+    if (target.current !== index) {
+      perfStart("tab", TABS[target.current]?.path ?? "?", TABS[index].path);
+      animateTo(index);
+    }
   }, [index, animateTo]);
 
   // The width, read on resize only (never in the frame loop).
@@ -221,7 +229,10 @@ export function TabShell({
       swallowClick.current = false;
     }, 60);
     const to = releaseTarget(index, d.dx, Math.max(1, performance.now() - d.t), width.current);
-    if (to !== index) goTo(to);
+    if (to !== index) {
+      perfStartAt(performance.now()); // a swipe is timed from its release
+      goTo(to);
+    }
     else animateTo(index);
   };
 
@@ -285,6 +296,7 @@ export function TabShell({
       </div>
       {/* fokus-minimise.md §2: Fokus's bar, a flex sibling under the pages (the scroll container shrinks), above the TabBar below lg. */}
       <MinimisedBar today={today} {...(devSnapshot === undefined ? {} : { devSnapshot })} />
+      <PerfSheet />
     </div>
     </ClipPlayerHost>
     </TabEntries>
