@@ -258,11 +258,19 @@ function outOfSpace(error: unknown): boolean {
  * named (a stray cut file is swept by finishDueTrims). The pending cut keeps [inS, outS] and `kind`
  * (own: Gem klip; approved: Godkend alle) for clip_accuracy (slice clip-accuracy-log).
  */
-export function startTrim(deps: TrimDeps, id: string, inS: number, outS: number, now: Date, kind: TrimKind): Promise<StartTrimResult> {
-  return lockOf(deps)(id, {}, () => startTrimLocked(deps, id, inS, outS, now, kind));
+export function startTrim(
+  deps: TrimDeps,
+  id: string,
+  inS: number,
+  outS: number,
+  now: Date,
+  kind: TrimKind,
+  opts: { readonly batch?: string } = {},
+): Promise<StartTrimResult> {
+  return lockOf(deps)(id, {}, () => startTrimLocked(deps, id, inS, outS, now, kind, opts.batch));
 }
 
-async function startTrimLocked(deps: TrimDeps, id: string, inS: number, outS: number, now: Date, kind: TrimKind): Promise<StartTrimResult> {
+async function startTrimLocked(deps: TrimDeps, id: string, inS: number, outS: number, now: Date, kind: TrimKind, batch: string | undefined): Promise<StartTrimResult> {
   const cut = deps.cut ?? cutClip;
   try {
     let entry = await deps.index.get(id);
@@ -299,6 +307,7 @@ async function startTrimLocked(deps: TrimDeps, id: string, inS: number, outS: nu
         outS,
         kind,
         ...(algoVersionOf(deps, id) === null ? {} : { algoVersion: algoVersionOf(deps, id)! }),
+        ...(batch === undefined ? {} : { batch }),
       },
     };
     await deps.index.put(next);
@@ -319,16 +328,22 @@ export type UndoTrimResult =
  * Under the clip's lock, reading the entry there: a finish that ran first leaves nothing pending, so
  * this is `expired` (the cut stays); `none` only when the clip has no entry.
  */
-export function undoTrim(deps: Pick<TrimDeps, "index" | "files" | "lock">, id: string, now: Date): Promise<UndoTrimResult> {
-  return lockOf(deps)(id, {}, () => undoTrimLocked(deps, id, now));
+export function undoTrim(
+  deps: Pick<TrimDeps, "index" | "files" | "lock">,
+  id: string,
+  now: Date,
+  opts: { readonly batch?: string } = {},
+): Promise<UndoTrimResult> {
+  return lockOf(deps)(id, {}, () => undoTrimLocked(deps, id, now, opts.batch));
 }
 
-async function undoTrimLocked(deps: Pick<TrimDeps, "index" | "files">, id: string, now: Date): Promise<UndoTrimResult> {
+async function undoTrimLocked(deps: Pick<TrimDeps, "index" | "files">, id: string, now: Date, batch: string | undefined): Promise<UndoTrimResult> {
   try {
     const entry = await deps.index.get(id);
     if (entry === null) return { kind: "none" };
     const p = entry.pendingTrim;
     if (p === undefined) return { kind: "expired" }; // a finish already ran (or a refusal rolled it back)
+    if (batch !== undefined && p.batch !== batch) return { kind: "expired" }; // the batch's cut finished; this pending one is another tap's
     if (now.getTime() >= Date.parse(p.deadline)) return { kind: "expired" };
     const cutName = clipFile(entry);
     const back: ClipIndexEntry = { ...withoutPending(entry), fileName: p.originalFileName, durationS: p.originalDurationS };

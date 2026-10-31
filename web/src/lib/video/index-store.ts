@@ -71,6 +71,8 @@ export type PendingTrim = {
   readonly kind?: TrimKind;
   /** The algorithm version that produced the clip's automatic range on this phone (clip_accuracy); absent = unknown. */
   readonly algoVersion?: number;
+  /** Godkend alle's batch (slice clip-approve-all): one tap's cuts share it and one deadline (one Fortryd). Absent = a single cut. */
+  readonly batch?: string;
 };
 
 /** The one path builder for a clip's file (slice clip-trim): the entry's fileName, else the old `<id>.<ext>`. */
