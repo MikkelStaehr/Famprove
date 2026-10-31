@@ -35,8 +35,11 @@ export type TrimKind = (typeof TRIM_KINDS)[number];
  */
 export type TrimPoints = { readonly inS: number; readonly outS: number; readonly kind: TrimKind; readonly algoVersion: number | null };
 
-/** points absent: an old pending cut (no clip_accuracy insert). */
-export type TrimClipInput = { readonly id: string; readonly durationS: unknown; readonly points?: TrimPoints };
+/**
+ * points absent: an old pending cut (no clip_accuracy insert). "unusable": point fields were sent but
+ * malformed; the cut is still stored, the record is skipped and logged (the cut is what the user asked for).
+ */
+export type TrimClipInput = { readonly id: string; readonly durationS: unknown; readonly points?: TrimPoints | "unusable" };
 
 /** What the phone sends (flat, the action's raw shape): the points, kind and version all or none. */
 export type TrimRequest = {
@@ -58,9 +61,9 @@ export function parseTrimClipInput(raw: unknown): TrimClipInput | null {
   if (!isClipId(r.id) || !("durationS" in r)) return null;
   if (POINT_KEYS.every((k) => r[k] === undefined)) return { id: r.id, durationS: r.durationS };
   const kind = TRIM_KINDS.find((k) => k === r.kind);
-  if (!finite(r.inS) || !finite(r.outS) || kind === undefined) return null;
+  if (!finite(r.inS) || !finite(r.outS) || kind === undefined) return { id: r.id, durationS: r.durationS, points: "unusable" };
   const v = r.algoVersion;
-  if (v !== undefined && v !== null && !(typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 1000)) return null;
+  if (v !== undefined && v !== null && !(typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 1000)) return { id: r.id, durationS: r.durationS, points: "unusable" };
   return { id: r.id, durationS: r.durationS, points: { inS: r.inS, outS: r.outS, kind, algoVersion: typeof v === "number" ? v : null } };
 }
 
@@ -99,11 +102,11 @@ export type ClipAccuracyBody = {
  * clipped; approved: no user points, the automatic ones. algo_version only with an automatic range.
  * null = nothing to insert: approved without an automatic range, or a retry after the PATCH landed
  * (the row is already the cut, so its points no longer fit; that attempt's insert came first).
- * "invalid": the points don't fit the original (refused, nothing written).
+ * "unusable": the points don't fit the original (no record, logged by the caller; the cut is still stored).
  */
-export function accuracyRecord(row: VideoClipRow, points: TrimPoints, newDurationS: number): ClipAccuracyBody | null | "invalid" {
+export function accuracyRecord(row: VideoClipRow, points: TrimPoints, newDurationS: number): ClipAccuracyBody | null | "unusable" {
   const user = validateTrimPoints(points.inS, points.outS, row.durationS);
-  if (user === null) return newDurationS >= tenth(row.durationS) ? null : "invalid";
+  if (user === null) return newDurationS >= tenth(row.durationS) ? null : "unusable";
   const auto = row.autoStatus === "clipped" && row.autoInS !== null && row.autoOutS !== null ? { inS: row.autoInS, outS: row.autoOutS } : null;
   if (points.kind === "approved" && auto === null) return null;
   const own = points.kind === "own";

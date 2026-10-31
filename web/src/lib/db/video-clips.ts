@@ -173,8 +173,9 @@ export async function recordClipRange(input: SetClipRangeInput, options: VideoCl
  * Before the PATCH (slice clip-accuracy-log), when the input has the points: one clip_accuracy insert
  * (accuracyRecord: the row's automatic in/out and the user's, on the original file), on conflict
  * (clip_id) do nothing, so a retry or a second cut of the clip keeps the first record. Points that
- * don't fit the original are refused (`invalid`, nothing written); a failed insert is `failed`
- * without the PATCH, so the phone's retry sends both again.
+ * are malformed or don't fit the original skip the insert (logged) and the PATCH still lands: the cut
+ * is what the user asked for; a failed insert is `failed` without the PATCH, so the phone's retry
+ * sends both again.
  * Dev switches read and write nothing and answer as if saved.
  */
 export async function recordClipTrim(input: TrimClipInput, options: VideoClipOptions = {}): Promise<TrimClipResult> {
@@ -191,9 +192,10 @@ export async function recordClipTrim(input: TrimClipInput, options: VideoClipOpt
     const durationS = validateTrim(input.durationS, row.durationS);
     if (durationS === null) return { ok: false, reason: "duration" };
     if (input.points !== undefined) {
-      const record = accuracyRecord(row, input.points, durationS);
-      if (record === "invalid") return { ok: false, reason: "invalid" };
-      if (record !== null) {
+      const record = input.points === "unusable" ? "unusable" : accuracyRecord(row, input.points, durationS);
+      // the record is secondary: unusable points skip it (logged), the cut is still stored
+      if (record === "unusable") console.warn("clip_accuracy: unusable points, not recorded", input.id);
+      else if (record !== null) {
         await write(c, ACCURACY_TABLE, "POST", { params: [["on_conflict", "clip_id"]], body: record, prefer: "resolution=ignore-duplicates" });
       }
     }

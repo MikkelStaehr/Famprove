@@ -168,8 +168,10 @@ test("accuracy: the validation table (shape in the action's parse, range against
     { ...base, algoVersion: "3" },
     { id: ID, durationS: 7.3, kind: "own" },
   ]) {
-    assert.equal(parseTrimClipInput(bad), null, JSON.stringify(bad));
+    assert.deepEqual(parseTrimClipInput(bad), { id: ID, durationS: 7.3, points: "unusable" }, `${JSON.stringify(bad)}: the cut stands, the record is skipped`);
   }
+  assert.equal(parseTrimClipInput({ ...base, id: "x" }), null, "the trim's own fields stay invalid");
+  assert.equal(parseTrimClipInput({ id: ID, inS: 1, outS: 9, kind: "own" }), null, "no duration: invalid");
   assert.deepEqual(parseTrimClipInput({ ...base, algoVersion: 1000 })?.points, { inS: 1, outS: 9, kind: "own", algoVersion: 1000 });
   assert.deepEqual(parseTrimClipInput(base)?.points, { inS: 1, outS: 9, kind: "own", algoVersion: null }, "no version sent = null");
   assert.deepEqual(parseTrimClipInput({ id: ID, durationS: 7.3 }), { id: ID, durationS: 7.3 }, "no points: an old pending cut");
@@ -185,9 +187,37 @@ test("accuracy: the validation table (shape in the action's parse, range against
   ];
   for (const [i, o, want] of range) assert.deepEqual(validateTrimPoints(i, o, 14.3), want, `${i}–${o}`);
   const db = fakeDb();
-  assert.deepEqual(await trim(db, { ...OWN, outS: 15 }), { ok: false, reason: "invalid" }, "points past the original are refused");
-  assert.deepEqual(db.log, ["GET video_clips"], "a refusal writes nothing");
-  assert.equal(db.clips[0].duration_s, 14.3);
+  assert.deepEqual(await trim(db, { ...OWN, outS: 15 }), { ok: true, dev: false, durationS: 7.3 }, "points past the original skip the record, not the cut");
+  assert.deepEqual(db.log, ["GET video_clips", "PATCH video_clips"], "no insert, the PATCH lands");
+  assert.deepEqual(db.accuracy, []);
+  assert.equal(db.clips[0].duration_s, 7.3);
+  const bad = fakeDb();
+  assert.deepEqual(await trim(bad, { ...OWN, kind: "auto" as "own" }), { ok: true, dev: false, durationS: 7.3 }, "malformed points: same");
+  assert.deepEqual(bad.log, ["GET video_clips", "PATCH video_clips"]);
+});
+
+test("accuracy: unusable points keep the cut on the phone (finishTrim done, no rollback)", async () => {
+  const db = fakeDb();
+  const files = memoryClipFiles();
+  await files.writeFile(`${ID}.mp4`, new Blob([new Uint8Array(100)]));
+  const deps: TrimDeps = {
+    index: memoryClipIndex([entry()]),
+    files,
+    cut: fakeCut,
+    lock: memoryLock(),
+    trim: async (input) => trim(db, { ...input, outS: 99 }), // points past the original
+  };
+  const r = await startTrim(deps, ID, 1.04, 8.96, T0);
+  assert.equal(r.kind, "done");
+  const toS = r.kind === "done" ? r.toS : null;
+  assert.equal(await finishTrim(deps, ID, new Date(T0.getTime() + TRIM_UNDO_MS)), "done");
+  const after = await deps.index.get(ID);
+  assert.equal(after?.pendingTrim, undefined);
+  assert.equal(after?.fileName, `${ID}.cut.mp4`, "the cut file is the clip");
+  assert.equal(after?.durationS, toS);
+  assert.equal(await files.readFile(`${ID}.mp4`), null, "the original is gone");
+  assert.deepEqual(db.accuracy, [], "no record");
+  assert.equal(db.clips[0].duration_s, toS, "the PATCH landed");
 });
 
 test("accuracy: failure injection, cut or lost reply at every request, then retry: one accuracy row and the PATCH landed", async () => {
