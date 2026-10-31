@@ -151,7 +151,7 @@ test("pickup (clip-auto-on): a clip analysed with version 3 (PAD_S 0.5) runs aga
   assert.deepEqual(pickupQueue([entry(r)], [r], now, {}).map((x) => x.id), [r.id], "none recorded = 1: due");
   assert.deepEqual(pickupQueue([entry(r)], [r], now, { [r.id]: 4 }), [], "version 4: done");
   const cut: VideoClipRow = { ...r, autoInS: null, autoOutS: null, autoStatus: null };
-  assert.deepEqual(pickupQueue([entry(cut)], [cut], now, { [r.id]: 4 }).map((x) => x.id), [r.id], "a cut clip (auto_* null) is due by its null status, whatever the version");
+  assert.deepEqual(pickupQueue([entry(cut)], [cut], now, { [r.id]: 4 }).map((x) => x.id), [r.id], "auto_* null on an uncut file is due by its null status, whatever the version (a cut file is skipped: clip-auto-run.test)");
 });
 
 test("Fokus after Stop: an analysis (and its slot) only for MP4 with the switch on", () => {
