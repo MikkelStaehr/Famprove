@@ -62,9 +62,10 @@ import {
   deleteNow,
   KEEP_CHOICES,
   type KeepWeeks,
+  markRun,
   nextCleanupLine,
+  readLastRun,
   readRetention,
-  RETENTION_RUN_KEY,
   retentionCleanupLine,
   retentionPrompt,
   retentionRunDue,
@@ -385,7 +386,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       const ret = readRetention(switchStore());
       if (ret.kind === "unasked" && selectionIds(selectRetention(notPendingDelete(entries), initialRows, new Date(), DEFAULT_KEEP_WEEKS)).length === 0) setKeepWeeks(switchStore(), DEFAULT_KEEP_WEEKS); // §4: N = 0 switches on silently
       const retNow = readRetention(switchStore());
-      const lastRun = window.localStorage.getItem(RETENTION_RUN_KEY);
+      const lastRun = readLastRun(switchStore());
       if (retNow.kind === "on" && retentionRunDue(lastRun, Date.now())) {
         // §1: the new rules, silently (no Fortryd, §5), through clip-delete's flow; the server's 8-week rule stays the maximum.
         const ids = selectionIds(selectRetention(notPendingDelete(entries), initialRows, new Date(), retNow.weeks));
@@ -396,7 +397,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         const gone = new Set([...r.done, ...serverOnly, ...dueDeletes.finished]);
         setRows((rs) => (rs ?? initialRows)?.filter((x) => !gone.has(x.id)) ?? rs);
         setRetCleaned(r.done.length);
-        window.localStorage.setItem(RETENTION_RUN_KEY, String(Date.now()));
+        markRun(switchStore(), Date.now());
       } else if (retNow.kind !== "on" && initialRows !== null && retentionRunDue(lastRun, Date.now())) {
         const plan = cleanupPlan(entries, initialRows, new Date());
         const removed: string[] = [];
@@ -409,7 +410,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         const gone = new Set([...removed, ...plan.deleteServerOnly, ...dueDeletes.finished]);
         setRows(initialRows.filter((r) => !gone.has(r.id)));
         setCleaned(removed.length);
-        window.localStorage.setItem(RETENTION_RUN_KEY, String(Date.now()));
+        markRun(switchStore(), Date.now());
       }
       entries = await s.index.all();
       setLastRuns(readAutoLast(browserStore()));
@@ -942,7 +943,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   async function confirmRetention(ids: readonly string[], weeks: KeepWeeks) {
     setKeepWeeks(switchStore(), weeks);
     setPick(null);
-    window.localStorage.setItem(RETENTION_RUN_KEY, String(new Date().getTime()));
+    markRun(switchStore(), new Date().getTime());
     const want = new Set(ids);
     await startDeleteRows(list.filter((r) => want.has(r.id)), false);
   }

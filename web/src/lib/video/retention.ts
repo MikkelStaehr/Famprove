@@ -88,6 +88,24 @@ export function retentionRunDue(lastRunMs: string | null, nowMs: number): boolea
   return !Number.isFinite(t) || nowMs - t >= RUN_EVERY_MS || t > nowMs;
 }
 
+/** The throttle's stored time; a blocked storage reads as null (due), so it runs once per open, never in a loop. */
+export function readLastRun(store: Pick<Storage, "getItem"> | null): string | null {
+  try {
+    return store?.getItem(RETENTION_RUN_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Stores the run's time; a blocked or full storage is ignored (the next open runs again). */
+export function markRun(store: Pick<Storage, "setItem"> | null, nowMs: number): void {
+  try {
+    store?.setItem(RETENTION_RUN_KEY, String(nowMs));
+  } catch {
+    // ignored: due again at the next open
+  }
+}
+
 /** savedAt's setter for clips marked `gemt ✓` before this slice: their 24 h start now, never at once. */
 export function missingSavedAt(entries: readonly ClipIndexEntry[], now: Date): ClipIndexEntry[] {
   return entries.filter((e) => e.savedOut === true && e.savedAt === undefined).map((e) => ({ ...e, savedAt: now.toISOString() }));
