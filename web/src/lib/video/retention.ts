@@ -189,7 +189,7 @@ export function deleteInText(e: Pick<ClipIndexEntry, "savedOut" | "savedAt" | "s
  * a failed row stays marked and hidden, so the next open's finishDueDeletes retries it.
  */
 export async function deleteNow(deps: DeleteDeps, ids: readonly string[], batch: string, now: Date): Promise<{ readonly done: string[]; readonly failed: string[] }> {
-  const { marked } = await startDelete(deps, ids, batch, now);
+  const { marked } = await startDelete(deps, ids, batch, now, { skipPendingTrim: true });
   const done: string[] = [];
   const failed: string[] = [];
   const at = new Date(now.getTime() + DELETE_UNDO_MS);

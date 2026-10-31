@@ -42,7 +42,7 @@ export async function startDelete(
   ids: readonly string[],
   batch: string,
   now: Date,
-  opts: { readonly allowStarred?: boolean } = {},
+  opts: { readonly allowStarred?: boolean; readonly skipPendingTrim?: boolean } = {},
 ): Promise<{ readonly marked: ClipIndexEntry[]; readonly starred: string[]; readonly deadline: string }> {
   const deadline = new Date(now.getTime() + DELETE_UNDO_MS).toISOString();
   const marked: ClipIndexEntry[] = [];
@@ -51,6 +51,8 @@ export async function startDelete(
     const e = await lockOf(deps)(id, {}, async (): Promise<ClipIndexEntry | "starred" | null> => {
       const entry = await deps.index.get(id);
       if (entry === null || entry.state === "recording" || entry.pendingDelete !== undefined) return null;
+      // The cleanup never takes a clip in a cut's window (clip-retention review): its Fortryd still holds the original.
+      if (opts.skipPendingTrim === true && entry.pendingTrim !== undefined) return null;
       if (entry.starred && opts.allowStarred !== true) return "starred";
       const next: ClipIndexEntry = { ...entry, pendingDelete: { deadline, batch } };
       await deps.index.put(next);

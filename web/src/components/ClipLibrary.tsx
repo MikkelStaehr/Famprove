@@ -384,10 +384,12 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       if (unstamped.length > 0) await markSaved({ index: s.index }, unstamped);
       entries = await s.index.all();
       const ret = readRetention(switchStore());
-      if (ret.kind === "unasked" && selectionIds(selectRetention(notPendingDelete(entries), initialRows, new Date(), DEFAULT_KEEP_WEEKS)).length === 0) setKeepWeeks(switchStore(), DEFAULT_KEEP_WEEKS); // §4: N = 0 switches on silently
+      if (ret.kind === "unasked" && initialRows !== null && selectionIds(selectRetention(notPendingDelete(entries), initialRows, new Date(), DEFAULT_KEEP_WEEKS)).length === 0) setKeepWeeks(switchStore(), DEFAULT_KEEP_WEEKS); // §4: N = 0 switches on silently
       const retNow = readRetention(switchStore());
       const lastRun = readLastRun(switchStore());
-      if (retNow.kind === "on" && retentionRunDue(lastRun, Date.now())) {
+      // Only with the server's rows (a ★ set only there must be seen, as the old cleanup required), and
+      // never while Godkend alle cuts (a clip waiting in its batch has no pendingTrim yet; review).
+      if (retNow.kind === "on" && initialRows !== null && approveGuard.current() === null && retentionRunDue(lastRun, Date.now())) {
         // §1: the new rules, silently (no Fortryd, §5), through clip-delete's flow; the server's 8-week rule stays the maximum.
         const ids = selectionIds(selectRetention(notPendingDelete(entries), initialRows, new Date(), retNow.weeks));
         const batch = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `retention-${Date.now()}`;
@@ -424,7 +426,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       console.error("optagelser: reading the clip index failed", error);
       setLocal({ kind: "error" });
     }
-  }, [fixture, initialRows, delTimers]);
+  }, [fixture, initialRows, delTimers, approveGuard]);
   /** clip-approve-all: re-arm each pending batch's one timer; the newest batch's Fortryd comes back on the line. */
   const rearmApproveRef = useRef((all: readonly ClipIndexEntry[]) => {
     const batches = rearmableBatches(all, approveGuard.current()); // a batch still cutting is timed at its end
@@ -941,11 +943,12 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
    */
   /** clip-retention §4: Slet N switches the rules on and deletes the clips as one batch with Fortryd (clip-delete's flow). */
   async function confirmRetention(ids: readonly string[], weeks: KeepWeeks) {
+    if (approveGuard.current() !== null) return; // not while Godkend alle cuts: its waiting clips have no pendingTrim yet (review)
     setKeepWeeks(switchStore(), weeks);
     setPick(null);
     markRun(switchStore(), new Date().getTime());
     const want = new Set(ids);
-    await startDeleteRows(list.filter((r) => want.has(r.id)), false);
+    await startDeleteRows(list.filter((r) => want.has(r.id)), false, false, true);
   }
 
   /** clip-retention §2: a pick while the rules are off opens the confirm (N = 0 switches on silently). */
@@ -956,7 +959,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     } else setPick(w);
   }
 
-  async function startDeleteRows(targets: readonly LibraryRow[], viaPlayer: boolean, allowStarred = false): Promise<"started" | "starred" | "none"> {
+  async function startDeleteRows(targets: readonly LibraryRow[], viaPlayer: boolean, allowStarred = false, skipPendingTrim = false): Promise<"started" | "starred" | "none"> {
     const deps = deleteDeps();
     const s = store.current;
     if (deps === null || s === null || targets.length === 0) return "none";
@@ -964,7 +967,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     const focus = focusTargetAfter(new Set(ids));
     if (viaPlayer) focusAfter.current = focus;
     const batch = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${new Date().toISOString()}-${ids.join(",")}`;
-    const { marked, starred, deadline } = await startDelete(deps, ids, batch, new Date(), { allowStarred });
+    const { marked, starred, deadline } = await startDelete(deps, ids, batch, new Date(), { allowStarred, skipPendingTrim });
     setLocal({ kind: "ready", entries: await s.index.all() });
     if (marked.length === 0) {
       if (viaPlayer) focusAfter.current = null;
@@ -1136,7 +1139,12 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       <div role="group" aria-label="Oprydning" className="mt-1 flex flex-col gap-1">
         <p className="font-sans text-13 text-text">{retentionPrompt(askSel.old.length, askSel.saved.length, askWeeks)}</p>
         <div className="flex flex-wrap items-center gap-x-4">
-          <button type="button" className={`${QUIET_BTN} rounded-button border border-border bg-raised px-3`} onClick={() => void confirmRetention(askIds, askWeeks)}>
+          <button
+            type="button"
+            className={`${QUIET_BTN} rounded-button border border-border bg-raised px-3 aria-disabled:opacity-60`}
+            aria-disabled={approve.kind === "busy" || undefined}
+            onClick={() => void confirmRetention(askIds, askWeeks)}
+          >
             <Icon name="trash" size={16} className="text-text-muted" />
             {`Slet ${askIds.length}`}
           </button>

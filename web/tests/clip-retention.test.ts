@@ -157,3 +157,18 @@ test("deleteNow: a failed row keeps the file and the marked entry for the next o
   assert.notEqual(await files.readFile(clipFile(a)), null);
   assert.notEqual((await index.get("a"))?.pendingDelete, undefined);
 });
+
+test("review: the cleanup never takes a clip in a cut's window (pendingTrim rechecked under the lock)", async () => {
+  const pending = { deadline: new Date(NOW.getTime() + 5000).toISOString(), originalFileName: "c.mp4", originalDurationS: 40, newDurationS: 20 };
+  const c = entry("c", { recordedAt: ago(30 * D), fileName: "c.cut.mp4", pendingTrim: pending });
+  const index = memoryClipIndex([c]);
+  const files = memoryClipFiles();
+  await files.writeFile("c.cut.mp4", new Blob([new Uint8Array(4)]));
+  await files.writeFile("c.mp4", new Blob([new Uint8Array(8)]));
+  const calls: string[] = [];
+  const r = await deleteNow({ index, files, del: async (i): Promise<DeleteClipResult> => (calls.push(i.id), { ok: true, dev: false }) }, ["c"], "b", NOW);
+  assert.deepEqual(r, { done: [], failed: [] });
+  assert.deepEqual(calls, [], "no server delete");
+  assert.notEqual(await index.get("c"), null, "the entry and its window stay");
+  assert.notEqual(await files.readFile("c.mp4"), null, "the original stays for its Fortryd");
+});
