@@ -102,7 +102,7 @@ test("the editor's Gem klip cuts through startTrim, never setClipRange", () => {
   assert.match(editor, /\{CANCEL\}/);
   const lib = readFileSync(new URL("../src/components/ClipLibrary.tsx", import.meta.url), "utf8");
   assert.match(lib, /onCut=\{\(r\) => onTrim\(r\.inS, r\.outS\)\}/);
-  assert.match(body("ClipLibrary.tsx", "runTrim"), /startTrim\(deps, id, inS, outS, new Date\(\)\)/);
+  assert.match(body("ClipLibrary.tsx", "runTrim"), /startTrim\(deps, id, inS, outS, new Date\(\), "own"\)/);
 });
 
 test("an old stored range opens as pending points with its line; the auto range never pre-fills", () => {
@@ -128,7 +128,7 @@ test("the fixture-style cut (fakes, no write) commits once at 0", async () => {
     return { ok: true, dev: true, durationS: i.durationS };
   };
   const cut = async (_b: Blob, inS: number, outS: number) => ({ blob: new Blob([new Uint8Array(16)]), actual: { startS: inS - 0.5, endS: outS } });
-  const r = await startTrim({ index, files, trim, cut }, ID, 12.3, 48, T0);
+  const r = await startTrim({ index, files, trim, cut }, ID, 12.3, 48, T0, "own");
   assert.equal(r.kind, "done");
   if (r.kind !== "done") return;
   assert.equal(r.toS, 36.2);

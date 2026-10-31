@@ -13,7 +13,7 @@
  * Invariant (trimInvariant): the index always names exactly one file per clip and it exists; the
  * original is deleted only after the PATCH landed. Deps are injected so tests use the fakes.
  */
-import { ALGO_VERSION, type SetClipAutoInput, type SetClipAutoResult } from "./auto-clip.ts";
+import type { SetClipAutoInput, SetClipAutoResult } from "./auto-clip.ts";
 import { isClipId, storedDuration, type VideoClipRow } from "./clips.ts";
 import { cutClip } from "./cut.ts";
 import { clipFile, type ClipIndex, type ClipIndexEntry, type PendingTrim } from "./index-store.ts";
@@ -30,7 +30,7 @@ export type TrimKind = (typeof TRIM_KINDS)[number];
 
 /**
  * The cut's points for clip_accuracy (slice clip-accuracy-log): the user's requested in/out on the
- * original file (not the keyframe-adjusted start), the kind, and the automatic clip's ALGO_VERSION
+ * original file (not the keyframe-adjusted start), the kind, and the automatic clip's algorithm version
  * (null: not sent).
  */
 export type TrimPoints = { readonly inS: number; readonly outS: number; readonly kind: TrimKind; readonly algoVersion: number | null };
@@ -147,10 +147,16 @@ export type TrimClipResult =
   | { readonly ok: true; readonly dev: boolean; readonly durationS: number }
   | { readonly ok: false; readonly reason: "invalid" | "duration" | "not_found" | "not_allowed" | "failed" };
 
-/** finishTrim's request: the new duration, plus the pending cut's points, kind and ALGO_VERSION when it kept them (an old entry sends none). */
+/** The version that produced the clip's automatic range, as this phone recorded it; null when unknown. */
+function algoVersionOf(deps: Pick<TrimDeps, "autoVersionOf">, id: string): number | null {
+  const v = deps.autoVersionOf?.(id) ?? null;
+  return v !== null && Number.isInteger(v) && v >= 1 ? v : null;
+}
+
+/** finishTrim's request: the new duration, plus the pending cut's points, kind and the analysing algorithm version when it kept them (an old entry sends none). */
 export function trimRequest(id: string, p: PendingTrim): TrimRequest {
   if (p.inS === undefined || p.outS === undefined || p.kind === undefined) return { id, durationS: p.newDurationS };
-  return { id, durationS: p.newDurationS, inS: p.inS, outS: p.outS, kind: p.kind, algoVersion: ALGO_VERSION };
+  return { id, durationS: p.newDurationS, inS: p.inS, outS: p.outS, kind: p.kind, ...(p.algoVersion === undefined ? {} : { algoVersion: p.algoVersion }) };
 }
 
 // --- the phone: start, Fortryd, finish ------------------------------------------------------------
@@ -217,6 +223,11 @@ export type TrimDeps = {
   readonly cut?: (file: Blob, inS: number, outS: number) => Promise<CutResult>;
   /** The per-clip lock; browserLock() (else an in-memory one) by default. */
   readonly lock?: ClipLock;
+  /**
+   * The automatic clip's algorithm version this phone analysed the clip with (auto-version.ts), kept
+   * with the pending cut for clip_accuracy (review: not the app's version at the finish); none = null.
+   */
+  readonly autoVersionOf?: (id: string) => number | null;
 };
 
 /** The cut's length as stored: the file's own range (end − start), 0.1 s, so it equals the file within 0.1 s. */
@@ -247,7 +258,7 @@ function outOfSpace(error: unknown): boolean {
  * named (a stray cut file is swept by finishDueTrims). The pending cut keeps [inS, outS] and `kind`
  * (own: Gem klip; approved: Godkend alle) for clip_accuracy (slice clip-accuracy-log).
  */
-export function startTrim(deps: TrimDeps, id: string, inS: number, outS: number, now: Date, kind: TrimKind = "own"): Promise<StartTrimResult> {
+export function startTrim(deps: TrimDeps, id: string, inS: number, outS: number, now: Date, kind: TrimKind): Promise<StartTrimResult> {
   return lockOf(deps)(id, {}, () => startTrimLocked(deps, id, inS, outS, now, kind));
 }
 
@@ -279,7 +290,16 @@ async function startTrimLocked(deps: TrimDeps, id: string, inS: number, outS: nu
       ...entry,
       fileName: name,
       durationS: toS,
-      pendingTrim: { deadline, originalFileName: clipFile(entry), originalDurationS: entry.durationS, newDurationS: toS, inS, outS, kind },
+      pendingTrim: {
+        deadline,
+        originalFileName: clipFile(entry),
+        originalDurationS: entry.durationS,
+        newDurationS: toS,
+        inS,
+        outS,
+        kind,
+        ...(algoVersionOf(deps, id) === null ? {} : { algoVersion: algoVersionOf(deps, id)! }),
+      },
     };
     await deps.index.put(next);
     return { kind: "done", entry: next, fromS: entry.durationS, toS, deadline };

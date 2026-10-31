@@ -101,7 +101,7 @@ import { FIXTURE_FAILING_RANGE_ID } from "@/lib/video/clip-range";
 import { ClipEditor, sendClipRange } from "./ClipEditor";
 import { autoMetaWord, type ClipLiftMeta, editLabel, inPickupWindow, pickupQueue, playerAutoLine } from "@/lib/video/auto-lines";
 import { type AutoOutcome, analyseClip } from "@/lib/video/auto-run";
-import { browserStore, readAutoVersions } from "@/lib/video/auto-version";
+import { browserStore, readAutoVersions, versionOf } from "@/lib/video/auto-version";
 import { autoClipOn, setAutoClipOn, subscribeAutoClip, switchStore } from "@/lib/video/auto-switch";
 import { type AutoLast, readAutoLast, recordRun } from "@/lib/video/auto-last";
 import { ClipSummary, type SummaryItem } from "@/components/ClipSummary";
@@ -482,7 +482,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     const s = store.current;
     if (s === null) return null;
     if (fixture !== null) return { index: s.index, files: s.files, trim: async (i) => ({ ok: true, dev: true, durationS: i.durationS }), cut: fixtureCut(id) };
-    return { index: s.index, files: s.files, trim: trimClip };
+    return { index: s.index, files: s.files, trim: trimClip, autoVersionOf: (clip) => versionOf(readAutoVersions(browserStore()), clip) };
   }
 
   async function fileBytes(id: string, toS?: number, fromS?: number | null): Promise<number | null> {
@@ -603,7 +603,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     });
     const bytes = sizes[id] ?? null;
     const row = serverById.get(id) ?? null;
-    const r = await startTrim(deps, id, inS, outS, new Date());
+    const r = await startTrim(deps, id, inS, outS, new Date(), "own");
     if (r.kind !== "done") return r;
     if (!trimBefore.current.has(id)) trimBefore.current.set(id, { row, bytes });
     setLocal({ kind: "ready", entries: await s.index.all() });

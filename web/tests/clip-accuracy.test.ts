@@ -207,7 +207,7 @@ test("accuracy: unusable points keep the cut on the phone (finishTrim done, no r
     lock: memoryLock(),
     trim: async (input) => trim(db, { ...input, outS: 99 }), // points past the original
   };
-  const r = await startTrim(deps, ID, 1.04, 8.96, T0);
+  const r = await startTrim(deps, ID, 1.04, 8.96, T0, "own");
   assert.equal(r.kind, "done");
   const toS = r.kind === "done" ? r.toS : null;
   assert.equal(await finishTrim(deps, ID, new Date(T0.getTime() + TRIM_UNDO_MS)), "done");
@@ -304,14 +304,22 @@ async function phone(initial: ClipIndexEntry = entry()): Promise<{ deps: TrimDep
   return { deps, sent };
 }
 
-test("accuracy: Gem klip's pending cut keeps the requested points (not the keyframe start) and kind own; finishTrim sends them with ALGO_VERSION", async () => {
-  const { deps, sent } = await phone();
-  const r = await startTrim(deps, ID, 1.04, 8.96, T0);
+test("accuracy: Gem klip's pending cut keeps the requested points (not the keyframe start), kind own and the analysing version; finishTrim sends them", async () => {
+  const { deps: base, sent } = await phone();
+  const deps = { ...base, autoVersionOf: () => 3 }; // this phone analysed the clip with version 3 (review: not the app's)
+  const r = await startTrim(deps, ID, 1.04, 8.96, T0, "own");
   assert.equal(r.kind, "done");
   const p = (await deps.index.get(ID))?.pendingTrim;
   assert.deepEqual({ inS: p?.inS, outS: p?.outS, kind: p?.kind }, { inS: 1.04, outS: 8.96, kind: "own" });
   assert.equal(await finishTrim(deps, ID, new Date(T0.getTime() + TRIM_UNDO_MS)), "done");
-  assert.deepEqual(sent, [{ id: ID, durationS: p?.newDurationS, inS: 1.04, outS: 8.96, kind: "own", algoVersion: ALGO_VERSION }]);
+  assert.deepEqual(sent, [{ id: ID, durationS: p?.newDurationS, inS: 1.04, outS: 8.96, kind: "own", algoVersion: 3 }]);
+});
+
+test("accuracy: without a recorded analysis version the request carries none (never the app's current version)", async () => {
+  const { deps, sent } = await phone();
+  await startTrim(deps, ID, 1.04, 8.96, T0, "own");
+  await finishTrim(deps, ID, T0, { force: true });
+  assert.equal(sent[0]?.algoVersion, undefined);
 });
 
 test("accuracy: startTrim takes kind approved (for Godkend alle)", async () => {

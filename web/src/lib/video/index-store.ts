@@ -69,6 +69,8 @@ export type PendingTrim = {
   readonly inS?: number;
   readonly outS?: number;
   readonly kind?: TrimKind;
+  /** The algorithm version that produced the clip's automatic range on this phone (clip_accuracy); absent = unknown. */
+  readonly algoVersion?: number;
 };
 
 /** The one path builder for a clip's file (slice clip-trim): the entry's fileName, else the old `<id>.<ext>`. */

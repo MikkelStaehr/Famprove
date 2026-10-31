@@ -95,7 +95,7 @@ test("clipFile: an old entry is <id>.<ext>; a new one names its file; clipFiles 
 test("happy path: Gem klip makes the cut the clip with Fortryd for 10 s; at 0 one PATCH, the original goes, pending cleared last", async () => {
   const w = await world();
   const d = deps(w);
-  const r = await startTrim(d, ID, 12.3, 48.0, T0);
+  const r = await startTrim(d, ID, 12.3, 48.0, T0, "own");
   assert.equal(r.kind, "done");
   if (r.kind !== "done") return;
   assert.deepEqual({ from: r.fromS, to: r.toS, deadline: r.deadline }, { from: 51.8, to: 36.2, deadline: at(TRIM_UNDO_MS).toISOString() });
@@ -122,7 +122,7 @@ test("happy path: Gem klip makes the cut the clip with Fortryd for 10 s; at 0 on
 test("Fortryd at 9 s: the original comes back byte for byte, the cut is deleted, no server call; at 10 s it is too late", async () => {
   const w = await world();
   const d = deps(w);
-  await startTrim(d, ID, 12.3, 48.0, T0);
+  await startTrim(d, ID, 12.3, 48.0, T0, "own");
   const u = await undoTrim(d, ID, at(9_000));
   assert.equal(u.kind, "undone");
   assert.deepEqual(await bytesOf(w.files, `${ID}.mp4`), [...ORIGINAL]);
@@ -134,14 +134,14 @@ test("Fortryd at 9 s: the original comes back byte for byte, the cut is deleted,
   assert.equal(w.server.durationS, 51.8);
 
   const w2 = await world();
-  await startTrim(deps(w2), ID, 12.3, 48.0, T0);
+  await startTrim(deps(w2), ID, 12.3, 48.0, T0, "own");
   assert.deepEqual(await undoTrim(deps(w2), ID, at(TRIM_UNDO_MS)), { kind: "expired" });
   assert.deepEqual(await undoTrim(deps(w2), "11111111-1111-4111-8111-111111111111", T0), { kind: "none" });
 });
 
 test("the deadline reached while closed: the next load finishes; before it, the load leaves the window open", async () => {
   const w = await world();
-  await startTrim(deps(w), ID, 12.3, 48.0, T0);
+  await startTrim(deps(w), ID, 12.3, 48.0, T0, "own");
   // the page closes; a new mount has new deps over the same storage
   assert.deepEqual(await finishDueTrims(deps(w), at(5_000)), { finished: [], failed: [], refused: [], pending: [ID] });
   assert.equal(w.server.calls, 0);
@@ -177,7 +177,7 @@ function faulty(w: World, k: number, afterApply: boolean): TrimDeps & { readonly
 test("failure injection: a break at every step, then a reload, ends untouched or fully done, never 0 files or 2", async () => {
   const clean = await world();
   const all = faulty(clean, Number.POSITIVE_INFINITY, false);
-  await startTrim(all, ID, 12.3, 48.0, T0);
+  await startTrim(all, ID, 12.3, 48.0, T0, "own");
   await finishTrim(all, ID, at(TRIM_UNDO_MS));
   assert.deepEqual(all.steps(), ["writeFile", "put", "trim", "removeFile", "put"], "the cut write, the index, the PATCH, the original's delete, the clear");
   for (const afterApply of [false, true]) {
@@ -185,7 +185,7 @@ test("failure injection: a break at every step, then a reload, ends untouched or
       const label = `${afterApply ? "lost reply" : "cut"} at step ${k} (${all.steps()[k - 1]})`;
       const w = await world();
       const d = faulty(w, k, afterApply);
-      await startTrim(d, ID, 12.3, 48.0, T0);
+      await startTrim(d, ID, 12.3, 48.0, T0, "own");
       await finishTrim(d, ID, at(TRIM_UNDO_MS));
       // in between: the index names a file that exists; the original exists until the PATCH landed
       const mid = await w.index.all();
@@ -217,16 +217,16 @@ test("failure injection: a break at every step, then a reload, ends untouched or
 test("a failed cut, an unreadable original, or no space leave the original untouched; a second cut finishes the first", async () => {
   const w = await world();
   const failing: TrimDeps = { ...deps(w), cut: async () => Promise.reject(new Error("codec")) };
-  assert.deepEqual(await startTrim(failing, ID, 12.3, 48.0, T0), { kind: "failed", space: false });
+  assert.deepEqual(await startTrim(failing, ID, 12.3, 48.0, T0, "own"), { kind: "failed", space: false });
   const full: TrimDeps = { ...deps(w), files: { ...w.files, writeFile: async () => Promise.reject(new DOMException("full", "QuotaExceededError")) } };
-  assert.deepEqual(await startTrim(full, ID, 12.3, 48.0, T0), { kind: "failed", space: true });
+  assert.deepEqual(await startTrim(full, ID, 12.3, 48.0, T0, "own"), { kind: "failed", space: true });
   assert.deepEqual(await w.files.names(), [`${ID}.mp4`]);
   assert.deepEqual(await bytesOf(w.files, `${ID}.mp4`), [...ORIGINAL]);
   assert.equal((await w.index.get(ID))?.pendingTrim, undefined);
 
-  const r1 = await startTrim(deps(w), ID, 12.3, 48.0, T0);
+  const r1 = await startTrim(deps(w), ID, 12.3, 48.0, T0, "own");
   assert.equal(r1.kind, "done");
-  const r2 = await startTrim(deps(w), ID, 2.2, 30.0, at(3_000)); // inside the first's window
+  const r2 = await startTrim(deps(w), ID, 2.2, 30.0, at(3_000), "own"); // inside the first's window
   assert.equal(r2.kind, "done");
   assert.equal(w.server.calls, 1, "the first cut was committed before the second");
   assert.deepEqual((await w.files.names()).toSorted(), [`${ID}.cut.mp4`, `${ID}.mp4`]);
@@ -262,7 +262,7 @@ test("the parked automatic clip sends no setClipAuto for a clip with a pending c
 
 test("a trimClip refusal leaves the cut pending for the next load", async () => {
   const w = await world();
-  await startTrim(deps(w), ID, 12.3, 48.0, T0);
+  await startTrim(deps(w), ID, 12.3, 48.0, T0, "own");
   const down: TrimDeps = { ...deps(w), trim: async (): Promise<TrimClipResult> => ({ ok: false, reason: "failed" }) };
   assert.equal(await finishTrim(down, ID, at(TRIM_UNDO_MS)), "failed");
   assert.deepEqual((await w.files.names()).toSorted(), [`${ID}.cut.mp4`, `${ID}.mp4`]);
@@ -277,7 +277,7 @@ const locked = (w: World, lock = memoryLock()): TrimDeps => ({ ...deps(w), lock 
 test("race: Fortryd in the last ms and the timer's finish under one lock; Fortryd first wins, the finish sees nothing pending", async () => {
   const w = await world();
   const d = locked(w);
-  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0)).kind, "done");
+  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0, "own")).kind, "done");
   // both start before either awaits: Fortryd at 9.95 s, the finish timer at deadline + 50 ms
   const [u, f] = await Promise.all([undoTrim(d, ID, at(TRIM_UNDO_MS - 50)), finishTrim(d, ID, at(TRIM_UNDO_MS + 50))]);
   assert.equal(u.kind, "undone");
@@ -291,7 +291,7 @@ test("race: Fortryd in the last ms and the timer's finish under one lock; Fortry
 test("race: the finish first, then a Fortryd that read before the deadline: expired, the cut stays, never zero files", async () => {
   const w = await world();
   const d = locked(w);
-  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0)).kind, "done");
+  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0, "own")).kind, "done");
   const [f, u] = await Promise.all([finishTrim(d, ID, at(TRIM_UNDO_MS + 50)), undoTrim(d, ID, at(TRIM_UNDO_MS - 50))]);
   assert.equal(f, "done");
   assert.deepEqual(u, { kind: "expired" });
@@ -303,7 +303,7 @@ test("race: the finish first, then a Fortryd that read before the deadline: expi
 test("race: two tabs' finishes on one lock: one PATCH lands, the other sees nothing pending", async () => {
   const w = await world();
   const d = locked(w);
-  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0)).kind, "done");
+  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0, "own")).kind, "done");
   const rs = await Promise.all([finishTrim(d, ID, at(TRIM_UNDO_MS)), finishTrim(d, ID, at(TRIM_UNDO_MS))]);
   assert.deepEqual(rs, ["done", "done"]);
   assert.equal(w.server.calls, 1);
@@ -313,7 +313,7 @@ test("race: two tabs' finishes on one lock: one PATCH lands, the other sees noth
 test("finish: a cut file that is gone never costs the original; the original is the clip again (refused)", async () => {
   const w = await world();
   const d = locked(w);
-  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0)).kind, "done");
+  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0, "own")).kind, "done");
   await w.files.removeFile(`${ID}.cut.mp4`);
   assert.equal(await finishTrim(d, ID, at(TRIM_UNDO_MS)), "refused");
   assert.equal(w.server.calls, 0);
@@ -327,7 +327,7 @@ for (const reason of ["duration", "invalid", "not_allowed"] as const) {
     const w = await world();
     let calls = 0;
     const d: TrimDeps = { ...locked(w), trim: async () => ((calls += 1), { ok: false, reason }) };
-    assert.equal((await startTrim(d, ID, 12.3, 48.0, T0)).kind, "done");
+    assert.equal((await startTrim(d, ID, 12.3, 48.0, T0, "own")).kind, "done");
     const r = await finishDueTrims(d, at(TRIM_UNDO_MS));
     assert.deepEqual(r.refused, [ID]);
     const e = await w.index.get(ID);
@@ -343,7 +343,7 @@ for (const reason of ["duration", "invalid", "not_allowed"] as const) {
 test("finish: failed (thrown, the network) leaves pendingTrim for the next load", async () => {
   const w = await world();
   const d: TrimDeps = { ...locked(w), trim: async () => { throw new Error("offline"); } };
-  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0)).kind, "done");
+  assert.equal((await startTrim(d, ID, 12.3, 48.0, T0, "own")).kind, "done");
   assert.equal(await finishTrim(d, ID, at(TRIM_UNDO_MS)), "failed");
   assert.notEqual((await w.index.get(ID))?.pendingTrim, undefined);
   assert.deepEqual((await w.files.names()).toSorted(), [`${ID}.cut.mp4`, `${ID}.mp4`]);
@@ -353,7 +353,7 @@ test("clamp: a cut from the first keyframe to the end that measures 0.1 s over i
   const w = await world();
   const over = async (file: Blob): Promise<CutResult> => ({ blob: new Blob([new Uint8Array(await file.arrayBuffer()).slice(0, 90)]), actual: { startS: 0, endS: 51.9 } });
   const d: TrimDeps = { ...locked(w), cut: over };
-  const r = await startTrim(d, ID, 0.4, 51.8, T0);
+  const r = await startTrim(d, ID, 0.4, 51.8, T0, "own");
   assert.equal(r.kind, "done");
   if (r.kind !== "done") return;
   assert.equal(r.toS, 51.8);

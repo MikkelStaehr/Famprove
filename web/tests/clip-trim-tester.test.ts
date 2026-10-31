@@ -95,7 +95,7 @@ test("T2/§7.4 real file: Gem klip's cut is the clip, its measured length = dura
   assert.ok(kf.length >= 2, `fixture has ${kf.length} keyframes`);
   const inS = r1(facts.durationS * 0.3);
   const outS = r1(facts.durationS * 0.8);
-  const r = await startTrim({ index: w.index, files: w.files, trim: serverTrim(w.server) }, ID, inS, outS, T0);
+  const r = await startTrim({ index: w.index, files: w.files, trim: serverTrim(w.server) }, ID, inS, outS, T0, "own");
   assert.equal(r.kind, "done");
   if (r.kind !== "done") return;
   assert.deepEqual(w.server.calls, [], "Gem klip itself sends nothing");
@@ -123,7 +123,7 @@ test("T2/§7.4 real file: Gem klip's cut is the clip, its measured length = dura
 test("T3/§7.6 real file: Fortryd at 9.9 s gives back the original's exact sha256 and length, deletes the cut, sends nothing; at 10 s it is expired", async () => {
   const w = await realWorld();
   const deps: TrimDeps = { index: w.index, files: w.files, trim: serverTrim(w.server) };
-  const r = await startTrim(deps, ID, 1.0, 3.0, T0);
+  const r = await startTrim(deps, ID, 1.0, 3.0, T0, "own");
   assert.equal(r.kind, "done");
   if (r.kind !== "done") return;
   const cutName = clipFile(r.entry);
@@ -141,14 +141,14 @@ test("T3/§7.6 real file: Fortryd at 9.9 s gives back the original's exact sha25
   assert.deepEqual(w.server.calls, []);
   assert.deepEqual(await w.files.names(), [`${ID}.mp4`]);
   // a second cut, then Fortryd exactly at the deadline: too late, the cut stays
-  const r2 = await startTrim(deps, ID, 1.0, 3.0, T0);
+  const r2 = await startTrim(deps, ID, 1.0, 3.0, T0, "own");
   assert.equal(r2.kind, "done");
   assert.equal((await undoTrim(deps, ID, at(TRIM_UNDO_MS))).kind, "expired");
 });
 
 test("T4/§7.7 real file: the app closed inside the window, the next load past the deadline finishes: one PATCH = the file's length, the original gone, listed once", async () => {
   const w = await realWorld();
-  const r = await startTrim({ index: w.index, files: w.files, trim: serverTrim(w.server) }, ID, 2.0, 5.0, T0);
+  const r = await startTrim({ index: w.index, files: w.files, trim: serverTrim(w.server) }, ID, 2.0, 5.0, T0, "own");
   assert.equal(r.kind, "done");
   // "reload": fresh deps over the same storage (the in-memory timer is gone)
   const reload = (): TrimDeps => ({ index: w.index, files: w.files, trim: serverTrim(w.server) });
@@ -225,7 +225,7 @@ test("T7 invariant: seeded random start/undo/finish/load with failing storage, a
       if (a < 0.35 && len > 1.5) {
         const inS = r1(rand() * (len - 1.2));
         const outS = r1(Math.min(len, inS + 1.0 + rand() * (len - inS - 1.0)));
-        await startTrim(deps, ID, inS, outS, now);
+        await startTrim(deps, ID, inS, outS, now, "own");
       } else if (a < 0.55) {
         if ((await undoTrim(deps, ID, now)).kind === "undone") undos++;
       }
@@ -277,7 +277,7 @@ for (const reason of ["duration", "invalid", "not_allowed"] as const) {
       return { ok: false, reason };
     };
     const deps: TrimDeps = { index: w.index, files: w.files, trim };
-    const r = await startTrim(deps, ID, 1.0, 3.0, T0);
+    const r = await startTrim(deps, ID, 1.0, 3.0, T0, "own");
     assert.equal(r.kind, "done");
     if (r.kind !== "done") return;
     const cutName = clipFile(r.entry);
@@ -311,7 +311,7 @@ test("fix: a network failure (thrown, or reason failed) at 0 is not permanent: t
     return ok(input);
   };
   const deps: TrimDeps = { index: w.index, files: w.files, trim };
-  const r = await startTrim(deps, ID, 1.0, 3.0, T0);
+  const r = await startTrim(deps, ID, 1.0, 3.0, T0, "own");
   assert.equal(r.kind, "done");
   assert.equal(await finishTrim(deps, ID, at(TRIM_UNDO_MS)), "failed");
   mode = "failed";
@@ -330,7 +330,7 @@ test("fix: the clamp keeps the new duration ≤ the clip's own length, for a cut
   // a cut that reports 0.3 s more than the clip (first keyframe to the end measuring over)
   const w = await realWorld();
   const over: TrimDeps["cut"] = async (file) => ({ blob: file, actual: { startS: 0, endS: w.lengthS + 0.3 } });
-  const r = await startTrim({ index: w.index, files: w.files, trim: serverTrim(w.server), cut: over }, ID, 0, w.lengthS, T0);
+  const r = await startTrim({ index: w.index, files: w.files, trim: serverTrim(w.server), cut: over }, ID, 0, w.lengthS, T0, "own");
   assert.equal(r.kind, "done");
   if (r.kind !== "done") return;
   assert.ok(r.toS <= w.lengthS, `toS ${r.toS} > clip ${w.lengthS}`);
@@ -341,7 +341,7 @@ test("fix: the clamp keeps the new duration ≤ the clip's own length, for a cut
   assert.ok(w.server.durationS <= w.lengthS);
   // the real cut (cutClip) of the whole fixture
   const v = await realWorld();
-  const r2 = await startTrim({ index: v.index, files: v.files, trim: serverTrim(v.server) }, ID, 0, v.lengthS, T0);
+  const r2 = await startTrim({ index: v.index, files: v.files, trim: serverTrim(v.server) }, ID, 0, v.lengthS, T0, "own");
   assert.equal(r2.kind, "done");
   if (r2.kind !== "done") return;
   assert.ok(r2.toS <= v.lengthS && (r2.entry.pendingTrim?.newDurationS ?? Number.POSITIVE_INFINITY) <= v.lengthS);
@@ -355,7 +355,7 @@ test("fix T3 race: Fortryd and the finish fired together without awaiting at 9.9
   ] as const) {
     const w = await realWorld();
     const deps: TrimDeps = { index: w.index, files: w.files, trim: serverTrim(w.server), lock: memoryLock() };
-    assert.equal((await startTrim(deps, ID, 1.0, 3.0, T0)).kind, "done");
+    assert.equal((await startTrim(deps, ID, 1.0, 3.0, T0, "own")).kind, "done");
     const u = undoTrim(deps, ID, at(undoAt));
     const f = finishTrim(deps, ID, at(TRIM_UNDO_MS), { force: !firstUndo });
     const [ur, fr] = await Promise.all([u, f]); // both fired before either is awaited
@@ -428,7 +428,7 @@ test("fix T7 invariant on the real fixture: seeded steps that fire start/undo/fi
         if (a < 0.3 && len > 1.5) {
           const inS = r1(rand() * (len - 1.2));
           const outS = r1(Math.min(len, inS + 1.0 + rand() * (len - inS - 1.0)));
-          ops.push(startTrim(deps, ID, inS, outS, now));
+          ops.push(startTrim(deps, ID, inS, outS, now, "own"));
         } else if (a < 0.55) {
           ops.push(undoTrim(deps, ID, now).then((u) => (u.kind === "undone" ? undone++ : 0)));
         } else if (a < 0.8) {

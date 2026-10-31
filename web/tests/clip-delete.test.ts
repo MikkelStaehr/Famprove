@@ -282,7 +282,7 @@ test("a delete never races a concurrent trim: the lock serialises them, both fil
     return { blob: new Blob([new Uint8Array(5)]), actual: { startS: 1, endS: 21 } };
   };
   const trimDeps: TrimDeps = { index: w.index, files: w.files, lock: w.deps.lock, trim: async (i) => ({ ok: true, dev: false, durationS: i.durationS }), cut };
-  const trimming = startTrim(trimDeps, A, 1, 21, T0);
+  const trimming = startTrim(trimDeps, A, 1, 21, T0, "own");
   const marking = startDelete(w.deps, [A], "b1", T0);
   release();
   const t = await trimming;
