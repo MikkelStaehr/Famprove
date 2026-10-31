@@ -23,8 +23,10 @@ import {
   finishDueTrims,
   memoryLock,
   parseTrimClipInput,
+  startTrim,
   TRIM_UNDO_MS,
   trimInvariant,
+  undoTrim,
   validateTrim,
 } from "../src/lib/video/trim.ts";
 
@@ -250,4 +252,73 @@ test("comma decimal: a duration sent as text ('35,9') is refused, never read as 
   assert.equal(validateTrim("35,9", 50), null);
   assert.equal(validateTrim("35.9", 50), null);
   assert.equal(validateTrim(35.9, 50), 35.9);
+});
+
+/** The user's own Gem klip in the player: a range unlike the automatic one. */
+async function snapshot(w: World, id: string) {
+  const e = await w.index.get(id);
+  assert.ok(e !== null);
+  return { pendingTrim: e.pendingTrim, file: clipFile(e), sha: sha(await u8(w.files, clipFile(e))), durationS: e.durationS };
+}
+
+for (const mode of ["sequential", "concurrent"] as const) {
+  test(`race (${mode}, real file): a Gem klip on B lands first; the batch skips B, leaves its cut and pending Fortryd byte for byte, and still cuts A`, async () => {
+    const w = await realWorld();
+    const deps: ApproveDeps = { index: w.index, files: w.files, trim: server(w), lock: memoryLock(), newBatch: () => "tester-batch" };
+    const clips = approvableClips([...w.rows.values()], await w.index.all(), lasts, TODAY); // the list the tap saw
+    assert.deepEqual(clips.map((c) => c.id).toSorted(), [A, B]);
+    const ownIn = r1(w.lengthS * 0.1);
+    const ownOut = r1(w.lengthS * 0.6);
+    let r: Awaited<ReturnType<typeof approveAll>>;
+    if (mode === "sequential") {
+      const own = await startTrim(deps, B, ownIn, ownOut, T0, "own");
+      assert.equal(own.kind, "done");
+      const before = await snapshot(w, B);
+      r = await approveAll(deps, clips, clock());
+      assert.deepEqual(await snapshot(w, B), before, "B: same bytes, same pendingTrim, same file");
+    } else {
+      const own = startTrim(deps, B, ownIn, ownOut, T0, "own"); // takes B's lock before the batch's first await
+      const batch = approveAll(deps, clips, clock());
+      assert.equal((await own).kind, "done");
+      r = await batch;
+    }
+    assert.deepEqual(r.done, [A]);
+    assert.deepEqual(r.failed, [{ id: B, space: false, notOriginal: true }]);
+    const eb = await w.index.get(B);
+    assert.equal(eb?.pendingTrim?.kind, "own");
+    assert.equal(eb?.pendingTrim?.batch, undefined, "B's Fortryd is still the user's own, not the batch's");
+    assert.deepEqual([eb?.pendingTrim?.inS, eb?.pendingTrim?.outS], [ownIn, ownOut]);
+    const ea = await w.index.get(A);
+    assert.equal(ea?.pendingTrim?.batch, "tester-batch");
+    assert.deepEqual([ea?.pendingTrim?.inS, ea?.pendingTrim?.outS], [w.inS, w.outS]);
+    assert.notEqual(sha(await u8(w.files, clipFile(ea!))), sha(FIXTURE), "A is cut");
+    assert.deepEqual(trimInvariant(await w.index.all(), await w.files.names()), []);
+    // the batch's Fortryd gives back A only; B keeps the user's cut
+    const bSnap = await snapshot(w, B);
+    const u = await undoBatch(deps, r.batch, new Date(Date.parse(r.deadline!) - 1));
+    assert.equal(u.kind, "undone");
+    if (u.kind === "undone") assert.deepEqual(u.restored, [A]);
+    assert.equal(sha(await u8(w.files, `${A}.mp4`)), sha(FIXTURE), "A byte for byte");
+    assert.deepEqual(await snapshot(w, B), bSnap, "batch Fortryd leaves B alone");
+    // the user's own Fortryd still works and restores B byte for byte
+    const ub = await undoTrim(deps, B, new Date(Date.parse(eb!.pendingTrim!.deadline) - 1));
+    assert.equal(ub.kind, "undone");
+    assert.equal(clipFile((await w.index.get(B))!), `${B}.mp4`);
+    assert.equal(sha(await u8(w.files, `${B}.mp4`)), sha(FIXTURE), "B byte for byte");
+    assert.deepEqual([w.patches.length, w.accuracy.length], [0, 0]);
+  });
+}
+
+test("race (real file): finishing after the skip gives A an approved row and B the user's own row, one PATCH each", async () => {
+  const w = await realWorld();
+  const deps: ApproveDeps = { index: w.index, files: w.files, trim: server(w), lock: memoryLock(), newBatch: () => "tester-batch" };
+  const clips = approvableClips([...w.rows.values()], await w.index.all(), lasts, TODAY);
+  const ownIn = r1(w.lengthS * 0.1);
+  const ownOut = r1(w.lengthS * 0.6);
+  assert.equal((await startTrim(deps, B, ownIn, ownOut, T0, "own")).kind, "done");
+  const r = await approveAll(deps, clips, clock());
+  await finishDueTrims(deps, new Date(Date.parse(r.deadline!) + TRIM_UNDO_MS + 1));
+  assert.deepEqual(w.patches.map((p) => p.id).toSorted(), [A, B].toSorted());
+  const kinds = Object.fromEntries(w.accuracy.map((a) => [a.clip_id, a.kind]));
+  assert.deepEqual(kinds, { [A]: "approved", [B]: "own" });
 });
