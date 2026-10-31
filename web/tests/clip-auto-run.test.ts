@@ -342,3 +342,19 @@ test("clip-auto-2 review: Venter på klip only inside the pickup window; play re
   assert.equal(autoMetaWord("mp4", waiting, false, false), null);
   assert.equal(playerAutoLine(null, null, false), null);
 });
+
+test("clip-auto-on: the pickup skips a clip whose file is already a cut, whatever its status", () => {
+  const now = new Date("2026-10-31T12:00:00Z");
+  const row = (id: string): VideoClipRow => ({
+    id, date: "2026-10-31", session: 1, row: 25, set: 1, exerciseId: 1, variantId: null, recordedAt: "2026-10-31T10:00:00+01:00",
+    durationS: 20, starred: false, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null,
+  });
+  const entry = (id: string, fileName?: string): ClipIndexEntry => ({
+    id, setKey: { date: "2026-10-31", sessionNo: 1, row: 25, set: 1 }, ext: "mp4", recordedAt: "2026-10-31T10:00:00+01:00",
+    durationS: 20, starred: false, starSynced: true, state: "done", ...(fileName === undefined ? {} : { fileName }),
+  });
+  const a = "00000000-0000-4000-8000-0000000000a1";
+  const b = "00000000-0000-4000-8000-0000000000b2";
+  const queue = pickupQueue([entry(a), entry(b, `${b}.cut.mp4`)], [row(a), row(b)], now);
+  assert.deepEqual(queue.map((r) => r.id), [a]);
+});

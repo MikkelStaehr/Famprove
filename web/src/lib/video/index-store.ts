@@ -78,6 +78,11 @@ export function clipFile(entry: Pick<ClipIndexEntry, "id" | "ext" | "fileName">)
   return entry.fileName ?? clipFileName(entry.id, entry.ext);
 }
 
+/** The clip's file is a cut (Gem klip / Godkend alle), not the original recording: the file is already the clip. */
+export function isCut(entry: Pick<ClipIndexEntry, "id" | "ext" | "fileName">): boolean {
+  return clipFile(entry) !== clipFileName(entry.id, entry.ext);
+}
+
 /** Every file a clip owns on the phone: its file, plus the original while a cut is pending (deleting a clip deletes both). */
 export function clipFiles(entry: Pick<ClipIndexEntry, "id" | "ext" | "fileName" | "pendingTrim">): string[] {
   const own = clipFile(entry);

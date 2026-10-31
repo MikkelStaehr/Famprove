@@ -6,7 +6,7 @@ import { ALGO_VERSION, type AutoStatus, type LiftFamily } from "./auto-clip.ts";
 import type { AutoProgress } from "./auto-run.ts";
 import type { VideoClipRow } from "./clips.ts";
 import { formatRange } from "./cut-lines.ts";
-import type { ClipIndexEntry } from "./index-store.ts";
+import { type ClipIndexEntry, isCut } from "./index-store.ts";
 import { type AutoVersions, versionOf } from "./auto-version.ts";
 
 /** Fokus's slot: a phase on, or the outcome. */
@@ -114,7 +114,8 @@ export function inPickupWindow(recordedAt: string, now: Date): boolean {
 
 export function pickupQueue(local: readonly ClipIndexEntry[], rows: readonly VideoClipRow[], now: Date, versions: AutoVersions = {}, auto = true): VideoClipRow[] {
   if (!auto) return []; // clip-auto-park: the switch is off, the pickup takes nothing
-  const files = new Map(local.filter((e) => e.state === "done" && e.ext === "mp4" && e.pendingTrim === undefined).map((e) => [e.id, e]));
+  // A clip already cut is the clip: analysing it again would only offer a second cut (clip-auto-on).
+  const files = new Map(local.filter((e) => e.state === "done" && e.ext === "mp4" && e.pendingTrim === undefined && !isCut(e)).map((e) => [e.id, e]));
   const due = (r: VideoClipRow): boolean => r.autoStatus === null || versionOf(versions, r.id) < ALGO_VERSION;
   return rows
     .filter((r) => due(r) && files.has(r.id) && inPickupWindow(r.recordedAt, now))
