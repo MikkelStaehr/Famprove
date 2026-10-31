@@ -16,7 +16,7 @@
 import type { SetClipAutoInput, SetClipAutoResult } from "./auto-clip.ts";
 import { isClipId, storedDuration, type VideoClipRow } from "./clips.ts";
 import { cutClip } from "./cut.ts";
-import { clipFile, type ClipIndex, type ClipIndexEntry, type PendingTrim } from "./index-store.ts";
+import { clipFile, type ClipIndex, type ClipIndexEntry, isCut, type PendingTrim } from "./index-store.ts";
 import { clipFileName, cutFileName, type ClipFiles } from "./opfs.ts";
 
 /** Fortryd's window (§3). */
@@ -244,8 +244,11 @@ export function nextCutName(entry: Pick<ClipIndexEntry, "id" | "ext" | "fileName
 
 export type StartTrimResult =
   | { readonly kind: "done"; readonly entry: ClipIndexEntry; readonly fromS: number | null; readonly toS: number; readonly deadline: string }
-  /** §2.3 Failed: the original is untouched. `space`: the phone is out of space (adds "Telefonen mangler plads."). */
-  | { readonly kind: "failed"; readonly space: boolean };
+  /**
+   * §2.3 Failed: the original is untouched. `space`: the phone is out of space (adds "Telefonen mangler plads.").
+   * `reason` not_original: onlyOriginal and the clip was no longer an untouched original (nothing done to it).
+   */
+  | { readonly kind: "failed"; readonly space: boolean; readonly reason?: "not_original" };
 
 function outOfSpace(error: unknown): boolean {
   return error instanceof DOMException && error.name === "QuotaExceededError";
@@ -257,6 +260,10 @@ function outOfSpace(error: unknown): boolean {
  * write the cut, read it back, then the index entry; a failure before the entry leaves the original
  * named (a stray cut file is swept by finishDueTrims). The pending cut keeps [inS, outS] and `kind`
  * (own: Gem klip; approved: Godkend alle) for clip_accuracy (slice clip-accuracy-log).
+ *
+ * `onlyOriginal` (Godkend alle, review): the range was measured on the original, so under the lock
+ * the clip must still be it: a pending cut, a finished cut or a pending delete returns `failed`
+ * (reason not_original) and nothing is touched; a pending cut is never force-finished then.
  */
 export function startTrim(
   deps: TrimDeps,
@@ -265,15 +272,27 @@ export function startTrim(
   outS: number,
   now: Date,
   kind: TrimKind,
-  opts: { readonly batch?: string } = {},
+  opts: { readonly batch?: string; readonly onlyOriginal?: boolean } = {},
 ): Promise<StartTrimResult> {
-  return lockOf(deps)(id, {}, () => startTrimLocked(deps, id, inS, outS, now, kind, opts.batch));
+  return lockOf(deps)(id, {}, () => startTrimLocked(deps, id, inS, outS, now, kind, opts.batch, opts.onlyOriginal === true));
 }
 
-async function startTrimLocked(deps: TrimDeps, id: string, inS: number, outS: number, now: Date, kind: TrimKind, batch: string | undefined): Promise<StartTrimResult> {
+async function startTrimLocked(
+  deps: TrimDeps,
+  id: string,
+  inS: number,
+  outS: number,
+  now: Date,
+  kind: TrimKind,
+  batch: string | undefined,
+  onlyOriginal: boolean,
+): Promise<StartTrimResult> {
   const cut = deps.cut ?? cutClip;
   try {
     let entry = await deps.index.get(id);
+    if (onlyOriginal && (entry === null || entry.pendingTrim !== undefined || entry.pendingDelete !== undefined || isCut(entry))) {
+      return { kind: "failed", space: false, reason: "not_original" };
+    }
     if (entry?.pendingTrim !== undefined) {
       if ((await finishTrimLocked(deps, id, now, true)) !== "done") return { kind: "failed", space: false };
       entry = await deps.index.get(id);

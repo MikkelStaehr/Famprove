@@ -112,7 +112,7 @@ import { usePublishClips } from "@/components/ClipPlayerHost";
 import { isDebugToggle } from "@/lib/video/debug-log";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
 import { allLabel, type LinePart, lineParts, sheetCloseVia, sheetShouldPush, sheetStaysOnPop, SHEET_HISTORY_STATE } from "@/lib/video/clip-line";
-import { type ApprovableClip, approvableClips, approveAll, type ApproveDeps, finishBatch, pendingTrimBatches, undoBatch } from "@/lib/video/approve-all";
+import { type ApprovableClip, approvableClips, approveAll, type ApproveDeps, batchGuard, finishBatch, pendingTrimBatches, rearmableBatches, undoBatch } from "@/lib/video/approve-all";
 import {
   APPROVE_IDLE,
   approveAllFailedLine,
@@ -271,6 +271,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const currentBatch = useRef<string | null>(null);
   /** clip-approve-all: the batch's line, this phone's last outcomes (the exact rep count) and one finish timer per batch (delete.ts's batchTimers). */
   const [approve, setApprove] = useState<ApproveState>(APPROVE_IDLE);
+  /** The running batch, set synchronously at the tap (review: state would only show it after a render). */
+  const [approveGuard] = useState(batchGuard);
   const [lastRuns, setLastRuns] = useState<Readonly<Record<string, AutoLast>>>({});
   const approveBtn = useRef<HTMLButtonElement | null>(null);
   const approveBatch = useRef<string | null>(null);
@@ -382,7 +384,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   }, [fixture, initialRows, today, delTimers]);
   /** clip-approve-all: re-arm each pending batch's one timer; the newest batch's Fortryd comes back on the line. */
   const rearmApproveRef = useRef((all: readonly ClipIndexEntry[]) => {
-    const batches = pendingTrimBatches(all);
+    const batches = rearmableBatches(all, approveGuard.current()); // a batch still cutting is timed at its end
     for (const b of batches) approveTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime());
     const last = batches.at(-1);
     if (last === undefined || Date.parse(last.deadline) <= new Date().getTime()) return;
@@ -629,7 +631,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       if (s === null) return;
       void s.index.all().then((all) => {
         for (const e of all) if (e.pendingTrim !== undefined && e.pendingTrim.batch === undefined) scheduleFinishRef.current(e.id, e.pendingTrim.deadline);
-        for (const b of pendingTrimBatches(all)) approveTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime());
+        // a batch still cutting is left alone: approveAll aligns its deadline at its end, then runApprove times it (review)
+        for (const b of rearmableBatches(all, approveGuard.current())) approveTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime());
         for (const b of pendingBatches(all)) delTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime());
       });
     };
@@ -638,7 +641,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       document.removeEventListener("visibilitychange", onVis);
       clearAll();
     };
-  }, [delTimers, approveTimers]);
+  }, [delTimers, approveTimers, approveGuard]);
 
   /** §2.3 Gem klip: startTrim; done updates the row (new file, length, no stored range) and times the finish. */
   async function runTrim(id: string, inS: number, outS: number): Promise<StartTrimResult> {
@@ -695,29 +698,34 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   async function runApprove(clips: readonly ApprovableClip[]) {
     const deps = approveDeps();
     const s = store.current;
-    if (deps === null || s === null || clips.length === 0 || approve.kind === "busy") return;
-    setApprove(busyAfter(0, 0, clips.length));
-    setStatus(approveStartAnnouncement(clips.length));
-    for (const c of clips) if (!trimBefore.current.has(c.id)) trimBefore.current.set(c.id, { row: serverById.get(c.id) ?? null, bytes: sizes[c.id] ?? null });
-    const r = await approveAll(deps, clips, () => new Date(), (p) => setApprove(busyAfter(p.done, p.failed, p.total)));
-    for (const f of r.failed) trimBefore.current.delete(f.id);
-    const all = await s.index.all();
-    const cutLen = new Map(all.flatMap((e) => (e.pendingTrim === undefined ? [] : [[e.id, e.pendingTrim.newDurationS] as const])));
-    const cut = new Set(r.done);
-    setRows((rs) => rs?.map((x) => (cut.has(x.id) ? { ...x, durationS: cutLen.get(x.id) ?? x.durationS, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null } : x)) ?? rs);
-    setLocal({ kind: "ready", entries: all });
-    const next = approveResultState(r);
-    setNowMs(new Date().getTime());
-    setApprove(next);
-    if (next.kind === "window") {
-      approveBatch.current = r.batch;
-      setStatus(approveDoneAnnouncement(r.done.length));
-      approveTimers().schedule(r.batch, r.done, next.deadline, new Date().getTime());
-    } else setStatus(approveAllFailedLine(r.failed.length));
-    // §3 Focus: never Fortryd. From the batch's result, not a ref that may still point at the unmounting
-    // button (design-lead): a failed clip stays approvable, so its button; else Alle klip.
-    const target = r.failed.length > 0 ? approveBtn : allBtn;
-    setTimeout(() => target.current?.focus(), 0);
+    if (deps === null || s === null || clips.length === 0) return;
+    // the guard, not React state, stops a double tap: it is set before the first await (review)
+    const batch = crypto.randomUUID();
+    await approveGuard.run(batch, async () => {
+      setApprove(busyAfter(0, 0, clips.length));
+      setStatus(approveStartAnnouncement(clips.length));
+      for (const c of clips) if (!trimBefore.current.has(c.id)) trimBefore.current.set(c.id, { row: serverById.get(c.id) ?? null, bytes: sizes[c.id] ?? null });
+      const r = await approveAll({ ...deps, newBatch: () => batch }, clips, () => new Date(), (p) => setApprove(busyAfter(p.done, p.failed, p.total)));
+      for (const f of r.failed) if (f.notOriginal !== true) trimBefore.current.delete(f.id); // a Gem klip that got there first keeps its own Fortryd
+      const all = await s.index.all();
+      const cutLen = new Map(all.flatMap((e) => (e.pendingTrim === undefined ? [] : [[e.id, e.pendingTrim.newDurationS] as const])));
+      const cut = new Set(r.done);
+      setRows((rs) => rs?.map((x) => (cut.has(x.id) ? { ...x, durationS: cutLen.get(x.id) ?? x.durationS, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null } : x)) ?? rs);
+      setLocal({ kind: "ready", entries: all });
+      const next = approveResultState(r);
+      setNowMs(new Date().getTime());
+      setApprove(next);
+      if (next.kind === "window") {
+        approveBatch.current = r.batch;
+        setStatus(approveDoneAnnouncement(r.done.length));
+        approveTimers().schedule(r.batch, r.done, next.deadline, new Date().getTime());
+      } else setStatus(approveAllFailedLine(r.failed.length));
+      // §3 Focus: never Fortryd. From the batch's result, not a ref that may still point at the unmounting
+      // button (design-lead): a failed clip stays approvable, so its button; else Alle klip.
+      // the button hides while the window is open (review), so it is the target only when no window opened
+      const target = next.kind !== "window" && r.failed.length > 0 ? approveBtn : allBtn;
+      setTimeout(() => (target.current ?? allBtn.current)?.focus(), 0);
+    });
   }
 
   /** §4 Fortryd: every clip of the batch back to its original (local only); the button comes back, focus on it. */
@@ -1062,7 +1070,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const trimsOpen = (entries ?? []).filter((e) => e.pendingTrim !== undefined && e.pendingTrim.batch === undefined && e.id !== open?.id && nowMs > 0 && secondsLeft(e.pendingTrim.deadline, nowMs) > 0);
   /** clip-approve-all §1: N (never while the switch is off: no auto range is trusted then). */
   const approvable = autoOn && rows !== null && entries !== null ? approvableClips(rows, entries, lastRuns, today) : [];
-  const approveN = approveCount(autoOn, approvable.length, approve);
+  const approveN = approveCount(autoOn, approvable.length, approve, nowMs);
   const approveWindow = approve.kind === "window" && nowMs > 0 && secondsLeft(approve.deadline, nowMs) > 0 ? approve : null;
   const approveText = approve.kind === "window" ? (approveWindow === null ? null : approveLineText(approve)) : approveLineText(approve);
   const parts = lineParts({

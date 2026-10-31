@@ -12,7 +12,9 @@ import {
   approveLineText,
   approveResultState,
   type ApproveState,
+  approveShown,
   approveStartAnnouncement,
+  approveWindowOpen,
   busyAfter,
 } from "../src/lib/video/approve-line.ts";
 import { lineParts, type LineInput } from "../src/lib/video/clip-line.ts";
@@ -153,4 +155,19 @@ test("Fortryd inside the window restores every clip of the batch and writes noth
   if (u.kind === "undone") assert.deepEqual(u.restored.toSorted(), [...r.done].toSorted());
   assert.equal(writes.length, 0);
   assert.equal(approvableClips(f.rows, await deps.index.all(), f.autoLast, TODAY).length, 2, "the button comes back with the same N");
+});
+
+test("the button hides while a batch's Fortryd window is open, so a second batch can't replace it", () => {
+  const deadline = "2026-10-31T16:00:10.000Z";
+  const win = { kind: "window", batch: "b", ids: ["x"], deadline, failed: 1 } as const;
+  const before = Date.parse(deadline) - 4000;
+  assert.equal(approveWindowOpen(win, before), true);
+  assert.equal(approveShown(true, 2, win, before), false, "a failed clip is still approvable, but the window is open");
+  assert.equal(approveCount(true, 2, win, before), 0);
+  assert.equal(approveShown(true, 2, win, 0), false, "time not known yet: treated as open");
+  assert.equal(approveShown(true, 2, win), false);
+  assert.equal(approveShown(true, 2, win, Date.parse(deadline)), true, "at 0 the window is over");
+  assert.equal(approveCount(true, 2, win, Date.parse(deadline) + 1), 2);
+  assert.equal(approveShown(true, 2, { kind: "finished", count: 1, freed: null }, before), true);
+  assert.equal(approveShown(true, 2, { kind: "undone", count: 1 }, before), true, "after Fortryd the button comes back");
 });

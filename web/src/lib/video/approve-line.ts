@@ -31,15 +31,27 @@ export function approveBusyLabel(k: number, total: number): string {
   return `Klipper ${k} af ${total} …`;
 }
 
-/** §1/§5: the button shows only with the switch on and N > 0, or while its own batch runs (it keeps its place). */
-export function approveShown(autoOn: boolean, n: number, state: ApproveState): boolean {
-  return state.kind === "busy" || (autoOn && n > 0);
+/**
+ * A batch's Fortryd window still open at `nowMs` (review: a second batch would replace it, so the
+ * button hides while it is). nowMs not known yet (≤ 0, or not given) counts as open.
+ */
+export function approveWindowOpen(state: ApproveState, nowMs?: number): boolean {
+  if (state.kind !== "window") return false;
+  return nowMs === undefined || nowMs <= 0 || Date.parse(state.deadline) > nowMs;
+}
+
+/**
+ * §1/§5: the button shows only with the switch on and N > 0, or while its own batch runs (it keeps its
+ * place); never while a batch's Fortryd window is open.
+ */
+export function approveShown(autoOn: boolean, n: number, state: ApproveState, nowMs?: number): boolean {
+  return state.kind === "busy" || (autoOn && n > 0 && !approveWindowOpen(state, nowMs));
 }
 
 /** The count row 2 gets for the button (lineParts' `approve`); 0 = hidden. */
-export function approveCount(autoOn: boolean, n: number, state: ApproveState): number {
+export function approveCount(autoOn: boolean, n: number, state: ApproveState, nowMs?: number): number {
   if (state.kind === "busy") return state.total;
-  return approveShown(autoOn, n, state) ? n : 0;
+  return approveShown(autoOn, n, state, nowMs) ? n : 0;
 }
 
 /** §2: the progress after `done` + `failed` clips: the next clip being cut, never past the total. */

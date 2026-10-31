@@ -82,8 +82,12 @@ export type ApproveProgress = { readonly done: number; readonly failed: number; 
 export type ApproveAllResult = {
   readonly batch: string;
   readonly done: readonly string[];
-  /** space: the phone was out of space for that clip ("Telefonen mangler plads."). */
-  readonly failed: readonly { readonly id: string; readonly space: boolean }[];
+  /**
+   * space: the phone was out of space for that clip ("Telefonen mangler plads."). notOriginal: the clip
+   * was no longer the untouched original under its lock (a Gem klip in the player got there first):
+   * skipped, and the user's own cut and its Fortryd are left as they are.
+   */
+  readonly failed: readonly { readonly id: string; readonly space: boolean; readonly notOriginal?: true }[];
   /** The batch's one deadline (Fortryd's countdown); null when nothing was cut. */
   readonly deadline: string | null;
 };
@@ -107,19 +111,19 @@ export async function approveAll(
 ): Promise<ApproveAllResult> {
   const batch = deps.newBatch?.() ?? crypto.randomUUID();
   const done: string[] = [];
-  const failed: { id: string; space: boolean }[] = [];
+  const failed: { id: string; space: boolean; notOriginal?: true }[] = [];
   let latest: string | null = null;
   for (const c of clips) {
     let r: Awaited<ReturnType<typeof startTrim>>;
     try {
-      r = await startTrim(deps, c.id, c.inS, c.outS, now(), "approved", { batch });
+      r = await startTrim(deps, c.id, c.inS, c.outS, now(), "approved", { batch, onlyOriginal: true });
     } catch {
       r = { kind: "failed", space: false }; // startTrim catches its own; a lock that throws is one clip's failure too
     }
     if (r.kind === "done") {
       done.push(c.id);
       if (latest === null || Date.parse(r.deadline) > Date.parse(latest)) latest = r.deadline;
-    } else failed.push({ id: c.id, space: r.space });
+    } else failed.push(r.reason === "not_original" ? { id: c.id, space: r.space, notOriginal: true } : { id: c.id, space: r.space });
     onProgress?.({ done: done.length, failed: failed.length, total: clips.length });
   }
   if (latest !== null) await alignDeadlines(deps, done, batch, latest);
@@ -172,6 +176,39 @@ export async function undoBatch(deps: Pick<TrimDeps, "index" | "files" | "lock">
 export async function finishBatch(deps: TrimDeps, ids: readonly string[], now: Date): Promise<Readonly<Record<string, FinishTrimResult>>> {
   const results = await Promise.all(ids.map((id) => finishTrim(deps, id, now).catch((): FinishTrimResult => "failed")));
   return Object.fromEntries(ids.map((id, i) => [id, results[i]]));
+}
+
+/**
+ * One batch at a time (review): the batch's id is set synchronously at the tap, before any await, so a
+ * double tap can't start a second batch (React state would only show it after a render). `current`
+ * is the running batch, so a page coming back mid-batch leaves its timer alone (rearmableBatches).
+ */
+export function batchGuard(): {
+  readonly current: () => string | null;
+  readonly run: <T>(batch: string, fn: () => Promise<T>) => Promise<T | null>;
+} {
+  let current: string | null = null;
+  return {
+    current: () => current,
+    async run<T>(batch: string, fn: () => Promise<T>): Promise<T | null> {
+      if (current !== null) return null;
+      current = batch;
+      try {
+        return await fn();
+      } finally {
+        current = null;
+      }
+    },
+  };
+}
+
+/**
+ * The batches whose one timer a re-arm (page visible again, a reload) sets: every pending batch but
+ * the one still being cut (`running`), whose clips cut so far must not finish before its Fortryd shows;
+ * approveAll aligns its deadline at its end and the library times it then.
+ */
+export function rearmableBatches(entries: readonly ClipIndexEntry[], running: string | null): TrimBatch[] {
+  return pendingTrimBatches(entries).filter((b) => b.batch !== running);
 }
 
 /** One batch's pending cuts (a reload re-arms one timer and one Fortryd per batch); the deadline is the latest. */

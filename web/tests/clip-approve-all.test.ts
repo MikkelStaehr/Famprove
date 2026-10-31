@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { approvableClips, approveAll, type ApproveDeps, finishBatch, pendingTrimBatches, undoBatch } from "../src/lib/video/approve-all.ts";
+import { approvableClips, approveAll, type ApproveDeps, batchGuard, finishBatch, pendingTrimBatches, rearmableBatches, undoBatch } from "../src/lib/video/approve-all.ts";
 import type { AutoLast } from "../src/lib/video/auto-last.ts";
 import type { VideoClipRow } from "../src/lib/video/clips.ts";
 import { clipFile, type ClipIndex, type ClipIndexEntry, memoryClipIndex } from "../src/lib/video/index-store.ts";
@@ -13,8 +13,10 @@ import {
   finishDueTrims,
   memoryLock,
   parseTrimClipInput,
+  startTrim,
   TRIM_UNDO_MS,
   trimInvariant,
+  undoTrim,
   validateTrim,
 } from "../src/lib/video/trim.ts";
 
@@ -286,4 +288,99 @@ test("failure injection: die at every step of the batch and its finish, reload: 
     assert.ok(w.accuracy.every((a) => a.kind === "approved"));
   }
   assert.ok(Number.isFinite(total) && total > 20, `the batch and finish have ${total} steps`);
+});
+
+// --- review fixes ----------------------------------------------------------------------------------
+
+test("race: a Gem klip in the player while the batch runs; the batch then skips that clip and leaves the user's cut and its Fortryd alone", async () => {
+  const w = await world();
+  const lock = memoryLock();
+  const user = IDS[1];
+  const list = clips(w); // the batch's list, read at the tap: all three are untouched originals
+  assert.equal(list.length, 3);
+  let own: Awaited<ReturnType<typeof startTrim>> | null = null;
+  // while the batch cuts its first clip (under that clip's lock), the user saves an own range on another
+  const cut: ApproveDeps["cut"] = async (file, i, o) => {
+    if (own === null) own = await startTrim({ index: w.index, files: w.files, trim: serverTrim(w), cut: fakeCut, lock }, user, 10, 30, at(500), "own");
+    return fakeCut(file, i, o);
+  };
+  const r = await approveAll(deps(w, { cut, lock }), list, clock());
+  assert.equal(own!.kind, "done");
+  assert.deepEqual(r.failed, [{ id: user, space: false, notOriginal: true }], "skipped: no longer the untouched original");
+  assert.equal(r.done.length, 2);
+  const e = await w.index.get(user);
+  assert.deepEqual([e?.pendingTrim?.kind, e?.pendingTrim?.inS, e?.pendingTrim?.outS, e?.pendingTrim?.batch], ["own", 10, 30, undefined], "the user's range, never the auto range");
+  assert.equal(e?.pendingTrim?.deadline, at(500 + TRIM_UNDO_MS).toISOString(), "its own deadline, not the batch's");
+  assert.equal(w.calls, 0, "nothing force-finished, nothing sent");
+  assert.deepEqual(pendingTrimBatches(await w.index.all()).map((b) => b.ids.includes(user)), [false]);
+  const u = await undoTrim({ index: w.index, files: w.files, lock }, user, at(1000));
+  assert.equal(u.kind, "undone", "the user's Fortryd still works");
+  assert.deepEqual(await bytes(w.files, `${user}.mp4`), [...originalBytes(1)]);
+  assert.deepEqual(trimInvariant(await w.index.all(), await w.files.names()), []);
+});
+
+test("startTrim onlyOriginal: a pending cut, a finished cut or a pending delete is not_original and untouched; without it a pending cut is still finished first", async () => {
+  const pending = { deadline: at(TRIM_UNDO_MS).toISOString(), originalFileName: `${IDS[0]}.mp4`, originalDurationS: 50, newDurationS: 30, inS: 10, outS: 30, kind: "own" as const };
+  const cases: { name: string; over: Partial<ClipIndexEntry> }[] = [
+    { name: "a cut pending", over: { fileName: `${IDS[0]}.cut.mp4`, durationS: 30, pendingTrim: pending } },
+    { name: "already cut", over: { fileName: `${IDS[0]}.cut.mp4`, durationS: 30 } },
+    { name: "a delete pending", over: { pendingDelete: { deadline: at(TRIM_UNDO_MS).toISOString(), batch: "d" } } },
+  ];
+  for (const c of cases) {
+    const w = await world();
+    await w.files.writeFile(`${IDS[0]}.cut.mp4`, new Blob([originalBytes(0).slice(0, 30)]));
+    const before = entry(IDS[0], c.over);
+    await w.index.put(before);
+    const r = await startTrim(deps(w), IDS[0], 4.2, 39.6, at(1000), "approved", { batch: "b", onlyOriginal: true });
+    assert.deepEqual(r, { kind: "failed", space: false, reason: "not_original" }, c.name);
+    assert.deepEqual(await w.index.get(IDS[0]), before, `${c.name}: entry untouched`);
+    assert.equal(w.calls, 0, `${c.name}: no finish sent`);
+  }
+  const w = await world();
+  await w.files.writeFile(`${IDS[0]}.cut.mp4`, new Blob([originalBytes(0).slice(0, 30)]));
+  await w.index.put(entry(IDS[0], cases[0].over));
+  const r = await startTrim(deps(w), IDS[0], 4.2, 20, at(1000), "own");
+  assert.equal(r.kind, "done", "Gem klip in the player keeps its second-cut behaviour");
+  assert.equal(w.calls, 1, "the first cut was finished first");
+});
+
+test("batchGuard: a double tap starts one batch; current is the running batch until it ends", async () => {
+  const g = batchGuard();
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  let runs = 0;
+  const first = g.run("b1", async () => {
+    runs += 1;
+    await gate;
+    return "one";
+  });
+  assert.equal(g.current(), "b1", "set synchronously at the tap");
+  assert.equal(await g.run("b2", async () => ((runs += 1), "two")), null, "the second tap does nothing");
+  release();
+  assert.equal(await first, "one");
+  assert.equal(runs, 1);
+  assert.equal(g.current(), null);
+  await assert.rejects(g.run("b3", async () => Promise.reject(new Error("x"))));
+  assert.equal(g.current(), null, "a throw frees it");
+});
+
+test("rearmableBatches: a page coming back mid-batch leaves the running batch's clips alone, re-arms the others", async () => {
+  const w = await world();
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  let n = 0;
+  const cut: ApproveDeps["cut"] = async (file, i, o) => {
+    if ((n += 1) === 2) await gate; // hold the batch on its second clip
+    return fakeCut(file, i, o);
+  };
+  const running = approveAll(deps(w, { cut, newBatch: () => "batch-run" }), clips(w), clock());
+  while (n < 2) await new Promise((r) => setTimeout(r, 0));
+  const mid = await w.index.all();
+  assert.equal(pendingTrimBatches(mid).length, 1, "the first clip is cut and pending");
+  assert.deepEqual(rearmableBatches(mid, "batch-run"), [], "visible again mid-batch: no timer for it");
+  const older = { deadline: at(5000).toISOString(), originalFileName: "o.mp4", originalDurationS: 50, newDurationS: 30, batch: "batch-old" };
+  assert.deepEqual(rearmableBatches([...mid, entry("old", { pendingTrim: older })], "batch-run").map((b) => b.batch), ["batch-old"], "an older batch still re-arms");
+  assert.deepEqual(rearmableBatches(mid, null).map((b) => b.batch), ["batch-run"], "after the batch: re-armed as before");
+  release();
+  await running;
 });
