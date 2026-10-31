@@ -43,6 +43,8 @@ export type LibraryRow = {
   readonly sr: string; // the row button's accessible name
   /** `gemt ✓` (slice clip-delete): saved or shared from the app; absent = not. */
   readonly saved?: boolean;
+  /** clip-retention: when it first got `gemt ✓` (the 24 h rule's start); absent = not saved or not stamped yet. */
+  readonly savedAt?: string;
 };
 
 /**
@@ -194,7 +196,7 @@ export function libraryRows(
       out.push({
         id: e.id, kind: afbrudt ? "afbrudt" : "clip", ext: e.ext, file: clipFile(e), files: clipFiles(e), ...nm, date,
         session: r?.session ?? e.setKey.sessionNo, sheetRow: r?.row ?? e.setKey.row, set, durationS,
-        starred: !afbrudt && e.starred, starUnsynced, recordedAt: r?.recordedAt ?? e.recordedAt, meta, saved: e.savedOut === true,
+        starred: !afbrudt && e.starred, starUnsynced, recordedAt: r?.recordedAt ?? e.recordedAt, meta, saved: e.savedOut === true, ...(e.savedAt === undefined ? {} : { savedAt: e.savedAt }),
         sr: `Afspil ${label}, sæt ${set}, ${clipDayLong(date)}${durationS === null ? "" : `, ${spokenDuration(durationS)}`}${afbrudt ? ", afbrudt" : ""}.`,
       });
     }

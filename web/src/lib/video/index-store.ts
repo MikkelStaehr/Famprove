@@ -44,6 +44,8 @@ export type ClipIndexEntry = {
   readonly pendingDelete?: PendingDelete;
   /** `gemt ✓` (slice clip-delete): handed to Downloads (Gem, Gem alle) or a share that resolved. Local only; absent = not. */
   readonly savedOut?: boolean;
+  /** When the clip first got `gemt ✓` (slice clip-retention): its 24 h start here; a later save keeps it. Absent = not saved, or saved before the slice (stamped at the next open). */
+  readonly savedAt?: string;
 };
 
 /** A delete inside Fortryd's window: until `deadline` the clip is only hidden; `batch` groups one tap's clips (one Fortryd). */

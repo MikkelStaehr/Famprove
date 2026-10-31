@@ -55,11 +55,29 @@ import { WarningLine } from "@/components/WarningLine";
 import type { IsoDate } from "@/lib/db/rows";
 import { type DeleteClipResult, PERMANENT_SAVE_REFUSALS, type VideoClipRow } from "@/lib/video/clips";
 import { cleanupPlan } from "@/lib/video/cleanup";
+import {
+  DEFAULT_KEEP_WEEKS,
+  declineRetention,
+  deleteInText,
+  deleteNow,
+  KEEP_CHOICES,
+  type KeepWeeks,
+  nextCleanupLine,
+  readRetention,
+  RETENTION_RUN_KEY,
+  retentionCleanupLine,
+  retentionPrompt,
+  retentionRunDue,
+  selectionIds,
+  selectRetention,
+  setKeepWeeks,
+  spaceRule,
+  subscribeRetention,
+} from "@/lib/video/retention";
 import { type ClipIndex, type ClipIndexEntry, clipFile, clipFiles, memoryClipIndex } from "@/lib/video/index-store";
 import { indexedDbClipIndex } from "@/lib/video/index-store-browser";
 import { FIXTURE_CLIP_BYTES, FIXTURE_SAVED, fixturePlayhead } from "@/lib/video/library-fixture";
 import {
-  cleanupDue,
   cleanupLine,
   type ClipNames,
   type RunSets,
@@ -131,7 +149,6 @@ import {
 
 const NO_LIFTS: Readonly<Record<string, ClipLiftMeta>> = {};
 
-const CLEANUP_KEY = "famprove.clips.cleanup";
 const BTN = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
 /** Resolves once the page is visible again, or the signal aborts. */
@@ -234,6 +251,10 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const [space, setSpace] = useState<{ quota: number | undefined; persisted: boolean | null }>({ quota: undefined, persisted: null });
   const [sizes, setSizes] = useState<Record<string, number | null>>({});
   const [cleaned, setCleaned] = useState<number>(0);
+  /** clip-retention §4: clips the new rules deleted silently on this open. */
+  const [retCleaned, setRetCleaned] = useState<number>(0);
+  /** clip-retention §2: a keep time picked in the sheet before the rules are on (its confirm shows there). */
+  const [pick, setPick] = useState<KeepWeeks | null>(null);
   const [status, setStatus] = useState("");
   /** clip-line §2: the Alle klip sheet. */
   const [sheet, setSheet] = useState(false);
@@ -320,7 +341,10 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         for (const e of fixture.local) await store.current.files.writeFile(clipFile(e), new Blob([new Uint8Array(32)])); // clip-trim §6: the simulated cut reads a placeholder
         setFiles(store.current.files);
         setLastRuns(fixture.autoLast ?? {});
-        await markSaved({ index: store.current.index }, FIXTURE_SAVED); // clip-delete §4: through Gem's own setter
+        // clip-delete §4: through Gem's own setter; clip-retention's shots: the newest saved 6 h ago, the next 30 h ago.
+        const fixNow = Date.now();
+        await markSaved({ index: store.current.index }, FIXTURE_SAVED.slice(0, 1), new Date(fixNow - 6 * 3_600_000 + 300_000));
+        await markSaved({ index: store.current.index }, FIXTURE_SAVED.slice(1), new Date(fixNow - 30 * 3_600_000));
         setLocal({ kind: "ready", entries: await store.current.index.all() });
         setSizes(Object.fromEntries(fixture.local.map((e) => [e.id, FIXTURE_CLIP_BYTES])));
         return;
@@ -354,8 +378,26 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         const r = await starClip({ id: e.id, starred: e.starred });
         if (r.ok && r.found) await s.index.put({ ...e, starSynced: true });
       }
-      const last = window.localStorage.getItem(CLEANUP_KEY);
-      if (initialRows !== null && cleanupDue(last, today)) {
+      // clip-retention §1: a clip marked gemt ✓ before the slice starts its 24 h now, never at once.
+      const unstamped = entries.filter((e) => e.savedOut === true && e.savedAt === undefined).map((e) => e.id);
+      if (unstamped.length > 0) await markSaved({ index: s.index }, unstamped);
+      entries = await s.index.all();
+      const ret = readRetention(switchStore());
+      if (ret.kind === "unasked" && selectionIds(selectRetention(notPendingDelete(entries), initialRows, new Date(), DEFAULT_KEEP_WEEKS)).length === 0) setKeepWeeks(switchStore(), DEFAULT_KEEP_WEEKS); // §4: N = 0 switches on silently
+      const retNow = readRetention(switchStore());
+      const lastRun = window.localStorage.getItem(RETENTION_RUN_KEY);
+      if (retNow.kind === "on" && retentionRunDue(lastRun, Date.now())) {
+        // §1: the new rules, silently (no Fortryd, §5), through clip-delete's flow; the server's 8-week rule stays the maximum.
+        const ids = selectionIds(selectRetention(notPendingDelete(entries), initialRows, new Date(), retNow.weeks));
+        const batch = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `retention-${Date.now()}`;
+        const r = await deleteNow({ index: s.index, files: s.files, del: (i) => tryDeleteClip(i.id) }, ids, batch, new Date());
+        const serverOnly = initialRows === null ? [] : cleanupPlan(entries, initialRows, new Date()).deleteServerOnly;
+        for (const id of serverOnly) await tryDeleteClip(id);
+        const gone = new Set([...r.done, ...serverOnly, ...dueDeletes.finished]);
+        setRows((rs) => (rs ?? initialRows)?.filter((x) => !gone.has(x.id)) ?? rs);
+        setRetCleaned(r.done.length);
+        window.localStorage.setItem(RETENTION_RUN_KEY, String(Date.now()));
+      } else if (retNow.kind !== "on" && initialRows !== null && retentionRunDue(lastRun, Date.now())) {
         const plan = cleanupPlan(entries, initialRows, new Date());
         const removed: string[] = [];
         for (const e of notPendingDelete(plan.deleteLocal)) {
@@ -367,7 +409,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         const gone = new Set([...removed, ...plan.deleteServerOnly, ...dueDeletes.finished]);
         setRows(initialRows.filter((r) => !gone.has(r.id)));
         setCleaned(removed.length);
-        window.localStorage.setItem(CLEANUP_KEY, today);
+        window.localStorage.setItem(RETENTION_RUN_KEY, String(Date.now()));
       }
       entries = await s.index.all();
       setLastRuns(readAutoLast(browserStore()));
@@ -381,7 +423,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       console.error("optagelser: reading the clip index failed", error);
       setLocal({ kind: "error" });
     }
-  }, [fixture, initialRows, today, delTimers]);
+  }, [fixture, initialRows, delTimers]);
   /** clip-approve-all: re-arm each pending batch's one timer; the newest batch's Fortryd comes back on the line. */
   const rearmApproveRef = useRef((all: readonly ClipIndexEntry[]) => {
     const batches = rearmableBatches(all, approveGuard.current()); // a batch still cutting is timed at its end
@@ -433,6 +475,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   // Keyed on the index being read, never on rows: the run's own outcome updates rows.
   // clip-auto-park / clip-auto-on: the switch (on by default since 2026-10-31), read after hydration (the server's snapshot is off).
   const autoOn = useSyncExternalStore(subscribeAutoClip, readAutoClip, () => false);
+  const retention = useSyncExternalStore(subscribeRetention, readRetentionBrowser, readRetentionServer);
   const readyEntries = local.kind === "ready" ? local.entries : null;
   const ready = readyEntries !== null;
   const entriesNow = useRef<readonly ClipIndexEntry[] | null>(null);
@@ -895,6 +938,23 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
    * Slet (one clip) and Slet gemte (a batch): mark, hide, open Fortryd's window, time the finish.
    * "starred": nothing marked because ★ was set after the render (the player then shows its confirm).
    */
+  /** clip-retention §4: Slet N switches the rules on and deletes the clips as one batch with Fortryd (clip-delete's flow). */
+  async function confirmRetention(ids: readonly string[], weeks: KeepWeeks) {
+    setKeepWeeks(switchStore(), weeks);
+    setPick(null);
+    window.localStorage.setItem(RETENTION_RUN_KEY, String(new Date().getTime()));
+    const want = new Set(ids);
+    await startDeleteRows(list.filter((r) => want.has(r.id)), false);
+  }
+
+  /** clip-retention §2: a pick while the rules are off opens the confirm (N = 0 switches on silently). */
+  function pickKeepWeeks(w: KeepWeeks) {
+    if (retention.kind === "on" || entries === null || selectionIds(selectRetention(entries, rows, new Date(), w)).length === 0) {
+      setKeepWeeks(switchStore(), w);
+      setPick(null);
+    } else setPick(w);
+  }
+
   async function startDeleteRows(targets: readonly LibraryRow[], viaPlayer: boolean, allowStarred = false): Promise<"started" | "starred" | "none"> {
     const deps = deleteDeps();
     const s = store.current;
@@ -1063,7 +1123,36 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const shown = list; // clip-line §2: the sheet lists every row (no Vis alle)
   /** The open clip as the list has it now (a cut changes its file and length, clip-trim §2.3). */
   const openRow = open === null ? null : (list.find((r) => r.id === open.id) ?? open);
-  const line = cleanupLine(cleaned);
+  const line = retentionCleanupLine(retCleaned) ?? cleanupLine(cleaned);
+  // clip-retention §2/§4: the confirm's N (the default 2 uger before the first answer, or the time picked in the sheet).
+  const retOn = retention.kind === "on";
+  const askWeeks: KeepWeeks | null = retOn ? null : (pick ?? (retention.kind === "unasked" ? DEFAULT_KEEP_WEEKS : null));
+  const askSel = askWeeks !== null && entries !== null && local.kind === "ready" ? selectRetention(entries, rows, new Date(), askWeeks) : null;
+  const askIds = askSel === null ? [] : selectionIds(askSel);
+  const nextN = retOn && entries !== null ? selectionIds(selectRetention(entries, rows, new Date(), retention.weeks)).length : 0;
+  const askBox =
+    askSel !== null && askWeeks !== null && askIds.length > 0 ? (
+      <div role="group" aria-label="Oprydning" className="mt-1 flex flex-col gap-1">
+        <p className="font-sans text-13 text-text">{retentionPrompt(askSel.old.length, askSel.saved.length, askWeeks)}</p>
+        <div className="flex flex-wrap items-center gap-x-4">
+          <button type="button" className={`${QUIET_BTN} rounded-button border border-border bg-raised px-3`} onClick={() => void confirmRetention(askIds, askWeeks)}>
+            <Icon name="trash" size={16} className="text-text-muted" />
+            {`Slet ${askIds.length}`}
+          </button>
+          <button
+            type="button"
+            className={`${QUIET_BTN} text-text-muted`}
+            onClick={() => {
+              declineRetention(switchStore());
+              setPick(null);
+              setTimeout(() => allBtn.current?.focus(), 0);
+            }}
+          >
+            Ikke nu
+          </button>
+        </div>
+      </div>
+    ) : null;
   const deletable = entries === null ? [] : savedDeletable(entries);
   const saveCount = rest.length > 0 ? rest.length : today_.length;
   /** clip-line §3: a cut's Fortryd once its player has closed. */
@@ -1262,6 +1351,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     <section aria-label="Optagelser" className="-mt-1 px-5 lg:col-start-1 lg:-mt-2">
       <div className="flex flex-wrap items-center gap-x-4">{parts.row1.map(part)}</div>
       {parts.row2.length > 0 && <div className="flex flex-wrap items-center gap-x-4">{parts.row2.map(part)}</div>}
+      {!sheet && askBox}
       {parts.status === "line" && statusRow}
       {!autoOn && (
         <span id="auto-clip-off-line" className="sr-only">
@@ -1271,13 +1361,33 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       {overview !== null && <ClipSummary items={summaryItems(list, serverById, overview)} onClose={closeOverview} />}
       {sheet && (
         <ClipSheet count={list.length} onClose={requestCloseSheet} onPopped={closeSheet} playerOpen={open !== null} footer={parts.status === "sheet" ? statusRow : null}>
+          {askBox !== null && <div className="mb-2">{askBox}</div>}
           {usedText !== null && quotaText !== null && entries !== null && (
             <p className="font-mono text-12 text-text-muted tabular-nums">
-              {usedText} af {quotaText} · ældre end 8 uger slettes automatisk (
+              {usedText} af {quotaText} · {spaceRule(retention).text}
               <Icon name="star" size={16} className="inline size-3 align-[-1px]" />
               <span className="sr-only">stjernemarkerede</span> beholdes)
             </p>
           )}
+          <fieldset className="mt-2">
+            <legend className="font-sans text-13 text-text-muted">Behold klip i</legend>
+            <div className="mt-1 flex gap-1">
+              {KEEP_CHOICES.map((w) => {
+                const checked = retOn ? retention.weeks === w : pick === w;
+                return (
+                  <label
+                    key={w}
+                    className={`flex min-h-11 min-w-11 flex-1 cursor-pointer items-center justify-center rounded-button px-2 font-sans text-13 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus ${checked ? "bg-raised text-text" : "text-text-muted"}`}
+                  >
+                    <input type="radio" name="keep-weeks" value={w} checked={checked} onChange={() => pickKeepWeeks(w)} className="sr-only" />
+                    {w === 1 ? "1 uge" : `${w} uger`}
+                  </label>
+                );
+              })}
+            </div>
+            {retOn && nextCleanupLine(nextN) !== null && <p className="mt-1 font-sans text-13 text-text-muted">{nextCleanupLine(nextN)}</p>}
+            {!retOn && pick === null && <p className="mt-1 font-sans text-13 text-text-muted">Vælg en tid for at slå den nye oprydning til.</p>}
+          </fieldset>
           {list.length === 0 && local.kind === "ready" && <AutoClipSwitch on={autoOn} />}
           {list.length > 0 && !autoOn && <p className="mt-2 font-sans text-13 text-text-muted">Slået fra. Klip med Start her og Slut her i afspilleren.</p>}
           {space.persisted === false && entries !== null && (
@@ -1312,6 +1422,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
                 <ClipRow
                   key={row.id}
                   row={row}
+                  deleteIn={deleteInText({ savedOut: row.saved, savedAt: row.savedAt, starred: row.starred }, new Date(), retOn)}
                   word={row.kind === "clip" ? autoMetaWord(row.ext, serverById.get(row.id) ?? null, running?.id === row.id, inPickupWindow(row.recordedAt, new Date()), autoOn) : null}
                   onOpen={(el) => {
                     opener.current = el;
@@ -1338,6 +1449,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         <Player
           key={open.id}
           row={openRow}
+          deleteIn={deleteInText({ savedOut: openRow.saved, savedAt: openRow.savedAt, starred: openRow.starred }, new Date(), retOn)}
           onTrim={(inS, outS) => runTrim(open.id, inS, outS)}
           onUndoTrim={() => runUndoTrim(open.id)}
           finished={open.id in finishedTrims ? (finishedTrims[open.id] ?? null) : undefined}
@@ -1390,12 +1502,15 @@ function NameStack({ row }: { readonly row: LibraryRow }) {
 
 function ClipRow({
   row,
+  deleteIn,
   word,
   onOpen,
   onStar,
   onDelete,
 }: {
   readonly row: LibraryRow;
+  /** clip-retention §3: `slettes om 18 t` on an unstarred gemt ✓ clip while the rules are on; null = none. */
+  readonly deleteIn: { readonly text: string; readonly sr: string } | null;
   /** clip-auto §2: the word after the duration (`klippet`, `auto-klippet`, `klip selv`, `venter på klip`, `klipper …`); null = none. */
   readonly word: string | null;
   readonly onOpen: (el: HTMLElement) => void;
@@ -1407,6 +1522,12 @@ function ClipRow({
       {row.meta}
       {word !== null && ` ·\u00a0${word}`}{/* the dot wraps with its word (design-lead) */}
       {row.saved === true && " ·\u00a0gemt ✓"}
+      {deleteIn !== null && (
+        <>
+          <span aria-hidden="true">{` ·\u00a0${deleteIn.text}`}</span>
+          <span className="sr-only">{`, gemt eller delt fra appen, ${deleteIn.sr}`}</span>
+        </>
+      )}
       {row.starUnsynced && <span className="text-11"> · ikke synkroniseret</span>}
     </MonoCaption>
   );
@@ -1445,6 +1566,14 @@ function ClipRow({
       )}
     </li>
   );
+}
+
+/** clip-retention: the keep time's snapshots (this phone's localStorage; the server has none: unasked). */
+function readRetentionBrowser() {
+  return readRetention(switchStore());
+}
+function readRetentionServer() {
+  return readRetention(null);
 }
 
 /** clip-auto-park: the switch's snapshot (this phone's localStorage). */
@@ -1580,6 +1709,7 @@ function ClipSheet({
 
 function Player({
   row,
+  deleteIn,
   onTrim,
   onUndoTrim,
   finished,
@@ -1602,6 +1732,8 @@ function Player({
   onDelete,
 }: {
   readonly row: LibraryRow;
+  /** clip-retention §3: as on the row. */
+  readonly deleteIn: { readonly text: string; readonly sr: string } | null;
   /** clip-trim §2.3: Gem klip's cut (startTrim at the library); never throws. */
   readonly onTrim: (inS: number, outS: number) => Promise<StartTrimResult>;
   /** §3 Fortryd (undoTrim, local only). */
@@ -1949,8 +2081,8 @@ function Player({
             {row.meta}
             {row.saved === true && (
               <>
-                <span aria-hidden="true"> ·&nbsp;gemt ✓</span>
-                <span className="sr-only">, gemt eller delt fra appen</span>
+                <span aria-hidden="true"> ·&nbsp;gemt ✓{deleteIn !== null && ` ·\u00a0${deleteIn.text}`}</span>
+                <span className="sr-only">, gemt eller delt fra appen{deleteIn !== null && `, ${deleteIn.sr}`}</span>
               </>
             )}
           </MonoCaption>

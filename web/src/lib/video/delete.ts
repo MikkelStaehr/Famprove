@@ -196,11 +196,12 @@ export function cleanupRemoveLocal(deps: Pick<DeleteDeps, "index" | "files" | "l
 }
 
 /** `gemt ✓`'s setter (Gem, Gem alle, a resolved share; the fixture uses it too). Under the lock, so a cut's put keeps it. */
-export async function markSaved(deps: Pick<DeleteDeps, "index" | "lock">, ids: readonly string[]): Promise<void> {
+export async function markSaved(deps: Pick<DeleteDeps, "index" | "lock">, ids: readonly string[], now: Date = new Date()): Promise<void> {
   for (const id of ids) {
     await lockOf(deps)(id, {}, async () => {
       const e = await deps.index.get(id);
-      if (e !== null && e.savedOut !== true) await deps.index.put({ ...e, savedOut: true });
+      // clip-retention: savedAt is the first save's time; a later save doesn't extend it.
+      if (e !== null && (e.savedOut !== true || e.savedAt === undefined)) await deps.index.put({ ...e, savedOut: true, savedAt: e.savedAt ?? now.toISOString() });
     });
   }
 }
