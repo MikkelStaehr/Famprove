@@ -34,15 +34,14 @@ test("autoClipOn (clip-auto-on): absent = on, \"off\" = off, another value on; u
   assert.equal(autoClipOn(null), false, "no storage");
 });
 
-test("autoClipOn (clip-auto-on): the old key is ignored and removed, so a phone left off by the park turns on once", () => {
+test("autoClipOn (clip-auto-on): the old key is ignored, so a phone left off by the park turns on once; a read never writes", () => {
   const parked = memory({ [OLD_AUTO_CLIP_KEY]: "on" });
   assert.equal(autoClipOn(parked), true, "the old \"on\" doesn't matter");
-  assert.equal(parked.getItem(OLD_AUTO_CLIP_KEY), null, "removed");
+  assert.equal(parked.getItem(OLD_AUTO_CLIP_KEY), "on", "a read (getSnapshot) leaves storage as it was (review)");
   const offByPark = memory(); // the park's off = the old key absent
   assert.equal(autoClipOn(offByPark), true, "on once");
   const oldOther = memory({ [OLD_AUTO_CLIP_KEY]: "off", [AUTO_CLIP_KEY]: "off" });
   assert.equal(autoClipOn(oldOther), false, "the new key decides");
-  assert.equal(oldOther.getItem(OLD_AUTO_CLIP_KEY), null);
   assert.equal(autoClipOn({ getItem: (k) => (k === OLD_AUTO_CLIP_KEY ? "on" : null) }), true, "a store without removeItem still reads");
 });
 
