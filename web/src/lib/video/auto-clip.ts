@@ -21,7 +21,7 @@ import { isClipId } from "./clips.ts";
  * The analysis's version (slice clip-auto-2): the pickup re-runs a clip analysed with an older one
  * (lib/video/auto-version.ts). Raise it whenever findLift's result can change.
  */
-export const ALGO_VERSION = 3;
+export const ALGO_VERSION = 4; // 4: PAD_S 0.5 → 1.0 (slice clip-auto-on, user 2026-10-31)
 
 /**
  * Every threshold of the automatic clip, in one place: slice clip-accuracy tunes them against
@@ -36,8 +36,8 @@ export const AUTO_CLIP = {
   PROMINENCE_SHARE: 0.4,
   /** Two reps' peaks are at least this far apart (s). */
   PEAK_MIN_GAP_S: 1.0,
-  /** Padding before the first rep's start and after the last rep's end (s). */
-  PAD_S: 0.5,
+  /** Padding before the first rep's start and after the last rep's end (s); 1.0 since slice clip-auto-on (user 2026-10-31, was 0.5). */
+  PAD_S: 1.0,
   /** The rest band: a rep starts and ends within this share of the range above its local rest level. */
   BAND_SHARE: 0.15,
   /**

@@ -1,17 +1,27 @@
 /**
- * The automatic clip's switch (slice clip-auto-park, user 2026-10-20): parked, off by default.
- * localStorage `famprove.clips.autoClip` = "on" turns it on; absent, any other value or an
- * unreadable storage is off. Off: no pickup, no analysis after Stop, no auto words, auto ranges
- * ignored in the cut. Storage is injected, so node tests it.
+ * The automatic clip's switch (slice clip-auto-park, user 2026-10-20; on by default again since
+ * slice clip-auto-on, user 2026-10-31). localStorage `famprove.clips.autoClipV2` = "off" turns it
+ * off; absent or any other value is on, so a phone left off by the park turns on once. The old key
+ * `famprove.clips.autoClip` is ignored and removed. Unreadable or no storage is off (nothing can
+ * be recorded about the clip then). Off: no pickup, no analysis after Stop, no auto words, auto
+ * ranges ignored in the cut. Storage is injected, so node tests it.
  */
 import type { KeyStore } from "./auto-version.ts";
 
-export const AUTO_CLIP_KEY = "famprove.clips.autoClip";
+export const AUTO_CLIP_KEY = "famprove.clips.autoClipV2";
+/** The parked switch's key (absent = off): ignored, and removed where the storage allows. */
+export const OLD_AUTO_CLIP_KEY = "famprove.clips.autoClip";
 
-/** The switch: on only when the key reads "on". */
-export function autoClipOn(store: Pick<Storage, "getItem"> | null): boolean {
+/** The switch: on unless the key reads "off"; the old key is ignored (and removed when the store can). */
+export function autoClipOn(store: (Pick<Storage, "getItem"> & Partial<Pick<Storage, "removeItem">>) | null): boolean {
+  if (store === null) return false;
   try {
-    return store?.getItem(AUTO_CLIP_KEY) === "on";
+    if (store.removeItem !== undefined && store.getItem(OLD_AUTO_CLIP_KEY) !== null) store.removeItem(OLD_AUTO_CLIP_KEY);
+  } catch {
+    // ignored: the old key is never read
+  }
+  try {
+    return store.getItem(AUTO_CLIP_KEY) !== "off";
   } catch {
     return false;
   }
@@ -19,12 +29,13 @@ export function autoClipOn(store: Pick<Storage, "getItem"> | null): boolean {
 
 const listeners = new Set<() => void>();
 
-/** Stores the switch ("on", or the key removed) and tells subscribers; a blocked storage is ignored (it then stays off). */
+/** Stores the switch (the key removed = on, or "off") and tells subscribers; a blocked storage is ignored (the switch then reads as before). */
 export function setAutoClipOn(store: (KeyStore & Pick<Storage, "removeItem">) | null, on: boolean): void {
   try {
     if (store !== null) {
-      if (on) store.setItem(AUTO_CLIP_KEY, "on");
-      else store.removeItem(AUTO_CLIP_KEY);
+      store.removeItem(OLD_AUTO_CLIP_KEY);
+      if (on) store.removeItem(AUTO_CLIP_KEY);
+      else store.setItem(AUTO_CLIP_KEY, "off");
     }
   } catch {
     // ignored: see above

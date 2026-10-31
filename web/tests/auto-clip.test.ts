@@ -71,7 +71,7 @@ function series(spec: Spec): PoseFrame[] {
 }
 
 const STARTS = [3, 6, 9, 12, 15];
-/** Truth for the 5-rep series: the first rep's start − 0.5 and the last rep's end + 0.5. */
+/** Truth for the 5-rep series: the first rep's start − PAD_S (1.0) and the last rep's end + PAD_S. */
 const TRUTH = { inS: STARTS[0] - AUTO_CLIP.PAD_S, outS: STARTS[4] + REP_S + AUTO_CLIP.PAD_S };
 const reps5 = (rest: number, amp: number, starts = STARTS) => (t: number) => rest + amp * starts.reduce((s, t0) => s + repShape(t, t0), 0);
 
@@ -90,6 +90,15 @@ function assertClipped(result: ReturnType<typeof findLift>, joint: Joint, reps: 
 test("squat, 5 reps from the side: hips, in/out within 0.2 s", () => {
   const frames = series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips", "knees"] });
   assertClipped(findLift(frames, 5, "lower", 20), "hips", 5);
+});
+
+test("clip-auto-on: the synthetic squat's in/out carry the 1.0 s margin (first rep 3.0 → in 2.0, last rep end 17.2 → out 18.2)", () => {
+  assert.equal(AUTO_CLIP.PAD_S, 1.0);
+  const r = findLift(series({ durationS: 20, y: reps5(0.45, 0.2), moving: ["hips", "knees"] }), 5, "lower", 20);
+  assertClipped(r, "hips", 5, { inS: 2.0, outS: 18.2 });
+  const near = findLift(series({ durationS: 17.8, y: reps5(0.45, 0.2), moving: ["hips", "knees"] }), 5, "lower", 17.8);
+  assert.equal(near.status, "clipped", JSON.stringify(near));
+  if (near.status === "clipped") assert.ok(near.outS <= 17.8, `out ${near.outS} clamped to the duration`);
 });
 
 test("squat at pose-run's default 5 fps", () => {
@@ -261,8 +270,8 @@ test("clip-auto-2: one rep after a walk-out and before a re-rack", () => {
   const r = findLift(series({ durationS: 14, y, moving: ["hips", "knees"] }), 1, "lower", 14);
   assert.equal(r.status, "clipped", JSON.stringify(r));
   if (r.status === "clipped") {
-    assert.ok(Math.abs(r.inS - 5.5) <= 0.3 + 1e-9, `in ${r.inS}`);
-    assert.ok(Math.abs(r.outS - 8.7) <= 0.3 + 1e-9, `out ${r.outS}`);
+    assert.ok(Math.abs(r.inS - 5.0) <= 0.3 + 1e-9, `in ${r.inS}`); // clip-auto-on: 5.5 − 0.5 (PAD_S 1.0)
+    assert.ok(Math.abs(r.outS - 9.2) <= 0.3 + 1e-9, `out ${r.outS}`); // 8.7 + 0.5
   }
 });
 
@@ -280,7 +289,7 @@ test("clip-auto-2: found = expected clips even with a rep 3× the others; off by
   assert.equal(trace.repLengths?.length, 5);
   assert.ok(trace.repLengths !== null && Math.abs(trace.repLengths[2] / trace.repLengths[0] - 3) < 0.3, JSON.stringify(trace.repLengths));
   assert.ok(trace.reps !== null && trace.reps.every((r) => r.start < r.peak && r.peak < r.end));
-  assert.equal(ALGO_VERSION, 3);
+  assert.equal(ALGO_VERSION, 4);
 });
 
 test("diagnoseLift follows findLift: the same status and reason on every synthetic series", () => {

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { ALGO_VERSION } from "../src/lib/video/auto-clip.ts";
 import { autoMetaWord, editLabel, pickupQueue, PLAYER_WAITING_LINE, playerAutoLine } from "../src/lib/video/auto-lines.ts";
-import { analysesAfterStop, AUTO_CLIP_KEY, autoClipOn, setAutoClipOn, subscribeAutoClip } from "../src/lib/video/auto-switch.ts";
+import { analysesAfterStop, AUTO_CLIP_KEY, autoClipOn, OLD_AUTO_CLIP_KEY, setAutoClipOn, subscribeAutoClip } from "../src/lib/video/auto-switch.ts";
 import { markIn, markRange } from "../src/lib/video/clip-mark.ts";
 import { startRange } from "../src/lib/video/clip-range.ts";
 import type { VideoClipRow } from "../src/lib/video/clips.ts";
@@ -24,30 +25,45 @@ function memory(init: Record<string, string> = {}): Storage {
 }
 const throwing = { getItem: (): string | null => { throw new Error("blocked"); } };
 
-test("autoClipOn: on only for \"on\"; absent, another value, unreadable or no storage = off", () => {
-  assert.equal(autoClipOn(memory()), false, "absent");
-  assert.equal(autoClipOn(memory({ [AUTO_CLIP_KEY]: "on" })), true);
-  assert.equal(autoClipOn(memory({ [AUTO_CLIP_KEY]: "true" })), false, "another value");
+test("autoClipOn (clip-auto-on): absent = on, \"off\" = off, another value on; unreadable or no storage = off", () => {
+  assert.equal(AUTO_CLIP_KEY, "famprove.clips.autoClipV2");
+  assert.equal(autoClipOn(memory()), true, "absent");
+  assert.equal(autoClipOn(memory({ [AUTO_CLIP_KEY]: "off" })), false);
+  assert.equal(autoClipOn(memory({ [AUTO_CLIP_KEY]: "on" })), true, "another value");
   assert.equal(autoClipOn(throwing), false, "unreadable");
   assert.equal(autoClipOn(null), false, "no storage");
 });
 
-test("setAutoClipOn: on writes \"on\", off removes the key, subscribers hear both; a blocked storage stays off", () => {
-  const s = memory();
+test("autoClipOn (clip-auto-on): the old key is ignored and removed, so a phone left off by the park turns on once", () => {
+  const parked = memory({ [OLD_AUTO_CLIP_KEY]: "on" });
+  assert.equal(autoClipOn(parked), true, "the old \"on\" doesn't matter");
+  assert.equal(parked.getItem(OLD_AUTO_CLIP_KEY), null, "removed");
+  const offByPark = memory(); // the park's off = the old key absent
+  assert.equal(autoClipOn(offByPark), true, "on once");
+  const oldOther = memory({ [OLD_AUTO_CLIP_KEY]: "off", [AUTO_CLIP_KEY]: "off" });
+  assert.equal(autoClipOn(oldOther), false, "the new key decides");
+  assert.equal(oldOther.getItem(OLD_AUTO_CLIP_KEY), null);
+  assert.equal(autoClipOn({ getItem: (k) => (k === OLD_AUTO_CLIP_KEY ? "on" : null) }), true, "a store without removeItem still reads");
+});
+
+test("setAutoClipOn: off writes \"off\", on removes the key (and the old one), subscribers hear both; a blocked storage reads as before", () => {
+  const s = memory({ [OLD_AUTO_CLIP_KEY]: "on" });
   let heard = 0;
   const off = subscribeAutoClip(() => heard++);
-  setAutoClipOn(s, true);
-  assert.equal(s.getItem(AUTO_CLIP_KEY), "on");
-  assert.equal(autoClipOn(s), true);
   setAutoClipOn(s, false);
+  assert.equal(s.getItem(AUTO_CLIP_KEY), "off");
+  assert.equal(s.getItem(OLD_AUTO_CLIP_KEY), null);
+  assert.equal(autoClipOn(s), false);
+  setAutoClipOn(s, true);
   assert.equal(s.getItem(AUTO_CLIP_KEY), null);
+  assert.equal(autoClipOn(s), true);
   assert.equal(heard, 2);
   off();
-  setAutoClipOn(s, true);
+  setAutoClipOn(s, false);
   assert.equal(heard, 2, "unsubscribed");
   const blocked = { getItem: () => null, setItem: () => { throw new Error("full"); }, removeItem: () => undefined };
-  assert.doesNotThrow(() => setAutoClipOn(blocked, true));
-  assert.equal(autoClipOn(blocked), false);
+  assert.doesNotThrow(() => setAutoClipOn(blocked, false));
+  assert.equal(autoClipOn(blocked), true, "absent reads on");
 });
 
 const NONE = { clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null, durationS: 48 } as const;
@@ -125,6 +141,17 @@ test("pickup: the switch off takes nothing; on (the default) takes the due clip"
   assert.deepEqual(pickupQueue([entry(r)], [r], now).map((x) => x.id), [r.id]);
   assert.deepEqual(pickupQueue([entry(r)], [r], now, {}, true).map((x) => x.id), [r.id]);
   assert.deepEqual(pickupQueue([entry(r)], [r], now, {}, false), []);
+});
+
+test("pickup (clip-auto-on): a clip analysed with version 3 (PAD_S 0.5) runs again once; version 4 doesn't", () => {
+  const now = new Date("2026-10-31T12:00:00+01:00");
+  const r: VideoClipRow = { ...row(2, "2026-10-30T09:00:00+01:00"), autoInS: 2.5, autoOutS: 18.0, autoStatus: "clipped" };
+  assert.equal(ALGO_VERSION, 4);
+  assert.deepEqual(pickupQueue([entry(r)], [r], now, { [r.id]: 3 }).map((x) => x.id), [r.id], "version 3: due");
+  assert.deepEqual(pickupQueue([entry(r)], [r], now, {}).map((x) => x.id), [r.id], "none recorded = 1: due");
+  assert.deepEqual(pickupQueue([entry(r)], [r], now, { [r.id]: 4 }), [], "version 4: done");
+  const cut: VideoClipRow = { ...r, autoInS: null, autoOutS: null, autoStatus: null };
+  assert.deepEqual(pickupQueue([entry(cut)], [cut], now, { [r.id]: 4 }).map((x) => x.id), [r.id], "a cut clip (auto_* null) is due by its null status, whatever the version");
 });
 
 test("Fokus after Stop: an analysis (and its slot) only for MP4 with the switch on", () => {

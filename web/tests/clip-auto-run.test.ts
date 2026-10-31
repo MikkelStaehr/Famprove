@@ -242,7 +242,7 @@ test("auto versions: localStorage map, unreadable = empty, recorded as ALGO_VERS
   assert.deepEqual(readAutoVersions(broken), {});
   recordAutoVersion(broken, "x"); // never throws
   recordAutoVersion(null, "x");
-  assert.equal(ALGO_VERSION, 3);
+  assert.equal(ALGO_VERSION, 4); // clip-auto-on: PAD_S 1.0
 });
 
 test("mode (clip-auto-3): always play, the keyframe facts kept for the log", () => {

@@ -384,7 +384,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   // local file, the last 7 days), one at a time, newest first, through the same analyseClip. Unmount aborts
   // the run (nothing written for that clip); the fixture never runs one.
   // Keyed on the index being read, never on rows: the run's own outcome updates rows.
-  // clip-auto-park: the switch (off by default), read after hydration (the server's snapshot is off).
+  // clip-auto-park / clip-auto-on: the switch (on by default since 2026-10-31), read after hydration (the server's snapshot is off).
   const autoOn = useSyncExternalStore(subscribeAutoClip, readAutoClip, () => false);
   const readyEntries = local.kind === "ready" ? local.entries : null;
   const ready = readyEntries !== null;
@@ -1234,7 +1234,7 @@ function readAutoClip(): boolean {
 }
 
 /**
- * clip-auto-park: the parked automatic clip's switch, a native checkbox in a 44px label row, and
+ * clip-auto-park / clip-auto-on: the automatic clip's switch (on by default), a native checkbox in a 44px label row, and
  * the muted line while it is off.
  */
 function AutoClipSwitch({ on }: { readonly on: boolean }) {
