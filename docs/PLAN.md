@@ -171,5 +171,12 @@ Size is the one agreed for it (S, M or L, see CLAUDE.md); `—` where none was s
 | clip-delete | Slet with Fortryd for 10 s (a starred clip asks first); "gemt ✓" after a download or share; Slet gemte; the 8-week cleanup stays | M |
 | clip-at-set | A ▶ at each set with a clip on Træning and in the week card's sessions; an expanded exercise's "Klip: sæt 1 ▶ · …" row | M |
 | clip-line | The Optagelser card becomes one line under the session (space, Gem alle fra i dag, Slet gemte, the auto-clip switch); the full list behind Alle klip | M |
+| tab-perf-probe | A local-only speed probe: tap to content shown and the server requests per tab switch and Minimér, kept on the phone with Kopiér; the before/after numbers | S |
+| clip-accuracy-log | One table clip_accuracy: the automatic vs the user's in/out per clip, written before a cut or a range nulls them, so it survives a cut and Slet | M |
+| clip-auto-on | Automatic clip on by default again, a 1.0 s margin before and after, ALGO_VERSION 4 | M |
+| clip-approve-all | Godkend alle auto-klip fra i dag: one tap cuts every exact-count clipped clip of today destructively, one Fortryd for the batch | L |
+| fokus-in-shell | Fokus inside the tabs shell (an @fokus slot, /fokus kept): Minimér and Begynd as client state without a route change | M |
+| tab-data-reuse | Tabs reuse their data and refresh in the background (on visibility after 10 min and after ↻), never while a set save is queued | M |
+| clip-retention | Video keep time 1/2/4/8 weeks (default 2), saved-and-unstarred clips deleted 24 h after saving or sharing, one confirm before the first cleanup | M |
 | clip-handles | Manual in/out handles on a clip, saved as clip_in_s / clip_out_s | M |
 | clip-accuracy | Auto-clip accuracy and run time on the user's own clips (needs the user's phone) | S |
