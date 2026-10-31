@@ -714,8 +714,10 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       setStatus(approveDoneAnnouncement(r.done.length));
       approveTimers().schedule(r.batch, r.done, next.deadline, new Date().getTime());
     } else setStatus(approveAllFailedLine(r.failed.length));
-    // §3 Focus: never Fortryd; the button when it is still there (a failed clip stays approvable), else Alle klip
-    setTimeout(() => (approveBtn.current ?? allBtn.current)?.focus(), 0);
+    // §3 Focus: never Fortryd. From the batch's result, not a ref that may still point at the unmounting
+    // button (design-lead): a failed clip stays approvable, so its button; else Alle klip.
+    const target = r.failed.length > 0 ? approveBtn : allBtn;
+    setTimeout(() => target.current?.focus(), 0);
   }
 
   /** §4 Fortryd: every clip of the batch back to its original (local only); the button comes back, focus on it. */
@@ -1187,8 +1189,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
             key={p}
             ref={approveBtn}
             type="button"
-            className={`${QUIET_BTN} disabled:opacity-60`}
-            disabled={approve.kind === "busy"}
+            className={`${QUIET_BTN} aria-disabled:opacity-60`}
+            aria-disabled={approve.kind === "busy" || undefined}
             onClick={() => void runApprove(approvable)}
           >
             <Icon name="scissors" size={16} className="text-text-muted" />
