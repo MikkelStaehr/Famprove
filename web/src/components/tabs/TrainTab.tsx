@@ -18,7 +18,7 @@ import { devFixture, devSwitchOn } from "@/lib/db/dev-fixture";
 import { readClipLifts, readClipNames, readClipRunSets, readVideoClips } from "@/lib/db/video-clips";
 import type { ClipLiftMeta } from "@/lib/video/auto-lines";
 import { recordingAllowed, type VideoClipRow } from "@/lib/video/clips";
-import { clipsFixture, FIXTURE_NAMES, fixtureRunSets } from "@/lib/video/library-fixture";
+import { clipsFixtureWithApprove, FIXTURE_NAMES, fixtureRunSets } from "@/lib/video/library-fixture";
 import type { ClipNames, RunSets } from "@/lib/video/library-view";
 import { loadDashboardData, loadExerciseCategories, loadTrainingForm, loadTrainingPlan, loadWeekDetail, NEXT_SESSION_DAYS } from "@/lib/db/queries";
 import type { IsoDate } from "@/lib/db/rows";
@@ -253,8 +253,8 @@ function DayCards({ plan, today, form }: { readonly plan: TrainingPlan; readonly
 async function VideoLibrary({ today }: { readonly today: IsoDate }) {
   const canRecord = recordingAllowed(process.env, process.env.NODE_ENV);
   if (devFixture() === "clips") {
-    const f = clipsFixture(today);
-    return <ClipLibrary today={today} rows={f.rows} names={FIXTURE_NAMES} runSets={fixtureRunSets(today)} canRecord={canRecord} fixture={{ local: f.local }} />;
+    const f = clipsFixtureWithApprove(today);
+    return <ClipLibrary today={today} rows={f.rows} names={FIXTURE_NAMES} runSets={fixtureRunSets(today)} canRecord={canRecord} fixture={{ local: f.local, autoLast: f.autoLast }} />;
   }
   let rows: VideoClipRow[] | null = null;
   let names: ClipNames = { exercises: {}, variants: {} };

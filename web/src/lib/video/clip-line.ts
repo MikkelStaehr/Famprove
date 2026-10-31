@@ -3,8 +3,8 @@
  * sheet. Pure: which parts each row of the line holds, and the sheet's history entry.
  */
 
-/** A part of the line: the space figure, the Auto-klip switch, Alle klip, the empty sentence, the two actions, the read error. */
-export type LinePart = "space" | "switch" | "all" | "empty" | "save" | "delete" | "error";
+/** A part of the line: the space figure, the Auto-klip switch, Alle klip, the empty sentence, the three actions, the read error. */
+export type LinePart = "space" | "switch" | "all" | "empty" | "approve" | "save" | "delete" | "error";
 
 export type LineInput = {
   /** The local index is still being read. */
@@ -17,6 +17,8 @@ export type LineInput = {
   readonly save: number;
   /** Slet gemte's count; 0 = hidden. */
   readonly deletable: number;
+  /** Godkend auto-klip's count (clip-approve-all §1, approve-line.ts approveCount); 0 or absent = hidden. */
+  readonly approve?: number;
   /** A Fortryd window, a delete or trim line, or the save line has content. */
   readonly pending: boolean;
   /** The Alle klip sheet is open. */
@@ -36,6 +38,7 @@ export function lineParts(i: LineInput): LineParts {
   if (i.error) return { row1: ["space", "switch", "all"], row2: ["error"], status };
   if (i.clips === 0) return { row1: ["empty", "all"], row2: [], status };
   const row2: LinePart[] = [];
+  if ((i.approve ?? 0) > 0) row2.push("approve"); // clip-approve-all §1: first in row 2
   if (i.save > 0) row2.push("save");
   if (i.deletable > 0) row2.push("delete");
   return { row1: ["space", "switch", "all"], row2, status };

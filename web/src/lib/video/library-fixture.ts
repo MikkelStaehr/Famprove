@@ -5,6 +5,7 @@
  */
 import { addDays, isoWeekStart } from "../dates.ts";
 import type { IsoDate } from "../db/rows.ts";
+import type { AutoLast } from "./auto-last.ts";
 import type { VideoClipRow } from "./clips.ts";
 import type { ClipIndexEntry } from "./index-store.ts";
 import { type ClipNames, type RunSets, runSetNumbers } from "./library-view.ts";
@@ -91,3 +92,47 @@ export function fixturePlayhead(clipId: string, pending: boolean): number {
 
 /** clip-delete §4: the clips marked `gemt ✓` (two today, plus the starred one): Slet gemte · 2. */
 export const FIXTURE_SAVED: readonly string[] = [id(1), id(2), id(5)];
+
+/**
+ * clip-approve-all §6: the shots need ≥ 2 exact automatic clips today, 1 off by one and 1 Klip selv
+ * (the 4th, low_confidence). The 2nd clip is exact; two Deadlift clips are added today (one exact,
+ * one 4 of 5), with this phone's last outcome per clip (auto-last.ts's shape, never stored). Kept out
+ * of clipsFixture so the library's own fixture tests keep their 9 rows.
+ */
+const APPROVE_SPECS = [
+  { n: 10, hour: "10:58", set: 2, dur: 50, inS: 2.6, outS: 41, found: 5 },
+  { n: 11, hour: "10:52", set: 1, dur: 46, inS: 3.1, outS: 38.4, found: 4 }, // off by one: clipped, never approvable
+] as const;
+
+const lastRun = (found: number, expected: number, at: number): AutoLast => ({
+  kind: "clipped",
+  mode: "fixture",
+  why: null,
+  runMs: 18_000,
+  summary: { joint: "hips", validShare: 0.96, peaksUp: found, peaksDown: 9, chosen: 1, expected, repLengths: null },
+  at,
+});
+
+export function clipsFixtureWithApprove(today: IsoDate): {
+  readonly rows: VideoClipRow[];
+  readonly local: ClipIndexEntry[];
+  readonly autoLast: Readonly<Record<string, AutoLast>>;
+} {
+  const f = clipsFixture(today);
+  const at = Date.parse(`${today}T11:00:00+02:00`);
+  const autoLast: Record<string, AutoLast> = { [id(2)]: lastRun(5, 5, at) };
+  for (const s of APPROVE_SPECS) {
+    const row: VideoClipRow = {
+      id: id(s.n), date: today, session: 1, row: 30, set: s.set, exerciseId: 3, variantId: null,
+      recordedAt: `${today}T${s.hour}:00+02:00`, durationS: s.dur, starred: false,
+      clipInS: null, clipOutS: null, autoInS: s.inS, autoOutS: s.outS, autoStatus: "clipped",
+    };
+    f.rows.push(row);
+    f.local.push({
+      id: row.id, setKey: { date: today, sessionNo: 1, row: 30, set: s.set }, ext: "mp4",
+      recordedAt: row.recordedAt, durationS: s.dur, starred: false, starSynced: true, state: "done",
+    });
+    autoLast[row.id] = lastRun(s.found, 5, at);
+  }
+  return { rows: f.rows, local: f.local, autoLast };
+}

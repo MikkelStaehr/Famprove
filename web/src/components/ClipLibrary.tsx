@@ -112,6 +112,22 @@ import { usePublishClips } from "@/components/ClipPlayerHost";
 import { isDebugToggle } from "@/lib/video/debug-log";
 import { browserAutoDeps } from "@/lib/video/auto-run-browser";
 import { allLabel, type LinePart, lineParts, sheetCloseVia, sheetShouldPush, sheetStaysOnPop, SHEET_HISTORY_STATE } from "@/lib/video/clip-line";
+import { type ApprovableClip, approvableClips, approveAll, type ApproveDeps, finishBatch, pendingTrimBatches, undoBatch } from "@/lib/video/approve-all";
+import {
+  APPROVE_IDLE,
+  approveAllFailedLine,
+  approveBusyLabel,
+  approveCount,
+  approveDoneAnnouncement,
+  approveFinishedLine,
+  approveLabel,
+  approveLineText,
+  approveResultState,
+  type ApproveState,
+  approveStartAnnouncement,
+  approveUndoneLine,
+  busyAfter,
+} from "@/lib/video/approve-line";
 
 const NO_LIFTS: Readonly<Record<string, ClipLiftMeta>> = {};
 
@@ -148,6 +164,9 @@ type RangeAction = { readonly kind: "undo-remove"; readonly old: ClipRangeS };
 type RangeText = { readonly text: string; readonly warn: boolean; readonly action: RangeAction | null };
 const keptUndo = (t: RangeText | null): RangeAction | null => t?.action ?? null;
 
+/** DEV_FIXTURE=clips (clip-approve-all §6): each simulated cut of Godkend auto-klip takes this long. */
+const FIXTURE_APPROVE_CUT_MS = 900;
+
 /** DEV_FIXTURE=clips (clip-trim §6): the simulated cut, no file and no write; the keyframe 0,5 s before in, clip 3 fails. */
 function fixtureCut(id: string) {
   return async (_file: Blob, inS: number, outS: number): Promise<CutResult> => {
@@ -164,8 +183,8 @@ type Props = {
   readonly runSets: RunSets; // the clips' run set numbers (Fokus's "Sæt n"); {} = set_no
   /** Recording possible on this host (not a preview URL). */
   readonly canRecord: boolean;
-  /** DEV_FIXTURE=clips: the fake index; nothing is written, deleted or shared. */
-  readonly fixture: { readonly local: readonly ClipIndexEntry[] } | null;
+  /** DEV_FIXTURE=clips: the fake index (and this phone's fake last outcomes, clip-approve-all §6); nothing is written, deleted or shared. */
+  readonly fixture: { readonly local: readonly ClipIndexEntry[]; readonly autoLast?: Readonly<Record<string, AutoLast>> } | null;
   /** clip-auto's pickup: each recent clip's lift family and reps (readClipLifts); a clip without one is never picked up. */
   readonly lifts?: Readonly<Record<string, ClipLiftMeta>>;
 };
@@ -250,6 +269,19 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     return deleteTimersRef.current;
   }, []);
   const currentBatch = useRef<string | null>(null);
+  /** clip-approve-all: the batch's line, this phone's last outcomes (the exact rep count) and one finish timer per batch (delete.ts's batchTimers). */
+  const [approve, setApprove] = useState<ApproveState>(APPROVE_IDLE);
+  const [lastRuns, setLastRuns] = useState<Readonly<Record<string, AutoLast>>>({});
+  const approveBtn = useRef<HTMLButtonElement | null>(null);
+  const approveBatch = useRef<string | null>(null);
+  const approveTimersRef = useRef<ReturnType<typeof batchTimers> | null>(null);
+  const approveTimers = useCallback(() => {
+    approveTimersRef.current ??= batchTimers(
+      { setTimeout: (fn, ms) => window.setTimeout(fn, ms), clearTimeout: (h) => window.clearTimeout(h as number) }, // the handle is setTimeout's number
+      (batch, ids) => void finishApproveRef.current(batch, ids),
+    );
+    return approveTimersRef.current;
+  }, []);
   /** clip-delete §3 Focus: where focus goes when the player closes after Slet (a row id, "heading"); null = the opener. */
   const focusAfter = useRef<string | null>(null);
   const sizesRef = useRef(sizes);
@@ -285,6 +317,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         store.current = { index: memoryClipIndex(fixture.local), files: memoryClipFiles() };
         for (const e of fixture.local) await store.current.files.writeFile(clipFile(e), new Blob([new Uint8Array(32)])); // clip-trim §6: the simulated cut reads a placeholder
         setFiles(store.current.files);
+        setLastRuns(fixture.autoLast ?? {});
         await markSaved({ index: store.current.index }, FIXTURE_SAVED); // clip-delete §4: through Gem's own setter
         setLocal({ kind: "ready", entries: await store.current.index.all() });
         setSizes(Object.fromEntries(fixture.local.map((e) => [e.id, FIXTURE_CLIP_BYTES])));
@@ -335,8 +368,10 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         window.localStorage.setItem(CLEANUP_KEY, today);
       }
       entries = await s.index.all();
+      setLastRuns(readAutoLast(browserStore()));
       setLocal({ kind: "ready", entries });
-      for (const e of entries) if (e.pendingTrim !== undefined) scheduleFinishRef.current(e.id, e.pendingTrim.deadline); // a window still open from before: its finish
+      for (const e of entries) if (e.pendingTrim !== undefined && e.pendingTrim.batch === undefined) scheduleFinishRef.current(e.id, e.pendingTrim.deadline); // a window still open from before: its finish
+      rearmApproveRef.current(entries); // clip-approve-all: a reload inside a batch's window: one timer and one Fortryd per batch
       const sz: Record<string, number | null> = {};
       for (const e of entries) sz[e.id] = (await s.files.readFile(clipFile(e)))?.size ?? null;
       setSizes(sz);
@@ -345,6 +380,16 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       setLocal({ kind: "error" });
     }
   }, [fixture, initialRows, today, delTimers]);
+  /** clip-approve-all: re-arm each pending batch's one timer; the newest batch's Fortryd comes back on the line. */
+  const rearmApproveRef = useRef((all: readonly ClipIndexEntry[]) => {
+    const batches = pendingTrimBatches(all);
+    for (const b of batches) approveTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime());
+    const last = batches.at(-1);
+    if (last === undefined || Date.parse(last.deadline) <= new Date().getTime()) return;
+    approveBatch.current = last.batch;
+    setNowMs(new Date().getTime());
+    setApprove((a) => (a.kind === "busy" ? a : { kind: "window", batch: last.batch, ids: last.ids, deadline: last.deadline, failed: 0 }));
+  });
 
   useEffect(() => {
     const t = setTimeout(() => setSlowLoad(true), 1000); // clip-line §4: the space figure pulses after 1 s
@@ -421,6 +466,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         });
         setRunning(null);
         recordRun(browserStore(), r.id, out, new Date().getTime());
+        setLastRuns(readAutoLast(browserStore())); // clip-approve-all: the exact count is this phone's last outcome
         if (out.kind === "aborted" && !ctrl.signal.aborted) {
           // clip-auto-3: a hidden page aborts the run (nothing written; the pickup's own abort is the
           // only other cause, excluded above); the same clip again once visible, even if the page is
@@ -545,6 +591,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   });
 
   useEffect(() => () => delTimers().clearAll(), [delTimers]); // unmount: the next load's finishDueDeletes finishes them
+  useEffect(() => () => approveTimers().clearAll(), [approveTimers]); // unmount: the next load's finishDueTrims finishes them
   // §3: Fortryd's text countdown (10 → 1) while a window is open.
   // clip-line §3: a cut's window on the line, only while its deadline is ahead (a finish that failed
   // leaves pendingTrim set; it retries on the next load and must not keep the 250 ms tick alive; review).
@@ -571,6 +618,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       for (const t of timers.values()) window.clearTimeout(t);
       timers.clear();
       delTimers().clearAll();
+      approveTimers().clearAll();
     };
     const onVis = () => {
       if (document.visibilityState === "hidden") {
@@ -580,7 +628,8 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       const s = store.current;
       if (s === null) return;
       void s.index.all().then((all) => {
-        for (const e of all) if (e.pendingTrim !== undefined) scheduleFinishRef.current(e.id, e.pendingTrim.deadline);
+        for (const e of all) if (e.pendingTrim !== undefined && e.pendingTrim.batch === undefined) scheduleFinishRef.current(e.id, e.pendingTrim.deadline);
+        for (const b of pendingTrimBatches(all)) approveTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime());
         for (const b of pendingBatches(all)) delTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime());
       });
     };
@@ -589,7 +638,7 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
       document.removeEventListener("visibilitychange", onVis);
       clearAll();
     };
-  }, [delTimers]);
+  }, [delTimers, approveTimers]);
 
   /** §2.3 Gem klip: startTrim; done updates the row (new file, length, no stored range) and times the finish. */
   async function runTrim(id: string, inS: number, outS: number): Promise<StartTrimResult> {
@@ -628,6 +677,112 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
     setLocal({ kind: "ready", entries: await s.index.all() });
     return r;
   }
+
+  /** clip-approve-all: the batch's deps; the fixture's cut and trim are fakes (no file, no write), as Gem klip's. */
+  function approveDeps(): ApproveDeps | null {
+    const s = store.current;
+    if (s === null) return null;
+    if (fixture !== null) {
+      const cut = fixtureCut("");
+      // the fixture's cut takes a phone-like moment, so `Klipper 2 af 2 …` can be shot (§6 S2)
+      const slow = async (file: Blob, inS: number, outS: number) => (await new Promise((r) => setTimeout(r, FIXTURE_APPROVE_CUT_MS)), cut(file, inS, outS));
+      return { index: s.index, files: s.files, trim: async (i) => ({ ok: true, dev: true, durationS: i.durationS }), cut: slow };
+    }
+    return { index: s.index, files: s.files, trim: trimClip, autoVersionOf: (clip) => versionOf(readAutoVersions(browserStore()), clip) };
+  }
+
+  /** §2–§3 Godkend auto-klip: cut each clip in turn, then one window and one timer for the batch. */
+  async function runApprove(clips: readonly ApprovableClip[]) {
+    const deps = approveDeps();
+    const s = store.current;
+    if (deps === null || s === null || clips.length === 0 || approve.kind === "busy") return;
+    setApprove(busyAfter(0, 0, clips.length));
+    setStatus(approveStartAnnouncement(clips.length));
+    for (const c of clips) if (!trimBefore.current.has(c.id)) trimBefore.current.set(c.id, { row: serverById.get(c.id) ?? null, bytes: sizes[c.id] ?? null });
+    const r = await approveAll(deps, clips, () => new Date(), (p) => setApprove(busyAfter(p.done, p.failed, p.total)));
+    for (const f of r.failed) trimBefore.current.delete(f.id);
+    const all = await s.index.all();
+    const cutLen = new Map(all.flatMap((e) => (e.pendingTrim === undefined ? [] : [[e.id, e.pendingTrim.newDurationS] as const])));
+    const cut = new Set(r.done);
+    setRows((rs) => rs?.map((x) => (cut.has(x.id) ? { ...x, durationS: cutLen.get(x.id) ?? x.durationS, clipInS: null, clipOutS: null, autoInS: null, autoOutS: null, autoStatus: null } : x)) ?? rs);
+    setLocal({ kind: "ready", entries: all });
+    const next = approveResultState(r);
+    setNowMs(new Date().getTime());
+    setApprove(next);
+    if (next.kind === "window") {
+      approveBatch.current = r.batch;
+      setStatus(approveDoneAnnouncement(r.done.length));
+      approveTimers().schedule(r.batch, r.done, next.deadline, new Date().getTime());
+    } else setStatus(approveAllFailedLine(r.failed.length));
+    // §3 Focus: never Fortryd; the button when it is still there (a failed clip stays approvable), else Alle klip
+    setTimeout(() => (approveBtn.current ?? allBtn.current)?.focus(), 0);
+  }
+
+  /** §4 Fortryd: every clip of the batch back to its original (local only); the button comes back, focus on it. */
+  async function undoApprove(batch: string) {
+    const s = store.current;
+    if (s === null) return;
+    const r = await undoBatch({ index: s.index, files: s.files }, batch, new Date());
+    if (r.kind !== "undone" || r.restored.length === 0) return; // the window closed first: the finish goes on
+    const back = new Map(r.restored.flatMap((id) => {
+      const b = trimBefore.current.get(id);
+      trimBefore.current.delete(id);
+      return b?.row == null ? [] : [[id, b.row] as const];
+    }));
+    setRows((rs) => rs?.map((x) => back.get(x.id) ?? x) ?? rs);
+    const left = (await s.index.all()).filter((e) => e.pendingTrim?.batch === batch);
+    approveTimers().cancel(batch);
+    for (const b of pendingTrimBatches(left)) approveTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime()); // a clip that failed to restore still finishes
+    setLocal({ kind: "ready", entries: await s.index.all() });
+    const text = approveUndoneLine(r.restored.length);
+    setApprove({ kind: "undone", count: r.restored.length });
+    setStatus(text);
+    setTimeout(() => approveBtn.current?.focus(), 0);
+  }
+
+  /** At 0 (the batch's one timer): finishBatch, then the rows, the space and `N klip klippet · MB frigjort.` */
+  async function finishApproveBatch(batch: string, ids: readonly string[]) {
+    const deps = approveDeps();
+    const s = store.current;
+    if (deps === null || s === null) return;
+    const res = await finishBatch(deps, ids, new Date());
+    const waiting: ClipIndexEntry[] = [];
+    let freed: number | null = 0;
+    let count = 0;
+    for (const id of ids) {
+      const r = res[id];
+      const before = trimBefore.current.get(id);
+      if (r === "waiting") {
+        const e = await s.index.get(id);
+        if (e !== null) waiting.push(e);
+        continue;
+      }
+      if (r === "failed") continue; // pendingTrim stays: the next load's finishDueTrims retries
+      trimBefore.current.delete(id);
+      if (r === "refused") {
+        if (before?.row != null) {
+          const prev = before.row;
+          setRows((rs) => rs?.map((x) => (x.id === id ? prev : x)) ?? rs);
+        }
+        setSizes((sz) => ({ ...sz, [id]: before?.bytes ?? null }));
+        continue;
+      }
+      count += 1;
+      const e = await s.index.get(id);
+      const after = await fileBytes(id, e?.durationS ?? undefined, before?.row?.durationS ?? null);
+      setSizes((sz) => ({ ...sz, [id]: after }));
+      freed = freed === null || before?.bytes == null || after === null ? null : freed + Math.max(0, before.bytes - after);
+    }
+    for (const b of pendingTrimBatches(waiting)) approveTimers().schedule(b.batch, b.ids, b.deadline, new Date().getTime()); // once for the batch
+    setLocal({ kind: "ready", entries: await s.index.all() });
+    if (approveBatch.current !== batch || count === 0) return; // an older batch: the line shows the newest
+    setApprove({ kind: "finished", count, freed });
+    setStatus(approveFinishedLine(count, freed));
+  }
+  const finishApproveRef = useRef(finishApproveBatch);
+  useEffect(() => {
+    finishApproveRef.current = finishApproveBatch;
+  });
 
   /** One clip to Downloads (the player's Gem, §1). Fixture: no file, no URL. */
   function download(blob: Blob, name: string) {
@@ -902,14 +1057,20 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
   const deletable = entries === null ? [] : savedDeletable(entries);
   const saveCount = rest.length > 0 ? rest.length : today_.length;
   /** clip-line §3: a cut's Fortryd once its player has closed. */
-  const trimsOpen = (entries ?? []).filter((e) => e.pendingTrim !== undefined && e.id !== open?.id && nowMs > 0 && secondsLeft(e.pendingTrim.deadline, nowMs) > 0);
+  const trimsOpen = (entries ?? []).filter((e) => e.pendingTrim !== undefined && e.pendingTrim.batch === undefined && e.id !== open?.id && nowMs > 0 && secondsLeft(e.pendingTrim.deadline, nowMs) > 0);
+  /** clip-approve-all §1: N (never while the switch is off: no auto range is trusted then). */
+  const approvable = autoOn && rows !== null && entries !== null ? approvableClips(rows, entries, lastRuns, today) : [];
+  const approveN = approveCount(autoOn, approvable.length, approve);
+  const approveWindow = approve.kind === "window" && nowMs > 0 && secondsLeft(approve.deadline, nowMs) > 0 ? approve : null;
+  const approveText = approve.kind === "window" ? (approveWindow === null ? null : approveLineText(approve)) : approveLineText(approve);
   const parts = lineParts({
     loading: local.kind === "loading",
     error: local.kind === "error",
     clips: list.length,
     save: entries === null ? 0 : saveCount,
     deletable: deletable.length,
-    pending: delLine !== null || saveLine !== "" || trimsOpen.length > 0,
+    approve: approveN,
+    pending: delLine !== null || saveLine !== "" || trimsOpen.length > 0 || approveText !== null,
     sheetOpen: sheet,
   });
   const warn = (space.persisted === false && entries !== null) || rows === null;
@@ -925,6 +1086,30 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         </p>
       ) : delLine?.kind === "text" ? (
         <p className="font-sans text-13 text-text-muted">{delLine.text}</p>
+      ) : null}
+      {approveWindow !== null && approveText !== null ? (
+        <p className="flex flex-wrap items-center gap-x-1 font-sans text-13 text-text-muted">
+          <span>{approveText}</span>
+          <button
+            type="button"
+            className={`${DARK_BTN} tabular-nums`}
+            aria-label={`Fortryd klipningen af ${approveWindow.ids.length} klip`}
+            onClick={() => void undoApprove(approveWindow.batch)}
+          >
+            Fortryd <span aria-hidden="true" className="font-mono tabular-nums">{secondsLeft(approveWindow.deadline, nowMs)}</span>
+          </button>
+        </p>
+      ) : approve.kind === "allFailed" ? (
+        <p className="flex flex-wrap items-center gap-x-3 font-sans text-13 text-text-muted">
+          <span>{approveText}</span>
+          {approvable.length > 0 && (
+            <button type="button" className={QUIET_BTN} onClick={() => void runApprove(approvable)}>
+              Prøv igen
+            </button>
+          )}
+        </p>
+      ) : approveText !== null && approve.kind !== "window" ? (
+        <p className="font-sans text-13 text-text-muted">{approveText}</p>
       ) : null}
       {trimsOpen.map((e) =>
         e.pendingTrim === undefined ? null : (
@@ -996,13 +1181,31 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
             Ingen optagelser endnu
           </span>
         );
+      case "approve":
+        return (
+          <button
+            key={p}
+            ref={approveBtn}
+            type="button"
+            className={`${QUIET_BTN} disabled:opacity-60`}
+            disabled={approve.kind === "busy"}
+            onClick={() => void runApprove(approvable)}
+          >
+            <Icon name="scissors" size={16} className="text-text-muted" />
+            {/* §2: the button keeps its width; the other label, invisible in the same cell, holds it */}
+            <span className="grid text-left">
+              <span className="col-start-1 row-start-1">{approve.kind === "busy" ? approveBusyLabel(approve.k, approve.total) : approveLabel(approveN)}</span>
+              <span className="invisible col-start-1 row-start-1">{approve.kind === "busy" ? approveLabel(approve.total) : approveBusyLabel(approveN, approveN)}</span>
+            </span>
+          </button>
+        );
       case "save":
         return (
           <button
             key={p}
             type="button"
             className={`${QUIET_BTN} disabled:opacity-60`}
-            disabled={saving !== null}
+            disabled={saving !== null || approve.kind === "busy"}
             onClick={() =>
               void saveAll(
                 rest.length > 0 ? rest : today_.map((r) => ({ id: r.id, name: fileNames.get(r.id) ?? `${r.id}.${r.ext}`, label: clipLabel(r) })),
@@ -1015,7 +1218,13 @@ export function ClipLibrary({ today, rows: initialRows, names, runSets, canRecor
         );
       case "delete":
         return (
-          <button key={p} type="button" className={QUIET_BTN} onClick={() => void startDeleteRows(list.filter((r) => deletable.some((e) => e.id === r.id)), false)}>
+          <button
+            key={p}
+            type="button"
+            className={`${QUIET_BTN} disabled:opacity-60`}
+            disabled={approve.kind === "busy"}
+            onClick={() => void startDeleteRows(list.filter((r) => deletable.some((e) => e.id === r.id)), false)}
+          >
             <Icon name="trash" size={16} className="text-text-muted" />
             {`Slet gemte · ${deletable.length}`}
           </button>
