@@ -23,7 +23,7 @@ import { type ClipNames, type RunSets, runSetNumbers, type SessionSetRow } from 
 import { FIXTURE_FAILING_RANGE_ID, type SetClipRangeInput, type SetClipRangeResult, validateClipRange } from "../video/clip-range.ts";
 import { expectedReps, liftFamily, type SetClipAutoInput, type SetClipAutoResult, validateClipAuto } from "../video/auto-clip.ts";
 import { PICKUP_DAYS } from "../video/auto-lines.ts";
-import { type TrimClipInput, type TrimClipResult, validateTrim } from "../video/trim.ts";
+import { accuracyRecord, type TrimClipInput, type TrimClipResult, validateTrim } from "../video/trim.ts";
 import type { ClipLiftMeta } from "../video/auto-lines.ts";
 
 /**
@@ -47,12 +47,17 @@ import type { ClipLiftMeta } from "../video/auto-lines.ts";
  *  - auto (slice clip-auto): the phone's automatic clip, one PATCH of auto_in_s/auto_out_s/auto_status/
  *    auto_run_ms by id after one read of duration_s (lib/video/auto-clip.ts validateClipAuto). Never
  *    landmarks or frames: the input type has only those four values. Refused on a preview host.
+ *  - trim (slice clip-trim; clip-accuracy-log): one read of the row, then, when the cut sent its points,
+ *    one insert into public.clip_accuracy (on conflict (clip_id) do nothing; insert-only, no foreign
+ *    key, so it outlives Slet), then the PATCH last. A failed insert returns failed without the PATCH.
  *  - delete: one DELETE by id (deleting a clip on the phone deletes its row); idempotent.
  * Dev switches (DEV_TODAY, DEV_FIXTURE) write nothing and answer as if written.
  * Python never reads the table: TSS is unchanged.
  */
 
 const TABLE = VIDEO_CLIPS_SELECT.table;
+/** The cut's accuracy record (slice clip-accuracy-log): select and insert only. */
+const ACCURACY_TABLE = "clip_accuracy";
 
 function client(): PostgrestClient {
   const env = readSupabaseEnv();
@@ -162,9 +167,14 @@ export async function recordClipRange(input: SetClipRangeInput, options: VideoCl
 /**
  * A committed manual cut (slice clip-trim): one PATCH of duration_s (the cut file's own length) with
  * clip_in_s/clip_out_s and auto_* null (the file is the clip, so no stored range applies), after one
- * read of the row's duration_s, filtered duration_s ≥ new so it never raises (0 rows = `duration`).
+ * read of the row, filtered duration_s ≥ new so it never raises (0 rows = `duration`).
  * Refused unless 0 < new < current (validateTrim); the same new
  * duration again is ok (idempotent: a retry after a lost reply). Refused on a preview host.
+ * Before the PATCH (slice clip-accuracy-log), when the input has the points: one clip_accuracy insert
+ * (accuracyRecord: the row's automatic in/out and the user's, on the original file), on conflict
+ * (clip_id) do nothing, so a retry or a second cut of the clip keeps the first record. Points that
+ * don't fit the original are refused (`invalid`, nothing written); a failed insert is `failed`
+ * without the PATCH, so the phone's retry sends both again.
  * Dev switches read and write nothing and answer as if saved.
  */
 export async function recordClipTrim(input: TrimClipInput, options: VideoClipOptions = {}): Promise<TrimClipResult> {
@@ -175,10 +185,18 @@ export async function recordClipTrim(input: TrimClipInput, options: VideoClipOpt
   if (devSwitchOn(env, nodeEnv)) return { ok: true, dev: true, durationS: shaped }; // nothing is read or written
   try {
     const c = makeClient();
-    const current = await clipDuration(c, input.id);
-    if (current === undefined) return { ok: false, reason: "not_found" };
-    const durationS = validateTrim(input.durationS, current);
+    const found = await selectAll(c, TABLE, { ...VIDEO_CLIPS_SELECT, filters: [["id", `eq.${input.id}`]] }, parseVideoClipRow);
+    const row = found[0];
+    if (row === undefined) return { ok: false, reason: "not_found" };
+    const durationS = validateTrim(input.durationS, row.durationS);
     if (durationS === null) return { ok: false, reason: "duration" };
+    if (input.points !== undefined) {
+      const record = accuracyRecord(row, input.points, durationS);
+      if (record === "invalid") return { ok: false, reason: "invalid" };
+      if (record !== null) {
+        await write(c, ACCURACY_TABLE, "POST", { params: [["on_conflict", "clip_id"]], body: record, prefer: "resolution=ignore-duplicates" });
+      }
+    }
     const n = await patchCount(c, TABLE, {
       params: [
         ["id", `eq.${input.id}`],

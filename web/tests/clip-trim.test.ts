@@ -102,7 +102,7 @@ test("happy path: Gem klip makes the cut the clip with Fortryd for 10 s; at 0 on
   const e = await w.index.get(ID);
   assert.equal(e?.fileName, `${ID}.cut.mp4`);
   assert.equal(e?.durationS, 36.2);
-  assert.deepEqual(e?.pendingTrim, { deadline: r.deadline, originalFileName: `${ID}.mp4`, originalDurationS: 51.8, newDurationS: 36.2 });
+  assert.deepEqual(e?.pendingTrim, { deadline: r.deadline, originalFileName: `${ID}.mp4`, originalDurationS: 51.8, newDurationS: 36.2, inS: 12.3, outS: 48, kind: "own" }); // the requested points (clip-accuracy-log)
   assert.deepEqual((await w.files.names()).toSorted(), [`${ID}.cut.mp4`, `${ID}.mp4`]);
   assert.deepEqual(trimInvariant(await w.index.all(), await w.files.names()), []);
   assert.equal(w.server.calls, 0, "never a server write during the window");

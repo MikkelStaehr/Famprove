@@ -5,17 +5,18 @@
  * lock (ClipLock: navigator.locks, so other tabs too). Fortryd inside TRIM_UNDO_MS points
  * the entry back and deletes the cut; it writes nothing to the server. Once the deadline has passed
  * (a timer while open, or the next library / Fokus load: finishDueTrims) the finish runs:
- * (a) trimClip's one PATCH (the new duration_s; clip_in_s/clip_out_s and auto_* null), (b) delete the
+ * (a) trimClip (one clip_accuracy insert when the pending cut has its points, slice clip-accuracy-log,
+ * then one PATCH: the new duration_s; clip_in_s/clip_out_s and auto_* null), (b) delete the
  * original, (c) clear pendingTrim last. A step that fails leaves pendingTrim, so the next load retries;
  * a permanent refusal rolls back locally (the original is the clip again).
  *
  * Invariant (trimInvariant): the index always names exactly one file per clip and it exists; the
  * original is deleted only after the PATCH landed. Deps are injected so tests use the fakes.
  */
-import type { SetClipAutoInput, SetClipAutoResult } from "./auto-clip.ts";
-import { isClipId, storedDuration } from "./clips.ts";
+import { ALGO_VERSION, type SetClipAutoInput, type SetClipAutoResult } from "./auto-clip.ts";
+import { isClipId, storedDuration, type VideoClipRow } from "./clips.ts";
 import { cutClip } from "./cut.ts";
-import { clipFile, type ClipIndex, type ClipIndexEntry } from "./index-store.ts";
+import { clipFile, type ClipIndex, type ClipIndexEntry, type PendingTrim } from "./index-store.ts";
 import { clipFileName, cutFileName, type ClipFiles } from "./opfs.ts";
 
 /** Fortryd's window (§3). */
@@ -23,13 +24,105 @@ export const TRIM_UNDO_MS = 10_000;
 
 // --- server: trimClip's input and its rule ------------------------------------------------------
 
-export type TrimClipInput = { readonly id: string; readonly durationS: unknown };
+/** clip_accuracy.kind (slice clip-accuracy-log): own = the user's points (Gem klip), approved = the automatic ones (Godkend alle). */
+export const TRIM_KINDS = ["own", "approved"] as const;
+export type TrimKind = (typeof TRIM_KINDS)[number];
+
+/**
+ * The cut's points for clip_accuracy (slice clip-accuracy-log): the user's requested in/out on the
+ * original file (not the keyframe-adjusted start), the kind, and the automatic clip's ALGO_VERSION
+ * (null: not sent).
+ */
+export type TrimPoints = { readonly inS: number; readonly outS: number; readonly kind: TrimKind; readonly algoVersion: number | null };
+
+/** points absent: an old pending cut (no clip_accuracy insert). */
+export type TrimClipInput = { readonly id: string; readonly durationS: unknown; readonly points?: TrimPoints };
+
+/** What the phone sends (flat, the action's raw shape): the points, kind and version all or none. */
+export type TrimRequest = {
+  readonly id: string;
+  readonly durationS: number;
+  readonly inS?: number;
+  readonly outS?: number;
+  readonly kind?: TrimKind;
+  readonly algoVersion?: number;
+};
+
+const POINT_KEYS = ["inS", "outS", "kind", "algoVersion"] as const;
+
+const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
 export function parseTrimClipInput(raw: unknown): TrimClipInput | null {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>; // narrowed field by field below
   if (!isClipId(r.id) || !("durationS" in r)) return null;
-  return { id: r.id, durationS: r.durationS };
+  if (POINT_KEYS.every((k) => r[k] === undefined)) return { id: r.id, durationS: r.durationS };
+  const kind = TRIM_KINDS.find((k) => k === r.kind);
+  if (!finite(r.inS) || !finite(r.outS) || kind === undefined) return null;
+  const v = r.algoVersion;
+  if (v !== undefined && v !== null && !(typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 1000)) return null;
+  return { id: r.id, durationS: r.durationS, points: { inS: r.inS, outS: r.outS, kind, algoVersion: typeof v === "number" ? v : null } };
+}
+
+const tenth = (x: number): number => Math.round(x * 10) / 10;
+
+/** The points rounded to 0.1 when 0 ≤ in < out ≤ `currentS` (the row's duration_s, read server-side), else null. */
+export function validateTrimPoints(inS: unknown, outS: unknown, currentS: number): { readonly inS: number; readonly outS: number } | null {
+  if (!finite(inS) || !finite(outS)) return null;
+  const i = tenth(inS);
+  const o = tenth(outS);
+  return i >= 0 && i < o && o <= tenth(currentS) ? { inS: i, outS: o } : null;
+}
+
+/** One public.clip_accuracy row (snake_case, the insert's body). */
+export type ClipAccuracyBody = {
+  readonly clip_id: string;
+  readonly date: string;
+  readonly session_no: number;
+  readonly row_no: number;
+  readonly set_no: number;
+  readonly exercise_id: number;
+  readonly variant_id: number | null;
+  readonly kind: TrimKind;
+  readonly auto_in_s: number | null;
+  readonly auto_out_s: number | null;
+  readonly user_in_s: number | null;
+  readonly user_out_s: number | null;
+  readonly algo_version: number | null;
+  readonly duration_s: number;
+};
+
+/**
+ * The clip_accuracy row a trim inserts before its PATCH (slice clip-accuracy-log), from the row as
+ * read (its current = the original's duration and auto_*) and the trim's points; `newDurationS` is
+ * the validated cut length. own: the user's points, the automatic ones only when auto_status is
+ * clipped; approved: no user points, the automatic ones. algo_version only with an automatic range.
+ * null = nothing to insert: approved without an automatic range, or a retry after the PATCH landed
+ * (the row is already the cut, so its points no longer fit; that attempt's insert came first).
+ * "invalid": the points don't fit the original (refused, nothing written).
+ */
+export function accuracyRecord(row: VideoClipRow, points: TrimPoints, newDurationS: number): ClipAccuracyBody | null | "invalid" {
+  const user = validateTrimPoints(points.inS, points.outS, row.durationS);
+  if (user === null) return newDurationS >= tenth(row.durationS) ? null : "invalid";
+  const auto = row.autoStatus === "clipped" && row.autoInS !== null && row.autoOutS !== null ? { inS: row.autoInS, outS: row.autoOutS } : null;
+  if (points.kind === "approved" && auto === null) return null;
+  const own = points.kind === "own";
+  return {
+    clip_id: row.id,
+    date: row.date,
+    session_no: row.session,
+    row_no: row.row,
+    set_no: row.set,
+    exercise_id: row.exerciseId,
+    variant_id: row.variantId,
+    kind: points.kind,
+    auto_in_s: auto?.inS ?? null,
+    auto_out_s: auto?.outS ?? null,
+    user_in_s: own ? user.inS : null,
+    user_out_s: own ? user.outS : null,
+    algo_version: auto === null ? null : points.algoVersion,
+    duration_s: row.durationS,
+  };
 }
 
 /**
@@ -50,6 +143,12 @@ export function validateTrim(durationS: unknown, currentS: number | null): numbe
 export type TrimClipResult =
   | { readonly ok: true; readonly dev: boolean; readonly durationS: number }
   | { readonly ok: false; readonly reason: "invalid" | "duration" | "not_found" | "not_allowed" | "failed" };
+
+/** finishTrim's request: the new duration, plus the pending cut's points, kind and ALGO_VERSION when it kept them (an old entry sends none). */
+export function trimRequest(id: string, p: PendingTrim): TrimRequest {
+  if (p.inS === undefined || p.outS === undefined || p.kind === undefined) return { id, durationS: p.newDurationS };
+  return { id, durationS: p.newDurationS, inS: p.inS, outS: p.outS, kind: p.kind, algoVersion: ALGO_VERSION };
+}
 
 // --- the phone: start, Fortryd, finish ------------------------------------------------------------
 
@@ -110,7 +209,7 @@ export type TrimDeps = {
   readonly index: ClipIndex;
   readonly files: ClipFiles;
   /** The server action (trimClip); a thrown error (the network) counts as failed. */
-  readonly trim: (input: { readonly id: string; readonly durationS: number }) => Promise<TrimClipResult>;
+  readonly trim: (input: TrimRequest) => Promise<TrimClipResult>;
   /** cutClip by default; tests inject a fake. */
   readonly cut?: (file: Blob, inS: number, outS: number) => Promise<CutResult>;
   /** The per-clip lock; browserLock() (else an in-memory one) by default. */
@@ -142,13 +241,14 @@ function outOfSpace(error: unknown): boolean {
  * Gem klip: cut [inS, outS] of the clip's file and make the cut the clip, with Fortryd until the
  * deadline. A cut already pending is finished first (a second cut ends the first's window). Order:
  * write the cut, read it back, then the index entry; a failure before the entry leaves the original
- * named (a stray cut file is swept by finishDueTrims).
+ * named (a stray cut file is swept by finishDueTrims). The pending cut keeps [inS, outS] and `kind`
+ * (own: Gem klip; approved: Godkend alle) for clip_accuracy (slice clip-accuracy-log).
  */
-export function startTrim(deps: TrimDeps, id: string, inS: number, outS: number, now: Date): Promise<StartTrimResult> {
-  return lockOf(deps)(id, {}, () => startTrimLocked(deps, id, inS, outS, now));
+export function startTrim(deps: TrimDeps, id: string, inS: number, outS: number, now: Date, kind: TrimKind = "own"): Promise<StartTrimResult> {
+  return lockOf(deps)(id, {}, () => startTrimLocked(deps, id, inS, outS, now, kind));
 }
 
-async function startTrimLocked(deps: TrimDeps, id: string, inS: number, outS: number, now: Date): Promise<StartTrimResult> {
+async function startTrimLocked(deps: TrimDeps, id: string, inS: number, outS: number, now: Date, kind: TrimKind): Promise<StartTrimResult> {
   const cut = deps.cut ?? cutClip;
   try {
     let entry = await deps.index.get(id);
@@ -176,7 +276,7 @@ async function startTrimLocked(deps: TrimDeps, id: string, inS: number, outS: nu
       ...entry,
       fileName: name,
       durationS: toS,
-      pendingTrim: { deadline, originalFileName: clipFile(entry), originalDurationS: entry.durationS, newDurationS: toS },
+      pendingTrim: { deadline, originalFileName: clipFile(entry), originalDurationS: entry.durationS, newDurationS: toS, inS, outS, kind },
     };
     await deps.index.put(next);
     return { kind: "done", entry: next, fromS: entry.durationS, toS, deadline };
@@ -255,7 +355,7 @@ async function finishTrimLocked(deps: TrimDeps, id: string, now: Date, force: bo
       await rollBack(deps, entry, p);
       return "refused";
     }
-    const r = await deps.trim({ id, durationS: p.newDurationS });
+    const r = await deps.trim(trimRequest(id, p));
     if (!r.ok && PERMANENT.has(r.reason)) {
       await rollBack(deps, entry, p);
       return "refused";

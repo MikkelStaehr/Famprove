@@ -6,6 +6,7 @@
 import type { IsoDate } from "../db/rows.ts";
 import type { ClipExt } from "./mime.ts";
 import { clipFileName } from "./opfs.ts";
+import type { TrimKind } from "./trim.ts";
 
 /** recording: the recorder is running; done: stopped and closed; afbrudt: the page died mid-recording. */
 export type ClipState = "recording" | "done" | "afbrudt";
@@ -60,6 +61,14 @@ export type PendingTrim = {
   readonly originalFileName: string;
   readonly originalDurationS: number | null; // what Fortryd gives back
   readonly newDurationS: number; // the cut file's own length (cutClip's actual range), 0.1 s
+  /**
+   * The cut's requested points on the original file (not the keyframe-adjusted start) and its kind,
+   * sent to trimClip for public.clip_accuracy (slice clip-accuracy-log). Absent on older entries
+   * (then nothing is recorded).
+   */
+  readonly inS?: number;
+  readonly outS?: number;
+  readonly kind?: TrimKind;
 };
 
 /** The one path builder for a clip's file (slice clip-trim): the entry's fileName, else the old `<id>.<ext>`. */

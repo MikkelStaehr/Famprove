@@ -111,6 +111,8 @@ export async function setClipAuto(raw: unknown): Promise<SetClipAutoResult> {
 /**
  * A committed manual cut (slice clip-trim), sent once Fortryd's window is over: one PATCH of the new
  * duration_s with clip_in_s/clip_out_s and auto_* null; refused unless 0 < new ≤ the row's duration_s.
+ * With the cut's points (inS, outS on the original, kind own | approved, algoVersion; slice
+ * clip-accuracy-log) one public.clip_accuracy insert comes first, on conflict do nothing.
  */
 export async function trimClip(raw: unknown): Promise<TrimClipResult> {
   const input = parseTrimClipInput(raw);
