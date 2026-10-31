@@ -13,7 +13,7 @@ import { INVERSE_BUTTON } from "./InverseCard";
 import { useSession } from "./SetLogProvider";
 import { TodaySecond, TodayShell } from "./TodayCard";
 import { settle } from "./useSetLog";
-import { perfStart } from "@/lib/perf-probe";
+import { perfMarkTap, perfStart } from "@/lib/perf-probe";
 
 /**
  * Træning's "I dag" card with a strength session next (reset-traening.md §3; behaviour
@@ -44,6 +44,7 @@ export function SessionBlock({ today, className }: { readonly today: IsoDate; re
     const at = view.beginAt;
     if (at === null) return;
     if (setLog.log.get(setKey(at))?.startedAt == null) setLog.tap("begin", at);
+    perfMarkTap(); // the tap, so the probe counts the save's wait (review)
     void settle(setLog.flush).then(() => {
       perfStart("begin", "/train", "/fokus");
       router.push("/fokus?view=set");

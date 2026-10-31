@@ -157,6 +157,11 @@ export function perfStartAt(t: number): void {
   t0Next = t;
 }
 
+/** The next switch starts now: Minimér and Begynd call it at the tap, before their save (review). */
+export function perfMarkTap(): void {
+  if (typeof performance !== "undefined") t0Next = performance.now();
+}
+
 /** A target with no DOM signal (FokusScreen) says it rendered. */
 export function perfReady(path: string): void {
   signalled.add(path);
@@ -218,14 +223,18 @@ export function perfStart(kind: PerfKind, from: string, to: string): void {
   if (typeof window === "undefined") return;
   const now = performance.now();
   if (current !== null) finish(current);
-  const t0 = t0Next ?? (now - lastDown < 1500 ? lastDown : now - lastPop < 1500 ? lastPop : now);
+  // A tap's own start (perfStartAt: Minimér and Begynd mark it before their save) counts within 30 s;
+  // an older one is stale (a refused Minimér, review) and never times an unrelated switch.
+  const marked = t0Next !== null && now - t0Next < 30_000 ? t0Next : null;
+  const t0 = marked ?? (now - lastDown < 1500 ? lastDown : now - lastPop < 1500 ? lastPop : now);
   t0Next = null;
   signalled.delete(to);
   const c: Pending = { kind, from, to, at: new Date().toISOString(), t0, content: null, settled: null, requests: 0, observer: null, timers: [], done: false };
   current = c;
   try {
     c.observer = new PerformanceObserver((list) => count(c, list.getEntries()));
-    c.observer.observe({ type: "resource", buffered: false });
+    // buffered: the requests since t0 too (a save that ran between the tap and this start), filtered by count().
+    c.observer.observe({ type: "resource", buffered: true });
   } catch {
     c.observer = null; // no observer: the count stays 0
   }
